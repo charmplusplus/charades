@@ -1,8 +1,7 @@
 # Charades
 
 Charm++ Adaptive Discrete Event Simulation: a parallel discrete event
-simulation (PDES) engine built on Charm++. Charades is the successor to the
-POSE library that shipped inside Charm++ through release v8.0.2.
+simulation (PDES) engine built on Charm++.
 
 ## Status
 
