@@ -5,6 +5,8 @@
 
 #include "lp.h"
 
+#include <mutex>
+
 #include "avl_tree.h"
 #include "event.h"
 #include "factory.h"
@@ -67,10 +69,13 @@ LPChare::LPChare() : next_token(this), next_event_id(0), cancel_q(NULL),
    * correctly set on every PE during the construction of the array.
    * \todo Remove this if we no longer need a global lp proxy
    */
-  if(isLpSet == 0) {
+  // Once per process: every PE thread constructs elements concurrently, and
+  // lps is a multi-word proxy that other threads read when they send.
+  static std::once_flag lps_set;
+  std::call_once(lps_set, [this] {
     lps = thisProxy;
     isLpSet = 1;
-  }
+  });
 
   usesAtSync = true;
   if (g_tw_ldb_metric != 0) usesAutoMeasure = false;

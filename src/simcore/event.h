@@ -10,6 +10,8 @@
 #include "globals.h" // Included for g_num_msg_types (TODO should be to move this)
 #include "typedefs.h"
 
+#include <mutex>
+
 class LPBase;
 
 struct RemoteEvent : public CMessage_RemoteEvent {
@@ -259,9 +261,18 @@ void charm_event_cancel(Event* e);
 void charm_anti_send(unsigned, Event* e);
 void charm_event_release(RemoteEvent* e);
 
+/** Hands out message type ids; safe to call from several PE threads. */
+inline uint32_t next_msg_id() {
+  static std::mutex lock;
+  std::lock_guard<std::mutex> guard(lock);
+  return g_num_msg_types++;
+}
+
 template <typename MsgType>
 uint32_t get_msg_id() {
-  static uint32_t msg_id = g_num_msg_types++;
+  // Function-local static initialization is thread-safe (C++11), and
+  // next_msg_id serializes ids across different message types.
+  static const uint32_t msg_id = next_msg_id();
   return msg_id;
 }
 

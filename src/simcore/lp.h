@@ -313,27 +313,41 @@ class LPBase {
 template <typename Derived, typename M, typename... Ms>
 class LP : public LPBase {
   private:
-    static bool registered;
-    static vector<DispatcherBase<Derived>*> dispatchers;
+    typedef vector<DispatcherBase<Derived>*> DispatchTable;
 
     template <typename M1>
-    static void register_msg_type() {
-      dispatchers[get_msg_id<M1>()] = new Dispatcher<Derived, M1>();
+    static void add_dispatcher(DispatchTable& table) {
+      uint32_t id = get_msg_id<M1>();
+      if (table.size() <= id) table.resize(id + 1, nullptr);
+      table[id] = new Dispatcher<Derived, M1>();
     }
 
     template <typename M1, typename M2, typename... M3>
-    static void register_msg_type() {
-      register_msg_type<M1>();
-      register_msg_type<M2, M3...>();
+    static void add_dispatcher(DispatchTable& table) {
+      add_dispatcher<M1>(table);
+      add_dispatcher<M2, M3...>(table);
+    }
+
+    /**
+     * The dispatch table for this LP type, built once on first use. It used to
+     * be a static vector that every LP constructor resized and the first one
+     * filled, which races when PEs are threads of one process (SMP builds,
+     * and every Reconverse build): one thread's resize could drop another's
+     * registration and leave a null dispatcher. Function-local statics are
+     * initialized exactly once even under concurrent first calls (C++11).
+     */
+    static const DispatchTable& dispatchers() {
+      static const DispatchTable table = [] {
+        DispatchTable t(g_num_msg_types, nullptr);
+        add_dispatcher<M, Ms...>(t);
+        return t;
+      }();
+      return table;
     }
 
   public:
     LP() {
-      dispatchers.resize(g_num_msg_types);
-      if (!registered) {
-        register_msg_type<M, Ms...>();
-        registered = true;
-      }
+      dispatchers();
     }
 
     /**
@@ -341,29 +355,23 @@ class LP : public LPBase {
      * call the correct handler on the derived class.
      */
     void forward(Event* e) {
-      dispatchers[e->type_id]->forward(static_cast<Derived*>(this), e);
+      dispatchers()[e->type_id]->forward(static_cast<Derived*>(this), e);
     }
     /**
      * Called by the Scheduler to reverse execute \p e during a rollback. Uses
      * a dispatcher to call the correct handler on the derived class.
      */
     void reverse(Event* e) {
-      dispatchers[e->type_id]->reverse(static_cast<Derived*>(this), e);
+      dispatchers()[e->type_id]->reverse(static_cast<Derived*>(this), e);
     }
     /**
      * Called by the Scheduler when \p e is committed. Uses  a dispatcher to
      * call the correct handler on the derived class.
      */
     void commit(Event* e) {
-      dispatchers[e->type_id]->commit(static_cast<Derived*>(this), e);
+      dispatchers()[e->type_id]->commit(static_cast<Derived*>(this), e);
     }
 };
-
-template <typename Derived, typename M, typename... Ms>
-vector<DispatcherBase<Derived>*> LP<Derived, M, Ms...>::dispatchers;
-
-template <typename Derived, typename M, typename... Ms>
-bool LP<Derived, M, Ms...>::registered = false;
 
 /**
  * \name API for ROSS

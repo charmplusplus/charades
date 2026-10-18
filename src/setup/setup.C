@@ -13,6 +13,37 @@ void tw_init(int argc, char** argv) {
   get_msg_id<void *>();
 }
 
+/**
+ * Check that the mapper places exactly g_total_lps LPs on g_num_chares chares
+ * and that its maps invert (issue #9). A bad mapping otherwise surfaces only
+ * as a Charm++ array-index assertion, or as events sent to the wrong LP.
+ */
+static void validate_mapping() {
+  uint64_t placed = 0;
+  for (uint64_t c = 0; c < g_num_chares; c++) {
+    uint64_t n = g_lp_mapper->get_num_lps(c);
+    for (uint64_t l = 0; l < n; l++) {
+      uint64_t gid = g_lp_mapper->get_global_id(c, l);
+      if (gid >= g_total_lps || g_lp_mapper->get_chare_id(gid) != c ||
+          g_lp_mapper->get_local_id(gid) != l) {
+        CkPrintf("Error: chare %llu slot %llu maps to LP %llu, which does not "
+            "map back (chare %llu, slot %llu) or is past %u LPs\n",
+            (unsigned long long)c, (unsigned long long)l,
+            (unsigned long long)gid,
+            (unsigned long long)g_lp_mapper->get_chare_id(gid),
+            (unsigned long long)g_lp_mapper->get_local_id(gid), g_total_lps);
+        CkAbort("Invalid LP mapping\n");
+      }
+    }
+    placed += n;
+  }
+  if (placed != g_total_lps) {
+    CkPrintf("Error: %u chares hold %llu LPs, but num-lps is %u\n",
+        g_num_chares, (unsigned long long)placed, g_total_lps);
+    CkAbort("Invalid LP mapping\n");
+  }
+}
+
 void tw_create_simulation(LPFactory* factory) {
   tw_create_simulation(factory, new BlockMapper());
 }
@@ -36,6 +67,18 @@ void tw_create_simulation(LPFactory* factory, LPMapper* mapper) {
     CkPrintf("Overriding LP placement maps.\n");
     g_lp_mapper = new BlockMapper();
   } else {
+    // num-lps and num-chares without lps-per-chare: the block mapper reads
+    // only lps-per-chare, so derive it (it used to stay 1 and send LPs to
+    // chare indices past the end of the array).
+    if (g_total_lps != 1 && g_num_chares != 1 && g_lps_per_chare == 1 &&
+        dynamic_cast<BlockMapper*>(g_lp_mapper) != NULL) {
+      if (g_total_lps % g_num_chares != 0) {
+        CkPrintf("Error: %u LPs do not divide evenly over %u chares\n",
+            g_total_lps, g_num_chares);
+        CkAbort("Invalid LP configuration\n");
+      }
+      g_lps_per_chare = g_total_lps / g_num_chares;
+    }
     if (g_total_lps == 1) {
       g_total_lps = 0;
       for (int i = 0; i < g_num_chares; i++) {
@@ -48,6 +91,10 @@ void tw_create_simulation(LPFactory* factory, LPMapper* mapper) {
         sum += g_lp_mapper->get_num_lps(g_num_chares++);
       }
     }
+  }
+
+  if (tw_ismaster()) {
+    validate_mapping();
   }
 
   // TODO Update this
@@ -104,7 +151,13 @@ void charm_exit() {
   CharmLibExit();
 }
 void charm_run() {
-  ((Scheduler*)CkLocalBranch(scheduler_id))->start_simulation();
+  // Broadcast from PE 0 rather than calling the local branch: in SMP interop
+  // main runs only on rank 0 of each process, so a local call left the other
+  // ranks' schedulers unstarted until a remote event happened to wake them
+  // (a deterministic hang with one LP chare per PE).
+  if (CkMyPe() == 0) {
+    CProxy_Scheduler(scheduler_id).start_simulation();
+  }
   StartCharmScheduler();
 }
 
