@@ -6,6 +6,8 @@
 class SyncGVT : public CBase_SyncGVT {
   private:
     double gvt_start;
+    /** Stopped for a round (gvt_begin) and not yet contributed to it */
+    bool waiting_to_contribute;
   public:
     SyncGVT();
 
@@ -15,6 +17,7 @@ class SyncGVT : public CBase_SyncGVT {
     void gvt_contribute();
     /** Called by the all reduce from gvt_contribute() with resulting gvt */
     void gvt_end(Time);
+    bool holding_execution() const { return waiting_to_contribute; }
 };
 
 #endif

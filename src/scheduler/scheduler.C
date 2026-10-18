@@ -245,7 +245,7 @@ void DistributedScheduler::gvt_done(Time gvt, bool lb) {
     }
     if (lb) {
       start_balancing();
-    } else {
+    } else if (!gvt_manager->holding_execution()) {
       next_iteration();
     }
   }

@@ -41,6 +41,11 @@ class GVTManager : public CBase_GVTManager {
     Time previous_gvt() const { return prev_gvt; }
 
     bool is_active() const { return active; }
+    /**
+     * True while this PE has stopped for a GVT round and must not resume
+     * until it contributes, even if an earlier round's result arrives.
+     */
+    virtual bool holding_execution() const { return false; }
     bool is_continuous() const { return continuous; }
 
     /** Called by the local PEManager after all groups have been initialized */
