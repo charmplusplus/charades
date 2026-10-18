@@ -56,7 +56,7 @@ RUNNING PHOLD
 ===============================================================================
 To run PHOLD with default settings on N processors:
 > make
-> ./charmrun +pN ./phold
+> ./phold +pe N
 
 To get a list of available options for phold run:
 > ./phold --help

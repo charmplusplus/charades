@@ -1,0 +1,6 @@
+# Long: 16 LPs to a 16x later end time
+num-lps=16
+lps-per-chare=4
+end-time=1024000
+lookahead=100
+expected-events=16370

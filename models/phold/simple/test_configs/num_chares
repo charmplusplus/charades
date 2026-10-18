@@ -1,0 +1,6 @@
+# 64 LPs given by num-chares=8 instead of lps-per-chare
+num-lps=64
+num-chares=8
+end-time=64000
+lookahead=100
+expected-events=4085

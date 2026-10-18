@@ -1,0 +1,6 @@
+# Wide chares: 64 LPs, 16 per chare
+num-lps=64
+lps-per-chare=16
+end-time=64000
+lookahead=100
+expected-events=4085

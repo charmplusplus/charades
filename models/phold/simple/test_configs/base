@@ -1,0 +1,6 @@
+# Base: 32 LPs, 4 per chare
+num-lps=32
+lps-per-chare=4
+end-time=64000
+lookahead=100
+expected-events=2055

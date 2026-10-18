@@ -2,9 +2,13 @@
 RUNNING PHOLD
 ===============================================================================
 ===============================================================================
-To run PHOLD with default settings on N processors:
+To run PHOLD with default settings on N PEs (Charm++ on Reconverse, which has
+no charmrun):
 > make
-> ./charmrun +pN ./phold
+> ./phold +pe N
+
+Across P processes on a Mac, use LCI's lcrun; on a cluster, use srun:
+> lcrun -n P ./phold +pe N
 
 To get a list of available options for phold run:
 > ./phold --help
@@ -13,17 +17,15 @@ To get a list of available options for phold run:
 TESTING PHOLD
 ===============================================================================
 ===============================================================================
-To run tests, run ./test_script
-For now all tests are based on the principle that running an instance of PHOLD
-with x lps, y initial messages per lp, and an end time of z, should result in
-the same number net events processed regardless of all other parameters.
+Tests are in test_configs/. Each is a configuration file that sets
+expected-events, the number of committed events the run must produce: PHOLD
+with x LPs, y initial events per LP and end time z commits the same number of
+events regardless of the synchronization protocol, PE count or mapping, and
+the simulator aborts if the count does not match.
 
-In the future, a more rigorous test may be needed.
+To run every model configuration under every synchronization configuration at
+several PE and process counts, use tests/test.py from the repository root:
+> python3 tests/test.py --quick
 
-To add test cases see the example tests in the 'tests' directory. Each test
-is a list of commands that should all generate the same number of net events
-processed. The last line of the test should be:
-Net Events Processed <x>
-
-When each test is run, it will compare the net events processed to this line,
-and fail if they don't match.
+To add a test case, add a configuration file to test_configs/ with an
+expected-events line.

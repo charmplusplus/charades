@@ -1,4 +1,4 @@
-# Optimistic w/Phased GVT
+# Optimistic w/Bucketed GVT
 sync=3
 gvt=4
 buffer-size=655360
