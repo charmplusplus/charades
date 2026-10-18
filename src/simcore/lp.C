@@ -292,16 +292,14 @@ void LPChare::recv_remote_event(RemoteEvent* event) {
 }
 
 void LPChare::recv_local_event(Event* e) {
+  /** GVT is a lower bound: an event below it means a GVT was too late */
+  TW_ASSERT(!isOptimistic || e->ts >= PE_VALUE(g_last_gvt),
+      "[%d] chare %d: event ts %llu below GVT %llu (src %llu, remote %d)\n",
+      CkMyPe(), thisIndex, (unsigned long long)e->ts,
+      (unsigned long long)PE_VALUE(g_last_gvt),
+      (unsigned long long)e->src_lp, (int)e->state.remote);
   /** Use g_local_map to look up the specific LPStruct pointer for this event */
   e->owner = lp_structs[g_lp_mapper->get_local_id(e->dest_lp)];
-
-  /**
-   * If this event is now the earliest event we know about, update the
-   * scheduler with our new minumum time.
-   */
-  if (e->ts < events.min()) {
-    scheduler->update_next(&next_token, e->ts);
-  }
 
   /**
    * Check if this event incurs a causality violation
@@ -310,6 +308,19 @@ void LPChare::recv_local_event(Event* e) {
    */
   if(isOptimistic && e->ts <= get_current_time()) {
     BRACKET_TRACE(rollback_me(e->ts);,USER_EVENT_RB)
+  }
+
+  /**
+   * If this event is now the earliest event we know about, update the
+   * scheduler with our new minumum time. This must come after the rollback:
+   * rollback_me sets the token to the minimum of the heap, which does not yet
+   * hold this event, so a straggler's own (earlier) time was overwritten and
+   * the token stayed late until the chare next executed. A GVT taken in that
+   * window -- stragglers often arrive while a PE waits on GVT -- was too late,
+   * and fossil collection committed events the straggler then rolled back.
+   */
+  if (e->ts < events.min()) {
+    scheduler->update_next(&next_token, e->ts);
   }
 
   /** Push the event onto our heap of pending events */
@@ -323,6 +334,12 @@ void LPChare::recv_anti_event(RemoteEvent* event) {
    * \todo This might not be needed once CD is no longer used for GVT
    */
   scheduler->consume(event);
+  /** As for events: an anti event below GVT means a GVT was too late */
+  TW_ASSERT(event->ts >= PE_VALUE(g_last_gvt),
+      "[%d] chare %d: anti event ts %llu below GVT %llu (src %llu id %llu)\n",
+      CkMyPe(), thisIndex, (unsigned long long)event->ts,
+      (unsigned long long)PE_VALUE(g_last_gvt),
+      (unsigned long long)event->src_lp, (unsigned long long)event->event_id);
 
   /** Allocate a local event as a key into the hash and fill it */
   Event* key = event_alloc();
@@ -444,6 +461,12 @@ void LPChare::fossil_me(Time gvt) {
    */
   Event* e;
   while (processed_events.back() != NULL && processed_events.back()->ts < gvt) {
+    /** min_cancel_time keeps GVT at or below every queued cancellation */
+    TW_ASSERT(!processed_events.back()->state.cancel_q,
+        "[%d] chare %d: committing event ts %llu that is in the cancel queue "
+        "(gvt %llu, chare min_cancel_q %llu)\n", CkMyPe(), thisIndex,
+        (unsigned long long)processed_events.back()->ts,
+        (unsigned long long)gvt, (unsigned long long)min_cancel_q);
     e = processed_events.pop_back();
     tw_event_free(e,true);
     committed_events++;

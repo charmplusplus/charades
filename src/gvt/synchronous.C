@@ -26,6 +26,7 @@ void SyncGVT::gvt_begin() {
 }
 
 void SyncGVT::gvt_contribute() {
+  scheduler->check_next_lps();
   Time min_time = scheduler->get_min_time();
   CkAssert(min_time >= curr_gvt);
 

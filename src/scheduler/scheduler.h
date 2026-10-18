@@ -67,6 +67,8 @@ class Scheduler : public CBase_Scheduler {
 
     /** Get the minimum time of any event on this PE */
     virtual Time get_min_time() const;
+    /** Abort if any LP's token disagrees with its earliest pending event */
+    void check_next_lps() const;
 
     /** Entry method for executing a scheduler iteration */
     virtual void execute();

@@ -11,6 +11,7 @@ class OptimisticScheduler : public CBase_OptimisticScheduler {
   private:
     // TODO: Do we need a separate cancel queue, or can we treat it like FC?
     Time min_cancel_time; /**< minumum event time in the cancel queue */
+    vector<LPChare*> cancel_lps; /**< process_cancel_q's snapshot of LPs */
 
   public:
     OptimisticScheduler();

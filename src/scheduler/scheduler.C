@@ -113,6 +113,22 @@ Time Scheduler::get_min_time() const {
   return next_lps.top() != NULL ? next_lps.top()->ts : TIME_MAX;
 }
 
+/**
+ * Every LP's token must hold the time of its earliest pending event whenever
+ * no LP code is running: get_min_time() reads the tokens, so a token that is
+ * too late makes this PE's GVT contribution too late, and fossil collection
+ * then commits events that a pending event will still roll back.
+ */
+void Scheduler::check_next_lps() const {
+  for (int i = 0; i < next_lps.get_size(); i++) {
+    const LPToken* t = next_lps.as_array()[i];
+    TW_ASSERT(t->ts == t->lp->min_pending(),
+        "PE %d: LP chare %d token says %llu but its earliest pending event is "
+        "at %llu\n", CkMyPe(), t->lp->thisIndex,
+        (unsigned long long)t->ts, (unsigned long long)t->lp->min_pending());
+  }
+}
+
 /** Needs to be overridden by each base class to define a scheduler iteration */
 void Scheduler::execute() {
   CkAbort("Must instantiate a particular scheduler type!\n");

@@ -73,11 +73,23 @@ void OptimisticScheduler::balancing_complete() {
   DistributedScheduler::balancing_complete();
 }
 
-/** Call process_cancel_q on every LP chare on our PE */
+/**
+ * Call process_cancel_q on every LP chare on our PE.
+ *
+ * Iterate over a snapshot: next_lps is a heap, and cancelling rolls an LP back,
+ * which updates its token and reorders the heap's array mid-loop. Walking that
+ * array by index then visited some LPs twice and skipped others, and a skipped
+ * LP kept its queued cancellations after min_cancel_time had been reset -- so
+ * GVT passed them and fossil collection committed events that were cancelled.
+ */
 void OptimisticScheduler::process_cancel_q() {
   min_cancel_time = TIME_MAX;
+  cancel_lps.clear();
   for (int i = 0; i < next_lps.get_size(); i++) {
-    next_lps.as_array()[i]->lp->process_cancel_q();
+    cancel_lps.push_back(next_lps.as_array()[i]->lp);
+  }
+  for (LPChare* lp : cancel_lps) {
+    lp->process_cancel_q();
   }
 }
 

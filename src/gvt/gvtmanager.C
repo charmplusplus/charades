@@ -1,5 +1,7 @@
 #include "gvtmanager.h"
 
+#include <mutex>
+
 #include "globals.h"
 #include "scheduler.h"
 #include "trigger.h"
@@ -9,7 +11,9 @@ CProxy_GVTManager gvt_manager_proxy;
 
 /* GVTManager FUNCTIONS */
 GVTManager::GVTManager() : curr_gvt(0), prev_gvt(0) {
-  gvt_manager_proxy = thisProxy;
+  // Once per process: every PE thread constructs its branch concurrently.
+  static std::once_flag proxy_set;
+  std::call_once(proxy_set, [this] { gvt_manager_proxy = thisProxy; });
 
   // Set up the load balancing trigger
   if (g_tw_ldb_interval > 0 || g_tw_ldb_first > 0) {

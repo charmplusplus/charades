@@ -143,6 +143,8 @@ class LPChare : public CBase_LPChare {
     // we have no history. Also have the initial event be not the abort event,
     // probably by again having a sentinel in the processed queue.
     uint64_t get_next_event_id() { return next_event_id++; }
+    /** Timestamp of the earliest pending event, which next_token must hold */
+    Time min_pending() const { return events.min(); }
     Event* get_current_event() const { return current_event; }
     Time get_current_time() const { return current_time; }
     void set_current_event(Event* e) {
