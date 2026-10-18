@@ -12,7 +12,9 @@ endif
 all: example
 clean:
 	rm -f example charmrun
-	rm -f *.o *~ core*
+	rm -f *.o *.d *~ core*
 
-example: example.C example.h $(BUILD_DIR)/libcharades.a
-	$(CC) example.C -o example -L$(BUILD_DIR) -lcharades $(CFLAGS) $(LFLAGS)
+example: example.o $(BUILD_DIR)/libcharades.a
+	$(CC) example.o -o example -L$(BUILD_DIR) -lcharades $(CFLAGS) $(LFLAGS)
+
+include ../../src/model.mk

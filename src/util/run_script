@@ -18,7 +18,13 @@ do
   fi
 done
 
-command="./charmrun +p$pes $exe $args"
+if [ -x ./charmrun ]
+then
+  command="./charmrun +p$pes $exe $args"
+else
+  # Reconverse: no charmrun, the executable takes +pe itself.
+  command="$exe +pe $pes $args"
+fi
 
 echo "Running command: $command"
 

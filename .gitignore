@@ -5,3 +5,7 @@ ci_files
 config.mk
 ross.csv
 charmrun
+gvt_*.out
+tests/test_output/
+src/build/
+*.d

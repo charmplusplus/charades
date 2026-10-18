@@ -63,7 +63,7 @@ void IntersectionLP::reverse(ArrivalMsg* msg, tw_bf* bf) {
     total_cars_finished--;
   } else {
     uint8_t new_lane = (msg->car.current_lane + 2) % 4;
-    tw_rand_reverse_unif(rng);
+    rng.prev();
     total_cars_arrived--;
     in_lane[new_lane]--;
   }
@@ -83,7 +83,7 @@ void IntersectionLP::forward(DepartureMsg* msg, tw_bf* bf) {
 }
 
 void IntersectionLP::reverse(DepartureMsg* msg, tw_bf* bf) {
-  tw_rand_reverse_unif(rng);
+  rng.prev();
   out_lane[msg->car.current_lane]++;
 }
 
@@ -142,7 +142,7 @@ void IntersectionLP::reverse(DirectionMsg* msg, tw_bf* bf) {
   uint8_t new_lane;
   if (this_x != msg->car.dest_x && this_y != msg->car.dest_y) {
     // The decision needed a random number
-    tw_rand_reverse_unif(rng);
+    rng.prev();
   }
   if (bf->c0 == 0) { // Was a horizontal move
     if (bf->c1 == 0) {
@@ -157,7 +157,7 @@ void IntersectionLP::reverse(DirectionMsg* msg, tw_bf* bf) {
       new_lane = NORTH;
     }
   }
-  tw_rand_reverse_unif(rng);
+  rng.prev();
   in_lane[msg->car.current_lane]++;
   out_lane[new_lane]--;
 }

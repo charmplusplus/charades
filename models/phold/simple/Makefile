@@ -12,9 +12,11 @@ endif
 all: phold
 clean:
 	rm -f phold charmrun
-	rm -f *.o *~ core*
+	rm -f *.o *.d *~ core*
 	rm -f output ross.csv
 
 
-phold: phold.C phold.h $(BUILD_DIR)/libcharades.a
-	$(CC) $(CFLAGS) $(LFLAGS) phold.C -o phold -L$(BUILD_DIR) -lcharades
+phold: phold.o $(BUILD_DIR)/libcharades.a
+	$(CC) $(CFLAGS) $(LFLAGS) phold.o -o phold -L$(BUILD_DIR) -lcharades
+
+include ../../../src/model.mk
