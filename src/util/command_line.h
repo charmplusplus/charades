@@ -6,7 +6,9 @@
 #define CLARG_H_
 
 #include <charm++.h>
+#include <limits>
 #include <map>
+#include <sstream>
 #include <string>
 #include <vector>
 
@@ -45,6 +47,40 @@ public:
   }
 };
 
+/**
+ * Read a whole option value into \p location, rejecting trailing characters.
+ * Single-byte integers go through int: streaming into a uint8_t reads one
+ * character, so "--start-events=10" would store '1' (49).
+ */
+template <typename ArgType>
+bool read_value(const std::string& text, ArgType& location) {
+  std::stringstream stream(text);
+  stream >> location;
+  return !stream.fail() && (stream >> std::ws).eof();
+}
+
+template <typename IntType>
+bool read_byte_value(const std::string& text, IntType& location) {
+  std::stringstream stream(text);
+  long value;
+  stream >> value;
+  if (stream.fail() || !(stream >> std::ws).eof() ||
+      value < std::numeric_limits<IntType>::min() ||
+      value > std::numeric_limits<IntType>::max()) {
+    return false;
+  }
+  location = static_cast<IntType>(value);
+  return true;
+}
+
+inline bool read_value(const std::string& text, uint8_t& location) {
+  return read_byte_value(text, location);
+}
+
+inline bool read_value(const std::string& text, int8_t& location) {
+  return read_byte_value(text, location);
+}
+
 template <typename ArgType>
 class Argument : public Parser {
 private:
@@ -61,16 +97,17 @@ public:
     std::getline(stream, lhs, '=');
     std::getline(stream, rhs, '=');
 
-    // TODO: Error checking on >>
     if (lhs != name) {
       return false;
-    } else if (rhs.length() == 0) {
-      return false;
-    } else {
-      std::stringstream rhs_stream(rhs);
-      rhs_stream >> location;
-      return true;
     }
+    // The option is ours: a missing or malformed value is an error, not an
+    // unrecognized option, so the run cannot quietly use the default.
+    if (rhs.length() == 0 || !read_value(rhs, location)) {
+      CkPrintf("Error: --%s needs a valid value, got '%s'\n",
+          name.c_str(), rhs.c_str());
+      CkAbort("Argument parse error\n");
+    }
+    return true;
   }
 
   void print() const {

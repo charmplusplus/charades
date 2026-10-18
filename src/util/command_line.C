@@ -53,18 +53,18 @@ void parse_command_line(int argc, char** argv) {
     if (argument.find("--") == 0) {
       argument.erase(0,2);
       if (!command_line_parser.parse(argument)) {
-        if (CkMyPe() == 0) {
-          CkPrintf("Warning: --%s is an unrecognized command line option\n",
-              argument.c_str());
-        }
+        // Fatal rather than a warning: a misspelled option (--synch for
+        // --sync) otherwise runs the default configuration and passes.
+        CkPrintf("Error: --%s is an unrecognized command line option\n",
+            argument.c_str());
+        CkAbort("Argument parse error\n");
       }
     } else {
       std::ifstream file(argument);
       if (!file.good()) {
-        if (CkMyPe() == 0) {
-          CkPrintf("Warning: %s is not a valid configuration file\n",
-              argument.c_str());
-        }
+        CkPrintf("Error: %s is not a valid configuration file\n",
+            argument.c_str());
+        CkAbort("Argument parse error\n");
       } else {
         std::string line;
         while(std::getline(file, line)) {
@@ -73,10 +73,9 @@ void parse_command_line(int argc, char** argv) {
           } else if (line.find_first_not_of("\t\r\n ") == std::string::npos) {
             continue;
           } else if (!command_line_parser.parse(line)) {
-            if (CkMyPe() == 0) {
-              CkPrintf("Warning: %s in file %s is an unrecognized option\n",
-                  line.c_str(), argument.c_str());
-            }
+            CkPrintf("Error: %s in file %s is an unrecognized option\n",
+                line.c_str(), argument.c_str());
+            CkAbort("Argument parse error\n");
           }
         }
       }
