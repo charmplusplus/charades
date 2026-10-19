@@ -1,0 +1,9 @@
+# Gaussian destinations (Bachan et al., PADS'24): 64 LPs, 4 per chare,
+# 4 starting events per LP, destination ~ sender + N(0, 6) LP ids
+num-lps=64
+lps-per-chare=4
+end-time=64000
+lookahead=100
+start-events=4
+sigma=6
+expected-events=16389

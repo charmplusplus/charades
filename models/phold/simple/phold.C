@@ -13,7 +13,12 @@ void PHoldLP::initialize() {
 
 void PHoldLP::forward(PHoldMessage* msg, tw_bf* bf) {
   uint64_t dest = gid;
-  if(tw_rand_unif(rng) <= percent_remote) {
+  if (sigma > 0) {
+    // Two uniform draws (tw_rand_normal01); reverse() undoes them
+    int64_t n = g_total_lps;
+    int64_t step = llround(tw_rand_normal_sd(rng, 0.0, sigma));
+    dest = (uint64_t)((((int64_t)gid + step) % n + n) % n);
+  } else if(tw_rand_unif(rng) <= percent_remote) {
     bf->c1 = 1;
     dest = tw_rand_integer(rng, 0, g_total_lps - 1);
   }
@@ -24,9 +29,13 @@ void PHoldLP::forward(PHoldMessage* msg, tw_bf* bf) {
 }
 
 void PHoldLP::reverse(PHoldMessage* msg, tw_bf* bf) {
-  // We definitely used rng for offset and remote percent
+  // We definitely used rng for offset, and for the remote percent or the
+  // first of the two Gaussian draws
   rng.prev();
   rng.prev();
+  if (sigma > 0) {
+    rng.prev();
+  }
 
   // If it was a remote message then we also used rng for the destination
   if(bf->c1 == 1) {
@@ -50,6 +59,7 @@ int main(int argc, char **argv, char **env) {
   args.register_argument("remote", "desired remote event rate", percent_remote);
   args.register_argument("mean", "exponential distribution mean for timestamps", mean);
   args.register_argument("start-events", "number of initial messages per LP", start_events);
+  args.register_argument("sigma", "if > 0: Gaussian destinations with this std. dev. in LP ids (ignores remote)", sigma);
   tw_add_arguments(&args);
 
   tw_init(argc, argv);
@@ -70,7 +80,11 @@ int main(int argc, char **argv, char **env) {
     printf("PHOLD Model Configuration..............\n");
     printf("   Start events...........%u\n", start_events);
     printf("   Mean...................%llu\n", mean);
-    printf("   Remote.................%lf\n", percent_remote);
+    if (sigma > 0) {
+      printf("   Sigma..................%lf (Gaussian destinations)\n", sigma);
+    } else {
+      printf("   Remote.................%lf\n", percent_remote);
+    }
     printf("========================================\n\n");
   }
 
