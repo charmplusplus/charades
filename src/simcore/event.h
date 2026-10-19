@@ -25,6 +25,9 @@ struct RemoteEvent : public CMessage_RemoteEvent {
       event_id = 0;
       src_lp = 0;
       dest_lp = 0;
+      phase = 0;
+      anti = false;
+      offset = 0;
     }
 
     Time ts;
@@ -153,6 +156,10 @@ public:
   // corrupted the heap (common once GVT stops throttling execution).
   uint32_t index;
 
+  // Buckets ahead of GVT when this event was sent remotely (bucketed GVT),
+  // copied to its anti-message for the event-holding statistics
+  uint32_t offset;
+
   // Fields for rebuilding causality lists after migration
   unsigned  pending_count;
   unsigned  processed_count;
@@ -175,7 +182,7 @@ public:
 
     next = prev = caused_by_me = cause_next = cancel_next = NULL;
 
-    type_id = type_size = index = 0;
+    type_id = type_size = index = offset = 0;
 
     pending_count = processed_count = sent_count = 0;
     pending_indices = processed_indices = NULL;
@@ -206,6 +213,7 @@ public:
       p | event_id;
       p | src_lp;
       p | dest_lp;
+      p | offset;
     } else {
       CkAbort("Bad event state during pupping\n");
     }

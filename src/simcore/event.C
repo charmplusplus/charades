@@ -123,8 +123,14 @@ void tw_event_send(Event* e) {
     dest_chare->recv_local_event(e);
   } else {
     PE_STATS(remote_sends)++;
-    scheduler->produce(e->get_msg());
-    lps(dest_chare_id).recv_remote_event(e->get_msg());
+    RemoteEvent* msg = e->get_msg();
+    // The bucketed GVT may hold the event back and send it later
+    // (charm_event_release) or delete it with its anti-message.
+    bool send_now = scheduler->produce(msg);
+    e->offset = msg->offset;
+    if (send_now) {
+      lps(dest_chare_id).recv_remote_event(msg);
+    }
     e->msg = NULL;
     if (g_tw_synchronization_protocol == OPTIMISTIC) {
       e->state.owner = TW_sent;
@@ -169,10 +175,14 @@ void charm_anti_send(unsigned dest_chare_id, Event* e) {
   eventMsg->ts = e->ts;
   eventMsg->dest_lp = e->dest_lp;
   eventMsg->src_lp = e->src_lp;
+  eventMsg->anti = true;
+  eventMsg->offset = e->offset;
 
-  scheduler->produce(eventMsg);
   PE_STATS(anti_sends)++;
-  lps(dest_chare_id).recv_anti_event(eventMsg);
+  // False when the original was still held: both were deleted unsent
+  if (scheduler->produce(eventMsg)) {
+    lps(dest_chare_id).recv_anti_event(eventMsg);
+  }
 }
 
 // Cancels an event by either sending an anti-message, or calling cancel_event

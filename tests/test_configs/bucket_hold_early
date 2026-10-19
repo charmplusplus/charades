@@ -1,0 +1,9 @@
+# As bucket_hold, but every GVT advance also releases held events in later
+# buckets once GVT has advanced more than one bucket since they were held
+sync=3
+gvt=4
+buffer-size=655360
+gvt-adaptive-buckets=1
+gvt-reserve-buckets=1
+gvt-clear-buckets=0
+gvt-clear-lag=1
