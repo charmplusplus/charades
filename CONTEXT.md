@@ -95,7 +95,7 @@ result) and/or a 2-page PhD colloquium abstract.
 |---|---|---|
 | charmplusplus/charades | `main` @ 09df056 | Reconverse port, SMP fixes, test harness, two optimistic-engine GVT fixes |
 | charmplusplus/charades | `smp-gvt-fixes` | Bucketed GVT fixes (four-counter rule, 32-bit phase, index macros), event holding wired up, `Event::index` fix, init races, `test.py --repeat/--nodes`, srun-safe `test.py`, Gaussian PHOLD, Stampede3 scripts, this file. Pushed up to 7423578; later commits are local and on the Stampede3 clone only. |
-| charmplusplus/charm | `reconverse-interop` @ a47851b88 | User-driven interop on Reconverse, review addressed; **PR #4055** (open, not merged). Pins Reconverse `main` ebafde2 |
+| charmplusplus/charm | `recharm` @ 9d6a55780 | Includes user-driven interop on Reconverse (PR #4055, merged 2026-10-19). Pins Reconverse `main` ebafde2. All three builds (Mac, `charm-pads`, `charm-pads-qd`) are on this commit |
 | charmplusplus/reconverse | `main` @ ebafde2 | Contains interop (#288, merged) |
 | charmplusplus/reconverse | `idle-progress-poll` @ ff33b56 | QD speed fix; **PR #290** (open, not merged) |
 
@@ -261,11 +261,12 @@ build falls back to `./buildold` and fails). Run `module use
 expect long pauses early in the Charm++ build.
 
 **Charm++.** Two trees in `$WORK`, built 2026-10-19 with gcc 13.2.0 and cmake
-4.1.1: `charm-pads` (Reconverse pinned at ebafde2) and `charm-pads-qd` (the
+4.1.1 (from `reconverse-interop`; now checked out at `recharm` 9d6a55780,
+which differs from the built commit only in CI files): `charm-pads` (Reconverse pinned at ebafde2) and `charm-pads-qd` (the
 same, with Reconverse on `idle-progress-poll` ff33b56):
 
 ```
-git clone -b reconverse-interop https://github.com/charmplusplus/charm.git charm-pads
+git clone -b recharm https://github.com/charmplusplus/charm.git charm-pads
 cd charm-pads
 git submodule update --init -- contrib/reconverse     # pinned ebafde2
 # for charm-pads-qd only (PR #290):
