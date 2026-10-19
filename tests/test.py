@@ -7,7 +7,8 @@ synchronization configuration in test_configs/, at several PE counts, in one
 process and across processes.
 
 Usage: python3 test.py [--quick] [--all] [--no-build] [--launcher lcrun|srun]
-                       [--timeout SECONDS] [--repeat N] [test_config ...]
+                       [--nodes N] [--timeout SECONDS] [--repeat N]
+                       [test_config ...]
 
 Races in the optimistic engine and the GVT algorithms show up in a few percent
 of runs or fewer, so one pass can miss them; --repeat N runs every case N times
@@ -53,17 +54,21 @@ class Launch:
     if launcher.kind == 'srun':
       # Even single-process runs: inside an allocation LCI reads the inherited
       # SLURM_NTASKS and would wait for peers that never start. One bad task
-      # ends the step instead of leaving the others blocked.
+      # ends the step instead of leaving the others blocked. -c gives each
+      # process a core per PE (by default a task gets one CPU, and all its PEs
+      # would share it); -N spreads the processes over up to --nodes nodes.
+      nodes = min(launcher.nodes, self.procs)
       return ['srun', '--mpi=pmi2', '--kill-on-bad-exit=1', '--wait=30',
-              '-n', str(self.procs)] + run
+              '-N', str(nodes), '-n', str(self.procs),
+              '-c', str(self.pes // self.procs)] + run
     if self.procs == 1:
       return run
     return [launcher.lcrun, '-n', str(self.procs)] + run
 
 
 class Launcher:
-  def __init__(self, kind, charm):
-    self.kind = kind
+  def __init__(self, kind, charm, nodes=1):
+    self.kind, self.nodes = kind, nodes
     self.lcrun = None
     if kind == 'lcrun':
       found = glob.glob(os.path.join(charm, '*', '_deps', 'lci-src', 'lcrun'))
@@ -99,6 +104,9 @@ def main():
   parser.add_argument('--launcher', choices=['lcrun', 'srun'],
                       default='lcrun',
                       help='multi-process launcher: lcrun (Mac) or srun')
+  parser.add_argument('--nodes', type=int, default=1,
+                      help='with srun: spread multi-process runs over up to '
+                      'this many nodes')
   # Generous for Reconverse builds without the idle-progress-poll scheduler
   # fix, where each quiescence-detection GVT round costs ~11 ms with one PE
   # per process and the conservative long config takes ~70-80 s at 2x1 and
@@ -110,7 +118,7 @@ def main():
   opts = parser.parse_args()
 
   charm = charm_dir()
-  launcher = Launcher(opts.launcher, charm)
+  launcher = Launcher(opts.launcher, charm, opts.nodes)
   env = dict(os.environ)
   libvar = 'DYLD_LIBRARY_PATH' if platform.system() == 'Darwin' \
       else 'LD_LIBRARY_PATH'
