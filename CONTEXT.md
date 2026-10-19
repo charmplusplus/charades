@@ -169,6 +169,55 @@ So the remote-heavy regime is unstable without optimism control, exactly as
 Devastator reported — this is the paper's motivating problem, now
 reproducible in Charades on two nodes.
 
+### Optimism window sweep (2026-10-19, idev job 3615917, 4 skx nodes)
+
+`scripts/stampede3/window_sweep.sh` on the `-qd` build: Gaussian PHOLD,
+128 LPs per PE, 15 start events per LP, end time 128,000, mean delay 1,000,
+lookahead 100. CSVs in `$WORK/charades-runs/window_sweep/` (`sweep1.csv`
+3 reps, `sweep2_small.csv` 2 reps, `sweep3_ppn1.csv` 2 reps). Committed
+counts are identical across every GVT and window for a given (nodes, σ), so
+the window does not change results. Medians, M committed events/s
+(efficiency):
+
+2 processes × 8 PEs per node (32 PEs on 2 nodes, 64 on 4):
+
+| Nodes | σ | Blocking | Bucketed, no window | w=125 | w=250 | w=500 | w=1000 |
+|---|---|---|---|---|---|---|---|
+| 2 | 100 | 2.65 (99%) | 2.28 (57%) | 2.56 (100%) | 2.42 (98%) | 2.23 (90%) | 2.19 (74%) |
+| 2 | 500 | 1.21 (99%) | 0.57 (50%) | 1.25 (100%) | 1.28 (98%) | 1.02 (83%) | 0.55 (48%) |
+| 2 | 2000 | 0.68 (99%) | 0.35 (58%) | 0.67 (100%) | 0.68 (97%) | 0.46 (71%) | 0.33 (54%) |
+| 2 | 8000 | 0.70 (99%) | 0.37 (60%) | 0.69 (100%) | 0.68 (97%) | 0.55 (78%) | 0.46 (70%) |
+| 4 | 100 | 4.66 (99%) | 3.93 (51%) | 5.00 (100%) | 5.21 (99%) | 4.09 (94%) | 4.58 (85%) |
+| 4 | 500 | 2.26 (99%) | 1.01 (46%) | 2.34 (100%) | 2.25 (99%) | 1.57 (84%) | 1.02 (51%) |
+| 4 | 2000 | 1.27 (99%) | 0.67 (58%) | 1.31 (100%) | 1.32 (99%) | 1.02 (82%) | 0.62 (55%) |
+| 4 | 8000 | 1.17 (99%) | 0.59 (56%) | 1.22 (100%) | 1.22 (99%) | 0.93 (80%) | 0.60 (57%) |
+
+1 process × 8 PEs per node (the layout that storms; 16 / 32 PEs):
+
+| Nodes | σ | Blocking | No window | w=100 | w=250 | w=500 | w=1000 |
+|---|---|---|---|---|---|---|---|
+| 2 | 500 | 0.66 | 0.21 (34%) | 0.65 (100%) | 0.63 (94%) | 0.29 (49%) | 0.21 (34%) |
+| 2 | 2000 | 0.53 | **stalls 2/2** | 0.53 (100%) | 0.50 (94%) | 0.24 (50%) | 0.20 (44%) |
+| 4 | 500 | 1.33 | 0.92 (65%) | 1.38 (100%) | 1.37 (98%) | 0.85 (73%) | 0.90 (64%) |
+| 4 | 2000 | 0.74 | 0.42 (59%) | 0.80 (100%) | 0.78 (97%) | 0.50 (68%) | 0.42 (60%) |
+
+What it says:
+- Unthrottled bucketed GVT runs at 0.3–0.6× of blocking once σ ≥ 500, and
+  can stall outright. The efficiency loss is the whole story: rollbacks.
+- A window of 1–2.5 lookaheads (100–250; a quarter of the mean delay)
+  removes the rollbacks and matches blocking (0.91–1.13×, mostly within the
+  run-to-run spread). Windows ≥ the mean delay buy almost nothing. Below the
+  lookahead (w=50) is ~5–10% slower.
+- With rollbacks gone (≈100% efficiency) the rate still falls 3.9× from
+  σ = 100 to σ = 2000 at 2 nodes, and flattens past σ ≈ 2000: the remaining
+  cost is per-event communication across processes and nodes. That is the
+  ceiling aggregation would have to raise — the first evidence for the
+  go/no-go, to be confirmed with per-message overhead measurements.
+- So the static optimum here is a small window, and it is model-dependent
+  (it tracks lookahead / delay): the case for an online controller is
+  robustness across models and phases, not beating the best static window
+  on a steady PHOLD.
+
 **Fixed so far** (details in the commit messages):
 - Builds against Charm++ on Reconverse; Makefiles track header dependencies
   (`src/module.mk`, `src/model.mk`); unknown or malformed options abort (the
@@ -347,12 +396,12 @@ node takes the job's `SLURM_*` variables from idev's environment file so
 
 ## Next steps, in order
 
-1. Measure the optimism window's cost and benefit: blocking vs. bucketed
-   vs. bucketed + window over σ and window sizes at 2–4 nodes. This is the
-   first data for the paper's motivation (stability vs. throughput) and
-   decides the GVT.
-2. Repeat `gvt_cost.sh` with several repetitions, more σ values and 4
-   nodes, using the `-qd` build.
+1. Instrument per-event send→receive latency and per-message overhead,
+   and attribute the σ-dependent slowdown at ~100% efficiency (window
+   sweep above) to communication: this is the go/no-go for aggregation.
+2. Window sweep on a model with different lookahead/delay (and a
+   phase-changing PHOLD) to show that the best static window moves — the
+   argument for an online controller.
 3. Event holding: choose a realistic cutoff and bucket size per model
    (open issue 1); it is the PADS'19 baseline.
 4. Per-event latency and residence-time instrumentation; Gaussian PHOLD at
