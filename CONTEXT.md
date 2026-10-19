@@ -404,7 +404,7 @@ node takes the job's `SLURM_*` variables from idev's environment file so
    argument for an online controller.
 3. Event holding: choose a realistic cutoff and bucket size per model
    (open issue 1); it is the PADS'19 baseline.
-4. Per-event latency and residence-time instrumentation; Gaussian PHOLD at
-   Devastator's scale (100 LPs per core, 15 start events, σ 100 → 25,600).
+4. Gaussian PHOLD at Devastator's scale (100 LPs per core, 15 start events,
+   σ 100 → 25,600) with the instrumentation from step 1.
 5. Go/no-go measurement at 4–16 nodes (see the timeline).
 6. Then htram, the controller, baselines; dragonfly port when needed.
