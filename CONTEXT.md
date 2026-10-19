@@ -142,18 +142,32 @@ Committed counts match across GVTs (1,961,605 at σ = 100; 1,961,944 at
 1.87 M vs. 3,750 at σ = 2000, 16 × 1): with no throttle, optimism runs away
 in the remote-heavy regime — the regime the paper targets.
 
-**The σ = 2000, 2 × 8 hang** (open issue 5) reproduces every time, on both
-Reconverse trees, and makes no GVT progress at all. gdb stacks of all
-threads on both nodes: nearly every PE thread is in Reconverse's
-`CommBackendLCI2::issueAm`, looping on LCI `post_am` returning retry and
-calling `progress()` between attempts (only one thread per device gets the
-progress trylock). Received messages are still drained (Reconverse's LCI
-allocator copies them into the PE queues), so the sends themselves stop
-completing: a deadlock or a livelock in LCI / libfabric RxM back-pressure,
-not yet established. With `+lci_ndevices 2` the same run finishes in 11.6 s
-(all events committed); with 1 start event per LP, in 18 s; blocking GVT
-(which pauses PEs) in 3.9 s. Ingredients: 8 PE threads sharing one LCI
-device and a burst of cross-node sends from unthrottled optimism.
+**The σ = 2000, 2 × 8 "hang" is a Time Warp rollback storm, not a runtime
+bug** (diagnosed 2026-10-19, idev job 3615673). GVT stops advancing while
+the network is saturated: each node received ~10 M packets in 30 s (hfi1
+`RxPkt`), 3.5× what the whole run needs (2.8 M), and gdb shows most PE
+threads in `charm_anti_send` under rollback/cancel processing. The bucketed
+GVT never throttles execution, so the rollback cascade can grow instead of
+dying out. With `--optimism-window` (added 2026-10-19), default transport:
+
+| Window | Result | Rolled back |
+|---|---|---|
+| 1,000 | 10.9 s | 3.0 M |
+| 3,000 | 52 s | 24.6 M (committed: 1.96 M) |
+| 10,000 / none | no progress in 90 s | — |
+
+Whether a run stays stable also depends on latency, which is why transport
+changes "fixed" it: `+lci_ndevices` 2/4/8 (4.5/8.9/14.5 s), libfabric
+`FI_OFI_RXM_MSG_RX_SIZE=1024` (9.6 s; the TX size, completions per
+progress, and more connections per peer did not help), `tcp;ofi_rxm` (7.7 s),
+or 4 processes × 8 PEs instead of 2 (6.1 s). It needs ≥ 8 PEs per process
+with 2 processes (7 is fine). Ruled out: LCI's per-device lock starving the
+CQ poller (no change with LCI locks off) and receiver-not-ready retries
+(hfi1 `RnrNak` stays 0).
+
+So the remote-heavy regime is unstable without optimism control, exactly as
+Devastator reported — this is the paper's motivating problem, now
+reproducible in Charades on two nodes.
 
 **Fixed so far** (details in the commit messages):
 - Builds against Charm++ on Reconverse; Makefiles track header dependencies
@@ -227,14 +241,13 @@ device and a burst of cross-node sends from unthrottled optimism.
    the code as a migration problem. The paper runs with LB off.
 4. Dragonfly and PCS still use the pre-2019 `ross_api.h` and don't build.
    Traffic builds but has no test configs.
-5. **Bucketed GVT hangs at σ = 2000 with 2 processes × 8 PEs** (see "First
-   Stampede3 measurements"): PE threads spin in Reconverse's `issueAm` send
-   retry while sends stop completing. A Reconverse/LCI (or RxM) bug, not
-   Charades; worth an upstream issue with the stacks
-   (`$WORK/charades-runs/hang/stacks.*`). Next diagnostic steps: LCI's own
-   counters/logging, `verbs;ofi_rxm` vs `tcp;ofi_rxm`, and whether it
-   recovers given minutes. `+lci_ndevices 2` avoids it for now. Reproduce: run `scripts/stampede3/gvt_cost.sh` once (it writes the
-   configs), then `scripts/stampede3/hang_stacks.sh`.
+5. **Unthrottled bucketed GVT is unstable in the remote-heavy regime**
+   (σ = 2000, 2 × 8 PEs): a rollback storm that never settles (see "First
+   Stampede3 measurements"). Not a runtime bug. Use `--optimism-window` (or
+   blocking GVT) for any bucketed run; picking the window is the controller
+   problem. Reproduce: `scripts/stampede3/gvt_cost.sh` once, then
+   `scripts/stampede3/try.sh 90 2 2 16 x -- $WORK/charades-runs/gvt_cost/gauss_2000
+   tests/test_configs/bucket`.
 6. One `double free or corruption (!prev)` at exit in ~600 Stampede3 runs
    (Example `base`, bucketed, 4 PEs, one process); no core was kept. Run
    `scripts/stampede3/repro.sh` with cores enabled if it shows up again.
@@ -334,17 +347,12 @@ node takes the job's `SLURM_*` variables from idev's environment file so
 
 ## Next steps, in order
 
-1. Narrow down the σ = 2000 hang (open issue 5) and report it upstream
-   (Reconverse or LCI) — it blocks bucketed-GVT runs with several PEs per
-   process in exactly the remote-heavy regime the paper needs. Meanwhile run
-   with more LCI devices: only `+lci_ndevices 2` has been tried (it works);
-   larger counts work on current Reconverse (#209 lifted the old limit of 2;
-   NAMD was fastest at 8 on 2 nodes), so also sweep 4/8 for this hang and for
-   speed.
-2. Pick the GVT for the paper. Bucketed is faster when traffic is local and
-   slower when it is remote-heavy (runaway rollbacks); repeat
-   `gvt_cost.sh` with several repetitions, more σ values and 4 nodes, using
-   the `-qd` build.
+1. Measure the optimism window's cost and benefit: blocking vs. bucketed
+   vs. bucketed + window over σ and window sizes at 2–4 nodes. This is the
+   first data for the paper's motivation (stability vs. throughput) and
+   decides the GVT.
+2. Repeat `gvt_cost.sh` with several repetitions, more σ values and 4
+   nodes, using the `-qd` build.
 3. Event holding: choose a realistic cutoff and bucket size per model
    (open issue 1); it is the PADS'19 baseline.
 4. Per-event latency and residence-time instrumentation; Gaussian PHOLD at
