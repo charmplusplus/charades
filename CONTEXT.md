@@ -336,7 +336,10 @@ node takes the job's `SLURM_*` variables from idev's environment file so
 1. Narrow down the σ = 2000 hang (open issue 5) and report it upstream
    (Reconverse or LCI) — it blocks bucketed-GVT runs with several PEs per
    process in exactly the remote-heavy regime the paper needs. Meanwhile run
-   with `+lci_ndevices 2`.
+   with more LCI devices: only `+lci_ndevices 2` has been tried (it works);
+   larger counts work on current Reconverse (#209 lifted the old limit of 2;
+   NAMD was fastest at 8 on 2 nodes), so also sweep 4/8 for this hang and for
+   speed.
 2. Pick the GVT for the paper. Bucketed is faster when traffic is local and
    slower when it is remote-heavy (runaway rollbacks); repeat
    `gvt_cost.sh` with several repetitions, more σ values and 4 nodes, using
