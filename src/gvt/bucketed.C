@@ -12,8 +12,8 @@
 #include <iomanip>
 #include <iostream>
 
-#define SENT_IDX(n) (n*2)
-#define RECV_IDX(n) (n*2+1)
+#define SENT_IDX(n) ((n)*2)
+#define RECV_IDX(n) ((n)*2+1)
 
 BucketGVT::BucketGVT() {
   gvt_name = "Bucket GVT";
