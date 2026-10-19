@@ -1,9 +1,10 @@
 #!/bin/bash
 # try.sh <cap s> <N> <n> <pes> <label> -- <phold args...>
+# TREE=charades-qd uses the other build; PROVIDER="tcp;ofi_rxm" another provider.
 # Run Gaussian-style PHOLD once with a time cap; on timeout cancel the step
 # with scancel (never SIGKILL srun: that orphans the step).
 cap=$1 N=$2 n=$3 pe=$4 label=$5; shift 6
-source "$(dirname "$0")/env.sh"
+source "$(dirname "$0")/env.sh"; [ -n "${PROVIDER:-}" ] && export LCI_ATTR_OFI_PROVIDER_NAME="$PROVIDER" FI_PROVIDER=${PROVIDER//;/,}
 out=${RUNS:-$WORK/charades-runs}/try; mkdir -p $out; cd $out
 f=run.$label
 srun --mpi=pmi2 --kill-on-bad-exit=1 --wait=30 -N $N -n $n -c $((pe / n)) -J try_$label \

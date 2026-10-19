@@ -14,7 +14,7 @@ for i in $(seq $wait); do sleep 1; kill -0 $sp 2>/dev/null || { echo "finished a
 echo "still running after $wait s; last progress:"; grep "^GVT" run.out | tail -n 2
 for n in $(scontrol show hostnames $SLURM_JOB_NODELIST); do
     ssh -o "StrictHostKeyChecking no" -o LogLevel=ERROR $n \
-        'for p in $(pgrep -u $USER -x phold); do echo "=== $(hostname -s) pid $p"; gdb -p $p -batch -ex "set pagination off" -ex "thread apply all bt 12" 2>/dev/null | grep -E "^Thread|^#"; done' > stacks.$n 2>&1
+        'for p in $(pgrep -u $USER -x phold); do echo "=== $(hostname -s) pid $p"; gdb -p $p -batch -ex "set pagination off" -ex "thread apply all bt 40" 2>/dev/null | grep -E "^Thread|^#"; done' > stacks.$n 2>&1
 done
 wc -l stacks.*
 kill -TERM $sp; sleep 35; kill -0 $sp 2>/dev/null && { echo "srun still alive; scancel the step"; scancel $SLURM_JOB_ID.$(squeue -h -s -j $SLURM_JOB_ID -o %i | grep -v batch | tail -1 | cut -d. -f2); }
