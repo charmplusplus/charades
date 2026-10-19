@@ -7,7 +7,11 @@ synchronization configuration in test_configs/, at several PE counts, in one
 process and across processes.
 
 Usage: python3 test.py [--quick] [--all] [--no-build] [--launcher lcrun|srun]
-                       [--timeout SECONDS] [test_config ...]
+                       [--timeout SECONDS] [--repeat N] [test_config ...]
+
+Races in the optimistic engine and the GVT algorithms show up in a few percent
+of runs or fewer, so one pass can miss them; --repeat N runs every case N times
+(e.g. --quick --repeat 50 bucket).
 """
 
 import argparse
@@ -95,6 +99,8 @@ def main():
   # fix, where each quiescence-detection GVT round costs ~11 ms with one PE
   # per process and the conservative long config takes ~70-80 s at 2x1 and
   # 4x1. With the fix the slowest run takes ~5 s.
+  parser.add_argument('--repeat', type=int, default=1,
+                      help='run every case this many times (finds races)')
   parser.add_argument('--timeout', type=float, default=180.0,
                       help='seconds before a run counts as hung')
   opts = parser.parse_args()
@@ -138,8 +144,9 @@ def main():
           # The sequential scheduler only runs on one PE.
           if name == 'sequential' and launch.pes > 1:
             continue
-          results.append(run(m, mcfg, name, tcfg, launch, launcher, env,
-                             opts.timeout))
+          for rep in range(opts.repeat):
+            results.append(run(m, mcfg, name, tcfg, launch, launcher, env,
+                               opts.timeout, rep if opts.repeat > 1 else None))
 
   passed = sum(r == 'pass' for r in results)
   failed = sum(r == 'fail' for r in results)
@@ -151,15 +158,19 @@ def main():
   sys.exit(0 if passed == len(results) else 1)
 
 
-def run(model, mcfg, name, tcfg, launch, launcher, env, timeout):
+def run(model, mcfg, name, tcfg, launch, launcher, env, timeout, rep=None):
   outdir = os.path.join(test_dir, 'test_output',
                         os.path.relpath(model.root, model_dir),
                         os.path.basename(mcfg), name, launch.name)
+  if rep is not None:
+    outdir = os.path.join(outdir, str(rep))
   os.makedirs(outdir, exist_ok=True)
   out_path = os.path.join(outdir, 'test.out')
   cmd = launch.command(model.exe, [mcfg, tcfg], launcher)
   label = '%-17s %-8s %-19s %-5s' % (model.name, os.path.basename(mcfg),
                                     name, launch.name)
+  if rep is not None:
+    label += ' #%-3d' % rep
   start = time.time()
   with open(out_path, 'w') as out:
     # Own process group, so a hung multi-process run's ranks die with the
