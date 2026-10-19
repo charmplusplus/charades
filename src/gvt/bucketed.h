@@ -6,6 +6,7 @@
 #include "event.h"
 
 #include <list>
+#include <vector>
 
 struct OffsetStats {
   int regular, anti;
@@ -91,6 +92,14 @@ class BucketGVT : public CBase_BucketGVT {
     int total_buckets;  ///< Total number of buckets
     int curr_bucket;    ///< Index of current bucket
     int* counts;        ///< Array of sent and received counts
+
+    /**
+     * From the previous count wave, aligned to curr_bucket: the summed
+     * received counts, and how many of those buckets every PE had passed.
+     * check_counts compares them with the current wave's sent counts.
+     */
+    std::vector<int> prev_recv;
+    int prev_valid;
 
     int start_reductions;
     int count_reductions;

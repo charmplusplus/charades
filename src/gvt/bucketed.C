@@ -20,6 +20,7 @@ BucketGVT::BucketGVT() {
   continuous = true;
 
   curr_bucket = 0;
+  prev_valid = 0;
   bucket_size = g_tw_gvt_bucket_size;
   total_buckets = ceil(g_tw_ts_end / bucket_size);
   max_ts = total_buckets * bucket_size;
@@ -174,12 +175,32 @@ void BucketGVT::check_counts(CkReductionMsg* msg) {
 
   int* counts = (int*)result[0].data;
 
-  /** Loop to find out how many of the valid buckets are completed */
+  /**
+   * A bucket is complete when every PE had passed it at the PREVIOUS wave and
+   * the total received in it at the previous wave equals the total sent in it
+   * at this one (Mattern's four-counter rule). Comparing one wave's sent and
+   * received totals is not enough: each PE reads its counters at a different
+   * time while still executing, so an event counted as sent but not yet
+   * received can be offset by a later event counted as received but not sent
+   * -- e.g. one sent by a PE that read its counters, then got the first event
+   * and rolled back into the bucket. Every PE contributes to this wave only
+   * after the previous wave's result reached it, so any event received after
+   * a PE's previous-wave reading was sent before its sender's reading for this
+   * wave, and makes the totals differ.
+   */
   int completed_buckets = 0;
-  while (completed_buckets < valid_buckets && completed_buckets < num_buckets &&
-      counts[SENT_IDX(completed_buckets)] == counts[RECV_IDX(completed_buckets)]) {
+  while (completed_buckets < prev_valid && completed_buckets < num_buckets &&
+      prev_recv[completed_buckets] == counts[SENT_IDX(completed_buckets)]) {
     completed_buckets++;
     lb_trigger->iteration_done();
+  }
+
+  /** Keep this wave's received totals for the next wave's comparison */
+  prev_valid = std::max(0,
+      std::min(valid_buckets, num_buckets) - completed_buckets);
+  prev_recv.resize(prev_valid);
+  for (int i = 0; i < prev_valid; i++) {
+    prev_recv[i] = counts[RECV_IDX(completed_buckets + i)];
   }
 
   /** Advance the GVT past the completed buckets */
