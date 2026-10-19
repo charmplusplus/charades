@@ -25,3 +25,6 @@ CFLAGS+=-DUSE_CHARMC=$(USE_CHARMC)
 #CFLAGS+=-DDEBUG_MASTER_ON # Turn on debug prints from PE 0
 #CFLAGS+=-DDEBUG_PE_ON     # Turn on PE specific debug prints
 #CFLAGS+=-DDEBUG_LP_ON     # Turn on LP specific debug prints
+
+# Required: charmc defaults to -std=gnu++11, which rejects the constexpr RNG code
+CFLAGS += -std=c++17

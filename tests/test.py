@@ -50,10 +50,14 @@ class Launch:
 
   def command(self, exe, args, launcher):
     run = [exe, '+pe', str(self.pes)] + args
+    if launcher.kind == 'srun':
+      # Even single-process runs: inside an allocation LCI reads the inherited
+      # SLURM_NTASKS and would wait for peers that never start. One bad task
+      # ends the step instead of leaving the others blocked.
+      return ['srun', '--mpi=pmi2', '--kill-on-bad-exit=1', '--wait=30',
+              '-n', str(self.procs)] + run
     if self.procs == 1:
       return run
-    if launcher.kind == 'srun':
-      return ['srun', '--mpi=pmi2', '-n', str(self.procs)] + run
     return [launcher.lcrun, '-n', str(self.procs)] + run
 
 
@@ -180,8 +184,14 @@ def run(model, mcfg, name, tcfg, launch, launcher, env, timeout, rep=None):
     try:
       rc = proc.wait(timeout=timeout)
     except subprocess.TimeoutExpired:
-      os.killpg(proc.pid, signal.SIGKILL)
-      proc.wait()
+      # TERM first: a SIGKILLed srun cannot deregister its step, which then
+      # holds the nodes and blocks every later srun in the allocation.
+      os.killpg(proc.pid, signal.SIGTERM)
+      try:
+        proc.wait(timeout=30)
+      except subprocess.TimeoutExpired:
+        os.killpg(proc.pid, signal.SIGKILL)
+        proc.wait()
       rc = None
   elapsed = time.time() - start
   with open(out_path) as out:
