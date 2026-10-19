@@ -45,6 +45,13 @@ Time OptimisticScheduler::get_min_time() const {
 /** Execute events in batches until the trigger dictates it's GVT time */
 void OptimisticScheduler::execute() {
   for (int num_executed = 0; num_executed < g_tw_mblock; num_executed++) {
+    // With an optimism window, events past GVT + window wait for GVT to
+    // advance. The iteration still completes, so the GVT trigger keeps
+    // firing and stragglers inside the window are still processed.
+    if (g_tw_optimism_window && next_lps.top() != NULL &&
+        next_lps.top()->ts > PE_VALUE(g_last_gvt) + g_tw_optimism_window) {
+      break;
+    }
     if (!schedule_next_lp()) {
       break;
     }
