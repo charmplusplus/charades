@@ -1,0 +1,15 @@
+#!/bin/bash
+# Run a shell command on a node of the running idev job:
+#   nd [node] '<command string>'
+# The node defaults to the job's first node. The command runs in a login shell
+# (ssh shells get a generic MODULEPATH without TACC's tree, so add it)
+# with gcc 13.2.0 and cmake loaded; it reads no stdin.
+if [[ $1 == c[0-9]*-[0-9]* ]]; then
+    node=$1; shift
+else
+    nodes=$(squeue -h -u $USER -t R -o "%j %N" | awk '$1 ~ /^idv/ {print $2; exit}')
+    [ -n "$nodes" ] || { echo "nd: no running idev job" >&2; exit 1; }
+    node=$(scontrol show hostnames "$nodes" | head -1)
+fi
+printf 'module use /opt/apps/modulefiles; module load gcc/13.2.0 cmake >/dev/null 2>&1\n{\n%s\n} </dev/null\n' "$*" |
+    ssh -o "StrictHostKeyChecking no" -o LogLevel=ERROR "$node" bash -l -s
