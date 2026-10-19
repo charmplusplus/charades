@@ -3,6 +3,7 @@
 
 #include <assert.h>
 #include <math.h>
+#include <mutex>
 #include <random>
 
 #include "clcg4.h"
@@ -17,7 +18,12 @@ typedef xoroshiro128plus RNG;
 inline void tw_rand_init(uint32_t v, uint32_t w) {}
 #else
 typedef clcg4 RNG;
-inline void tw_rand_init(uint32_t v, uint32_t w) { clcg4::init(v, w); }
+// Once per process: clcg4's table is shared by every PE thread, and init
+// rewrites it in place, so concurrent calls from each PE's scheduler raced.
+inline void tw_rand_init(uint32_t v, uint32_t w) {
+  static std::once_flag initialized;
+  std::call_once(initialized, [v, w] { clcg4::init(v, w); });
+}
 #endif
 
 template <typename G>

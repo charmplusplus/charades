@@ -11,6 +11,16 @@ void tw_init(int argc, char** argv) {
   charm_init(argc, argv);
   parse_command_line(CmiGetArgc(argv), argv);
   get_msg_id<void *>();
+
+  // Derive the load balancing schedule here, once per process, rather than in
+  // each PE's GVTManager constructor, where every PE thread wrote it.
+  if (g_tw_ldb_interval > 0 || g_tw_ldb_first > 0) {
+    if (g_tw_ldb_interval == 0) {
+      g_tw_max_ldb = 1;
+    } else if (g_tw_ldb_first == 0) {
+      g_tw_ldb_first = g_tw_ldb_interval;
+    }
+  }
 }
 
 /**

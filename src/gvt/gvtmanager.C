@@ -16,12 +16,8 @@ GVTManager::GVTManager() : curr_gvt(0), prev_gvt(0) {
   std::call_once(proxy_set, [this] { gvt_manager_proxy = thisProxy; });
 
   // Set up the load balancing trigger
+  // g_tw_ldb_first and g_tw_max_ldb were derived in tw_init.
   if (g_tw_ldb_interval > 0 || g_tw_ldb_first > 0) {
-    if (g_tw_ldb_interval == 0) {
-      g_tw_max_ldb = 1;
-    } else if (g_tw_ldb_first == 0) {
-      g_tw_ldb_first = g_tw_ldb_interval;
-    }
     lb_trigger.reset(new CountTrigger(g_tw_ldb_first, g_tw_ldb_interval));
     if (g_tw_max_ldb > 0) {
       lb_trigger.reset(new BoundedTrigger(lb_trigger.release(), g_tw_max_ldb));
