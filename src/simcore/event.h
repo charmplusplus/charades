@@ -145,8 +145,10 @@ public:
   Event* cause_next;    // Next in parent's caused_by_me chain
   Event* cancel_next;   // next in cancel list
 
-  // Index of the event in the pending heap and the order of event pupping
-  uint8_t index;
+  // Index of the event in the pending heap and the order of event pupping.
+  // Was uint8_t: a chare with more than 256 pending events wrapped it and
+  // corrupted the heap (common once GVT stops throttling execution).
+  uint32_t index;
 
   // Fields for rebuilding causality lists after migration
   unsigned  pending_count;
