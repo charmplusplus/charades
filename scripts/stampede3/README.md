@@ -29,3 +29,7 @@ Outputs go under `$RUNS` (default `$WORK/charades-runs`).
 - `hang_stacks.sh [wait s] [phold args]` — reproduce the σ = 2000 bucketed
   hang (needs `gvt_cost.sh`'s configs) and save gdb stacks of every thread on
   every node to `$RUNS/hang/stacks.<node>`.
+- `window_sweep.sh <reps> [out.csv]` — blocking vs. bucketed vs. bucketed
+  with `--optimism-window` on Gaussian PHOLD, over σ, window and node count
+  (knobs in the header); one CSV row per run, stalled runs cancelled at
+  `CAP` seconds. `window_summary.py <csv...>` prints medians per case.
