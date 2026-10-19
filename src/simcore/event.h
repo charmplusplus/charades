@@ -32,10 +32,13 @@ struct RemoteEvent : public CMessage_RemoteEvent {
     uint64_t src_lp;
     uint64_t dest_lp;
 
-    // Async GVT variables
-    uint8_t phase;
+    // Async GVT variables. For the bucketed GVT, phase is the event's bucket
+    // (ts / bucket size) and offset its distance in buckets from GVT when sent.
+    // Both were uint8_t: past bucket 255 every event was counted in bucket
+    // b mod 256, so later buckets completed with events still in transit.
+    uint32_t phase;
     bool anti;
-    uint8_t offset;
+    uint32_t offset;
 
     uint8_t type_id;  /**< Used for double-dispatch of event data */
     uint8_t type_size;

@@ -5,6 +5,7 @@
 #include "scheduler.h"
 #include "statistics.h"
 #include "trigger.h"
+#include "util.h"
 
 #include <float.h>
 #include <fstream>
@@ -273,12 +274,20 @@ bool BucketGVT::attempt_cancel(RemoteEvent* anti) {
 }
 
 void BucketGVT::consume(RemoteEvent* e) {
+  // A bucket completes only when nothing sent in it is still in transit
+  TW_ASSERT(e->phase >= curr_bucket, "Event (ts %llu) received in bucket %u, "
+      "but GVT completed buckets up to %d\n", (unsigned long long)e->ts, e->phase,
+      curr_bucket);
   counts[RECV_IDX(e->phase)]++;
   attempt_gvt();
 }
 
 bool BucketGVT::produce(RemoteEvent* e) {
   e->phase = e->ts / bucket_size;
+  TW_ASSERT(e->phase >= curr_bucket && e->phase < total_buckets,
+      "Event (ts %llu) sent in bucket %u, outside [%d, %d)\n",
+      (unsigned long long)e->ts,
+      e->phase, curr_bucket, total_buckets);
   counts[SENT_IDX(e->phase)]++;
   attempt_gvt();
 
