@@ -33,3 +33,7 @@ Outputs go under `$RUNS` (default `$WORK/charades-runs`).
   with `--optimism-window` on Gaussian PHOLD, over σ, window and node count
   (knobs in the header); one CSV row per run, stalled runs cancelled at
   `CAP` seconds. `window_summary.py <csv...>` prints medians per case.
+- `comm_summary.py <csv> [setup]` — for a `WORKLOAD=uniform COMM_STATS=1`
+  sweep: rate, efficiency, messages per event and send-call cost per remote
+  fraction, and a fit of PE time per event against messages per event
+  (the full cost of one remote message).

@@ -8,7 +8,8 @@
 #   WINDOWS="250 500 1000 2000 4000 8000", PPN=2 (processes per node),
 #   PEPP=8 (PEs per process), LPS_PER_PE=128, START=15 (start events per LP),
 #   END=32000, CAP=120 (s), TREE=charades-qd, NOWINDOW=1 (also run bucketed
-#   without a window), COMM_STATS=0 (1: --comm-stats and its columns).
+#   without a window), COMM_STATS=0 (1: --comm-stats and its columns),
+#   EXTRA_ARGS (appended to every run, e.g. "+lci_ndevices 8").
 #   WORKLOAD=gauss (Gaussian destinations, swept over SIGMAS) or uniform
 #   (uniform destinations with probability remote, swept over REMOTES,
 #   e.g. REMOTES="0 0.1 0.5 1"; the CSV's sigma column then holds remote).
@@ -36,6 +37,7 @@ run_one() {  # nodes procs pes cfg gvt window label
   local f=logs/$label.out
   local extra=(); [ "$w" != 0 ] && extra=(--optimism-window=$w)
   [ "$COMM_STATS" = 1 ] && extra+=(--comm-stats=1)
+  extra+=(${EXTRA_ARGS:-})
   srun --mpi=pmi2 --kill-on-bad-exit=1 --wait=30 -N $N -n $n -c $((pe / n)) -J ws_$label \
       $C/models/phold/simple/phold +pe $pe $cfg $C/tests/test_configs/$gvt "${extra[@]}" \
       > $f 2>&1 &
