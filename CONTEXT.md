@@ -218,6 +218,61 @@ What it says:
   robustness across models and phases, not beating the best static window
   on a steady PHOLD.
 
+### Per-message cost and scaling (2026-10-20, idev job 3620576, 8 skx nodes)
+
+Uniform PHOLD (the thesis's PHOLD Base shape: 64 LPs per PE, 16 start
+events, mean delay 1,000, lookahead 100; destination uniform with
+probability `remote`, else a self-send), end time 256,000, 2 processes × 8
+PEs per node, `-qd` build, `+lci_ndevices 8`, `--comm-stats=1`, 2 reps.
+`scripts/stampede3/window_sweep.sh` with `WORKLOAD=uniform`; analysis
+`scripts/stampede3/comm_summary.py`. CSV:
+`$WORK/charades-runs/window_sweep/uniform_scale_fixed.csv` (run after the
+startup-race fix below; the pre-fix run agrees within a few %).
+
+**LCI devices.** With the default single device, 8 PE threads share it and a
+send call costs 26–29 µs (52–60% of PE time) at remote 0.5 on 2 nodes;
+2/4/8 devices: 15/11/9.3 µs, and +30–40% event rate at 8. Use
+`+lci_ndevices 8` (one per PE) for all communication measurements.
+
+**Per-message cost** — fit of PE-time per committed event against remote
+messages per committed event, window 250 (≥ 99% efficiency):
+
+| Nodes | Per event | Per remote message | of which send call | Messages' share of time, remote 0.1 / 0.5 / 1 |
+|---|---|---|---|---|
+| 2 | 4.1 µs | 25.4 µs | 9.5 µs | 38% / 76% / 86% |
+| 4 | 4.7 µs | 31.6 µs | 11.4 µs | 40% / 77% / 87% |
+| 8 | 5.8 µs | 34.4 µs | 12.4 µs | 37% / 75% / 85% |
+
+So the go/no-go is **GO**: per-message overhead is 37–87% of the run time
+whenever ≥ 10% of events are remote, far above the 10% threshold. Most of
+a message's cost is outside the send call (receive, scheduling, delivery).
+
+**GVT setups** (M committed events/s; eff %):
+
+| Nodes | remote | Blocking | Bucketed, no window | Bucketed, w=250 |
+|---|---|---|---|---|
+| 2 | 0 | 10.0 | 15.1 | 11.2 |
+| 2 | 0.1 | 4.48 (96) | 1.77 (26) | 4.90 (100) |
+| 2 | 0.5 | 1.75 (97) | stalls | 1.87 (99) |
+| 4 | 0 | 16.7 | 28.6 | 18.5 |
+| 4 | 0.1 | 6.97 (95) | 1.61 (13) | 7.94 (100) |
+| 4 | 0.5 | 2.86 (97) | stalls | 3.04 (100) |
+| 8 | 0 | 24.2 | 50.0 | 25.0 |
+| 8 | 0.1 | 11.8 (95) | 1.90 (8) | 14.6 (100) |
+| 8 | 0.5 | 4.98 (96) | stalls | 5.44 (100) |
+
+- Unthrottled bucketed GVT collapses as soon as there is remote traffic
+  (8–26% efficiency at 10% remote, stalls at ≥ 25%): every wasted event
+  costs ~30 µs messages. The thesis (Mikida 2019) found non-blocking GVT
+  faster than blocking at 64–1,024 nodes; its messages (PAMI/GNI, one
+  process per core) were far cheaper.
+- Bounded by a window, bucketed beats blocking, increasingly with nodes at
+  10% remote (1.09× → 1.14× → 1.24×) — the thesis's direction, but only
+  with optimism bounded.
+- The best window depends on the traffic: with no remote events, w=250
+  halves the rate at 8 nodes (25 vs. 50 M/s); with any, it is essential.
+  A static window cannot be right for both — the case for the controller.
+
 **Fixed so far** (details in the commit messages):
 - Builds against Charm++ on Reconverse; Makefiles track header dependencies
   (`src/module.mk`, `src/model.mk`); unknown or malformed options abort (the
@@ -251,6 +306,13 @@ What it says:
   `bucket_hold_early`.
 - `Event::index` was 8 bits: a chare with > 256 pending events corrupted its
   heap.
+- SMP startup race (2026-10-20): in interop SMP, option parsing runs only on
+  rank 0 of each process, but PE 0 created the scheduler group right after
+  its own parse, so worker ranks of other processes could construct it with
+  default settings (event buffer, GVT scheme/trigger/interval, bucket size,
+  window...). Exposed by `+lci_ndevices 8` at ≥ 4 nodes (8192-event buffer
+  aborts). PE 0 now creates the group from a quiescence callback. Results
+  before this fix were rechecked on 2 nodes (same picture).
 - Permanent assertions catch GVT running ahead: LP token vs. earliest pending
   event at each synchronous GVT contribution; events or anti-events arriving
   below GVT; committing an event that is in the cancel queue.
@@ -396,15 +458,16 @@ node takes the job's `SLURM_*` variables from idev's environment file so
 
 ## Next steps, in order
 
-1. Instrument per-event send→receive latency and per-message overhead,
-   and attribute the σ-dependent slowdown at ~100% efficiency (window
-   sweep above) to communication: this is the go/no-go for aggregation.
-2. Window sweep on a model with different lookahead/delay (and a
-   phase-changing PHOLD) to show that the best static window moves — the
-   argument for an online controller.
-3. Event holding: choose a realistic cutoff and bucket size per model
-   (open issue 1); it is the PADS'19 baseline.
+1. Go/no-go passed: start the htram path (`-DPDES` fixed-slot items,
+   urgent send, min-key query; Charades sends through it; anti-messages and
+   GVT control bypass). Target: the per-message cost table above.
+2. Window sweep on a model with different lookahead/delay and a
+   phase-changing PHOLD (e.g. remote 0 ↔ 0.5 phases), to show the best static
+   window moves; then the histogram controller. Include the remote-0 case,
+   where w=250 costs 2× at 8 nodes.
+3. Event holding: realistic cutoff and bucket size per model (open issue 1);
+   the PADS'19 baseline.
 4. Gaussian PHOLD at Devastator's scale (100 LPs per core, 15 start events,
-   σ 100 → 25,600) with the instrumentation from step 1.
-5. Go/no-go measurement at 4–16 nodes (see the timeline).
-6. Then htram, the controller, baselines; dragonfly port when needed.
+   σ 100 → 25,600) and 16+ nodes, `+lci_ndevices 8`, `--comm-stats=1`.
+5. ROSS baseline build on Stampede3; check whether Devastator builds.
+6. Dragonfly port when needed.
