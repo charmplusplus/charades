@@ -336,6 +336,91 @@ a message's cost is outside the send call (receive, scheduling, delivery).
 - Mac full matrix with every config (including `gaussian`, `bucket_hold`,
   `bucket_hold_early`): 550/550.
 
+### Aggregation through htram (2026-10-20, idev job 3621217, 4 skx nodes)
+
+**Code.**
+- Charades branch `htram`; htram branch `pdes` (UIUC-PPL/htram, off master `d877a09`).
+- Built in only when `src/config.mk` sets `HTRAM_DIR` (`src/htram.mk`).
+  Charades then compiles `htram_group.C` itself with `-DPDES -DBUCKETS_BY_DEST -DPDES_TIMED`, so both sides agree on the item layout.
+- `simcore/aggregation.{h,C,ci}`:
+  - an `Aggregator` group per PE;
+  - `agg_send()` copies a `RemoteEvent` into a fixed 64 B `PdesItem` (72 B with `PDES_TIMED`) after `produce()` has counted it;
+  - htram's batch callback rebuilds the event on the destination PE and calls `recv_remote_event`, which consumes it.
+- What bypasses htram:
+  - payloads over `PDES_PAYLOAD_BYTES` (16) go directly. Imbalanced PHOLD's message is 24 B, so all of its events go directly;
+  - anti-messages and GVT traffic.
+- Options:
+  - `--aggregation`
+  - `--agg-mode` (WPs=0, WsP=1, PP=2, WW=3)
+  - `--agg-buffer` (events)
+  - `--agg-urgent=T` (ship if ts < GVT + T)
+  - `--agg-scope` (1: only events to other processes)
+  - `--agg-gvt-flush` (0/1/2)
+- Flush rules, each needed for correctness or liveness:
+  - a PE with nothing it may execute (idle or window-blocked) calls `flushIdle`;
+  - every GVT update flushes everything (`--agg-gvt-flush=2`, required with bucketed GVT);
+  - a PE flushes before joining a blocking (QD-based) round, because QD cannot see buffered events;
+  - under bucketed GVT every event in the sender's current bucket ships at once. That bucket can't complete while one of its events sits in a buffer, and a busy PE never idles.
+- Startup chain on PE 0, each step on quiescence: htram's node groups → HTram → Aggregators → scheduler group. HTram's own start reduction can't be used: on one PE it completes inside HTram's constructor, before that branch is registered.
+
+**htram changes (`pdes`).**
+- `PdesItem`.
+- `insert`, `flushTo`, `insertUrgent`, `flushPending` and `setAggregationMode`, so one send/flush policy means the same thing in all four modes. WsP and PP had no per-destination flush, and `flushIdle` did nothing in them.
+- WW receive leaked its batch array.
+- PP's shared node buffer had three bugs, found here:
+  1. Relaxed atomics only, once BUCKETS_BY_DEST compiles out the mailbox fences. That's fine on x86, a race on ARM.
+  2. A PE waiting for a busy buffer, or flushing one, kept `fetch_add`ing `get_idx`, which wrapped past `INT_MAX` during a stalled ship. The result was segfaults at `0xffffffd8…` (−2³¹ × 80 B) with 16-item buffers.
+  3. Waiting at all deadlocked across processes. The shipper's LCI send retries until the destination progresses, while the destination's PEs wait on their own shipper. Now a PE that finds the buffer busy sends its 16-item local buffer alone (`local_bypasses`).
+
+None of this touches the WPs path the SSSP client uses. GRAPH, GRAPH with compact wire, and HISTO still compile, but the SSSP parity check has **not** been run yet.
+
+**Correctness.**
+- Mac:
+  - final code, every `agg_*` config at 1/4/2×2 PEs, `--repeat 3`: 891/891;
+  - before the PP fixes: `--repeat 10` on the bucketed ones 1650/1650;
+  - full matrix including `agg_*`: 1319/1320. The failure was PP bucketed at 3 PEs with empty output, not reproduced in 300 reruns, and predates the PP fixes.
+- Stampede3, 4 nodes, final code:
+  - `agg_blocking_*` and `agg_conservative_wps` at 4×4, 2×8 and 1×8: 165/165;
+  - `agg_bucket_*` at 4×4 and 1×8: 88/88.
+  
+  Bucketed at 2×8 is excluded because of the pre-existing hang below.
+- New launch shape 2×8: plain `bucket` (no aggregation) hangs on Imbalanced PHOLD `combo` and `noself`. It stalls at 54% of the end time, with every worker in LCI `post_am` retry. Same mechanism as open issue 5; see open issue 7.
+
+**Stage 1: mode × buffer** (uniform PHOLD, remote 0.5, 4 nodes × 2 processes × 8 PEs, 8,192 LPs, `+lci_ndevices 8`, `--comm-stats=1`, 2 reps; `$WORK/charades-runs/agg_sweep/stage1_all.csv`; M committed events/s):
+
+| GVT | direct | WPs 64 | WsP 64 | PP 64 | WW (any buffer) | events/msg | cross-node latency |
+|---|---|---|---|---|---|---|---|
+| blocking | 2.99 | **9.04 (3.02×)** | 8.79 | 8.58 (8.89 at 1024) | 5.6–5.9 | ~15 (WW 2.3) | 187 → ~510 µs |
+| bucketed, window 250 | 2.97 | 6.12 (2.06×) | 4.11 | **6.27 (2.11×)** | 4.1–4.7 | ~3 (WW 1.5) | 118 → ~290 µs |
+
+- Send-call time falls from 11.3–11.7 µs to 0.3–0.5 µs per event. Efficiency stays at 97–99%.
+- **Buffer size above 64 changes nothing.** Events per message saturate (~15 blocking, ~3 bucketed), so the flush cadence is the binding constraint, not the buffer:
+  - blocking: one flush per GVT round;
+  - bucketed: current-bucket events are urgent, and every bucket advance flushes.
+  
+  That cadence is what the controller should set.
+- Predictions, checked:
+  - "WW fewest events per message": yes.
+  - "WPs or PP best": yes, with WsP tied under blocking.
+  - "PP most events per message": no, same as WPs.
+  - "urgency matters most under bucketed": the cadence does.
+- WsP under bucketed is only 1.3×: its receive hands the whole message to every PE of the node, and each scans for its range.
+- With aggregation, blocking now beats bucketed + window (9.0 vs 6.3). Direct, they are equal at this remote fraction.
+
+**Other remote fractions and 2 nodes** (64-event buffers, 2 reps; `stage1_remote.csv`, `stage1_n2.csv`):
+
+| nodes | remote | GVT | direct | WPs | PP | events/msg |
+|---|---|---|---|---|---|---|
+| 4 | 0.1 | blocking | 7.12 | 11.10 (1.56×) | 10.92 (1.53×) | 3.3 |
+| 4 | 0.1 | bucketed w250 | 7.02 | 8.47 (1.21×) | 8.49 (1.21×) | 1.4 |
+| 4 | 1.0 | blocking | 1.80 | 7.06 (3.93×) | **7.17 (3.99×)** | 31 / 21 |
+| 4 | 1.0 | bucketed w250 | 1.74 | 4.92 (2.83×) | **5.66 (3.25×)** | 6–7 |
+| 2 | 0.5 | blocking | 1.82 | **6.06 (3.34×)** | 5.75 (3.17×) | 31 / 21 |
+| 2 | 0.5 | bucketed w250 | 1.78 | 4.25 (2.39×) | 4.13 (2.33×) | 5.3 |
+
+- Blocking GVT at 10% remote reaches about the ceiling the per-message fit predicted (~1.6×).
+- Bucketed GVT gets roughly half the possible gain, held back by its flush cadence.
+
 ## Open issues
 
 1. **Event holding needs a realistic cutoff.** With the test configs'
@@ -362,6 +447,14 @@ a message's cost is outside the send call (receive, scheduling, delivery).
 6. One `double free or corruption (!prev)` at exit in ~600 Stampede3 runs
    (Example `base`, bucketed, 4 PEs, one process); no core was kept. Run
    `scripts/stampede3/repro.sh` with cores enabled if it shows up again.
+7. **Bucketed GVT hangs on Imbalanced PHOLD at 2 × 8 PEs** (`combo`, `noself`;
+   without aggregation too). It's a launch shape the earlier matrices never ran.
+   Stacks (`$WORK/charades-runs/hang/imbalanced_combo_bucket_2x8/`) show every
+   worker in LCI `post_am` retry inside Reconverse's send loop
+   (`comm_backend_lci2.cpp:305`); on the Mac LCI warns "device does not have any
+   posted recvs". Same rollback-storm/backpressure picture as issue 5. Exclude
+   that shape from aggregation gates until it's fixed or windowed.
+   `scripts/stampede3/catch_hang.sh` reproduces it and saves stacks.
 
 ## Building on Stampede3
 
@@ -458,10 +551,18 @@ node takes the job's `SLURM_*` variables from idev's environment file so
 
 ## Next steps, in order
 
-1. Go/no-go passed: send events through htram. Target: the per-message cost
-   table above. Decided 2026-10-20: a fixed-slot `-DPDES` item now (not the
-   byte-oriented core), on htram branch `pdes`, and every htram aggregation
-   mode (WPs, WsP, PP, WW) tested as a transport arm.
+1. DONE 2026-10-20 (see "Aggregation through htram"): events go through htram
+   in all four modes, with a correctness gate on the Mac and on 4 Stampede3
+   nodes, and stage 1 of the sweep. Remaining from the original plan:
+   - SSSP parity check on htram `pdes` before merging it into master;
+   - stage 2 at 8+ nodes (skx-dev allows at most 4) and PPN 1 vs 2;
+   - payload slot size for models with larger messages (Imbalanced PHOLD needs 24 B).
+   
+   The next real step is the flush policy, since flush cadence, not buffer size, limits events per message. Options:
+   - per-destination minimum bucket tracking, so a GVT advance flushes only destinations holding now-current events (htram min-key query);
+   - then the histogram controller choosing urgency and cadence.
+   
+   The original plan's notes for this step:
    - htram `pdes` (built with `-DPDES -DBUCKETS_BY_DEST`):
      - `PdesItem` (event header + 16 B payload, ~64 B);
      - `sendUrgent(item, pe)`;
