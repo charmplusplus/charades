@@ -41,6 +41,7 @@ unsigned g_tw_gvt_trigger;
 unsigned g_tw_gvt_phases;
 unsigned g_tw_gvt_bucket_size;
 Time     g_tw_optimism_window;
+unsigned g_tw_comm_stats;
 unsigned g_tw_async_reduction;
 double   g_tw_reserve_threshold;
 uint32_t g_tw_reserve_buckets;
@@ -87,6 +88,7 @@ void clear_globals() {
   g_tw_gvt_phases    = 2;
   g_tw_gvt_bucket_size    = 8;
   g_tw_optimism_window    = 0;
+  g_tw_comm_stats         = 0;
   g_tw_async_reduction = 0;
   g_tw_reserve_threshold = 1.0;
   g_tw_reserve_buckets = 0;

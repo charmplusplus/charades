@@ -4,6 +4,7 @@
 
 #include "statistics.h"
 
+#include "event.h"
 #include "scheduler.h"
 
 #include <stdio.h>  // Included for printf
@@ -57,7 +58,19 @@ void Statistics::clear() {
   self_sends = 0;
   local_sends = 0;
   remote_sends = 0;
+  remote_holds = 0;
+  remote_cancels = 0;
   anti_sends = 0;
+  anti_cancels = 0;
+
+  // Communication stats
+  send_time = 0.0;
+  timed_sends = 0;
+  for (int c = 0; c < LAT_CLASSES; c++) {
+    lat_count[c] = 0;
+    lat_sum[c] = 0.0;
+    for (int b = 0; b < LAT_BUCKETS; b++) lat_hist[c][b] = 0;
+  }
 
   // GVT stats
   total_gvts = 0;
@@ -93,6 +106,7 @@ void Statistics::add(const Statistics* other) {
   local_sends += other->local_sends;
   remote_sends += other->remote_sends;
   anti_sends += other->anti_sends;
+  add_comm(other);
 
   // GVT stats
   total_gvts += other->total_gvts;
@@ -126,6 +140,7 @@ void Statistics::reduce(const Statistics* other) {
   local_sends += other->local_sends;
   remote_sends += other->remote_sends;
   anti_sends += other->anti_sends;
+  add_comm(other);
 
   // GVT stats
   total_gvts = other->total_gvts;
@@ -134,6 +149,61 @@ void Statistics::reduce(const Statistics* other) {
   max_events_used = fmax(max_events_used, other->max_events_used);
   new_event_calls += other->new_event_calls;
   del_event_calls += other->del_event_calls;
+}
+
+void Statistics::add_comm(const Statistics* other) {
+  remote_holds += other->remote_holds;
+  remote_cancels += other->remote_cancels;
+  anti_cancels += other->anti_cancels;
+  send_time += other->send_time;
+  timed_sends += other->timed_sends;
+  for (int c = 0; c < LAT_CLASSES; c++) {
+    lat_count[c] += other->lat_count[c];
+    lat_sum[c] += other->lat_sum[c];
+    for (int b = 0; b < LAT_BUCKETS; b++) lat_hist[c][b] += other->lat_hist[c][b];
+  }
+}
+
+int64_t comm_send_begin(RemoteEvent* e) {
+  int64_t now = comm_now_ns();
+  e->send_ns = now;
+  e->src_pe = CkMyPe();
+  return now;
+}
+
+void comm_send_end(int64_t start_ns) {
+  Statistics* s = get_statistics();
+  s->send_time += (comm_now_ns() - start_ns) * 1e-9;
+  s->timed_sends++;
+}
+
+void comm_record_latency(const RemoteEvent* e) {
+  if (e->src_pe < 0) return;  // sent without --comm-stats (not expected)
+  int c;
+  if (CkNodeOf(e->src_pe) == CkMyNode()) {
+    c = 0;
+  } else if (CmiPhysicalNodeID(e->src_pe) == CmiPhysicalNodeID(CkMyPe())) {
+    c = 1;
+  } else {
+    c = 2;  // clocks of different nodes are not synchronized: approximate
+  }
+  int64_t ns = comm_now_ns() - e->send_ns;
+  Statistics* s = get_statistics();
+  s->lat_count[c]++;
+  s->lat_sum[c] += ns * 1e-9;
+  int b = 0;
+  while (b < Statistics::LAT_BUCKETS - 1 && ns >= (int64_t)(2ll << b)) b++;
+  s->lat_hist[c][b]++;
+}
+
+/** Upper edge (in microseconds) of the bucket holding quantile q */
+static double lat_quantile_us(const uint64_t* hist, uint64_t count, double q) {
+  uint64_t target = (uint64_t)(q * count), seen = 0;
+  for (int b = 0; b < Statistics::LAT_BUCKETS; b++) {
+    seen += hist[b];
+    if (seen > target) return (double)(1ull << (b + 1)) / 1000.0;
+  }
+  return -1.0;
 }
 
 /** Print a section title and border */
@@ -181,6 +251,35 @@ void Statistics::print() const {
   print_int("Total Rollback Calls ", total_rollback_calls);
   print_int("Timestamp Rollback Calls ", ts_rollback_calls);
   print_int("Event Rollback Calls ", event_rollback_calls);
+
+  if (remote_holds) {
+    print_section("EVENT HOLDING STATISTICS");
+    print_int("Remote Events Held", remote_holds);
+    print_int("Held Events Cancelled In Sender", anti_cancels);
+  }
+
+  if (timed_sends) {
+    print_section("COMMUNICATION STATISTICS");
+    print_int("Timed Send Calls", timed_sends);
+    print_double("Mean Send Call (us)", 1e6 * send_time / timed_sends);
+    // Share of all PE time (execution time x PEs) spent inside send calls
+    print_double("Send Calls % of PE Time", 100.0 * send_time / (total_time * CkNumPes()));
+    const char* names[LAT_CLASSES] = {"Same Process", "Same Node", "Other Node"};
+    for (int c = 0; c < LAT_CLASSES; c++) {
+      if (!lat_count[c]) continue;
+      char label[64];
+      snprintf(label, sizeof(label), "Latency %s: Count", names[c]);
+      print_int(label, lat_count[c]);
+      snprintf(label, sizeof(label), "Latency %s: Mean (us)", names[c]);
+      print_double(label, 1e6 * lat_sum[c] / lat_count[c]);
+      const double qs[3] = {0.5, 0.9, 0.99};
+      const char* qn[3] = {"p50", "p90", "p99"};
+      for (int i = 0; i < 3; i++) {
+        snprintf(label, sizeof(label), "Latency %s: %s <= (us)", names[c], qn[i]);
+        print_double(label, lat_quantile_us(lat_hist[c], lat_count[c], qs[i]));
+      }
+    }
+  }
 
   print_section("MEMORY STATISTICS");
   print_int("Max Events Allocated on a PE", max_events_used);

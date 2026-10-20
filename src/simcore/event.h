@@ -28,6 +28,8 @@ struct RemoteEvent : public CMessage_RemoteEvent {
       phase = 0;
       anti = false;
       offset = 0;
+      send_ns = 0;
+      src_pe = -1;
     }
 
     Time ts;
@@ -43,6 +45,11 @@ struct RemoteEvent : public CMessage_RemoteEvent {
     bool anti;
     uint32_t offset;
 
+    // With --comm-stats: wall-clock send time (ns, CLOCK_REALTIME, so only
+    // comparable within a node) and the sending PE, for latency statistics
+    int64_t send_ns;
+    int32_t src_pe;
+
     uint8_t type_id;  /**< Used for double-dispatch of event data */
     uint8_t type_size;
     char* data;       /**< Points to memory for user event data */
@@ -55,6 +62,8 @@ struct RemoteEvent : public CMessage_RemoteEvent {
       p | phase;
       p | anti;
       p | offset;
+      p | send_ns;
+      p | src_pe;
       p | type_id;
       p | type_size;
       p(data, type_size);

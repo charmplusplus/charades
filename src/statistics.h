@@ -33,6 +33,7 @@
 #include "typedefs.h"
 
 #include <charm++.h>
+#include <chrono>
 
 /** MACRO to more easily access PE local statistics */
 #define PE_STATS(x) get_statistics()->x
@@ -74,6 +75,19 @@ class Statistics {
     uint64_t anti_cancels;
     ///@}
 
+    /** \name Communication stats (--comm-stats)
+     *  Time spent inside the send call for remote events and anti-events,
+     *  and send-to-receive latency histograms by where the sender is.
+     *////@{
+    static const int LAT_CLASSES = 3;  ///< same process, same node, other node
+    static const int LAT_BUCKETS = 40; ///< bucket b holds [2^b, 2^(b+1)) ns
+    double   send_time;                ///< seconds inside send calls
+    uint64_t timed_sends;              ///< number of send calls timed
+    uint64_t lat_count[LAT_CLASSES];
+    double   lat_sum[LAT_CLASSES];     ///< seconds
+    uint64_t lat_hist[LAT_CLASSES][LAT_BUCKETS];
+    ///@}
+
     /** \name GVT stats
      *  \todo Move these to the GVT controllers and add more
      *////@{
@@ -95,6 +109,8 @@ class Statistics {
   void add(const Statistics*);
   /** Reduces the passed in statistics object with this one */
   void reduce(const Statistics*);
+  /** Adds the communication and hold stats of another object (add/reduce) */
+  void add_comm(const Statistics*);
 
   /** \name Print Utility functions
    *  Utility functions for nicely printing out stats data
@@ -138,5 +154,22 @@ CkReductionMsg *statsReduction(int nMsg, CkReductionMsg **msgs);
 void registerStatsReduction();
 /** The type of the stats reduction used by the Charm++ runtime */
 extern CkReduction::reducerType statsReductionType;
+
+
+class RemoteEvent;
+
+/** \name --comm-stats helpers *////@{
+/** Wall-clock time in ns (CLOCK_REALTIME: comparable across PEs of a node) */
+inline int64_t comm_now_ns() {
+  return std::chrono::duration_cast<std::chrono::nanoseconds>(
+      std::chrono::system_clock::now().time_since_epoch()).count();
+}
+/** Stamp a message about to be sent; returns the start time for comm_send_end */
+int64_t comm_send_begin(RemoteEvent* e);
+/** Count the time since start as time spent in a send call */
+void comm_send_end(int64_t start_ns);
+/** Record the send-to-receive latency of a received message */
+void comm_record_latency(const RemoteEvent* e);
+///@}
 
 #endif

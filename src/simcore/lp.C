@@ -258,6 +258,8 @@ void LPChare::stop_scheduler() {
 }
 
 void LPChare::recv_remote_event(RemoteEvent* event) {
+  if (g_tw_comm_stats) comm_record_latency(event);
+
   /**
    * Inform the scheduler that the remote event was received (which may affect
    * the GVT computation)
@@ -328,6 +330,8 @@ void LPChare::recv_local_event(Event* e) {
 }
 
 void LPChare::recv_anti_event(RemoteEvent* event) {
+  if (g_tw_comm_stats) comm_record_latency(event);
+
   /**
    * Inform the scheduler that the anti event was received (which may affect
    * the GVT computation)

@@ -129,7 +129,13 @@ void tw_event_send(Event* e) {
     bool send_now = scheduler->produce(msg);
     e->offset = msg->offset;
     if (send_now) {
-      lps(dest_chare_id).recv_remote_event(msg);
+      if (g_tw_comm_stats) {
+        int64_t t0 = comm_send_begin(msg);
+        lps(dest_chare_id).recv_remote_event(msg);
+        comm_send_end(t0);
+      } else {
+        lps(dest_chare_id).recv_remote_event(msg);
+      }
     }
     e->msg = NULL;
     if (g_tw_synchronization_protocol == OPTIMISTIC) {
@@ -142,6 +148,12 @@ void tw_event_send(Event* e) {
 
 void charm_event_release(RemoteEvent* e) {
   int dest_chare = g_lp_mapper->get_chare_id(e->dest_lp);
+  if (g_tw_comm_stats) {
+    int64_t t0 = comm_send_begin(e);
+    lps(dest_chare).recv_remote_event(e);
+    comm_send_end(t0);
+    return;
+  }
   lps(dest_chare).recv_remote_event(e);
 }
 
@@ -181,7 +193,13 @@ void charm_anti_send(unsigned dest_chare_id, Event* e) {
   PE_STATS(anti_sends)++;
   // False when the original was still held: both were deleted unsent
   if (scheduler->produce(eventMsg)) {
-    lps(dest_chare_id).recv_anti_event(eventMsg);
+    if (g_tw_comm_stats) {
+      int64_t t0 = comm_send_begin(eventMsg);
+      lps(dest_chare_id).recv_anti_event(eventMsg);
+      comm_send_end(t0);
+    } else {
+      lps(dest_chare_id).recv_anti_event(eventMsg);
+    }
   }
 }
 

@@ -27,6 +27,7 @@ void parse_command_line(int argc, char** argv) {
   kernel.register_argument("gvt-reserve-threshold","Bucketed GVT: also hold events at offsets whose anti/regular ratio exceeds this", g_tw_reserve_threshold);
   kernel.register_argument("gvt-clear-lag",        "Bucketed GVT: release a held event once GVT has advanced more than this many buckets since it was held", g_tw_clear_lag);
   kernel.register_argument("gvt-clear-buckets",    "Bucketed GVT: buckets from GVT checked for early release on each advance (0 = all; 1 = release only on reaching its bucket)", g_tw_clear_buckets);
+  kernel.register_argument("comm-stats",           "Time remote send calls and send-to-receive latency - NO=0, YES=1", g_tw_comm_stats);
   kernel.register_argument("optimism-window",      "Optimistic: execute no event later than GVT + this (0 = unbounded)", g_tw_optimism_window);
   kernel.register_argument("gvt-async-reduction",  "Use asynchronous reductions in GVT - NO=0, YES=1", g_tw_async_reduction);
   kernel.register_argument("ldb-interval",         "Number of GVT computations between each LB call", g_tw_ldb_interval);
