@@ -95,6 +95,7 @@ class Statistics {
     uint64_t agg_msgs;         ///< messages htram sent
     uint64_t agg_bytes;        ///< bytes in those messages
     uint64_t agg_idle_flushes; ///< htram flushes from idle PEs
+    uint64_t agg_pp_bypasses;  ///< PP: local buffers sent alone, node buffer busy
     ///@}
 
     /** \name GVT stats

@@ -266,6 +266,7 @@ void agg_collect_stats(Statistics* s) {
   s->agg_msgs = tram->msgs_sent;
   s->agg_bytes = tram->bytes_sent;
   s->agg_idle_flushes = tram->idle_flushes;
+  s->agg_pp_bypasses = tram->local_bypasses;
 }
 
 #include "aggregation.def.h"

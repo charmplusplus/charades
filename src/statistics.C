@@ -67,7 +67,7 @@ void Statistics::clear() {
   send_time = 0.0;
   timed_sends = 0;
   agg_items = agg_urgent = agg_direct = 0;
-  agg_msgs = agg_bytes = agg_idle_flushes = 0;
+  agg_msgs = agg_bytes = agg_idle_flushes = agg_pp_bypasses = 0;
   for (int c = 0; c < LAT_CLASSES; c++) {
     lat_count[c] = 0;
     lat_sum[c] = 0.0;
@@ -165,6 +165,7 @@ void Statistics::add_comm(const Statistics* other) {
   agg_msgs += other->agg_msgs;
   agg_bytes += other->agg_bytes;
   agg_idle_flushes += other->agg_idle_flushes;
+  agg_pp_bypasses += other->agg_pp_bypasses;
   for (int c = 0; c < LAT_CLASSES; c++) {
     lat_count[c] += other->lat_count[c];
     lat_sum[c] += other->lat_sum[c];
@@ -298,6 +299,7 @@ void Statistics::print() const {
     print_double("Events per htram Message", agg_msgs ? (double)agg_items / agg_msgs : 0.0);
     print_double("Bytes per htram Message", agg_msgs ? (double)agg_bytes / agg_msgs : 0.0);
     print_int("htram Idle Flushes", agg_idle_flushes);
+    if (agg_pp_bypasses) print_int("htram PP Local Bypasses", agg_pp_bypasses);
   }
 
   print_section("MEMORY STATISTICS");
