@@ -43,9 +43,9 @@ Controller::Controller()
       last_rolled_back(0), last_committed(0), last_remote(0),
       last_stragglers(0),
       pending(BINS, 0.0), pending_total(0), pending_executed(0),
-      pending_remote(0), pending_stragglers(0),
+      pending_remote(0), pending_stragglers(0), pending_rolled_back(0),
       dist(BINS, 0.0), dist_total(0), dist_executed(0), dist_remote(0),
-      dist_stragglers(0), alpha(1),
+      dist_stragglers(0), dist_rolled_back(0), alpha(1),
       q(0), rounds(0), run_executed(0), run_stragglers(0),
       window(g_tw_optimism_window), first_time(0),
       window_time_sum(0), window_time(0), last_rate(-1), efficiency(0) {
@@ -160,14 +160,19 @@ double Controller::inverse_cdf(double q) const {
 /**
  * W = F^-1(min(Q_MAX, epsilon / (r * alpha))) over the decayed histogram.
  *
- * alpha (--ctl-calibrate=1) is how loose the bound r * F(W) is in practice:
- * the stragglers per executed event seen at the current W, over what the
- * bound allows there. Receivers rarely lead senders by the whole window, so
- * alpha is well below 1 and the uncalibrated bound throttles far more than
- * epsilon asks for (4 PEs, PHOLD at lookahead 10 / mean 200: 0.0001
- * stragglers per event against epsilon 0.05). alpha moves by at most a
- * factor of 2 per update, so a batch without stragglers opens the window
- * gradually instead of all at once.
+ * Uncalibrated (--ctl-calibrate=0, alpha = 1) this is the bound itself:
+ * primary stragglers per executed event at most epsilon. The bound is loose
+ * both ways. Receivers rarely lead senders by the whole window, so it
+ * throttles far more than needed (4 PEs, lookahead 10 / mean 200: 0.0001
+ * stragglers per event against epsilon 0.05); and a straggler can roll back
+ * many events and send anti-messages that roll back more (4 nodes: 0.017
+ * stragglers per event, 94% of events rolled back).
+ *
+ * Calibrated (the default), epsilon is the share of executed events that
+ * may be rolled back, and alpha is that share as seen at the current W over
+ * r * F(W): the delay distribution gives how waste grows with W, and the
+ * waste seen gives the scale, cascades included. alpha moves by at most a
+ * factor of 2 per update, so a quiet batch opens the window gradually.
  */
 Time Controller::quantile_window(const uint64_t* sum) {
   for (int b = 0; b < BINS; b++) {
@@ -177,6 +182,7 @@ Time Controller::quantile_window(const uint64_t* sum) {
   pending_executed += sum[EXECUTED];
   pending_remote += sum[REMOTE];
   pending_stragglers += sum[STRAGGLERS];
+  pending_rolled_back += sum[ROLLED_BACK];
   if (pending_total < BATCH || pending_executed == 0) return window;
 
   dist_total = 0;
@@ -188,16 +194,18 @@ Time Controller::quantile_window(const uint64_t* sum) {
   dist_executed = dist_executed * DECAY + pending_executed;
   dist_remote = dist_remote * DECAY + pending_remote;
   dist_stragglers = dist_stragglers * DECAY + pending_stragglers;
-  pending_total = pending_executed = pending_remote = pending_stragglers = 0;
+  dist_rolled_back = dist_rolled_back * DECAY + pending_rolled_back;
+  pending_total = pending_executed = pending_remote = pending_stragglers =
+      pending_rolled_back = 0;
 
   double r = dist_remote / dist_executed;
   if (g_tw_ctl_calibrate) {
     // What the bound allows at the window in force (0: unbounded)
     double bound = r * cdf(window ? window : g_tw_ts_end);
     if (bound > 0) {
-      double seen = dist_stragglers / dist_executed / bound;
-      alpha = std::min(1.0, std::max(alpha / 2, std::min(alpha * 2,
-          std::max(seen, 1e-4))));
+      double seen = dist_rolled_back / dist_executed / bound;
+      alpha = std::max(alpha / 2, std::min(alpha * 2,
+          std::min(1e4, std::max(seen, 1e-4))));
     }
   }
   q = std::min(Q_MAX, g_tw_ctl_epsilon / (r * alpha));
@@ -293,7 +301,7 @@ void Controller::finalize() {
   } else {
     CkPrintf("Policy                         delay quantile, epsilon %g, %s\n",
         g_tw_ctl_epsilon, g_tw_ctl_calibrate ? "calibrated" : "bound only");
-    CkPrintf("Final alpha (bound looseness)  %.4f\n", alpha);
+    CkPrintf("Final alpha (calibration)      %.4f\n", alpha);
   }
   CkPrintf("Rounds                         %d\n", rounds);
   CkPrintf("Final window                   %llu\n",

@@ -9,7 +9,9 @@
  * event are therefore at most r * F(W), with r the remote sends per executed
  * event and F the CDF of d over remote sends. The controller keeps that
  * bound at --ctl-epsilon: W = F^-1(min(Q_MAX, epsilon / r)). F is a property
- * of the model rather than of the window, so the rule is feed-forward.
+ * of the model rather than of the window. By default the bound is calibrated
+ * against the events actually rolled back, and epsilon is then the share of
+ * executed events that may be rolled back (see quantile_window).
  *
  * --ctl=2, the hill climb of Devastator (Bachan et al., PADS'24), as a
  * baseline in the same loop: from the efficiency (committed / executed)
@@ -75,10 +77,11 @@ class Controller : public CBase_Controller {
     /** Identical on every PE: computed only from reduced data */
     std::vector<double> pending; ///< global delays not yet folded into dist
     double pending_total, pending_executed, pending_remote,
-           pending_stragglers;
+           pending_stragglers, pending_rolled_back;
     std::vector<double> dist;    ///< decayed global histogram
-    double dist_total, dist_executed, dist_remote, dist_stragglers;
-    double alpha;                ///< calibration: seen / bound stragglers
+    double dist_total, dist_executed, dist_remote, dist_stragglers,
+           dist_rolled_back;
+    double alpha;                ///< calibration: waste seen / r * F(W)
     double q;                    ///< last quantile the rule asked for
     int rounds;
     double run_executed, run_stragglers;  ///< over every round, for the summary

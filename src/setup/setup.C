@@ -22,6 +22,14 @@ void tw_init(int argc, char** argv) {
       g_tw_ldb_first = g_tw_ldb_interval;
     }
   }
+
+  // The delay-quantile controller with no starting window starts from the
+  // smallest one and opens it as delays arrive: starting wide can set off a
+  // rollback storm that slows GVT, and with it the controller, for most of a
+  // run (4 nodes, lookahead 10 / mean 200, from W 2000: 6% efficiency).
+  if (g_tw_ctl == 1 && g_tw_optimism_window == 0) {
+    g_tw_optimism_window = g_tw_gvt_scheme == 4 ? g_tw_gvt_bucket_size : 1;
+  }
 }
 
 /**

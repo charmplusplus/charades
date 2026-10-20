@@ -12,9 +12,10 @@
 #              phases:10:200:100:1000:0.5:8000"
 #     steady:<lookahead>:<mean>:<remote>
 #     phases:<lookahead>:<mean>:<alt lookahead>:<alt mean>:<remote>:<length>
-#   ARMS="w:25 w:50 w:100 w:250 w:500 q:0.01 q:0.05 hill:250"
-#     w:<W> a fixed window; q:<epsilon> the quantile rule (calibrated, from
-#     W 2000); qb:<epsilon> the same without calibration; hill:<W0> the hill
+#   ARMS="w:25 w:50 w:100 w:250 w:500 q:0.02 q:0.05 q:0.1 hill:250"
+#     w:<W> a fixed window; q:<epsilon> the quantile rule (calibrated: the
+#     share of events rolled back; from the smallest window); qb:<epsilon>
+#     the bare bound (primary stragglers per event); hill:<W0> the hill
 #     climb from W0
 #   AGG="pp:64" (htram mode:buffer with the deadline policy, so the horizon
 #     follows the window; "off" sends directly), TREE=charades-qd,
@@ -26,7 +27,7 @@ source "$(dirname "$0")/env.sh"
 NODES=${NODES:-4} PPN=${PPN:-2} PEPP=${PEPP:-8} LPS_PER_PE=${LPS_PER_PE:-128}
 START=${START:-15} END=${END:-64000} CAP=${CAP:-180} TREE=${TREE:-charades-qd}
 WORKLOADS=${WORKLOADS:-"steady:10:200:0.5 steady:100:1000:0.5 phases:10:200:100:1000:0.5:8000"}
-ARMS=${ARMS:-"w:25 w:50 w:100 w:250 w:500 q:0.01 q:0.05 hill:250"}
+ARMS=${ARMS:-"w:25 w:50 w:100 w:250 w:500 q:0.02 q:0.05 q:0.1 hill:250"}
 AGG=${AGG:-pp:64}
 EXTRA_ARGS=${EXTRA_ARGS-"+lci_ndevices 8"}
 C=$WORK/$TREE
@@ -44,8 +45,8 @@ run_one() {  # nodes procs pes cfg arm label
   local extra=()
   case $kind in
     w)    extra+=(--optimism-window=$val) ;;
-    q)    extra+=(--optimism-window=2000 --ctl=1 --ctl-epsilon=$val) ;;
-    qb)   extra+=(--optimism-window=2000 --ctl=1 --ctl-epsilon=$val --ctl-calibrate=0) ;;
+    q)    extra+=(--ctl=1 --ctl-epsilon=$val) ;;
+    qb)   extra+=(--ctl=1 --ctl-epsilon=$val --ctl-calibrate=0) ;;
     hill) extra+=(--optimism-window=$val --ctl=2) ;;
   esac
   if [ "$AGG" != off ]; then
