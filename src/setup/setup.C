@@ -1,5 +1,6 @@
 #include "setup.h"
 
+#include "aggregation.h"
 #include "command_line.h"
 #include "factory.h"
 #include "mapper.h"
@@ -70,6 +71,12 @@ static void create_scheduler_group(void*, void* msg) {
     default:
       CkAbort("Unknown synchronization protocol\n");
   }
+}
+
+/** QD callback on PE 0: create htram, then the scheduler group */
+static void create_aggregation(void*, void* msg) {
+  if (msg) CkFreeMsg(msg);
+  agg_create(CkCallback(create_scheduler_group, NULL));
 }
 
 void tw_create_simulation(LPFactory* factory) {
@@ -146,7 +153,13 @@ void tw_create_simulation(LPFactory* factory, LPMapper* mapper) {
     // the configuration, and read defaults (e.g. an 8192-event buffer, the
     // default GVT settings). Quiescence cannot be reached until every rank 0
     // has entered the scheduler below, i.e. finished parsing and model setup.
-    CkStartQD(CkCallback(create_scheduler_group, NULL));
+    // With aggregation, htram and the aggregators come first: the scheduler
+    // group's creation is their completion callback.
+    if (g_tw_aggregation) {
+      CkStartQD(CkCallback(create_aggregation, NULL));
+    } else {
+      CkStartQD(CkCallback(create_scheduler_group, NULL));
+    }
   }
   StartCharmScheduler();
 }

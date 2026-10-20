@@ -28,6 +28,12 @@ void parse_command_line(int argc, char** argv) {
   kernel.register_argument("gvt-clear-lag",        "Bucketed GVT: release a held event once GVT has advanced more than this many buckets since it was held", g_tw_clear_lag);
   kernel.register_argument("gvt-clear-buckets",    "Bucketed GVT: buckets from GVT checked for early release on each advance (0 = all; 1 = release only on reaching its bucket)", g_tw_clear_buckets);
   kernel.register_argument("comm-stats",           "Time remote send calls and send-to-receive latency - NO=0, YES=1", g_tw_comm_stats);
+  kernel.register_argument("aggregation",          "Send remote events through htram (needs HTRAM_DIR in config.mk) - NO=0, YES=1", g_tw_aggregation);
+  kernel.register_argument("agg-mode",             "htram aggregation mode - WPs=0, WsP=1, PP=2, WW=3", g_tw_agg_mode);
+  kernel.register_argument("agg-buffer",           "htram buffer size in events (PP: a multiple of 16)", g_tw_agg_buffer);
+  kernel.register_argument("agg-urgent",           "Ship an event at once if its ts < GVT + this (0 = never)", g_tw_agg_urgent);
+  kernel.register_argument("agg-scope",            "Aggregate events to - ALL REMOTE CHARES=0, OTHER PROCESSES ONLY=1", g_tw_agg_scope);
+  kernel.register_argument("agg-gvt-flush",        "On each GVT update flush - NOTHING=0, DESTINATIONS NOT FILLING=1, EVERYTHING=2", g_tw_agg_gvt_flush);
   kernel.register_argument("optimism-window",      "Optimistic: execute no event later than GVT + this (0 = unbounded)", g_tw_optimism_window);
   kernel.register_argument("gvt-async-reduction",  "Use asynchronous reductions in GVT - NO=0, YES=1", g_tw_async_reduction);
   kernel.register_argument("ldb-interval",         "Number of GVT computations between each LB call", g_tw_ldb_interval);

@@ -37,3 +37,10 @@ Outputs go under `$RUNS` (default `$WORK/charades-runs`).
   sweep: rate, efficiency, messages per event and send-call cost per remote
   fraction, and a fit of PE time per event against messages per event
   (the full cost of one remote message).
+- `agg_sweep.sh <reps> [out.csv]` — uniform PHOLD sent directly vs. through
+  htram (`--aggregation=1`), over htram mode (WPs, WsP, PP, WW), buffer size
+  and `--agg-urgent`, per GVT setup, remote fraction and node count (knobs in
+  the header; defaults: 4 nodes, remote 0.5, bucketed GVT with window 250,
+  `+lci_ndevices 8`, `--comm-stats=1`). Needs a tree built with `HTRAM_DIR`
+  (`src/htram.mk`). `agg_summary.py <csv...>` prints medians per case and the
+  rate relative to the direct runs.

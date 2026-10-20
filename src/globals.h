@@ -49,6 +49,15 @@ extern uint32_t g_tw_clear_lag;
 extern uint32_t g_tw_clear_buckets;
 ///@}
 
+/** \name Event aggregation through htram (aggregation.h) *////@{
+extern unsigned g_tw_aggregation;     ///< send remote events through htram
+extern unsigned g_tw_agg_mode;        ///< htram mode: WPs=0, WsP=1, PP=2, WW=3
+extern unsigned g_tw_agg_buffer;      ///< htram buffer size, in events
+extern Time     g_tw_agg_urgent;      ///< events with ts < GVT + this ship at once
+extern unsigned g_tw_agg_scope;       ///< 0: all remote chares, 1: other processes only
+extern unsigned g_tw_agg_gvt_flush;   ///< on each GVT update: 0 none, 1 stale, 2 all
+///@}
+
 /** \name LB Configuration *////@{
 extern uint32_t g_tw_ldb_continuous;
 extern uint32_t g_tw_ldb_first;     ///< first interval to call lb

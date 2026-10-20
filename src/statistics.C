@@ -66,6 +66,8 @@ void Statistics::clear() {
   // Communication stats
   send_time = 0.0;
   timed_sends = 0;
+  agg_items = agg_urgent = agg_direct = 0;
+  agg_msgs = agg_bytes = agg_idle_flushes = 0;
   for (int c = 0; c < LAT_CLASSES; c++) {
     lat_count[c] = 0;
     lat_sum[c] = 0.0;
@@ -157,6 +159,12 @@ void Statistics::add_comm(const Statistics* other) {
   anti_cancels += other->anti_cancels;
   send_time += other->send_time;
   timed_sends += other->timed_sends;
+  agg_items += other->agg_items;
+  agg_urgent += other->agg_urgent;
+  agg_direct += other->agg_direct;
+  agg_msgs += other->agg_msgs;
+  agg_bytes += other->agg_bytes;
+  agg_idle_flushes += other->agg_idle_flushes;
   for (int c = 0; c < LAT_CLASSES; c++) {
     lat_count[c] += other->lat_count[c];
     lat_sum[c] += other->lat_sum[c];
@@ -279,6 +287,17 @@ void Statistics::print() const {
         print_double(label, lat_quantile_us(lat_hist[c], lat_count[c], qs[i]));
       }
     }
+  }
+
+  if (agg_items || agg_direct) {
+    print_section("AGGREGATION STATISTICS");
+    print_int("Events Through htram", agg_items);
+    print_int("Events Shipped Urgently", agg_urgent);
+    print_int("Events Sent Directly", agg_direct);
+    print_int("htram Messages", agg_msgs);
+    print_double("Events per htram Message", agg_msgs ? (double)agg_items / agg_msgs : 0.0);
+    print_double("Bytes per htram Message", agg_msgs ? (double)agg_bytes / agg_msgs : 0.0);
+    print_int("htram Idle Flushes", agg_idle_flushes);
   }
 
   print_section("MEMORY STATISTICS");

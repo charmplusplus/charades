@@ -33,14 +33,18 @@ model_dir = os.path.abspath(os.path.join(test_dir, '..', 'models'))
 KNOWN_BROKEN = {'cd', 'phased'}
 
 
-def charm_dir():
-  """CHARM_DIR from src/config.mk, which the model Makefiles also use."""
+def config_value(name):
+  """A variable from src/config.mk, which the model Makefiles also use."""
   with open(os.path.join(src_dir, 'config.mk')) as f:
     for line in f:
       key, _, value = line.partition('=')
-      if key.strip() == 'CHARM_DIR':
+      if key.strip() == name and value.strip():
         return value.strip()
-  sys.exit('CHARM_DIR not set in src/config.mk')
+  return None
+
+
+def charm_dir():
+  return config_value('CHARM_DIR') or sys.exit('CHARM_DIR not set in src/config.mk')
 
 
 class Launch:
@@ -134,6 +138,13 @@ def main():
     names = [n for n in names if n in opts.configs]
   elif not opts.all:
     names = [n for n in names if n not in KNOWN_BROKEN]
+  # The agg_* configs send events through htram, which is built in only when
+  # src/config.mk sets HTRAM_DIR (see src/htram.mk)
+  if not config_value('HTRAM_DIR'):
+    skipped = [n for n in names if n.startswith('agg_')]
+    if skipped:
+      print('HTRAM_DIR not set in src/config.mk; skipping ' + ', '.join(skipped))
+    names = [n for n in names if not n.startswith('agg_')]
 
   launches = [Launch(1, 1), Launch(1, 2), Launch(1, 3), Launch(1, 4),
               Launch(2, 2), Launch(2, 4), Launch(4, 4)]

@@ -88,6 +88,15 @@ class Statistics {
     uint64_t lat_hist[LAT_CLASSES][LAT_BUCKETS];
     ///@}
 
+    /** \name Aggregation stats (--aggregation) *////@{
+    uint64_t agg_items;        ///< remote events sent through htram
+    uint64_t agg_urgent;       ///< of those, shipped at once (--agg-urgent)
+    uint64_t agg_direct;       ///< remote events htram could not take
+    uint64_t agg_msgs;         ///< messages htram sent
+    uint64_t agg_bytes;        ///< bytes in those messages
+    uint64_t agg_idle_flushes; ///< htram flushes from idle PEs
+    ///@}
+
     /** \name GVT stats
      *  \todo Move these to the GVT controllers and add more
      *////@{

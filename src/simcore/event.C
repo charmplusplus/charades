@@ -1,5 +1,6 @@
 #include "event.h"
 
+#include "aggregation.h"
 #include "avl_tree.h"
 #include "event_buffer.h"
 #include "factory.h"
@@ -92,6 +93,18 @@ void tw_event_free(Event *e, bool commit) {
   PE_VALUE(event_buffer)->free_event(e);
 }
 
+/** Send a remote event: through htram when aggregating, else on its own */
+static void send_remote(RemoteEvent* msg, uint64_t dest_chare) {
+  if (agg_send(msg, dest_chare)) return;
+  if (g_tw_comm_stats) {
+    int64_t t0 = comm_send_begin(msg);
+    lps(dest_chare).recv_remote_event(msg);
+    comm_send_end(t0);
+  } else {
+    lps(dest_chare).recv_remote_event(msg);
+  }
+}
+
 void tw_event_send(Event* e) {
   Scheduler* scheduler = CpvAccess(g_scheduler);
   if (e == PE_VALUE(abort_event)) {
@@ -129,13 +142,7 @@ void tw_event_send(Event* e) {
     bool send_now = scheduler->produce(msg);
     e->offset = msg->offset;
     if (send_now) {
-      if (g_tw_comm_stats) {
-        int64_t t0 = comm_send_begin(msg);
-        lps(dest_chare_id).recv_remote_event(msg);
-        comm_send_end(t0);
-      } else {
-        lps(dest_chare_id).recv_remote_event(msg);
-      }
+      send_remote(msg, dest_chare_id);
     }
     e->msg = NULL;
     if (g_tw_synchronization_protocol == OPTIMISTIC) {
@@ -147,14 +154,7 @@ void tw_event_send(Event* e) {
 }
 
 void charm_event_release(RemoteEvent* e) {
-  int dest_chare = g_lp_mapper->get_chare_id(e->dest_lp);
-  if (g_tw_comm_stats) {
-    int64_t t0 = comm_send_begin(e);
-    lps(dest_chare).recv_remote_event(e);
-    comm_send_end(t0);
-    return;
-  }
-  lps(dest_chare).recv_remote_event(e);
+  send_remote(e, g_lp_mapper->get_chare_id(e->dest_lp));
 }
 
 void tw_event_rollback(Event * event) {

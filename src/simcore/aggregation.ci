@@ -1,0 +1,10 @@
+module aggregation {
+#ifdef CHARADES_HTRAM
+  extern module htram_group;
+
+  /** Per-PE glue between the event send/receive paths and htram */
+  group Aggregator {
+    entry [notrace] Aggregator(CkGroupID tram);
+  };
+#endif
+};

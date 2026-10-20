@@ -1,0 +1,7 @@
+# Optimistic w/Bucketed GVT, events aggregated through htram (WPs)
+sync=3
+gvt=4
+buffer-size=655360
+aggregation=1
+agg-mode=0
+agg-buffer=16

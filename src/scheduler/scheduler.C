@@ -1,5 +1,6 @@
 #include "scheduler.h"
 
+#include "aggregation.h"
 #include "event_buffer.h"
 #include "globals.h"
 #include "gvtmanager.h"
@@ -67,6 +68,7 @@ void Scheduler::end_simulation() {
 }
 
 void Scheduler::finalize_complete() {
+  agg_collect_stats(cumulative_stats);
   contribute(sizeof(Statistics), cumulative_stats, statsReductionType,
       CkCallback(CkIndex_Scheduler::finalize(NULL), thisProxy[0]));
 }
@@ -202,6 +204,9 @@ void DistributedScheduler::iteration_done() {
   running = false;
   gvt_trigger->iteration_done();
   if (gvt_trigger->ready()) {
+    // A blocking GVT waits for quiescence, which cannot see events still in
+    // htram's buffers; this PE sends nothing more until the round ends.
+    if (!gvt_manager->is_continuous()) agg_flush_all();
     gvt_manager->gvt_begin();
     gvt_trigger->reset();
   } else {
@@ -237,6 +242,8 @@ void DistributedScheduler::gvt_done(Time gvt, bool lb) {
   TW_ASSERT(gvt >= PE_VALUE(g_last_gvt), "GVT Causality Violation\n");
   PE_STATS(total_gvts)++;
   PE_VALUE(g_last_gvt) = gvt;
+  // Buffered events may now be at GVT, holding up the next advance
+  agg_flush_gvt();
 
   // TODO: Make stats trigger work like print trigger does below.
 #if CMK_TRACE_ENABLED

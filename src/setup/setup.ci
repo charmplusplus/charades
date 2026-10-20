@@ -5,4 +5,5 @@ mainmodule setup {
   extern module gvtmanager;
   extern module lp;
   extern module scheduler;
+  extern module aggregation;
 }

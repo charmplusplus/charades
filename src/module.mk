@@ -1,4 +1,5 @@
 include ../config.mk
+include ../htram.mk
 
 C_FILES=$(wildcard *.C)
 CPP_FILES=$(wildcard *.cpp)
@@ -19,8 +20,8 @@ $(BUILD_DIR):
 
 make_ci: $(MODULES)
 
-%.decl.h: %.ci
-	$(CHARMC) $<
+%.decl.h: %.ci ../config.mk
+	$(CHARMC) $(CIFLAGS) $<
 
 $(BUILD_DIR)/%.o: %.C $(MODULES) ../config.mk
 	$(CHARMC) $(CFLAGS) $(DEPFLAGS) -c $< -o $@

@@ -28,3 +28,7 @@ CFLAGS+=-DUSE_CHARMC=$(USE_CHARMC)
 
 # Required: charmc defaults to -std=gnu++11, which rejects the constexpr RNG code
 CFLAGS += -std=c++17
+
+# OPTIONAL: event aggregation through htram (--aggregation=1). Point this at
+# an htram checkout on its pdes branch; see htram.mk.
+#HTRAM_DIR = /path/to/htram

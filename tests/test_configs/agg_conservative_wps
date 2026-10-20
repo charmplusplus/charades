@@ -1,0 +1,5 @@
+# Conservative, events aggregated through htram (WPs)
+sync=2
+aggregation=1
+agg-mode=0
+agg-buffer=16

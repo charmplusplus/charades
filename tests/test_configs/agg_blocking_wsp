@@ -1,0 +1,6 @@
+# Optimistic w/Blocking GVT, events aggregated through htram (WsP)
+sync=3
+gvt=1
+aggregation=1
+agg-mode=1
+agg-buffer=16
