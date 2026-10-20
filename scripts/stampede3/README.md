@@ -44,3 +44,7 @@ Outputs go under `$RUNS` (default `$WORK/charades-runs`).
   `+lci_ndevices 8`, `--comm-stats=1`). Needs a tree built with `HTRAM_DIR`
   (`src/htram.mk`). `agg_summary.py <csv...>` prints medians per case and the
   rate relative to the direct runs.
+- `catch_hang.sh <reps> <cap s> <N> <procs> <pes> <model dir> <model cfg>
+  <test cfg> [args]` — rerun one test case until a run hangs, then save gdb
+  stacks of every thread on every node it used (`$RUNS/hang/<case>/`) and
+  cancel the step.
