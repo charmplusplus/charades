@@ -70,6 +70,7 @@ class Controller : public CBase_Controller {
   private:
     std::vector<uint64_t> hist;  ///< this PE, since its last contribution
     bool contributed;            ///< in the current round, awaiting apply()
+    unsigned gvts_since;         ///< GVT updates since the last result
     uint64_t last_executed, last_rolled_back, last_committed, last_remote,
              last_stragglers;
     double last_time;

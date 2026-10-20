@@ -53,6 +53,7 @@ Time     g_tw_agg_horizon;
 unsigned g_tw_ctl;
 double   g_tw_ctl_epsilon;
 unsigned g_tw_ctl_calibrate;
+unsigned g_tw_ctl_interval;
 unsigned g_tw_ctl_log;
 unsigned g_tw_async_reduction;
 double   g_tw_reserve_threshold;
@@ -112,6 +113,7 @@ void clear_globals() {
   g_tw_ctl                = 0;
   g_tw_ctl_epsilon        = 0.05;
   g_tw_ctl_calibrate      = 1;
+  g_tw_ctl_interval       = 8;
   g_tw_ctl_log            = 0;
   g_tw_async_reduction = 0;
   g_tw_reserve_threshold = 1.0;

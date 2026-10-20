@@ -21,6 +21,10 @@ static const double Q_MAX = 0.99;
  */
 static const double DECAY = 0.5;
 static const double BATCH = 256;
+/** Calibration moves alpha this share of the way (in log) per fold, ... */
+static const double ALPHA_GAIN = 0.25;
+/** ... and by at most this factor */
+static const double ALPHA_STEP = 1.25;
 /** Devastator's moving average: the last 16 rounds */
 static const size_t HILL_ROUNDS = 16;
 
@@ -39,7 +43,7 @@ void ctl_finalize() {
 }
 
 Controller::Controller()
-    : hist(BINS, 0), contributed(false), last_executed(0),
+    : hist(BINS, 0), contributed(false), gvts_since(0), last_executed(0),
       last_rolled_back(0), last_committed(0), last_remote(0),
       last_stragglers(0),
       pending(BINS, 0.0), pending_total(0), pending_executed(0),
@@ -93,9 +97,17 @@ static uint64_t delta(uint64_t now, uint64_t* last) {
   return d;
 }
 
+/**
+ * Contribute on every --ctl-interval-th GVT update after the last result.
+ * One reduction per GVT update cost 12-20% on 4 nodes (a GVT every 0.65 ms).
+ * Every PE contributes once per round, so rounds stay matched even where
+ * PEs see different numbers of GVT updates (async blocking GVT drops stale
+ * results).
+ */
 void Controller::gvt_done() {
-  if (contributed) return;
+  if (contributed || ++gvts_since < g_tw_ctl_interval) return;
   contributed = true;
+  gvts_since = 0;
 
   std::vector<uint64_t> v(FIELDS, 0);
   std::copy(hist.begin(), hist.end(), v.begin());
@@ -171,8 +183,8 @@ double Controller::inverse_cdf(double q) const {
  * Calibrated (the default), epsilon is the share of executed events that
  * may be rolled back, and alpha is that share as seen at the current W over
  * r * F(W): the delay distribution gives how waste grows with W, and the
- * waste seen gives the scale, cascades included. alpha moves by at most a
- * factor of 2 per update, so a quiet batch opens the window gradually.
+ * waste seen gives the scale, cascades included. alpha moves slowly (see
+ * ALPHA_GAIN): the histogram follows phase changes, alpha only the scale.
  */
 Time Controller::quantile_window(const uint64_t* sum) {
   for (int b = 0; b < BINS; b++) {
@@ -203,9 +215,13 @@ Time Controller::quantile_window(const uint64_t* sum) {
     // What the bound allows at the window in force (0: unbounded)
     double bound = r * cdf(window ? window : g_tw_ts_end);
     if (bound > 0) {
-      double seen = dist_rolled_back / dist_executed / bound;
-      alpha = std::max(alpha / 2, std::min(alpha * 2,
-          std::min(1e4, std::max(seen, 1e-4))));
+      // Geometric smoothing: a quarter of the way per fold, at most 1.25x.
+      // Rollbacks come in bursts; moving alpha 2x per fold made W swing
+      // 12-60 around a best fixed W of 25 (4 nodes, lookahead 10 / mean 200).
+      double seen = std::min(1e4, std::max(dist_rolled_back / dist_executed /
+          bound, 1e-4));
+      double step = std::pow(seen / alpha, ALPHA_GAIN);
+      alpha *= std::min(ALPHA_STEP, std::max(1 / ALPHA_STEP, step));
     }
   }
   q = std::min(Q_MAX, g_tw_ctl_epsilon / (r * alpha));

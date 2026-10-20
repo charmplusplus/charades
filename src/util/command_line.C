@@ -40,6 +40,7 @@ void parse_command_line(int argc, char** argv) {
   kernel.register_argument("ctl",                  "Set the optimism window online - NO=0, DELAY QUANTILE=1, HILL CLIMB (Devastator)=2", g_tw_ctl);
   kernel.register_argument("ctl-epsilon",          "Delay quantile rule: target share of executed events rolled back (uncalibrated: primary stragglers per executed event)", g_tw_ctl_epsilon);
   kernel.register_argument("ctl-calibrate",        "Delay quantile rule: scale the straggler bound by the events seen rolled back - NO=0, YES=1", g_tw_ctl_calibrate);
+  kernel.register_argument("ctl-interval",         "GVT updates per controller round (at least 1)", g_tw_ctl_interval);
   kernel.register_argument("ctl-log",              "Print every controller round - NO=0, YES=1", g_tw_ctl_log);
   kernel.register_argument("gvt-async-reduction",  "Use asynchronous reductions in GVT - NO=0, YES=1", g_tw_async_reduction);
   kernel.register_argument("ldb-interval",         "Number of GVT computations between each LB call", g_tw_ldb_interval);
