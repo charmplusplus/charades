@@ -11,7 +11,7 @@
 #   MODES="wps wsp pp ww", BUFFERS="16 64 256 1024", URGENTS="0",
 #   DIRECT=1 (also run without aggregation), GVT_FLUSH=2, SCOPE=0,
 #   PPN=2 (processes per node), PEPP=8 (PEs per process), LPS_PER_PE=128,
-#   START=15 (start events per LP), END=32000, CAP=120 (s), TREE=charades,
+#   START=15 (start events per LP), END=32000, CAP=120 (s), TREE=charades-qd,
 #   EXTRA_ARGS="+lci_ndevices 8" (appended to every run).
 # One CSV row per run, with --comm-stats on; a run that hits CAP is cancelled
 # with scancel (never SIGKILL srun, which orphans the step) and recorded as
@@ -22,7 +22,7 @@ NODES=${NODES:-4} REMOTES=${REMOTES:-0.5} GVTS=${GVTS:-bucket:250}
 MODES=${MODES:-"wps wsp pp ww"} BUFFERS=${BUFFERS:-"16 64 256 1024"}
 URGENTS=${URGENTS:-0} DIRECT=${DIRECT:-1} GVT_FLUSH=${GVT_FLUSH:-2} SCOPE=${SCOPE:-0}
 PPN=${PPN:-2} PEPP=${PEPP:-8} LPS_PER_PE=${LPS_PER_PE:-128} START=${START:-15}
-END=${END:-32000} CAP=${CAP:-120} TREE=${TREE:-charades}
+END=${END:-32000} CAP=${CAP:-120} TREE=${TREE:-charades-qd}
 EXTRA_ARGS=${EXTRA_ARGS-"+lci_ndevices 8"}
 C=$WORK/$TREE
 out=${RUNS:-$WORK/charades-runs}/agg_sweep; mkdir -p $out/logs; cd $out
