@@ -458,9 +458,32 @@ node takes the job's `SLURM_*` variables from idev's environment file so
 
 ## Next steps, in order
 
-1. Go/no-go passed: start the htram path (`-DPDES` fixed-slot items,
-   urgent send, min-key query; Charades sends through it; anti-messages and
-   GVT control bypass). Target: the per-message cost table above.
+1. Go/no-go passed: send events through htram. Target: the per-message cost
+   table above. Decided 2026-10-20: a fixed-slot `-DPDES` item now (not the
+   byte-oriented core), on htram branch `pdes`, and every htram aggregation
+   mode (WPs, WsP, PP, WW) tested as a transport arm.
+   - htram `pdes` (built with `-DPDES -DBUCKETS_BY_DEST`):
+     - `PdesItem` (event header + 16 B payload, ~64 B);
+     - `sendUrgent(item, pe)`;
+     - `flushDest` for WsP and PP, so one flush policy runs in all modes;
+     - fix the WW `receiveOnPE` leak of `buf`, which also skips `tot_recv_count`;
+     - make `receiveOnProc` abort (it drops items in BUCKETS_BY_DEST builds);
+     - SSSP parity check before merging to master.
+   - Charades branch `htram`:
+     - Options: `--aggregation`, `--agg-mode`, `--agg-buffer`, `--agg-urgent=k` (ship events within k buckets of GVT now), `--agg-scope`.
+     - Send path: `produce()`, then insert into htram. Receive: rebuild a `RemoteEvent` and call `recv_remote_event`. Anti-messages and GVT control bypass htram.
+     - Flush rules:
+       - `flushIdle` when `execute()` finds no ready LP or is window-blocked. The scheduler never goes idle in Charm's sense, so `[whenidle]` won't fire.
+       - `flushStale` each GVT round.
+       - `tflush` in `gvt_begin` before QD for blocking GVT. Otherwise QD can complete with events still buffered.
+     - Event holding off with aggregation for now.
+     - Gate: every `test.py` config in all four modes, with the committed count unchanged.
+   - Sweep:
+     - mode × buffer {16, 64, 256, 1024} at remote 0.5, 4 nodes;
+     - then the best two modes × urgency × remote {0.1, 0.5, 1} × nodes {2, 4, 8};
+     - then PPN 1 vs 2.
+     
+     Full design and predictions are in the research plan, "Current phase".
 2. Window sweep on a model with different lookahead/delay and a
    phase-changing PHOLD (e.g. remote 0 ↔ 0.5 phases), to show the best static
    window moves; then the histogram controller. Include the remote-0 case,
