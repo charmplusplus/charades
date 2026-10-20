@@ -41,14 +41,14 @@ $(SUB_DIRS):
 %.decl.h: %.ci
 	$(CHARMC) $<
 
-$(BUILD_DIR)/%.o: %.C $(MODULES) config.mk
+$(BUILD_DIR)/%.o: %.C $(MODULES) config.mk htram.mk
 	$(CHARMC) $(CFLAGS) $(DEPFLAGS) -c $< -o $@
 
 ifneq ($(HTRAM_DIR),)
 $(HTRAM_DECL): $(HTRAM_DIR)/htram_group.ci
 	cd $(HTRAM_DIR) && $(CHARMC) $(HTRAM_FLAGS) htram_group.ci
 
-$(HTRAM_OBJ): $(HTRAM_DIR)/htram_group.C $(HTRAM_DECL) config.mk
+$(HTRAM_OBJ): $(HTRAM_DIR)/htram_group.C $(HTRAM_DECL) config.mk htram.mk
 	mkdir -p $(dir $@)
 	$(CHARMC) -O3 -std=c++17 $(HTRAM_FLAGS) -I$(HTRAM_DIR) $(DEPFLAGS) -c $< -o $@
 

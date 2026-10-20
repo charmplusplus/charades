@@ -96,6 +96,19 @@ class Statistics {
     uint64_t agg_bytes;        ///< bytes in those messages
     uint64_t agg_idle_flushes; ///< htram flushes from idle PEs
     uint64_t agg_pp_bypasses;  ///< PP: local buffers sent alone, node buffer busy
+    /// htram messages by what sent them: a buffer filling during an insert,
+    /// an urgent event, an idle PE, a GVT update, a blocking GVT round
+    uint64_t agg_msgs_full, agg_msgs_urgent, agg_msgs_idle, agg_msgs_gvt,
+             agg_msgs_round;
+    ///@}
+
+    /** \name Remote event slack (--comm-stats): on arrival, the event's ts
+     *  minus its chare's current time. Zero or less is a straggler (rollback).
+     *////@{
+    static const int SLACK_BUCKETS = 40; ///< bucket b holds [2^b, 2^(b+1))
+    uint64_t remote_arrivals;
+    uint64_t remote_stragglers;
+    uint64_t slack_hist[SLACK_BUCKETS];
     ///@}
 
     /** \name GVT stats
@@ -174,6 +187,9 @@ inline int64_t comm_now_ns() {
   return std::chrono::duration_cast<std::chrono::nanoseconds>(
       std::chrono::system_clock::now().time_since_epoch()).count();
 }
+/** Record a remote event's slack: its ts against its chare's current time */
+void comm_record_slack(Time ts, Time current);
+
 /** Stamp a message about to be sent; returns the start time for comm_send_end */
 int64_t comm_send_begin(RemoteEvent* e);
 /** Count the time since start as time spent in a send call */

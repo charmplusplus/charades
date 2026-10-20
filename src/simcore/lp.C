@@ -286,6 +286,8 @@ void LPChare::recv_remote_event(RemoteEvent* event) {
     }
   }
 
+  if (g_tw_comm_stats && isOptimistic) comm_record_slack(e->ts, get_current_time());
+
   /**
    * After pre-processing, the locally allocated event is passed to
    * recv_local_event for the remainder of the work.

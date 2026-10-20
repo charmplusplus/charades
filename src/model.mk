@@ -9,7 +9,7 @@ include $(CHARADES_SRC)/htram.mk
 # .d file, so that editing any of them rebuilds the model. The library is
 # order-only: it must be built first, since that generates the framework's
 # .decl.h files, but rebuilding it does not by itself recompile the model.
-%.o: %.C $(CHARADES_SRC)/config.mk | $(BUILD_DIR)/libcharades.a
+%.o: %.C $(CHARADES_SRC)/config.mk $(CHARADES_SRC)/htram.mk | $(BUILD_DIR)/libcharades.a
 	$(CC) $(CFLAGS) -MMD -MP -c $< -o $@
 
 # Always bring the framework up to date first: otherwise editing a header in

@@ -48,6 +48,8 @@ unsigned g_tw_agg_buffer;
 Time     g_tw_agg_urgent;
 unsigned g_tw_agg_scope;
 unsigned g_tw_agg_gvt_flush;
+unsigned g_tw_agg_policy;
+Time     g_tw_agg_horizon;
 unsigned g_tw_async_reduction;
 double   g_tw_reserve_threshold;
 uint32_t g_tw_reserve_buckets;
@@ -101,6 +103,8 @@ void clear_globals() {
   g_tw_agg_urgent         = 0;
   g_tw_agg_scope          = 0;
   g_tw_agg_gvt_flush      = 2;
+  g_tw_agg_policy         = 0;
+  g_tw_agg_horizon        = 0;
   g_tw_async_reduction = 0;
   g_tw_reserve_threshold = 1.0;
   g_tw_reserve_buckets = 0;

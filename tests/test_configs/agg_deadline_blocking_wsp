@@ -1,0 +1,8 @@
+# Optimistic w/Blocking GVT, htram (WsP), deadline flush policy (no window:
+# only the flush before each GVT round)
+sync=3
+gvt=1
+aggregation=1
+agg-mode=1
+agg-buffer=16
+agg-policy=1

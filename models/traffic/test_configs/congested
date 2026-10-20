@@ -1,0 +1,17 @@
+# 8 x 8 intersections, 4 per chare, 1024 cars; half start in a 2 x 2
+# block and half end in another (congestion, imbalance)
+num-x=8
+num-y=8
+lps-per-chare=4
+total-cars=1024
+end-time=20000
+lookahead=100
+percent-start=0.5
+start-size=2
+start-x=1
+start-y=1
+percent-end=0.5
+end-size=2
+end-x=5
+end-y=5
+expected-events=15595

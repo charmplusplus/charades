@@ -80,8 +80,9 @@ class Launcher:
 
 
 class Model:
-  def __init__(self, name, root, exe):
+  def __init__(self, name, root, exe, skip=()):
     self.name, self.root = name, os.path.join(model_dir, root)
+    self.skip = set(skip)  # test_configs this model cannot run
     self.exe = os.path.join(self.root, exe)
     cfg_dir = os.path.join(self.root, 'test_configs')
     self.cfgs = sorted(os.path.join(cfg_dir, c) for c in os.listdir(cfg_dir)
@@ -92,6 +93,11 @@ MODELS = [
   Model('Simple PHOLD', 'phold/simple', 'phold'),
   Model('Imbalanced PHOLD', 'phold/imbalanced', 'phold'),
   Model('Example', 'example', 'example'),
+  # The sequential scheduler puts every LP on one chare, so event ids come
+  # from one counter instead of one per chare. That changes the order of
+  # events with equal timestamps, and traffic's intersections depend on it:
+  # every parallel scheduler commits the same count, sequential another.
+  Model('Traffic', 'traffic', 'traffic', skip=['sequential']),
 ]
 
 
@@ -172,6 +178,8 @@ def main():
   for m in MODELS:
     for mcfg in m.cfgs:
       for name in names:
+        if name in m.skip:
+          continue
         tcfg = os.path.join(cfg_path, name)
         for launch in launches:
           # The sequential scheduler only runs on one PE.

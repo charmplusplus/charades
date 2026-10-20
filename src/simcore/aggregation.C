@@ -41,10 +41,26 @@ extern CProxy_LPChare lps;
  * an imbalanced model runs optimistically to the end time first). An event
  * in a later bucket waits at most until its bucket becomes current, when
  * every PE flushes (agg_flush_gvt, --agg-gvt-flush=2).
+ *
+ * Deadline policy (--agg-policy=1): the window is the horizon instead, and
+ * idle PEs and GVT updates ship only destinations holding an event that is
+ * now due (HTram::flushDue on the per-destination minimum timestamp). Still
+ * live under the bucketed GVT: an event left in a buffer is at least one
+ * bucket ahead of GVT, and becomes due -- and every PE ships it -- by the GVT
+ * update that makes its bucket current.
  */
 static Time urgent_window() {
-  return std::max<Time>(g_tw_agg_urgent,
-      g_tw_gvt_scheme == 4 ? g_tw_gvt_bucket_size : 0);
+  Time w = g_tw_agg_urgent;
+  if (g_tw_agg_policy == 1) {
+    // Deadline policy: the horizon. No receiver may execute past GVT + window,
+    // so an event further out than that can wait at no rollback cost -- but
+    // one that becomes due at a GVT update ships just as that update lets the
+    // receivers run on, and races them. The default leaves a margin of one
+    // more window (a window of 2000 on 4 PEs: 47% stragglers at horizon =
+    // window, against 19% eager).
+    w = g_tw_agg_horizon ? g_tw_agg_horizon : 2 * g_tw_optimism_window;
+  }
+  return std::max<Time>(w, g_tw_gvt_scheme == 4 ? g_tw_gvt_bucket_size : 0);
 }
 
 class Aggregator : public CBase_Aggregator {
@@ -179,12 +195,19 @@ void agg_create(CkCallback done) {
   }
   const char* modes[] = {"WPs", "WsP", "PP", "WW"};
   CkPrintf("Aggregation: htram %s, %u-event buffers, %d-byte payload slot, "
-           "urgent within %llu of GVT, scope %s, GVT flush %u\n",
+           "%s policy, events with ts < GVT + %llu ship at once, scope %s%s\n",
            modes[g_tw_agg_mode], g_tw_agg_buffer, PDES_PAYLOAD_BYTES,
+           g_tw_agg_policy ? "deadline" : "eager",
            (unsigned long long)urgent_window(),
            g_tw_agg_scope ? "other processes" : "all remote chares",
-           g_tw_agg_gvt_flush);
-  if (g_tw_gvt_scheme == 4 && g_tw_agg_gvt_flush != 2) {
+           g_tw_agg_policy ? "" : (g_tw_agg_gvt_flush == 2 ? ", GVT updates flush all"
+                                   : g_tw_agg_gvt_flush == 1 ? ", GVT updates flush stale"
+                                   : ""));
+  if (g_tw_agg_policy > 1) {
+    CkAbort("--agg-policy must be 0 (eager) or 1 (deadline), not %u\n",
+            g_tw_agg_policy);
+  }
+  if (g_tw_agg_policy == 0 && g_tw_gvt_scheme == 4 && g_tw_agg_gvt_flush != 2) {
     CkAbort("--aggregation=1 with the bucketed GVT needs --agg-gvt-flush=2: "
             "an event waits for its bucket to become current\n");
   }
@@ -229,35 +252,64 @@ bool agg_send(RemoteEvent* msg, uint64_t dest_chare) {
   delete msg;
 
   // Sends are never earlier than GVT, so the difference cannot wrap
-  if (it.ts - PE_VALUE(g_last_gvt) < a->urgent) {
-    a->tram->insertUrgent(it, pe);
-    s->agg_urgent++;
+  HTram* tram = a->tram;
+  unsigned long long m0 = tram->msgs_sent;
+  if (g_tw_agg_policy == 1) {
+    tram->insert(it, pe, (long long)it.ts);
   } else {
-    a->tram->insert(it, pe);
+    tram->insert(it, pe);
+  }
+  unsigned long long m1 = tram->msgs_sent;
+  s->agg_msgs_full += m1 - m0;
+  if (it.ts - PE_VALUE(g_last_gvt) < a->urgent) {
+    tram->flushTo(pe);
+    s->agg_msgs_urgent += tram->msgs_sent - m1;
+    s->agg_urgent++;
   }
   s->agg_items++;
   if (g_tw_comm_stats) comm_send_end(t0);
   return true;
 }
 
+/** Deadline policy: ship every destination holding an event now due */
+static void flush_due(Aggregator* a) {
+  if (a->urgent == 0) return;  // nothing is ever due (blocking GVT, no window)
+  // Due: ts < GVT + horizon, i.e. ts <= GVT + horizon - 1
+  a->tram->flushDue((long long)(PE_VALUE(g_last_gvt) + a->urgent - 1));
+}
+
 void agg_flush_idle() {
   if (!g_tw_aggregation) return;
-  CpvAccess(g_aggregator)->tram->flushIdle();
+  Aggregator* a = CpvAccess(g_aggregator);
+  unsigned long long m0 = a->tram->msgs_sent;
+  if (g_tw_agg_policy == 1) {
+    flush_due(a);
+  } else {
+    a->tram->flushIdle();
+  }
+  get_statistics()->agg_msgs_idle += a->tram->msgs_sent - m0;
 }
 
 void agg_flush_gvt() {
   if (!g_tw_aggregation) return;
-  HTram* tram = CpvAccess(g_aggregator)->tram;
-  if (g_tw_agg_gvt_flush == 1) {
-    tram->flushStale();
+  Aggregator* a = CpvAccess(g_aggregator);
+  unsigned long long m0 = a->tram->msgs_sent;
+  if (g_tw_agg_policy == 1) {
+    flush_due(a);
+  } else if (g_tw_agg_gvt_flush == 1) {
+    a->tram->flushStale();
   } else if (g_tw_agg_gvt_flush == 2) {
-    tram->flushPending();
+    a->tram->flushPending();
   }
+  get_statistics()->agg_msgs_gvt += a->tram->msgs_sent - m0;
 }
 
 void agg_flush_all() {
   if (!g_tw_aggregation) return;
-  CpvAccess(g_aggregator)->tram->flushPending();
+  Aggregator* a = CpvAccess(g_aggregator);
+  unsigned long long m0 = a->tram->msgs_sent;
+  a->tram->flushPending();
+  get_statistics()->agg_msgs_round += a->tram->msgs_sent - m0;
 }
 
 void agg_collect_stats(Statistics* s) {

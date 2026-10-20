@@ -68,6 +68,10 @@ void Statistics::clear() {
   timed_sends = 0;
   agg_items = agg_urgent = agg_direct = 0;
   agg_msgs = agg_bytes = agg_idle_flushes = agg_pp_bypasses = 0;
+  agg_msgs_full = agg_msgs_urgent = agg_msgs_idle = agg_msgs_gvt = 0;
+  agg_msgs_round = 0;
+  remote_arrivals = remote_stragglers = 0;
+  for (int b = 0; b < SLACK_BUCKETS; b++) slack_hist[b] = 0;
   for (int c = 0; c < LAT_CLASSES; c++) {
     lat_count[c] = 0;
     lat_sum[c] = 0.0;
@@ -166,6 +170,14 @@ void Statistics::add_comm(const Statistics* other) {
   agg_bytes += other->agg_bytes;
   agg_idle_flushes += other->agg_idle_flushes;
   agg_pp_bypasses += other->agg_pp_bypasses;
+  agg_msgs_full += other->agg_msgs_full;
+  agg_msgs_urgent += other->agg_msgs_urgent;
+  agg_msgs_idle += other->agg_msgs_idle;
+  agg_msgs_gvt += other->agg_msgs_gvt;
+  agg_msgs_round += other->agg_msgs_round;
+  remote_arrivals += other->remote_arrivals;
+  remote_stragglers += other->remote_stragglers;
+  for (int b = 0; b < SLACK_BUCKETS; b++) slack_hist[b] += other->slack_hist[b];
   for (int c = 0; c < LAT_CLASSES; c++) {
     lat_count[c] += other->lat_count[c];
     lat_sum[c] += other->lat_sum[c];
@@ -178,6 +190,31 @@ int64_t comm_send_begin(RemoteEvent* e) {
   e->send_ns = now;
   e->src_pe = CkMyPe();
   return now;
+}
+
+void comm_record_slack(Time ts, Time current) {
+  Statistics* s = get_statistics();
+  s->remote_arrivals++;
+  if (ts <= current) {
+    s->remote_stragglers++;
+    return;
+  }
+  Time slack = ts - current;
+  int b = 0;
+  while (b < Statistics::SLACK_BUCKETS - 1 && slack >= (2ull << b)) b++;
+  s->slack_hist[b]++;
+}
+
+/** Upper edge of the slack bucket holding quantile q (0 for stragglers) */
+static double slack_quantile(const Statistics* s, double q) {
+  uint64_t target = (uint64_t)(q * s->remote_arrivals);
+  uint64_t seen = s->remote_stragglers;
+  if (seen > target) return 0.0;
+  for (int b = 0; b < Statistics::SLACK_BUCKETS; b++) {
+    seen += s->slack_hist[b];
+    if (seen > target) return (double)(2ull << b);
+  }
+  return (double)(2ull << (Statistics::SLACK_BUCKETS - 1));
 }
 
 void comm_send_end(int64_t start_ns) {
@@ -300,6 +337,20 @@ void Statistics::print() const {
     print_double("Bytes per htram Message", agg_msgs ? (double)agg_bytes / agg_msgs : 0.0);
     print_int("htram Idle Flushes", agg_idle_flushes);
     if (agg_pp_bypasses) print_int("htram PP Local Bypasses", agg_pp_bypasses);
+    print_int("htram Messages: Buffer Full", agg_msgs_full);
+    print_int("htram Messages: Urgent Event", agg_msgs_urgent);
+    print_int("htram Messages: Idle Flush", agg_msgs_idle);
+    print_int("htram Messages: GVT Update", agg_msgs_gvt);
+    print_int("htram Messages: GVT Round", agg_msgs_round);
+  }
+
+  if (remote_arrivals) {
+    print_section("REMOTE EVENT SLACK");
+    print_int("Remote Event Arrivals", remote_arrivals);
+    print_double("Remote Stragglers %", 100.0 * remote_stragglers / remote_arrivals);
+    print_double("Slack p10 <=", slack_quantile(this, 0.1));
+    print_double("Slack p50 <=", slack_quantile(this, 0.5));
+    print_double("Slack p90 <=", slack_quantile(this, 0.9));
   }
 
   print_section("MEMORY STATISTICS");

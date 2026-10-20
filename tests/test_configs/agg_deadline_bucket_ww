@@ -1,0 +1,8 @@
+# Optimistic w/Bucketed GVT, no window, htram (WW), deadline flush policy
+sync=3
+gvt=4
+buffer-size=655360
+aggregation=1
+agg-mode=3
+agg-buffer=16
+agg-policy=1

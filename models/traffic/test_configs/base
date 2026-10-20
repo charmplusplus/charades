@@ -1,0 +1,8 @@
+# 8 x 8 intersections, 4 per chare, 1024 cars spread uniformly
+num-x=8
+num-y=8
+lps-per-chare=4
+total-cars=1024
+end-time=20000
+lookahead=100
+expected-events=14789

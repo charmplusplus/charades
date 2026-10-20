@@ -4,8 +4,10 @@
 # htram_group.C itself, with the same HTRAM_FLAGS as aggregation.C, because
 # the item layout is fixed at compile time and both sides must agree on it.
 # PDES_TIMED adds a send timestamp to each item, for --comm-stats latencies.
+# PDES_PAYLOAD_BYTES is the largest event payload htram carries (larger ones
+# are sent directly): 24 fits Imbalanced PHOLD and traffic (16 did not).
 ifneq ($(HTRAM_DIR),)
-HTRAM_FLAGS ?= -DPDES -DBUCKETS_BY_DEST -DPDES_TIMED
+HTRAM_FLAGS ?= -DPDES -DBUCKETS_BY_DEST -DPDES_TIMED -DPDES_PAYLOAD_BYTES=24
 CFLAGS  += -DCHARADES_HTRAM $(HTRAM_FLAGS) -I$(HTRAM_DIR)
 CIFLAGS += -DCHARADES_HTRAM
 HTRAM_DECL = $(HTRAM_DIR)/htram_group.decl.h
