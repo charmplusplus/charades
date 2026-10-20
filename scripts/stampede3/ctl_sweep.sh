@@ -16,7 +16,9 @@
 #     w:<W> a fixed window; q:<epsilon> the quantile rule (calibrated: the
 #     share of events rolled back; from the smallest window); qb:<epsilon>
 #     the bare bound (primary stragglers per event); hill:<W0> the hill
-#     climb from W0
+#     climb from W0, deciding every 8 GVT updates like the quantile rule;
+#     hill1:<W0> the same deciding after every GVT update (Devastator's
+#     design, where the counts ride on the GVT reduction)
 #   AGG="pp:64" (htram mode:buffer with the deadline policy, so the horizon
 #     follows the window; "off" sends directly), TREE=charades-qd,
 #   EXTRA_ARGS="+lci_ndevices 8" (appended to every run).
@@ -48,6 +50,7 @@ run_one() {  # nodes procs pes cfg arm label
     q)    extra+=(--ctl=1 --ctl-epsilon=$val) ;;
     qb)   extra+=(--ctl=1 --ctl-epsilon=$val --ctl-calibrate=0) ;;
     hill) extra+=(--optimism-window=$val --ctl=2) ;;
+    hill1) extra+=(--optimism-window=$val --ctl=2 --ctl-interval=1) ;;
   esac
   if [ "$AGG" != off ]; then
     extra+=(--aggregation=1 --agg-mode=$(mode_num ${AGG%%:*}) --agg-buffer=${AGG##*:}

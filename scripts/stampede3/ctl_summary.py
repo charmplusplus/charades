@@ -35,7 +35,7 @@ for path in sys.argv[1:]:
         for r in csv.DictReader(f):
             rows[(int(r['nodes']), r['workload'], r['agg'], r['arm'])].append(r)
 
-ARM_ORDER = {'w': 0, 'qb': 1, 'q': 2, 'hill': 3}
+ARM_ORDER = {'w': 0, 'qb': 1, 'q': 2, 'hill': 3, 'hill1': 4}
 
 
 def order(key):
