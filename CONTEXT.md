@@ -421,6 +421,50 @@ None of this touches the WPs path the SSSP client uses. GRAPH, GRAPH with compac
 - Blocking GVT at 10% remote reaches about the ceiling the per-message fit predicted (~1.6×).
 - Bucketed GVT gets roughly half the possible gain, held back by its flush cadence.
 
+### Deadline flush policy (2026-10-20, idev job 3621758, 4 skx nodes)
+
+**The policy.** `--agg-policy=1`:
+- events go into htram keyed by timestamp (`HTram::insert(item, pe, key)`, which tracks the minimum key per destination);
+- an event with ts < GVT + h ships at once;
+- idle PEs and GVT updates call `flushDue(GVT + h)`, which ships only destinations holding a due event.
+
+`--agg-horizon` h defaults to the optimism window W. The rationale: no receiver may execute past GVT + W, so an event beyond that can wait at no rollback cost.
+
+**Why it was needed.** The flush-cause counters showed eager bucketed runs sending 96% of their messages from *idle* flushes. Window-blocked PEs shipped about 3 events per pass. The current-bucket urgent rule never fired, because lookahead 100 is far more than the bucket size of 8.
+
+**Statistics added.**
+- htram messages by cause: full / urgent / idle / GVT update / GVT round.
+- With `--comm-stats`, remote-event slack on arrival (ts minus the chare's current time): straggler % and quantiles.
+
+**Results** (uniform PHOLD, 4 nodes × 2 processes × 8 PEs, `+lci_ndevices 8`, 64-event buffers, 2 reps; `$WORK/charades-runs/agg_sweep/policy_{a..f}.csv`; M committed events/s, given as WPs / PP; direct given as blocking / bucketed):
+
+| workload | blocking, eager | bucketed, eager | bucketed, deadline h = W | direct |
+|---|---|---|---|---|
+| remote 0.1, lookahead 100, mean 1000, W 250 | 11.05 / 11.12 | 9.69 / 8.73 | 10.56 / **11.22** | 7.20 / 7.59 |
+| remote 0.5, same slack, W 250 | 8.69 / 8.55 | 5.62 / 5.25 | 7.77 / **9.83 (3.4×)** | 2.99 / 2.88 |
+| remote 1.0, same slack, W 250 | **7.20** / 7.07 | 4.47 / 5.24 | 6.30 / **7.30 (4.15×)** | 1.79 / 1.76 |
+| remote 0.5, lookahead 10, mean 200, W 25 | 5.31 / 5.68 (84–88% eff) | 7.10 / 7.01 | 7.78 / **8.10** | 2.95 / 2.93 |
+
+- **Horizon.**
+  - Below W the policy breaks: events arrive after receivers may have passed them. WPs at W 250, h 8–125: 8% stragglers, 47–62% efficiency.
+  - At W it works: under 2% stragglers, 22–48 events per message instead of about 3.
+  - Above W, more events are due on insert and messages shrink: h = 2W gives 1.9×, h = 4W gives 1.2–1.4×.
+  - Low slack, W 25: h = 32 is about as good as 25. At W 50, horizons 8–32 lose (h = 50 was not run).
+  - The default of 2W came from a 4-PE single-process Mac test and was wrong.
+- **PP vs. WPs below W:** PP degrades less, because its shared per-process buffers fill and ship on their own (92–98% of its messages), which bounds how long events wait.
+- **Blocking GVT:** the deadline policy with h = 0 equals eager (round flushes only).
+  - At default slack, a horizon only adds urgent flushes: h 250 to 1000 gives 2.9× down to 1.2×.
+  - At low slack, h = 32 *helps*: 7.96 vs 5.31, efficiency 84% → 97%. Shipping due events promptly cuts stragglers.
+- **Low slack needs a matching window.** At W 250, bucketed GVT runs at 10.6% efficiency even with direct sends (a rollback storm); at W 25 or 50 it reaches 98–100%.
+- **Conclusion: the right window and horizon both follow the workload's timestamp slack.** That is the controller's job:
+  - W from the slack distribution;
+  - h = W, plus a small margin when GVT advances quickly.
+
+**Correctness.**
+- Stampede3, 4 nodes: every `agg_*` config at 4×4, 144/144 (traffic excluded, open issue 8).
+- Deadline configs with the final default at 4×4 and 1×8, 2 repeats: 264/264.
+- The payload slot is now 24 B, so Imbalanced PHOLD and traffic go through htram.
+
 ## Open issues
 
 1. **Event holding needs a realistic cutoff.** With the test configs'
@@ -569,7 +613,9 @@ node takes the job's `SLURM_*` variables from idev's environment file so
    - stage 2 at 8+ nodes (skx-dev allows at most 4) and PPN 1 vs 2;
    - payload slot size for models with larger messages (Imbalanced PHOLD needs 24 B).
    
-   The next real step is the flush policy, since flush cadence, not buffer size, limits events per message. Options:
+   DONE 2026-10-20: deadline flush policy (see "Deadline flush policy"). Next: the controller that sets the window and horizon from the timestamp distribution; then the htram hold (#3) and in-buffer annihilation of anti-messages (#4) from the flush-policy brainstorm; dragonfly port after that.
+
+   The original options for this step:
    - per-destination minimum bucket tracking, so a GVT advance flushes only destinations holding now-current events (htram min-key query);
    - then the histogram controller choosing urgency and cadence.
    
