@@ -1,6 +1,9 @@
 # Rules shared by the model Makefiles. Include this after the model's own
 # targets, so that its first target stays the default.
 
+# Models see htram's generated headers too (setup's extern module aggregation)
+include $(CHARADES_SRC)/htram.mk
+
 # Compile each model source on its own, writing its header dependencies
 # (framework headers, generated .decl.h files, the model's own headers) to a
 # .d file, so that editing any of them rebuilds the model. The library is
