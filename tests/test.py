@@ -7,8 +7,8 @@ synchronization configuration in test_configs/, at several PE counts, in one
 process and across processes.
 
 Usage: python3 test.py [--quick] [--all] [--no-build] [--launcher lcrun|srun]
-                       [--nodes N] [--timeout SECONDS] [--repeat N]
-                       [test_config ...]
+                       [--nodes N] [--launch PxQ ...] [--timeout SECONDS]
+                       [--repeat N] [test_config ...]
 
 Races in the optimistic engine and the GVT algorithms show up in a few percent
 of runs or fewer, so one pass can miss them; --repeat N runs every case N times
@@ -115,6 +115,9 @@ def main():
   # fix, where each quiescence-detection GVT round costs ~11 ms with one PE
   # per process and the conservative long config takes ~70-80 s at 2x1 and
   # 4x1. With the fix the slowest run takes ~5 s.
+  parser.add_argument('--launch', action='append', metavar='PxQ',
+                      help='run only these shapes: P processes of Q PEs '
+                      '(repeatable; e.g. --launch 4x4 --launch 1x8)')
   parser.add_argument('--repeat', type=int, default=1,
                       help='run every case this many times (finds races)')
   parser.add_argument('--timeout', type=float, default=180.0,
@@ -150,6 +153,13 @@ def main():
               Launch(2, 2), Launch(2, 4), Launch(4, 4)]
   if opts.quick:
     launches = [Launch(1, 1), Launch(1, 4), Launch(2, 4)]
+  if opts.launch:
+    launches = []
+    for shape in opts.launch:
+      p, _, q = shape.partition('x')
+      if not (p.isdigit() and q.isdigit()):
+        sys.exit('--launch takes PxQ (processes x PEs per process), not ' + shape)
+      launches.append(Launch(int(p), int(p) * int(q)))
   if opts.launcher == 'lcrun' and launcher.lcrun is None:
     print('lcrun not found under %s; skipping multi-process runs' % charm)
     launches = [l for l in launches if l.procs == 1]
