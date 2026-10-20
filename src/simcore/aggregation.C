@@ -53,12 +53,13 @@ static Time urgent_window() {
   Time w = g_tw_agg_urgent;
   if (g_tw_agg_policy == 1) {
     // Deadline policy: the horizon. No receiver may execute past GVT + window,
-    // so an event further out than that can wait at no rollback cost -- but
-    // one that becomes due at a GVT update ships just as that update lets the
-    // receivers run on, and races them. The default leaves a margin of one
-    // more window (a window of 2000 on 4 PEs: 47% stragglers at horizon =
-    // window, against 19% eager).
-    w = g_tw_agg_horizon ? g_tw_agg_horizon : 2 * g_tw_optimism_window;
+    // so an event further out than that can wait at no rollback cost, and the
+    // default holds exactly that long. Measured (uniform PHOLD, remote 0.5,
+    // window 250, 4 Stampede3 nodes): a horizon below the window delivers
+    // events late (WPs: 8% stragglers, 47-62% efficiency); at the window,
+    // 1.6% stragglers and 2.7-3.4x direct; above it, more events are due on
+    // insert and messages shrink (2 x window: 1.9x).
+    w = g_tw_agg_horizon ? g_tw_agg_horizon : g_tw_optimism_window;
   }
   return std::max<Time>(w, g_tw_gvt_scheme == 4 ? g_tw_gvt_bucket_size : 0);
 }

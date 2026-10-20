@@ -456,6 +456,17 @@ None of this touches the WPs path the SSSP client uses. GRAPH, GRAPH with compac
    that shape from aggregation gates until it's fixed or windowed.
    `scripts/stampede3/catch_hang.sh` reproduces it and saves stacks.
 
+8. **Traffic's committed count is not deterministic** (found 2026-10-20 while
+   adding it to the tests). It commits 14789 events on one process at any PE count, but
+   14766–14794 across 4 Stampede3 processes, with or without aggregation;
+   sequential (one chare) commits 14718. Likely cause: events with equal
+   timestamps are ordered by `(ts, src_lp, event_id)`, `event_id` comes from a
+   per-chare counter that rollbacks never rewind (`LPChare::get_next_event_id`),
+   and traffic's intersections depend on that order (PHOLD does not).
+   Fixes to try: rewind the counter in rollback, or tie-break on a
+   deterministic key. Until then traffic is out of `test.py`; its configs are
+   in `models/traffic/test_configs/`.
+
 ## Building on Stampede3
 
 Run Claude and VS Code locally, not on login nodes (per-user process limit,
