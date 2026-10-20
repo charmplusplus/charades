@@ -1,5 +1,4 @@
 include ../config.mk ../htram.mk
-include ../htram.mk
 
 C_FILES=$(wildcard *.C)
 CPP_FILES=$(wildcard *.cpp)
