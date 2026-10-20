@@ -24,7 +24,7 @@ for path in sys.argv[1:]:
         for r in csv.DictReader(f):
             cfg = r['gvt'] if r['gvt'] == 'blocking' or r['window'] == '0' \
                 else 'bucket w=%s' % r['window']
-            rows[(int(r['nodes']), int(r['sigma']), cfg)].append(r)
+            rows[(int(r['nodes']), float(r['sigma']), cfg)].append(r)
 
 
 def order(key):
@@ -59,7 +59,7 @@ for key in sorted(rows, key=order):
     if rate is None:  # fall back to committed / execution time
         rate = med([num(r['committed']) / num(r['exec_s'])
                     for r in ok if num(r['exec_s'])])
-    print('%5d %6d %-14s %3d %5d %4d %11s %8s %7s %11s' % (
+    print('%5d %6g %-14s %3d %5d %4d %11s %8s %7s %11s' % (
         key[0], key[1], key[2], len(ok), stall, fail,
         fmt(rate, '.3g'), fmt(med([num(r['wall_s']) for r in ok]), '.2f'),
         fmt(med([num(r['efficiency']) for r in ok]), '.1f'),
