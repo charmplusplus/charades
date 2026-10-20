@@ -93,11 +93,13 @@ MODELS = [
   Model('Simple PHOLD', 'phold/simple', 'phold'),
   Model('Imbalanced PHOLD', 'phold/imbalanced', 'phold'),
   Model('Example', 'example', 'example'),
-  # The sequential scheduler puts every LP on one chare, so event ids come
-  # from one counter instead of one per chare. That changes the order of
-  # events with equal timestamps, and traffic's intersections depend on it:
-  # every parallel scheduler commits the same count, sequential another.
-  Model('Traffic', 'traffic', 'traffic', skip=['sequential']),
+  # Not yet: traffic's committed count is not deterministic. Events with
+  # equal timestamps are ordered by event id, ids come from a per-chare
+  # counter that rollbacks never rewind, and traffic's intersections depend
+  # on that order: 14789 on one process at any PE count, 14766-14794 across
+  # 4 Stampede3 processes with or without aggregation; sequential (one chare,
+  # one counter) commits 14718. See CONTEXT.md, open issues.
+  # Model('Traffic', 'traffic', 'traffic', skip=['sequential']),
 ]
 
 
