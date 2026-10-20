@@ -44,6 +44,12 @@ Outputs go under `$RUNS` (default `$WORK/charades-runs`).
   `+lci_ndevices 8`, `--comm-stats=1`). Needs a tree built with `HTRAM_DIR`
   (`src/htram.mk`). `agg_summary.py <csv...>` prints medians per case and the
   rate relative to the direct runs.
+- `ctl_sweep.sh <reps> [out.csv]` — PHOLD under the bucketed GVT with fixed
+  optimism windows vs. the window controller (`--ctl=1`, the delay-quantile
+  rule, per `--ctl-epsilon`; `--ctl=2`, Devastator's hill climb), on steady
+  and phase-changing workloads, through htram PP with the deadline policy by
+  default (knobs in the header). `ctl_summary.py <csv...>` prints medians per
+  case and the rate relative to the best fixed window.
 - `catch_hang.sh <reps> <cap s> <N> <procs> <pes> <model dir> <model cfg>
   <test cfg> [args]` — rerun one test case until a run hangs, then save gdb
   stacks of every thread on every node it used (`$RUNS/hang/<case>/`) and

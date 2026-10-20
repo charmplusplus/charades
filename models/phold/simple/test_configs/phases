@@ -1,0 +1,12 @@
+# Phase-changing: lookahead 10 / mean 200 in even phases of 8000, lookahead
+# 100 / mean 1000 and half the events remote in odd ones
+num-lps=64
+lps-per-chare=4
+end-time=64000
+lookahead=10
+mean=200
+phase-length=8000
+alt-lookahead=100
+alt-mean=1000
+alt-remote=0.5
+expected-events=11951

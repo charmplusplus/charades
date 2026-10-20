@@ -1,0 +1,6 @@
+# Optimistic w/Blocking GVT, the delay-quantile rule without calibration (the
+# bound alone, the tightest windows), starting unbounded
+sync=3
+gvt=1
+ctl=1
+ctl-calibrate=0

@@ -36,7 +36,11 @@ void parse_command_line(int argc, char** argv) {
   kernel.register_argument("agg-gvt-flush",        "On each GVT update flush - NOTHING=0, DESTINATIONS NOT FILLING=1, EVERYTHING=2", g_tw_agg_gvt_flush);
   kernel.register_argument("agg-policy",           "When htram buffers ship - EAGER (idle PEs and GVT updates flush everything)=0, DEADLINE (only events with ts < GVT + agg-horizon)=1", g_tw_agg_policy);
   kernel.register_argument("agg-horizon",          "Deadline policy: events with ts < GVT + this are due (0 = the optimism window)", g_tw_agg_horizon);
-  kernel.register_argument("optimism-window",      "Optimistic: execute no event later than GVT + this (0 = unbounded)", g_tw_optimism_window);
+  kernel.register_argument("optimism-window",      "Optimistic: execute no event later than GVT + this (0 = unbounded); with --ctl, the starting window", g_tw_optimism_window);
+  kernel.register_argument("ctl",                  "Set the optimism window online - NO=0, DELAY QUANTILE=1, HILL CLIMB (Devastator)=2", g_tw_ctl);
+  kernel.register_argument("ctl-epsilon",          "Delay quantile rule: target primary stragglers per executed event", g_tw_ctl_epsilon);
+  kernel.register_argument("ctl-calibrate",        "Delay quantile rule: scale the straggler bound by the stragglers seen - NO=0, YES=1", g_tw_ctl_calibrate);
+  kernel.register_argument("ctl-log",              "Print every controller round - NO=0, YES=1", g_tw_ctl_log);
   kernel.register_argument("gvt-async-reduction",  "Use asynchronous reductions in GVT - NO=0, YES=1", g_tw_async_reduction);
   kernel.register_argument("ldb-interval",         "Number of GVT computations between each LB call", g_tw_ldb_interval);
   kernel.register_argument("max-ldb",              "Max number of times to call load balancing", g_tw_max_ldb);

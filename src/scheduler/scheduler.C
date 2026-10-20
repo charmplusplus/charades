@@ -1,6 +1,7 @@
 #include "scheduler.h"
 
 #include "aggregation.h"
+#include "controller.h"
 #include "event_buffer.h"
 #include "globals.h"
 #include "gvtmanager.h"
@@ -171,6 +172,13 @@ DistributedScheduler::DistributedScheduler() {
       default:
         CkAbort("Unknown gvt scheme\n");
     }
+    if (g_tw_ctl) {
+      if (g_tw_synchronization_protocol != OPTIMISTIC) {
+        CkAbort("--ctl sets the optimism window: it needs the optimistic "
+                "scheduler\n");
+      }
+      CProxy_Controller::ckNew();
+    }
   }
 
   // Set up the print trigger
@@ -262,7 +270,9 @@ void DistributedScheduler::gvt_done(Time gvt, bool lb) {
     print_progress(gvt);
     end_simulation();
     gvt_manager->finalize();
+    ctl_finalize();
   } else {
+    ctl_gvt_done();
     if (print_trigger->ready()) {
       print_progress(gvt);
     }

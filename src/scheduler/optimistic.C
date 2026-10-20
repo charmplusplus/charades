@@ -50,8 +50,9 @@ void OptimisticScheduler::execute() {
     // With an optimism window, events past GVT + window wait for GVT to
     // advance. The iteration still completes, so the GVT trigger keeps
     // firing and stragglers inside the window are still processed.
-    if (g_tw_optimism_window && next_lps.top() != NULL &&
-        next_lps.top()->ts > PE_VALUE(g_last_gvt) + g_tw_optimism_window) {
+    Time window = PE_VALUE(window);
+    if (window && next_lps.top() != NULL &&
+        next_lps.top()->ts > PE_VALUE(g_last_gvt) + window) {
       break;
     }
     if (!schedule_next_lp()) {

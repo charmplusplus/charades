@@ -12,6 +12,13 @@ static Time mean = 1000;
 // and percent_remote is ignored: the Gaussian PHOLD of Bachan et al.,
 // PADS'24 (Devastator), where sigma sets how much traffic leaves a node.
 static double sigma = 0;
+// If > 0, the workload changes every phase_length units of virtual time: in
+// odd phases events use alt_lookahead, alt_mean and alt_remote instead (a
+// phase-changing PHOLD, for testing online control of the window).
+static Time phase_length = 0;
+static Time alt_lookahead = 0;
+static Time alt_mean = 0;
+static double alt_remote = -1;
 
 // Message and LP type declarations
 class PHoldMessage {};

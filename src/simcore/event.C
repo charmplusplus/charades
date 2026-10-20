@@ -1,6 +1,7 @@
 #include "event.h"
 
 #include "aggregation.h"
+#include "controller.h"
 #include "avl_tree.h"
 #include "event_buffer.h"
 #include "factory.h"
@@ -146,6 +147,7 @@ void tw_event_send(Event* e) {
     dest_chare->recv_local_event(e);
   } else {
     PE_STATS(remote_sends)++;
+    ctl_record_delay(e->ts - e->owner->get_current_time());
     RemoteEvent* msg = e->get_msg();
     // The bucketed GVT may hold the event back and send it later
     // (charm_event_release) or delete it with its anti-message.

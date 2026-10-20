@@ -1,0 +1,7 @@
+module controller {
+  /** Per-PE optimism-window controller (--ctl), see controller.h */
+  group Controller {
+    entry [notrace] Controller();
+    entry [notrace] void apply(CkReductionMsg* msg);
+  };
+};

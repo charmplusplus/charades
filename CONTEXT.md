@@ -465,6 +465,55 @@ None of this touches the WPs path the SSSP client uses. GRAPH, GRAPH with compac
 - Deadline configs with the final default at 4×4 and 1×8, 2 repeats: 264/264.
 - The payload slot is now 24 B, so Imbalanced PHOLD and traffic go through htram.
 
+### Window controller (design, 2026-10-20; written before any runs)
+
+**The rule.**
+- A remote event straggles when it arrives behind its receiver: ts < t_r, the receiver's current time.
+- It was sent at the sender's current time t_s with delay δ = ts − t_s.
+- Under a window W, both t_s and t_r lie in [GVT, GVT + W], so a straggler needs δ < t_r − t_s ≤ W.
+- Hence primary stragglers per executed event ≤ r · F(W), where r is remote sends per executed event and F is the CDF of δ over remote sends.
+- The controller holds that bound at a target ε: W = F⁻¹(min(q_max, ε / r)).
+  - When ε / r ≥ q_max (little remote traffic), W is the q_max quantile, so the window rarely binds.
+  - Under bucketed GVT, W ≥ bucket size (liveness).
+- The deadline horizon follows: h = W.
+- F is a property of the model, not of the window, so this is feed-forward. Devastator's hill climb (PADS'24) and Elastic Time instead feed back from an outcome (efficiency, or the state of the system).
+
+**Mechanism.**
+- Each PE builds a log-linear histogram of δ over its remote sends (8 sub-bins per power of two), plus deltas of events executed, rolled back, committed, timestamp rollbacks (stragglers) and remote sends.
+- After each GVT update, a PE contributes once per round to a sum reduction (a `Controller` group).
+- The broadcast result goes to every PE, and each computes the same W from the same data.
+  - New delays fold into the global histogram once 256 have arrived, and the histogram is halved at each fold, so it follows phase changes.
+  - Folding by sample count, not by round, was a fix: rounds can carry about 20 delays (4 PEs, 8-unit buckets). Halving every round held the histogram under the minimum, and W froze.
+- **Calibration (`--ctl-calibrate=1`, the default), added after the first local runs.**
+  - The bound is very loose in practice. On 4 PEs in one process (lookahead 10 / mean 200), the uncalibrated rule at ε 0.05 gave 0.0001 stragglers per event; even with no window the rate is only 0.025.
+  - So the rule scales the bound by α = (stragglers seen per executed event) / (r · F(W)) at the window in force, giving W = F⁻¹(min(q_max, ε / (r·α))). α moves by at most 2× per fold.
+  - The realised rate then tracks ε: ε 0.005 → 0.007, ε 0.001 → 0.0024. Where even an unthrottled run stays under ε, W opens to the q_max = 0.99 quantile.
+  - ε is now a target straggler rate rather than a bound, and α (0.02–0.09 locally) measures how loose the bound is.
+- Options: `--ctl=1` (quantile rule), `--ctl=2` (Devastator's hill climb, reimplemented from the paper's Sec. 2.1 as a baseline in the same loop), `--ctl-epsilon` (default 0.05), `--ctl-calibrate`, `--ctl-log` (one line per round on PE 0).
+- The hill climb's W is capped at the end time: past it a window changes nothing, and doubling while efficiency stays above 95% overflowed.
+- Phase-changing PHOLD: `--phase-length`, `--alt-lookahead`, `--alt-mean`, `--alt-remote` (odd phases), plus the test dataset `phases`.
+
+**Local check (Mac, 4 PEs, 1024 LPs, phases of 40,000, base lookahead 10 / mean 200, alt lookahead 100 / mean 1000, remote 0.5).**
+- Uncalibrated: W averages 31 in base phases and 196 in alt, as predicted (30 and 195). Each switch takes under a quarter of a phase.
+- Calibrated at ε 0.005: W averages 115–144 in base and 830–1100 in alt.
+- The hill climb goes to W = end time (no window) at 89% efficiency: one process is benign.
+- Single-process rates are too noisy to rank the policies (fixed W 192 spans 3.1–5.2 M ev/s over 3 repeats). Rankings wait for Stampede3.
+
+**Check against measurements so far.**
+- PHOLD with lookahead 100, mean 1000: δ = 100 + Exp(900).
+  - At remote 0.5 and ε = 0.05, q = 0.1 → W ≈ 195.
+  - The window sweep's best fixed W was 125–250.
+- Lookahead 10, mean 200, remote 0.5: q = 0.1 → W ≈ 30. W 25–50 gave 98–100% efficiency; W 250 gave 10%.
+
+**Predictions** (to be checked on 4 Stampede3 nodes, bucketed GVT, deadline policy, PP and WPs):
+1. A single ε (0.02–0.1) lands within 10% of the best fixed W in each of three regimes:
+   - lookahead 100 / mean 1000;
+   - lookahead 10 / mean 200;
+   - remote 0.1, 0.5 and 1.0, where W should grow as r falls.
+2. On a phase-changing PHOLD that alternates those slack regimes, the controller beats every fixed W.
+3. The hill climb approaches the best fixed W on steady workloads, but lags after each phase change. With W 250 at low slack it first goes through the rollback storm, and it loses most at remote 1.0 (Devastator's own weak spot).
+4. Realised straggler % stays well below ε (the bound is loose). If it is far below, a feedback trim on ε is the follow-up. *Confirmed locally at once (0.0001 vs 0.05); calibration is that trim, so predictions 1–3 now apply to the calibrated rule, with ε as the target rate.*
+
 ## Open issues
 
 1. **Event holding needs a realistic cutoff.** With the test configs'

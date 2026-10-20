@@ -18,6 +18,7 @@ void agg_flush_idle() {}
 void agg_flush_gvt() {}
 void agg_flush_all() {}
 void agg_collect_stats(Statistics*) {}
+void agg_set_window(uint64_t) {}
 
 #include "aggregation.decl.h"
 #include "aggregation.def.h"
@@ -49,7 +50,7 @@ extern CProxy_LPChare lps;
  * bucket ahead of GVT, and becomes due -- and every PE ships it -- by the GVT
  * update that makes its bucket current.
  */
-static Time urgent_window() {
+static Time urgent_window(Time window) {
   Time w = g_tw_agg_urgent;
   if (g_tw_agg_policy == 1) {
     // Deadline policy: the horizon. No receiver may execute past GVT + window,
@@ -59,7 +60,7 @@ static Time urgent_window() {
     // events late (WPs: 8% stragglers, 47-62% efficiency); at the window,
     // 1.6% stragglers and 2.7-3.4x direct; above it, more events are due on
     // insert and messages shrink (2 x window: 1.9x).
-    w = g_tw_agg_horizon ? g_tw_agg_horizon : g_tw_optimism_window;
+    w = g_tw_agg_horizon ? g_tw_agg_horizon : window;
   }
   return std::max<Time>(w, g_tw_gvt_scheme == 4 ? g_tw_gvt_bucket_size : 0);
 }
@@ -67,7 +68,7 @@ static Time urgent_window() {
 class Aggregator : public CBase_Aggregator {
   public:
     HTram* tram;
-    Time urgent;  ///< urgent_window(), read on every send
+    Time urgent;  ///< urgent_window(the current window), read on every send
 
     Aggregator(CkGroupID tram_gid);
 
@@ -116,7 +117,8 @@ Aggregator::Aggregator(CkGroupID tram_gid) {
   CpvInitialize(Aggregator*, g_aggregator);
   CpvAccess(g_aggregator) = this;
   tram = CProxy_HTram(tram_gid).ckLocalBranch();
-  urgent = urgent_window();
+  // Before the scheduler exists, so before PE_VALUE(window): the start value
+  urgent = urgent_window(g_tw_optimism_window);
   tram->set_func_ptr_retarr(deliver, dest_pe_of, NULL, this);
   tram->setAggregationMode(g_tw_agg_mode);
   // Node-level receives (WPs, PP) send nothing to PEs that get no items
@@ -196,10 +198,12 @@ void agg_create(CkCallback done) {
   }
   const char* modes[] = {"WPs", "WsP", "PP", "WW"};
   CkPrintf("Aggregation: htram %s, %u-event buffers, %d-byte payload slot, "
-           "%s policy, events with ts < GVT + %llu ship at once, scope %s%s\n",
+           "%s policy, events with ts < GVT + %llu ship at once%s, scope %s%s\n",
            modes[g_tw_agg_mode], g_tw_agg_buffer, PDES_PAYLOAD_BYTES,
            g_tw_agg_policy ? "deadline" : "eager",
-           (unsigned long long)urgent_window(),
+           (unsigned long long)urgent_window(g_tw_optimism_window),
+           g_tw_agg_policy && g_tw_ctl && !g_tw_agg_horizon
+               ? " (to start: the horizon follows --ctl)" : "",
            g_tw_agg_scope ? "other processes" : "all remote chares",
            g_tw_agg_policy ? "" : (g_tw_agg_gvt_flush == 2 ? ", GVT updates flush all"
                                    : g_tw_agg_gvt_flush == 1 ? ", GVT updates flush stale"
@@ -303,6 +307,11 @@ void agg_flush_gvt() {
     a->tram->flushPending();
   }
   get_statistics()->agg_msgs_gvt += a->tram->msgs_sent - m0;
+}
+
+void agg_set_window(uint64_t window) {
+  if (!g_tw_aggregation) return;
+  CpvAccess(g_aggregator)->urgent = urgent_window(window);
 }
 
 void agg_flush_all() {

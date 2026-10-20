@@ -42,6 +42,9 @@ void agg_flush_gvt();
 /** Ship everything this PE has buffered (before a blocking GVT round) */
 void agg_flush_all();
 
+/** The optimism window changed (--ctl): the deadline horizon follows it */
+void agg_set_window(uint64_t window);
+
 /** Copy htram's message and byte counts for this PE into s */
 void agg_collect_stats(Statistics* s);
 

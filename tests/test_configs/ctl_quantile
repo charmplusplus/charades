@@ -1,0 +1,7 @@
+# Optimistic w/Bucketed GVT, the window set online by the delay-quantile rule
+# (calibrated), starting from 2000
+sync=3
+gvt=4
+buffer-size=655360
+optimism-window=2000
+ctl=1

@@ -60,6 +60,13 @@ extern unsigned g_tw_agg_policy;      ///< 0: eager flushes, 1: flush by timesta
 extern Time     g_tw_agg_horizon;     ///< deadline policy: events with ts < GVT + this are due
 ///@}
 
+/** \name Optimism-window controller (controller.h) *////@{
+extern unsigned g_tw_ctl;             ///< 0: fixed window, 1: delay quantile, 2: hill climb
+extern double   g_tw_ctl_epsilon;     ///< quantile rule: target stragglers per executed event
+extern unsigned g_tw_ctl_calibrate;   ///< quantile rule: scale the bound by the stragglers seen
+extern unsigned g_tw_ctl_log;         ///< print every controller round on PE 0
+///@}
+
 /** \name LB Configuration *////@{
 extern uint32_t g_tw_ldb_continuous;
 extern uint32_t g_tw_ldb_first;     ///< first interval to call lb
@@ -110,11 +117,17 @@ class Globals {
      * \todo Can this be changed to an unordered_map?
      */
     AvlTree avl_list_head;
+    /**
+     * Optimism window: execute no event past GVT + this (0: unbounded).
+     * Starts at --optimism-window; the controller (--ctl) moves it.
+     */
+    Time window;
 
     Globals() : g_last_gvt(0),
                 abort_event(NULL),
                 event_buffer(NULL),
-                avl_list_head(NULL) {}
+                avl_list_head(NULL),
+                window(g_tw_optimism_window) {}
 };
 
 void clear_globals();   ///< sets all global variables to default values

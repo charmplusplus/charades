@@ -6,4 +6,5 @@ mainmodule setup {
   extern module lp;
   extern module scheduler;
   extern module aggregation;
+  extern module controller;
 }

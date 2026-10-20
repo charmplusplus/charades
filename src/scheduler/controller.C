@@ -1,0 +1,310 @@
+#include "controller.h"
+
+#include "aggregation.h"
+#include "globals.h"
+#include "scheduler.h"
+#include "statistics.h"
+#include "util.h"
+
+#include <algorithm>
+#include <cmath>
+#include <cstdio>
+
+/** Largest quantile the rule asks for: past it W follows outliers */
+static const double Q_MAX = 0.99;
+/**
+ * New delays fold into the global histogram, which is first halved so that
+ * it follows phase changes, once at least BATCH of them have arrived; W is
+ * recomputed then. Counting samples rather than rounds keeps the memory the
+ * same whether a round sees ten delays (a few PEs, small buckets) or many
+ * thousands.
+ */
+static const double DECAY = 0.5;
+static const double BATCH = 256;
+/** Devastator's moving average: the last 16 rounds */
+static const size_t HILL_ROUNDS = 16;
+
+CpvStaticDeclare(Controller*, g_controller);
+
+void ctl_record_delay(Time delay) {
+  if (g_tw_ctl) CpvAccess(g_controller)->record_delay(delay);
+}
+
+void ctl_gvt_done() {
+  if (g_tw_ctl) CpvAccess(g_controller)->gvt_done();
+}
+
+void ctl_finalize() {
+  if (g_tw_ctl) CpvAccess(g_controller)->finalize();
+}
+
+Controller::Controller()
+    : hist(BINS, 0), contributed(false), last_executed(0),
+      last_rolled_back(0), last_committed(0), last_remote(0),
+      last_stragglers(0),
+      pending(BINS, 0.0), pending_total(0), pending_executed(0),
+      pending_remote(0), pending_stragglers(0),
+      dist(BINS, 0.0), dist_total(0), dist_executed(0), dist_remote(0),
+      dist_stragglers(0), alpha(1),
+      q(0), rounds(0), run_executed(0), run_stragglers(0),
+      window(g_tw_optimism_window), first_time(0),
+      window_time_sum(0), window_time(0), last_rate(-1), efficiency(0) {
+  CpvInitialize(Controller*, g_controller);
+  CpvAccess(g_controller) = this;
+  last_time = CmiWallTimer();
+  if (g_tw_ctl == 2 && window == 0) {
+    CkAbort("--ctl=2 (hill climb) starts from --optimism-window, which must "
+            "be > 0\n");
+  }
+}
+
+int Controller::bin_of(Time d) {
+  if (d == 0) return 0;
+  int e = 63 - __builtin_clzll(d);
+  if (e >= MAX_EXP) return BINS - 1;
+  int sub = (int)((((d - (1ull << e)) << SUB_BITS) >> e));
+  return 1 + e * SUB + sub;
+}
+
+void Controller::bin_range(int b, double* lo, double* hi) {
+  if (b == 0) {
+    *lo = 0;
+    *hi = 1;
+    return;
+  }
+  int e = (b - 1) / SUB, sub = (b - 1) % SUB;
+  double width = std::ldexp(1.0, e) / SUB;
+  *lo = std::ldexp(1.0, e) + sub * width;
+  *hi = *lo + width;
+}
+
+/**
+ * A counter's run total, and its change since this PE's last contribution.
+ * With tracing, the scheduler moves its interval stats into cumulative_stats
+ * and clears them every --stat-interval GVTs; without, the two are the same
+ * object.
+ */
+#define RUN_TOTAL(sched, x) ((sched)->cumulative_stats == (sched)->stats \
+    ? (sched)->stats->x : (sched)->cumulative_stats->x + (sched)->stats->x)
+
+static uint64_t delta(uint64_t now, uint64_t* last) {
+  uint64_t d = now - *last;
+  *last = now;
+  return d;
+}
+
+void Controller::gvt_done() {
+  if (contributed) return;
+  contributed = true;
+
+  std::vector<uint64_t> v(FIELDS, 0);
+  std::copy(hist.begin(), hist.end(), v.begin());
+  std::fill(hist.begin(), hist.end(), 0);
+  Scheduler* s = CpvAccess(g_scheduler);
+  v[EXECUTED] = delta(RUN_TOTAL(s, events_executed), &last_executed);
+  v[ROLLED_BACK] = delta(RUN_TOTAL(s, events_rolled_back), &last_rolled_back);
+  v[COMMITTED] = delta(RUN_TOTAL(s, events_committed), &last_committed);
+  v[REMOTE] = delta(RUN_TOTAL(s, remote_sends), &last_remote);
+  // Rollbacks to a timestamp: an event arrived behind its chare
+  v[STRAGGLERS] = delta(RUN_TOTAL(s, ts_rollback_calls), &last_stragglers);
+  double now = CmiWallTimer();
+  v[ELAPSED_NS] = (uint64_t)((now - last_time) * 1e9);
+  last_time = now;
+
+  contribute(FIELDS * sizeof(uint64_t), v.data(), CkReduction::sum_ulong_long,
+      CkCallback(CkIndex_Controller::apply(NULL), thisProxy));
+}
+
+/**
+ * At least 1 (0 would turn the window off) and, under the bucketed GVT, the
+ * bucket size; at most the end time, past which a window changes nothing
+ * (and the hill climb, which doubles W while efficiency stays above 95%,
+ * would otherwise overflow).
+ */
+Time Controller::clamp_window(Time w) const {
+  w = std::max<Time>(w, 1);
+  if (g_tw_gvt_scheme == 4) w = std::max<Time>(w, g_tw_gvt_bucket_size);
+  return std::min<Time>(w, g_tw_ts_end);
+}
+
+/** F(w): the share of the decayed histogram with delay below w */
+double Controller::cdf(Time w) const {
+  double seen = 0;
+  for (int b = 0; b < BINS; b++) {
+    double lo, hi;
+    bin_range(b, &lo, &hi);
+    if (hi <= w) {
+      seen += dist[b];
+    } else {
+      if (lo < w) seen += dist[b] * (w - lo) / (hi - lo);
+      break;
+    }
+  }
+  return dist_total > 0 ? seen / dist_total : 0;
+}
+
+/** F^-1(q), interpolating within a bin */
+double Controller::inverse_cdf(double q) const {
+  double target = q * dist_total, seen = 0;
+  for (int b = 0; b < BINS; b++) {
+    if (seen + dist[b] >= target && dist[b] > 0) {
+      double lo, hi;
+      bin_range(b, &lo, &hi);
+      return lo + (target - seen) / dist[b] * (hi - lo);
+    }
+    seen += dist[b];
+  }
+  return 0;
+}
+
+/**
+ * W = F^-1(min(Q_MAX, epsilon / (r * alpha))) over the decayed histogram.
+ *
+ * alpha (--ctl-calibrate=1) is how loose the bound r * F(W) is in practice:
+ * the stragglers per executed event seen at the current W, over what the
+ * bound allows there. Receivers rarely lead senders by the whole window, so
+ * alpha is well below 1 and the uncalibrated bound throttles far more than
+ * epsilon asks for (4 PEs, PHOLD at lookahead 10 / mean 200: 0.0001
+ * stragglers per event against epsilon 0.05). alpha moves by at most a
+ * factor of 2 per update, so a batch without stragglers opens the window
+ * gradually instead of all at once.
+ */
+Time Controller::quantile_window(const uint64_t* sum) {
+  for (int b = 0; b < BINS; b++) {
+    pending[b] += sum[b];
+    pending_total += sum[b];
+  }
+  pending_executed += sum[EXECUTED];
+  pending_remote += sum[REMOTE];
+  pending_stragglers += sum[STRAGGLERS];
+  if (pending_total < BATCH || pending_executed == 0) return window;
+
+  dist_total = 0;
+  for (int b = 0; b < BINS; b++) {
+    dist[b] = dist[b] * DECAY + pending[b];
+    dist_total += dist[b];
+    pending[b] = 0;
+  }
+  dist_executed = dist_executed * DECAY + pending_executed;
+  dist_remote = dist_remote * DECAY + pending_remote;
+  dist_stragglers = dist_stragglers * DECAY + pending_stragglers;
+  pending_total = pending_executed = pending_remote = pending_stragglers = 0;
+
+  double r = dist_remote / dist_executed;
+  if (g_tw_ctl_calibrate) {
+    // What the bound allows at the window in force (0: unbounded)
+    double bound = r * cdf(window ? window : g_tw_ts_end);
+    if (bound > 0) {
+      double seen = dist_stragglers / dist_executed / bound;
+      alpha = std::min(1.0, std::max(alpha / 2, std::min(alpha * 2,
+          std::max(seen, 1e-4))));
+    }
+  }
+  q = std::min(Q_MAX, g_tw_ctl_epsilon / (r * alpha));
+  return clamp_window((Time)std::ceil(inverse_cdf(q)));
+}
+
+/**
+ * Devastator's rule (Bachan et al., PADS'24, Sec. 2.1), after every round,
+ * on the moving average of committed / executed over the last 16 rounds.
+ */
+Time Controller::hill_climb_window(const uint64_t* sum) {
+  eff_executed.push_back(sum[EXECUTED]);
+  eff_committed.push_back(sum[COMMITTED]);
+  if (eff_executed.size() > HILL_ROUNDS) {
+    eff_executed.erase(eff_executed.begin());
+    eff_committed.erase(eff_committed.begin());
+  }
+  double executed = 0, committed = 0;
+  for (size_t i = 0; i < eff_executed.size(); i++) {
+    executed += eff_executed[i];
+    committed += eff_committed[i];
+  }
+  double prev_committed = last_rate;
+  last_rate = sum[COMMITTED];
+  if (executed == 0) return window;
+  efficiency = committed / executed;
+
+  Time w = window;
+  if (efficiency < 0.33) {
+    w = w / 4;
+  } else if (efficiency < 0.66) {
+    w = w / 2;
+  } else if (efficiency > 0.95) {
+    w = w > g_tw_ts_end / 2 ? g_tw_ts_end : w * 2;
+  } else if (prev_committed >= 0) {
+    // 1%, but at least 1 so a small window can still move
+    Time step = std::max<Time>(1, w / 100);
+    if (sum[COMMITTED] > prev_committed) {
+      w += step;
+    } else if (sum[COMMITTED] < prev_committed && w > step) {
+      w -= step;
+    }
+  }
+  return clamp_window(w);
+}
+
+void Controller::apply(CkReductionMsg* msg) {
+  const uint64_t* sum = (const uint64_t*)msg->getData();
+  double now = CmiWallTimer();
+  if (rounds > 0) {
+    window_time_sum += (double)window * (now - window_time);
+  } else {
+    first_time = now;
+  }
+  window_time = now;
+  rounds++;
+  run_executed += sum[EXECUTED];
+  run_stragglers += sum[STRAGGLERS];
+
+  Time w = g_tw_ctl == 2 ? hill_climb_window(sum) : quantile_window(sum);
+  // The log shows this round's efficiency; the hill climb uses its average
+  double round_eff = sum[EXECUTED] ? (double)sum[COMMITTED] / sum[EXECUTED] : 0;
+  window = w;
+  PE_VALUE(window) = w;
+  agg_set_window(w);
+
+  if (g_tw_ctl_log && CkMyPe() == 0) {
+    uint64_t samples = 0;
+    for (int b = 0; b < BINS; b++) samples += sum[b];
+    CkPrintf("CTL round %d gvt %llu window %llu delays %llu executed %llu "
+        "rolled_back %llu committed %llu remote %llu stragglers %llu "
+        "round_ms %.3f q %.4f alpha %.4f eff %.3f\n", rounds, (unsigned long long)PE_VALUE(g_last_gvt),
+        (unsigned long long)w, (unsigned long long)samples,
+        (unsigned long long)sum[EXECUTED],
+        (unsigned long long)sum[ROLLED_BACK],
+        (unsigned long long)sum[COMMITTED], (unsigned long long)sum[REMOTE],
+        (unsigned long long)sum[STRAGGLERS],
+        sum[ELAPSED_NS] / 1e6 / CkNumPes(), q, alpha,
+        g_tw_ctl == 2 ? efficiency : round_eff);
+  }
+  delete msg;
+  contributed = false;
+}
+
+void Controller::finalize() {
+  if (CkMyPe() != 0) return;
+  double now = CmiWallTimer();
+  double total = window_time_sum + (double)window * (now - window_time);
+  double span = now - first_time;
+  CkPrintf("\n==== WINDOW CONTROLLER ==============\n");
+  if (g_tw_ctl == 2) {
+    CkPrintf("Policy                         hill climb (Devastator)\n");
+  } else {
+    CkPrintf("Policy                         delay quantile, epsilon %g, %s\n",
+        g_tw_ctl_epsilon, g_tw_ctl_calibrate ? "calibrated" : "bound only");
+    CkPrintf("Final alpha (bound looseness)  %.4f\n", alpha);
+  }
+  CkPrintf("Rounds                         %d\n", rounds);
+  CkPrintf("Final window                   %llu\n",
+      (unsigned long long)window);
+  if (rounds > 0 && span > 0) {
+    CkPrintf("Time-weighted mean window      %.1f\n", total / span);
+  }
+  if (run_executed > 0) {
+    CkPrintf("Stragglers per executed event  %.4f\n",
+        run_stragglers / run_executed);
+  }
+}
+
+#include "controller.def.h"
