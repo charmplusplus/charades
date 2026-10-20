@@ -500,16 +500,17 @@ None of this touches the WPs path the SSSP client uses. GRAPH, GRAPH with compac
    that shape from aggregation gates until it's fixed or windowed.
    `scripts/stampede3/catch_hang.sh` reproduces it and saves stacks.
 
-8. **Traffic's committed count is not deterministic** (found 2026-10-20 while
-   adding it to the tests). It commits 14789 events on one process at any PE count, but
-   14766–14794 across 4 Stampede3 processes, with or without aggregation;
-   sequential (one chare) commits 14718. Likely cause: events with equal
-   timestamps are ordered by `(ts, src_lp, event_id)`, `event_id` comes from a
-   per-chare counter that rollbacks never rewind (`LPChare::get_next_event_id`),
-   and traffic's intersections depend on that order (PHOLD does not).
-   Fixes to try: rewind the counter in rollback, or tie-break on a
-   deterministic key. Until then traffic is out of `test.py`; its configs are
-   in `models/traffic/test_configs/`.
+8. FIXED 2026-10-20: **traffic's committed count was not deterministic.**
+   - **Symptoms:** sequential 14718; 14789 on one process; 14766–14794 across Stampede3 processes; failures in single-process runs too.
+   - **Cause:** `CustomEventComparator`, which orders each chare's pending heap, called equal-timestamp events for *different* LPs equivalent in both directions while ordering those for the *same* LP. That is not a strict weak ordering. With A and C for one LP and B for another (A ≈ B, B ≈ C, A < C), the heap could pop C before A, depending on the rest of the heap and on arrival order.
+   - **Why only traffic:** its events carry their own cars, so swapping two of them gives each car different random draws. PHOLD's events are interchangeable, so its counts never showed it.
+   - **Fix:** order equal-timestamp events by destination LP. The order is now total; nothing changes between independent LPs. My first guess (event IDs not rewound on rollback) was wrong: IDs only order events from one source to one LP, which each source creates in its own deterministic order.
+   - **Verification:**
+     - every scheduler gives base 14789 and congested 15638, sequential included;
+     - traffic matrix with every config, including aggregation, at 1–4 PEs and 2×1/2×2/4×1 processes: 296/296;
+     - before the fix: 113/152;
+     - traffic is back in `test.py`.
+   - **Open:** the `USE_SPLAY` queue (off by default) still orders by timestamp alone.
 
 ## Building on Stampede3
 

@@ -21,6 +21,9 @@ CFLAGS+=-DUSE_CHARMC=$(USE_CHARMC)
 
 # OTHER COMPILATION OPTIONS FOR THE PREPROCESSOR
 #CFLAGS+=-DUSE_SPLAY       # Use splay tree instead of array-based heap
+                           # (orders by timestamp only: equal-timestamp events
+                           # run in arbitrary order, so models like traffic
+                           # are not deterministic with it)
 #CFLAGS+=-DDEBUG_ON        # Turn on general debug prints
 #CFLAGS+=-DDEBUG_MASTER_ON # Turn on debug prints from PE 0
 #CFLAGS+=-DDEBUG_PE_ON     # Turn on PE specific debug prints

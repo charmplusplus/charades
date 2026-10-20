@@ -93,13 +93,10 @@ MODELS = [
   Model('Simple PHOLD', 'phold/simple', 'phold'),
   Model('Imbalanced PHOLD', 'phold/imbalanced', 'phold'),
   Model('Example', 'example', 'example'),
-  # Not yet: traffic's committed count is not deterministic. Events with
-  # equal timestamps are ordered by event id, ids come from a per-chare
-  # counter that rollbacks never rewind, and traffic's intersections depend
-  # on that order: 14789 on one process at any PE count, 14766-14794 across
-  # 4 Stampede3 processes with or without aggregation; sequential (one chare,
-  # one counter) commits 14718. See CONTEXT.md, open issues.
-  # Model('Traffic', 'traffic', 'traffic', skip=['sequential']),
+  # Traffic's events carry their own cars, so its committed count depends on
+  # the order of equal-timestamp events: it found the non-strict comparator
+  # in CustomEventComparator (see event.C).
+  Model('Traffic', 'traffic', 'traffic'),
 ]
 
 

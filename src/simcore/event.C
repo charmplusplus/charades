@@ -24,13 +24,23 @@ bool StandardEventComparator::operator()(const Event* e1, const Event* e2) {
   }
 }
 
+// Orders a chare's pending heap. It must be a strict weak ordering: the heap
+// relies on "neither precedes the other" being transitive. Equal-timestamp
+// events for different LPs used to compare equivalent both ways while those
+// for the same LP were ordered, so with A and C for one LP and B for another
+// (A ~ B, B ~ C, A < C) a sift could pop C before A, depending on what else
+// the chare held and on arrival order. Models whose events carry their own
+// data (traffic's cars) then gave each event different random draws, and the
+// committed count changed with the run (traffic: 14718 sequential, 14789 on
+// one process, 14766-14794 across processes). Ordering by destination LP too
+// makes the order total; it changes nothing between independent LPs.
 bool CustomEventComparator::operator()(const Event* e1, const Event* e2) {
   if (e1->ts != e2->ts) {
     return e1->ts < e2->ts;
   } else if (e1->dest_lp == e2->dest_lp) {
     return e1->owner->compare(e1, e2);
   } else {
-    return false;
+    return e1->dest_lp < e2->dest_lp;
   }
 }
 
