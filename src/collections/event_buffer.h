@@ -39,7 +39,8 @@ class EventBuffer {
     }
 
     Event* get_event() {
-      TW_ASSERT(stack_pointer > 0, "Out of events to allocate!\n");
+      TW_ASSERT(stack_pointer > 0, "Out of events to allocate (buffer-size=%u)\n",
+          max_events);
       buffer[--stack_pointer]->clear();
       if(max_events - stack_pointer > PE_STATS(max_events_used)) {
         PE_STATS(max_events_used) = max_events - stack_pointer;

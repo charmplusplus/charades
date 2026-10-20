@@ -54,6 +54,24 @@ static void validate_mapping() {
   }
 }
 
+/** QD callback on PE 0: create the scheduler group (see tw_create_simulation) */
+static void create_scheduler_group(void*, void* msg) {
+  if (msg) CkFreeMsg(msg);
+  switch(g_tw_synchronization_protocol) {
+    case 1:
+      CProxy_SequentialScheduler::ckNew();
+      break;
+    case 2:
+      CProxy_ConservativeScheduler::ckNew();
+      break;
+    case 3:
+      CProxy_OptimisticScheduler::ckNew();
+      break;
+    default:
+      CkAbort("Unknown synchronization protocol\n");
+  }
+}
+
 void tw_create_simulation(LPFactory* factory) {
   tw_create_simulation(factory, new BlockMapper());
 }
@@ -121,19 +139,14 @@ void tw_create_simulation(LPFactory* factory, LPMapper* mapper) {
     printf("   Chares.................%u\n", g_num_chares);
     printf("   Buffer size............%u\n", g_event_buffer_size);
     printf("========================================\n\n");
-    switch(g_tw_synchronization_protocol) {
-      case 1:
-        CProxy_SequentialScheduler::ckNew();
-        break;
-      case 2:
-        CProxy_ConservativeScheduler::ckNew();
-        break;
-      case 3:
-        CProxy_OptimisticScheduler::ckNew();
-        break;
-      default:
-        CkAbort("Unknown synchronization protocol\n");
-    }
+    // Create the scheduler group only once every PE is in its scheduler. In
+    // SMP interop main runs only on rank 0 of each process, while the other
+    // ranks are already scheduling: created at once, the group's constructors
+    // ran on those ranks while their process's rank 0 could still be parsing
+    // the configuration, and read defaults (e.g. an 8192-event buffer, the
+    // default GVT settings). Quiescence cannot be reached until every rank 0
+    // has entered the scheduler below, i.e. finished parsing and model setup.
+    CkStartQD(CkCallback(create_scheduler_group, NULL));
   }
   StartCharmScheduler();
 }
