@@ -27,14 +27,30 @@ void agg_collect_stats(Statistics*) {}
 #include "htram_group.h"
 #include "aggregation.decl.h"
 
+#include <algorithm>
 #include <cstring>
 #include <vector>
 
 extern CProxy_LPChare lps;
 
+/**
+ * Events with ts < GVT + this ship at once. Under the bucketed GVT it is at
+ * least the bucket size, i.e. every event in the sender's current bucket is
+ * urgent: that bucket completes only when all its events have arrived, so one
+ * left in a buffer would hold GVT until this PE ran out of work (a busy PE in
+ * an imbalanced model runs optimistically to the end time first). An event
+ * in a later bucket waits at most until its bucket becomes current, when
+ * every PE flushes (agg_flush_gvt, --agg-gvt-flush=2).
+ */
+static Time urgent_window() {
+  return std::max<Time>(g_tw_agg_urgent,
+      g_tw_gvt_scheme == 4 ? g_tw_gvt_bucket_size : 0);
+}
+
 class Aggregator : public CBase_Aggregator {
   public:
     HTram* tram;
+    Time urgent;  ///< urgent_window(), read on every send
 
     Aggregator(CkGroupID tram_gid);
 
@@ -83,6 +99,7 @@ Aggregator::Aggregator(CkGroupID tram_gid) {
   CpvInitialize(Aggregator*, g_aggregator);
   CpvAccess(g_aggregator) = this;
   tram = CProxy_HTram(tram_gid).ckLocalBranch();
+  urgent = urgent_window();
   tram->set_func_ptr_retarr(deliver, dest_pe_of, NULL, this);
   tram->setAggregationMode(g_tw_agg_mode);
   // Node-level receives (WPs, PP) send nothing to PEs that get no items
@@ -164,9 +181,13 @@ void agg_create(CkCallback done) {
   CkPrintf("Aggregation: htram %s, %u-event buffers, %d-byte payload slot, "
            "urgent within %llu of GVT, scope %s, GVT flush %u\n",
            modes[g_tw_agg_mode], g_tw_agg_buffer, PDES_PAYLOAD_BYTES,
-           (unsigned long long)g_tw_agg_urgent,
+           (unsigned long long)urgent_window(),
            g_tw_agg_scope ? "other processes" : "all remote chares",
            g_tw_agg_gvt_flush);
+  if (g_tw_gvt_scheme == 4 && g_tw_agg_gvt_flush != 2) {
+    CkAbort("--aggregation=1 with the bucketed GVT needs --agg-gvt-flush=2: "
+            "an event waits for its bucket to become current\n");
+  }
   agg_done = done;
   agg_recv_gid = CProxy_HTramRecv::ckNew();
   agg_src_gid = CProxy_HTramNodeGrp::ckNew();
@@ -208,7 +229,7 @@ bool agg_send(RemoteEvent* msg, uint64_t dest_chare) {
   delete msg;
 
   // Sends are never earlier than GVT, so the difference cannot wrap
-  if (it.ts - PE_VALUE(g_last_gvt) < g_tw_agg_urgent) {
+  if (it.ts - PE_VALUE(g_last_gvt) < a->urgent) {
     a->tram->insertUrgent(it, pe);
     s->agg_urgent++;
   } else {
