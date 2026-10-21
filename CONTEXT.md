@@ -1016,8 +1016,63 @@ None of this touches the WPs path the SSSP client uses. GRAPH, GRAPH with compac
 - **ROSS is 1.07–1.4× faster** than Charades at 64 cores, and **2.7× faster on full nodes**, where Charades doesn't scale (11.4 at 64 PEs, 10.1 at 192).
 - **Devastator's hill-climbed window collapses on full nodes** (38% efficiency, 9.6 M ev/s). That fits its own paper's remote-heavy weakness, but we have one run.
 - **The paper's premise needs rethinking.** Charades' per-event cost is 3–4× Devastator's at equal cores, so "Charades with htram and the controller beats Devastator in its weak regime" holds at best on full nodes, against Devastator's collapsing window. Even there ROSS is 2.7× faster than Charades.
-- **Devastator's weakness is real, but it is its window, not its engine**: with a fixed window it is the fastest engine by 2.4–3.6×. So the controller's value is clearest *as a window for Devastator-like engines*. Our quantile rule kept Charades at 0.95–0.97 of its best fixed window where Devastator's hill climb fell to 2.8% efficiency.
+- **Devastator's weakness is real, but it is its window, not its engine**: with a fixed window it is the fastest engine by 2.4–3.6×. So the controller's value is clearest *as a window for Devastator-like engines*. Our quantile rule kept Charades at 0.95–0.97 of its best fixed window where Devastator's hill climb fell to 2.8% efficiency. (Correction, same day: that 0.95–0.97 is at 64 PEs, not on the full-node problem where Devastator collapsed; "Three engines: the gaps filled" below measures the controller there.)
 - **Before choosing the framing**, find where Charades loses per event against Devastator (about 5.6 µs of core time per committed event at 64 cores, against 1.7–1.9 µs: 64 workers plus 8 master threads): the scheduler, Charm++/Reconverse entry methods, or htram.
+
+### Three engines: the gaps filled (2026-10-21, idev job 3626388, 4 skx nodes)
+
+Why: the comparison above had no controller run on the weak-scaled full-node problem, only one fixed W for Charades there, and no fixed-W runs for Devastator at 64 cores. Script `$WORK/charades-runs/gap_fill.sh` and `gap_fill2.sh`; CSVs and `.out` files in `$WORK/charades-runs/gapfill/`. Charades at bcee55f (defaults: event share, full histogram), htram PP 64, margin 8. Gaussian σ 2,000, 4 nodes. Two runs per point unless noted.
+
+**Predictions (written before the runs):** rollbacks are rare at 128 LPs per PE (0.04% at W 250), so the controller widens W; the best fixed W is 500–1,000; the controller reaches ≥ 0.9; Devastator's fixed W at 64 cores is within 10% of its adaptive window.
+
+**Charades, full nodes weak-scaled** (4 × 2 × 24 PEs, 24,576 LPs, high slack, end time 512,000, 188,809,635 committed events in every run; M committed events/s, median; ÷ best fixed W; higher is better):
+
+| arm | M ev/s | ÷ best fixed W | efficiency (%) | mean W (sim. time) |
+|---|---|---|---|---|
+| W 100 | 17.6 | 0.75 | 99.95 | 100 |
+| W 175 | 22.0 | 0.94 | 99.96 | 175 |
+| **W 250** | **23.5** | 1.00 | 99.97 | 250 |
+| W 350 | 22.2 | 0.94 | 99.7 | 350 |
+| W 500 | 15.6 | 0.67 | 96.4 | 500 |
+| W 1,000 | 2.97 | 0.13 | 44.8 | 1,000 |
+| controller, event share 0.003 | 22.5 | 0.96 | 99.7 | 342–352 |
+| controller, event share 0.001 | 21.9 | 0.93 | 99.9 | 293–303 |
+| hill climb (Devastator's rule, in Charades) | 9.0 | 0.38 | 82.6 | 660–664 |
+
+At end time 128,000 (about 2 s of execution, which is short for the controller) the controller is 0.86 (0.003) and 0.89 (0.001) of W 250 (23.0). One W 100 run there took 27 s instead of 6.5 s (first run of the job, during the `$WORK` I/O errors); the median ignores it.
+
+**Devastator, fixed windows** (ofi-psm2; M committed events/s, median; ÷ its own best fixed W; higher is better):
+
+| layout and workload | adaptive (from job 3626068) | W sweep: M ev/s (efficiency %) | best fixed | adaptive ÷ best |
+|---|---|---|---|---|
+| 64 ranks (8 × 8), 8,192 LPs, high slack, end 512,000 | 37.1 (80%) | 250: 40.9 (99.99); 500: 47.0 (99.7); 1,000: 54.0 (98.8); 2,000: 53.8 (96.2); 4,000: 44.9 (88.2); 8,000: 38.3 (80.8) | 54.0 (W 1,000–2,000) | 0.69 |
+| 64 ranks, low slack (lookahead 10, mean 200), end 128,000 | 34.6 (78%) | 25: 33.1; 50: 39.6; 100: 46.1 (99.2); 200: 52.5 (97.1); 400: 51.3 (92.7); 800: 41.5 (82.3) | 52.5 (W 200) | 0.66 |
+| 184 ranks (8 × 23), 23,552 LPs, high slack, end 512,000 | 0.37 (2.8%; end 128,000) | 100: 57.5 (100); 250: 77.2 (99.99); 500: 94.6 (99.7); 1,000: 96.9 (96.4); 2,000: 74.4 (81.5); 4,000: 12.5 (43); 8,000: storm (one stall at the 300 s cap, one `std::bad_alloc`) | 96.9 (W 500–1,000) | 0.004 |
+
+**ROSS, full nodes weak-scaled, end 512,000:** 27.1 and 26.9 M ev/s (99.2% efficiency), lower than the 33.1 at end 128,000. Not investigated; the longer run's 2.4× more events are handled at a lower rate.
+
+**Best fixed configuration of each engine** (M committed events/s; higher is better):
+
+| | 64 cores, high slack | 64 cores, low slack | full nodes, weak-scaled |
+|---|---|---|---|
+| Charades + htram, best fixed W | 11.4 (W 250) | 8.6 (W 50) | 23.5 (W 250) |
+| Charades + htram, controller (event share) | 10.9 (0.001) | 8.3 (0.001) | 22.5 (0.003) |
+| ROSS optimistic | 12.3 | 12.0 | 27.0 (33.1 at end 128,000) |
+| Devastator, its adaptive window | 37.1 | 34.6 | 0.37 |
+| Devastator, best fixed W | 54.0 | 52.5 | 96.9 |
+| Devastator best ÷ Charades best | 4.7× | 6.1× | 4.1× |
+
+**Predictions checked.**
+1. Controller widens W: right (mean W 342–352 against 250), but too far: W 350 fixed is 0.94.
+2. Best fixed W 500–1,000: **wrong**. It is 250; W 500 loses a third of the throughput while still committing 96.4% of what it executes.
+3. Controller ≥ 0.9: right (0.93–0.96 on the long runs).
+4. Devastator fixed ≈ adaptive at 64 cores: **wrong**. Its hill climb leaves 1.45–1.5× on the table at 64 cores too, not only on full nodes.
+
+**What this means.**
+- **The controller holds on the full-node weak-scaled problem**: 0.93–0.96 of Charades' best fixed W, against 0.38 for the hill climb in the same engine. The earlier full-node failure (0.56–0.85) was the 44-LP-per-PE problem, where a rollback floor of 0.45% hides the window's effect.
+- **Devastator's window is weak everywhere, not only on full nodes**: 0.66–0.69 of its best fixed W at 64 cores, 0.004 on full nodes. That strengthens framing (a): a better window is worth 1.5× in the fastest engine at 64 cores and two orders of magnitude on full nodes.
+- **The two engines want very different efficiency targets.** Devastator's best W runs at 96–99% efficiency (1–4% of events rolled back); Charades' at 99.97% (0.03%), and Charades at 96.4% efficiency loses a third of its throughput. A rolled-back event costs Charades far more (about 110 µs of PE time between W 250 and W 500 here, against about 8 µs per committed event), as in step 2: its rollbacks hold GVT back. So an event-share ε does not transfer between engines: Devastator would need ε of about 0.01–0.04 against Charades' 0.003. Porting the controller to Devastator (framing a) needs either a per-engine ε or a target that measures the throughput cost of rollbacks directly; the time-share target (step 2) did not.
+- **The gap to Devastator widens with fair tuning**: 4.1–6.1× with each engine at its best fixed W, against 3.2–4.0× before.
 
 ## Open issues
 
