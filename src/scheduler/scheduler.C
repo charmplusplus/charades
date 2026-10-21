@@ -178,6 +178,10 @@ DistributedScheduler::DistributedScheduler() {
         CkAbort("--ctl sets the optimism window: it needs the optimistic "
                 "scheduler\n");
       }
+      if (g_tw_ctl_reduction == 1 && g_tw_gvt_scheme != 4) {
+        CkAbort("--ctl-reduction=1 rides on the bucketed GVT's count waves: "
+                "it needs --gvt=4\n");
+      }
       CProxy_Controller::ckNew();
     }
   }

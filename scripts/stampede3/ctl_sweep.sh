@@ -21,7 +21,12 @@
 #     hill1:<W0> the same deciding after every GVT update (Devastator's
 #     design, where the counts ride on the GVT reduction); dry:<W> fixed W
 #     with the quantile rule running but not applied (--ctl-dry, its cost);
-#     blk: blocking GVT, no window (the value is ignored)
+#     blk: blocking GVT, no window (the value is ignored);
+#     qs[c]<N>:<epsilon> the quantile rule on the GVT's count waves
+#     (--ctl-reduction=1, deciding every wave), the histogram on every Nth
+#     wave, coarse (one bin per power of two) with c; drys[c]<N>:<W> the same
+#     with fixed W (--ctl-dry, its cost); hills:<W0> the hill climb on the
+#     count waves, deciding every wave (Devastator's design)
 #   BUCKETS="8" (bucketed GVT bucket sizes), MARGINS="0" (deadline policy:
 #     --agg-horizon-margin values, the horizon being W + margin),
 #   AGG="pp:64" (htram mode:buffer with the deadline policy, so the horizon
@@ -40,7 +45,7 @@ EXTRA_ARGS=${EXTRA_ARGS-"+lci_ndevices 8"}
 C=$WORK/$TREE
 out=${RUNS:-$WORK/charades-runs}/ctl_sweep; mkdir -p $out/logs; cd $out
 csv=${2:-$out/sweep_$(date +%Y%m%d_%H%M%S).csv}
-echo "rep,nodes,procs,pes,lps,workload,agg,bucket,margin,arm,status,wall_s,exec_s,committed,rolled_back,efficiency,event_rate,gvts,remote_sends,agg_events_per_msg,ctl_rounds,final_window,mean_window,stragglers_per_event,alpha" > $csv
+echo "rep,nodes,procs,pes,lps,workload,agg,bucket,margin,arm,status,wall_s,exec_s,committed,rolled_back,efficiency,event_rate,gvts,remote_sends,agg_events_per_msg,ctl_rounds,final_window,mean_window,stragglers_per_event,alpha,count_waves" > $csv
 echo "writing $csv (tree $TREE, $(git -C $C log --oneline -1 | cut -c1-40))"
 
 stat() { awk -v k="$1" 'index($0, k) {print $NF; exit}' "$2"; }
@@ -58,7 +63,18 @@ run_one() {  # nodes procs pes cfg arm label
     hill) extra+=(--optimism-window=$val --ctl=2) ;;
     hill1) extra+=(--optimism-window=$val --ctl=2 --ctl-interval=1) ;;
     dry)  extra+=(--optimism-window=$val --ctl=1 --ctl-dry=1) ;;
+    hills) extra+=(--optimism-window=$val --ctl=2 --ctl-reduction=1 --ctl-interval=1) ;;
   esac
+  if [[ $kind =~ ^(qs|drys)(c?)([0-9]+)$ ]]; then
+    extra+=(--ctl=1 --ctl-reduction=1 --ctl-interval=1
+            --ctl-hist-waves=${BASH_REMATCH[3]})
+    [ -n "${BASH_REMATCH[2]}" ] && extra+=(--ctl-hist-coarse=1)
+    if [ ${BASH_REMATCH[1]} = qs ]; then
+      extra+=(--ctl-epsilon=$val)
+    else
+      extra+=(--optimism-window=$val --ctl-dry=1)
+    fi
+  fi
   extra+=(--gvt-bucket-size=$bucket)
   if [ "$AGG" != off ]; then
     extra+=(--aggregation=1 --agg-mode=$(mode_num ${AGG%%:*}) --agg-buffer=${AGG##*:}
@@ -85,8 +101,9 @@ run_one() {  # nodes procs pes cfg arm label
   fi
   local fw=$(stat 'Final window' $f) mw=$(stat 'Time-weighted mean window' $f)
   [ $kind = w ] && fw=$val mw=$val
+  [[ $kind =~ ^drys ]] && fw=$val mw=$val
   [ $kind = blk ] && fw=none mw=none
-  echo "$rep,$N,$n,$pe,$lps,$wl,$AGG,$bucket,$margin,$arm,$status,$(printf %.2f $wall),$(stat 'Execution Time' $f),$(stat 'Events Committed' $f),$(stat 'Events Rolled Back' $f),$(stat 'Efficiency' $f),$(stat 'Event Rate' $f),$(stat 'Total GVT Computations' $f),$(stat 'Remote Sends' $f),$(stat 'Events per htram Message' $f),$(stat 'Rounds' $f),$fw,$mw,$(stat 'Stragglers per executed event' $f),$(stat 'Final alpha' $f)" >> $csv
+  echo "$rep,$N,$n,$pe,$lps,$wl,$AGG,$bucket,$margin,$arm,$status,$(printf %.2f $wall),$(stat 'Execution Time' $f),$(stat 'Events Committed' $f),$(stat 'Events Rolled Back' $f),$(stat 'Efficiency' $f),$(stat 'Event Rate' $f),$(stat 'Total GVT Computations' $f),$(stat 'Remote Sends' $f),$(stat 'Events per htram Message' $f),$(stat 'Rounds' $f),$fw,$mw,$(stat 'Stragglers per executed event' $f),$(stat 'Final alpha' $f),$(stat 'Count Reductions :' $f)" >> $csv
   printf "%-60s %-5s %7.2fs\n" $label $status $wall
 }
 

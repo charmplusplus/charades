@@ -44,6 +44,19 @@ void ctl_gvt_done();
 /** End of the run: PE 0 prints the controller summary */
 void ctl_finalize();
 
+/**
+ * --ctl-reduction=1: the controller's data rides on the bucketed GVT's count
+ * waves instead of its own reduction. The wave's k-th contribution is the same
+ * wave on every PE, so every PE agrees on which waves carry the histogram.
+ */
+bool ctl_shared();
+/** Counters (and, on every --ctl-hist-waves-th wave, the histogram) to add */
+void ctl_wave_contribute(std::vector<uint64_t>* counters,
+                         std::vector<uint64_t>* hist);
+/** A wave's summed counters, and histogram (null when it carried none) */
+void ctl_wave_result(const uint64_t* counters, const uint64_t* hist,
+                     int hist_bins);
+
 class Controller : public CBase_Controller {
   public:
     /** Log-linear histogram of send delays: 8 bins per power of two */
@@ -51,9 +64,12 @@ class Controller : public CBase_Controller {
     static const int SUB = 1 << SUB_BITS;
     static const int MAX_EXP = 48;
     static const int BINS = 1 + MAX_EXP * SUB;
+    /** --ctl-hist-coarse: one bin per power of two */
+    static const int COARSE_BINS = 1 + MAX_EXP;
     /** Reduction layout: the histogram, then these counters */
     enum { EXECUTED = BINS, ROLLED_BACK, COMMITTED, REMOTE, STRAGGLERS,
            ELAPSED_NS, FIELDS };
+    static const int COUNTERS = FIELDS - BINS;
 
     Controller();
 
@@ -61,6 +77,10 @@ class Controller : public CBase_Controller {
     void gvt_done();
     /** Broadcast target of each round's reduction */
     void apply(CkReductionMsg* msg);
+    void wave_contribute(std::vector<uint64_t>* counters,
+                         std::vector<uint64_t>* hist);
+    void wave_result(const uint64_t* counters, const uint64_t* hist,
+                     int hist_bins);
     void finalize();
 
     static int bin_of(Time d);
@@ -69,6 +89,10 @@ class Controller : public CBase_Controller {
 
   private:
     std::vector<uint64_t> hist;  ///< this PE, since its last contribution
+    /** --ctl-reduction=1: waves contributed to, and summed since a decision */
+    uint64_t waves;
+    unsigned waves_since;
+    std::vector<uint64_t> wave_sum;
     bool contributed;            ///< in the current round, awaiting apply()
     unsigned gvts_since;         ///< GVT updates since the last result
     uint64_t last_executed, last_rolled_back, last_committed, last_remote,
@@ -95,6 +119,10 @@ class Controller : public CBase_Controller {
     double last_rate;            ///< committed in the previous round
     double efficiency;
 
+    /** This PE's counter deltas since its last contribution, into v */
+    void read_counters(uint64_t* v);
+    /** One round of data (FIELDS long): choose and apply the window */
+    void decide(const uint64_t* sum);
     Time quantile_window(const uint64_t* sum);
     double cdf(Time w) const;
     double inverse_cdf(double q) const;

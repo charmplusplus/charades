@@ -1,5 +1,6 @@
 #include "bucketed.h"
 
+#include "controller.h"
 #include "event.h"
 #include "globals.h"
 #include "scheduler.h"
@@ -217,13 +218,28 @@ void BucketGVT::contribute_counts(int num_buckets) {
     wave_passed = num_passed;
   }
 
-  CkReduction::tupleElement tuple[] = {
-      CkReduction::tupleElement(sizeof(int)*2*num_buckets,
-                                &counts[SENT_IDX(curr_bucket)],
-                                CkReduction::sum_int),
-      CkReduction::tupleElement(sizeof(int), &num_passed, CkReduction::min_int)
-  };
-  CkReductionMsg* msg = CkReductionMsg::buildFromTuple(tuple, 2);
+  CkReduction::tupleElement tuple[4];
+  tuple[0] = CkReduction::tupleElement(sizeof(int)*2*num_buckets,
+                                       &counts[SENT_IDX(curr_bucket)],
+                                       CkReduction::sum_int);
+  tuple[1] = CkReduction::tupleElement(sizeof(int), &num_passed,
+                                       CkReduction::min_int);
+  int elements = 2;
+  // --ctl-reduction=1: the controller's counters, and on some waves its
+  // histogram, ride along (see Controller::wave_contribute)
+  std::vector<uint64_t> ctl_counters, ctl_hist;
+  if (ctl_shared()) {
+    ctl_wave_contribute(&ctl_counters, &ctl_hist);
+    tuple[elements++] = CkReduction::tupleElement(
+        sizeof(uint64_t) * ctl_counters.size(), ctl_counters.data(),
+        CkReduction::sum_ulong_long);
+    if (!ctl_hist.empty()) {
+      tuple[elements++] = CkReduction::tupleElement(
+          sizeof(uint64_t) * ctl_hist.size(), ctl_hist.data(),
+          CkReduction::sum_ulong_long);
+    }
+  }
+  CkReductionMsg* msg = CkReductionMsg::buildFromTuple(tuple, elements);
   CkCallback cb(CkIndex_BucketGVT::check_counts(0), thisProxy);
   msg->setCallback(cb);
   contribute(msg);
@@ -235,6 +251,8 @@ void BucketGVT::check_counts(CkReductionMsg* msg) {
   int size;
   CkReduction::tupleElement* result;
   msg->toTuple(&result, &size);
+  // toTuple copied the data out; the message used to leak on every wave
+  delete msg;
 
   int num_buckets = (result[0].dataSize / sizeof(int)) / 2;
   int valid_buckets = *((int*)result[1].data);
@@ -281,6 +299,16 @@ void BucketGVT::check_counts(CkReductionMsg* msg) {
     w.lead0 = (long long)std::min(scheduler->get_min_time(), max_ts) -
               (long long)curr_gvt;
     trace.push_back(w);
+  }
+
+  /**
+   * The controller first, so a new window is in force with the GVT that
+   * follows; every PE gets the same sums and makes the same decision
+   */
+  if (size > 2) {
+    ctl_wave_result((const uint64_t*)result[2].data,
+        size > 3 ? (const uint64_t*)result[3].data : nullptr,
+        size > 3 ? (int)(result[3].dataSize / sizeof(uint64_t)) : 0);
   }
 
   /** Advance the GVT past the completed buckets */

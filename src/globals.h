@@ -72,6 +72,9 @@ extern unsigned g_tw_ctl_calibrate;   ///< quantile rule: scale the bound by the
 extern unsigned g_tw_ctl_interval;    ///< GVT updates per controller round
 extern unsigned g_tw_ctl_dry;         ///< run the controller but never change the window
 extern unsigned g_tw_ctl_log;         ///< print every controller round on PE 0
+extern unsigned g_tw_ctl_reduction;   ///< 0: own reduction, 1: on the bucketed GVT's count waves
+extern unsigned g_tw_ctl_hist_waves;  ///< shared reduction: the histogram rides on every Nth wave
+extern unsigned g_tw_ctl_hist_coarse; ///< shared reduction: one histogram bin per power of two
 ///@}
 
 /** \name LB Configuration *////@{

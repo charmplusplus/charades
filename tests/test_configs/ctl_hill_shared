@@ -1,0 +1,9 @@
+# Optimistic w/Bucketed GVT, Devastator's hill climb as Devastator runs it:
+# on the GVT reduction, deciding every count wave
+sync=3
+gvt=4
+buffer-size=655360
+optimism-window=2000
+ctl=2
+ctl-reduction=1
+ctl-interval=1

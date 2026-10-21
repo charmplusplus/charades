@@ -35,7 +35,21 @@ void ctl_record_delay(Time delay) {
 }
 
 void ctl_gvt_done() {
-  if (g_tw_ctl) CpvAccess(g_controller)->gvt_done();
+  if (g_tw_ctl && !ctl_shared()) CpvAccess(g_controller)->gvt_done();
+}
+
+bool ctl_shared() {
+  return g_tw_ctl && g_tw_ctl_reduction == 1;
+}
+
+void ctl_wave_contribute(std::vector<uint64_t>* counters,
+                         std::vector<uint64_t>* hist) {
+  CpvAccess(g_controller)->wave_contribute(counters, hist);
+}
+
+void ctl_wave_result(const uint64_t* counters, const uint64_t* hist,
+                     int hist_bins) {
+  CpvAccess(g_controller)->wave_result(counters, hist, hist_bins);
 }
 
 void ctl_finalize() {
@@ -43,7 +57,8 @@ void ctl_finalize() {
 }
 
 Controller::Controller()
-    : hist(BINS, 0), contributed(false), gvts_since(0), last_executed(0),
+    : hist(BINS, 0), waves(0), waves_since(0), wave_sum(FIELDS, 0),
+      contributed(false), gvts_since(0), last_executed(0),
       last_rolled_back(0), last_committed(0), last_remote(0),
       last_stragglers(0),
       pending(BINS, 0.0), pending_total(0), pending_executed(0),
@@ -112,19 +127,73 @@ void Controller::gvt_done() {
   std::vector<uint64_t> v(FIELDS, 0);
   std::copy(hist.begin(), hist.end(), v.begin());
   std::fill(hist.begin(), hist.end(), 0);
-  Scheduler* s = CpvAccess(g_scheduler);
-  v[EXECUTED] = delta(RUN_TOTAL(s, events_executed), &last_executed);
-  v[ROLLED_BACK] = delta(RUN_TOTAL(s, events_rolled_back), &last_rolled_back);
-  v[COMMITTED] = delta(RUN_TOTAL(s, events_committed), &last_committed);
-  v[REMOTE] = delta(RUN_TOTAL(s, remote_sends), &last_remote);
-  // Rollbacks to a timestamp: an event arrived behind its chare
-  v[STRAGGLERS] = delta(RUN_TOTAL(s, ts_rollback_calls), &last_stragglers);
-  double now = CmiWallTimer();
-  v[ELAPSED_NS] = (uint64_t)((now - last_time) * 1e9);
-  last_time = now;
+  read_counters(&v[EXECUTED]);
 
   contribute(FIELDS * sizeof(uint64_t), v.data(), CkReduction::sum_ulong_long,
       CkCallback(CkIndex_Controller::apply(NULL), thisProxy));
+}
+
+void Controller::read_counters(uint64_t* v) {
+  Scheduler* s = CpvAccess(g_scheduler);
+  v[EXECUTED - BINS] = delta(RUN_TOTAL(s, events_executed), &last_executed);
+  v[ROLLED_BACK - BINS] =
+      delta(RUN_TOTAL(s, events_rolled_back), &last_rolled_back);
+  v[COMMITTED - BINS] = delta(RUN_TOTAL(s, events_committed), &last_committed);
+  v[REMOTE - BINS] = delta(RUN_TOTAL(s, remote_sends), &last_remote);
+  // Rollbacks to a timestamp: an event arrived behind its chare
+  v[STRAGGLERS - BINS] =
+      delta(RUN_TOTAL(s, ts_rollback_calls), &last_stragglers);
+  double now = CmiWallTimer();
+  v[ELAPSED_NS - BINS] = (uint64_t)((now - last_time) * 1e9);
+  last_time = now;
+}
+
+/**
+ * --ctl-reduction=1. Counters ride on every count wave (48 B); the histogram
+ * on every --ctl-hist-waves-th one, whole (385 bins, 3 KB) or, with
+ * --ctl-hist-coarse, one bin per power of two (49 bins, 392 B). Between its
+ * waves the histogram keeps accumulating here.
+ */
+void Controller::wave_contribute(std::vector<uint64_t>* counters,
+                                 std::vector<uint64_t>* h) {
+  counters->assign(COUNTERS, 0);
+  read_counters(counters->data());
+  bool with_hist = waves++ % g_tw_ctl_hist_waves == 0;
+  h->clear();
+  if (!with_hist) return;
+  if (g_tw_ctl_hist_coarse) {
+    h->assign(COARSE_BINS, 0);
+    (*h)[0] = hist[0];
+    for (int b = 1; b < BINS; b++) (*h)[1 + (b - 1) / SUB] += hist[b];
+  } else {
+    h->assign(hist.begin(), hist.end());
+  }
+  std::fill(hist.begin(), hist.end(), 0);
+}
+
+/**
+ * Every PE gets the same sums, wave by wave, and decides once per
+ * --ctl-interval waves. A coarse bin is spread evenly over its sub-bins, which
+ * is what linear interpolation within the power of two would give.
+ */
+void Controller::wave_result(const uint64_t* counters, const uint64_t* h,
+                             int hist_bins) {
+  if (h && hist_bins == COARSE_BINS) {
+    wave_sum[0] += h[0];
+    for (int c = 1; c < COARSE_BINS; c++) {
+      // Exact for whole multiples of SUB; the remainder goes to the low bins
+      for (int k = 0; k < SUB; k++) {
+        wave_sum[1 + (c - 1) * SUB + k] += h[c] / SUB + (k < (int)(h[c] % SUB));
+      }
+    }
+  } else if (h) {
+    for (int b = 0; b < BINS; b++) wave_sum[b] += h[b];
+  }
+  for (int i = 0; i < COUNTERS; i++) wave_sum[BINS + i] += counters[i];
+  if (++waves_since < g_tw_ctl_interval) return;
+  waves_since = 0;
+  decide(wave_sum.data());
+  std::fill(wave_sum.begin(), wave_sum.end(), 0);
 }
 
 /**
@@ -269,7 +338,12 @@ Time Controller::hill_climb_window(const uint64_t* sum) {
 }
 
 void Controller::apply(CkReductionMsg* msg) {
-  const uint64_t* sum = (const uint64_t*)msg->getData();
+  decide((const uint64_t*)msg->getData());
+  delete msg;
+  contributed = false;
+}
+
+void Controller::decide(const uint64_t* sum) {
   double now = CmiWallTimer();
   if (rounds > 0) {
     window_time_sum += (double)window * (now - window_time);
@@ -309,8 +383,6 @@ void Controller::apply(CkReductionMsg* msg) {
         sum[ELAPSED_NS] / 1e6 / CkNumPes(), q, alpha,
         g_tw_ctl == 2 ? efficiency : round_eff);
   }
-  delete msg;
-  contributed = false;
 }
 
 void Controller::finalize() {
@@ -326,6 +398,10 @@ void Controller::finalize() {
         g_tw_ctl_epsilon, g_tw_ctl_calibrate ? "calibrated" : "bound only");
     CkPrintf("Final alpha (calibration)      %.4f\n", alpha);
   }
+  CkPrintf("Reduction                      %s\n", ctl_shared()
+      ? (g_tw_ctl_hist_coarse ? "shared with GVT waves, coarse histogram"
+                              : "shared with GVT waves")
+      : "separate");
   CkPrintf("Rounds                         %d\n", rounds);
   CkPrintf("Final window                   %llu\n",
       (unsigned long long)window);
