@@ -1144,6 +1144,46 @@ Setup: `charades-prod` (production runtime, 8bec616), Gaussian σ 2,000, high sl
 
 **Next.** Profile what remains (2.2–2.6×, about 2.3× in core time per committed event): the scheduler loop, entry-method and message overheads, and htram; and check whether ε should fall to 0.001 by default now that throughput is more sensitive to W. The `+backend_poll_thread` hang is a Reconverse issue to report (threads that don't poll seem never to get their messages progressed).
 
+### Profile: where Charades spends its time against Devastator (2026-10-21, idev job 3626915)
+
+Setup: best launch settings (2 × 23 PEs per node, `+pemap 2-46:2,3-47:2`, `+lci_ndevices 4`), `charades-prod`, Gaussian σ 2,000, high slack, W 250, 4 nodes; Devastator at fixed W 1,000 on the same 23,552 LPs. `perf` on node 0 mid-run (`$WORK/charades-runs/profile.sh`, `profile_dwarf.sh`; data and reports in `$WORK/charades-runs/profile/`); Projections traces of short runs (charm-pads-trace = production + `--enable-tracing`, `charades-trace` with `-DCHARADES_NO_BRACKETS`; logs in `$SCRATCH/proj/`). Analysis scripts: `scripts/stampede3/projsum.py` (time per entry method from Projections logs) and `stackcallers.py` (callers of hot leaf functions from `perf script`).
+
+**Counters per committed event on one node** (perf stat, 2 s; Charades at about 11.3 and Devastator at about 25 M committed events/s per node):
+
+| | Charades | Devastator | Charades ÷ Devastator |
+|---|---|---|---|
+| instructions | ~12,100 | ~7,500 | 1.6× |
+| cycles | ~11,100 | ~5,300 | 2.1× |
+| instructions per cycle (higher is better) | 1.09 | 1.41 | 0.77× |
+| LLC load misses per s | 33 M | 16 M | 2.1× |
+
+Both engines poll on every core, so these include polling.
+
+**Where Charades' PE time goes** (one process, DWARF call stacks, inclusive shares of its PE time):
+- Charm message handling 61%, of which:
+  - the scheduler pass (`Scheduler::execute`) 30.5%: LP event execution 20%, of which the PHOLD forward handlers (the model's own work) are only **6.6%** and sends 7.8% (`agg_send` into htram 6.5%);
+  - htram per-PE delivery (`HTram::receivePerPE`) **12.6%**, of which inserting each received event into the per-PE anti-message AVL tree (`recv_remote_event` → `avlInsertOrDelete`) is about 6%;
+  - GVT count waves (`BucketGVT::check_counts`) 10.4%, of which fossil collection 8.2%, nearly all `tw_event_free` (AVL deletes 3.5%; cross-thread frees to the Reconverse mempool 2.9%).
+- Network progress polled by every PE (`pollProgress` → LCI → libfabric RxM/verbs) **13.5%**.
+- The Converse scheduler and queue polling outside handlers about 15% (`try_dequeue` 5.7%, `CcdRaiseCondition`, `CcdNumTimerCBs`, `pollConverseThreadQueue` etc.).
+- Locks 8.1% as leaf (`pthread_mutex_lock/unlock`): message allocation through LCI's mempool (`CkAllocMsg` → `CmiAlloc` → `mempool_malloc`) 1.5%, `_processHandler` 1.5%, libfabric CQ progress about 2.5% (23 PEs polling 4 devices contend), event frees and `agg_send`.
+- `__tls_get_addr` 2.6%: thread-locals reached through the shared `libreconverse.so` (scheduler, `CmiGetState`, `CcdRaiseCondition`, LCI thread context).
+- By library (full nodes, self time): Charades + Charm core + model 41%, `libreconverse.so` 34%, libc 10% (mostly the locks), kernel 6%, libfabric + LCI + hfi1 4%.
+
+**Projections** (node 0, 46 PEs): the Charades entry methods are all `[notrace]` in the `.ci` files, so the trace shows only htram and Charm internals; 84% of PE time is outside traced entry methods. What it does show: `HTram::receivePerPE` takes 9.9% of PE time at 1.5 µs per call, with 2.2 M calls carrying the node's roughly 5.6 M events, so **about 2.5 events per per-PE message**; `HTramRecv::receive` (node buffers) 2.6% at 12.5 µs per call. Tracing cost 8% of throughput (33.8 against 36.7 M ev/s).
+
+**Devastator by contrast**: 82% of its time in its own binary, no runtime layer: `pdes::drain` 19%, thread-channel reaping 18% (mostly polling), event execution 6%, glibc malloc/free about 12%.
+
+**Ranked opportunities** (shares of Charades PE time; estimates, not measured gains):
+1. **htram's per-PE fan-out** (receivePerPE 12.6% incl., plus its share of allocation, queueing and freeing): PP delivers a node buffer, then one Charm message per destination PE carrying about 2.5 events. Deliver straight into the destination PEs' event queues in bulk, or make per-PE batches larger.
+2. **The anti-message AVL tree** (about 9–10%: inserts 6%, deletes 3.5%): every received remote event is inserted and later deleted. A hash keyed by (sender, event id), or matching only when an anti-message arrives, should be far cheaper.
+3. **Event frees at fossil collection** (8.2%): frees cross threads into the Reconverse mempool; recycle events into per-PE free lists instead.
+4. **Converse scheduler and polling overhead** (about 15%, plus 2.6% TLS): link Reconverse statically (initial-exec TLS) and trim per-iteration condition and timer checks.
+5. **Network progress on every PE** (13.5%, part of it lock contention in libfabric): fewer pollers once the `+backend_poll_thread` hang is fixed.
+6. Message allocation locks (1.5%).
+
+Even all of this together is unlikely to close 2.2×; items 1–3 are Charades/htram changes worth an estimated 1.2–1.3×, items 4–5 are Reconverse work.
+
 ## Open issues
 
 1. **Event holding needs a realistic cutoff.** With the test configs'
