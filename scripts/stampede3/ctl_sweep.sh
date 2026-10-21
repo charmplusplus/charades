@@ -12,6 +12,7 @@
 #              phases:10:200:100:1000:0.5:8000"
 #     steady:<lookahead>:<mean>:<remote>
 #     phases:<lookahead>:<mean>:<alt lookahead>:<alt mean>:<remote>:<length>
+#     gauss:<lookahead>:<mean>:<sigma> (Gaussian destinations, sigma in LP ids)
 #   ARMS="w:25 w:50 w:100 w:250 w:500 q:0.02 q:0.05 q:0.1 hill:250"
 #     w:<W> a fixed window; q:<epsilon> the quantile rule (calibrated: the
 #     share of events rolled back; from the smallest window); qb:<epsilon>
@@ -19,7 +20,8 @@
 #     climb from W0, deciding every 8 GVT updates like the quantile rule;
 #     hill1:<W0> the same deciding after every GVT update (Devastator's
 #     design, where the counts ride on the GVT reduction); dry:<W> fixed W
-#     with the quantile rule running but not applied (--ctl-dry, its cost)
+#     with the quantile rule running but not applied (--ctl-dry, its cost);
+#     blk: blocking GVT, no window (the value is ignored)
 #   BUCKETS="8" (bucketed GVT bucket sizes), MARGINS="0" (deadline policy:
 #     --agg-horizon-margin values, the horizon being W + margin),
 #   AGG="pp:64" (htram mode:buffer with the deadline policy, so the horizon
@@ -47,8 +49,9 @@ mode_num() { case $1 in wps) echo 0;; wsp) echo 1;; pp) echo 2;; ww) echo 3;; es
 run_one() {  # nodes procs pes cfg arm label
   local N=$1 n=$2 pe=$3 cfg=$4 arm=$5 label=$6
   local f=logs/$label.out kind=${arm%%:*} val=${arm##*:}
-  local extra=()
+  local extra=() gvtcfg=bucket
   case $kind in
+    blk)  gvtcfg=blocking ;;
     w)    extra+=(--optimism-window=$val) ;;
     q)    extra+=(--ctl=1 --ctl-epsilon=$val) ;;
     qb)   extra+=(--ctl=1 --ctl-epsilon=$val --ctl-calibrate=0) ;;
@@ -63,7 +66,7 @@ run_one() {  # nodes procs pes cfg arm label
   fi
   extra+=(${EXTRA_ARGS:-})
   srun --mpi=pmi2 --kill-on-bad-exit=1 --wait=30 -N $N -n $n -c $((pe / n)) -J cs_$label \
-      $C/models/phold/simple/phold +pe $pe $cfg $C/tests/test_configs/bucket "${extra[@]}" \
+      $C/models/phold/simple/phold +pe $pe $cfg $C/tests/test_configs/$gvtcfg "${extra[@]}" \
       > $f 2>&1 &
   local sp=$! t0=$(date +%s.%N) status=ok
   while kill -0 $sp 2>/dev/null; do
@@ -82,6 +85,7 @@ run_one() {  # nodes procs pes cfg arm label
   fi
   local fw=$(stat 'Final window' $f) mw=$(stat 'Time-weighted mean window' $f)
   [ $kind = w ] && fw=$val mw=$val
+  [ $kind = blk ] && fw=none mw=none
   echo "$rep,$N,$n,$pe,$lps,$wl,$AGG,$bucket,$margin,$arm,$status,$(printf %.2f $wall),$(stat 'Execution Time' $f),$(stat 'Events Committed' $f),$(stat 'Events Rolled Back' $f),$(stat 'Efficiency' $f),$(stat 'Event Rate' $f),$(stat 'Total GVT Computations' $f),$(stat 'Remote Sends' $f),$(stat 'Events per htram Message' $f),$(stat 'Rounds' $f),$fw,$mw,$(stat 'Stragglers per executed event' $f),$(stat 'Final alpha' $f)" >> $csv
   printf "%-60s %-5s %7.2fs\n" $label $status $wall
 }
@@ -96,6 +100,8 @@ for rep in $(seq $reps); do
           "start-events=$START" > $cfg
       if [ $kind = steady ]; then
         printf '%s\n' "lookahead=$a" "mean=$b" "remote=$c" >> $cfg
+      elif [ $kind = gauss ]; then
+        printf '%s\n' "lookahead=$a" "mean=$b" "sigma=$c" >> $cfg
       else
         printf '%s\n' "lookahead=$a" "mean=$b" "alt-lookahead=$c" "alt-mean=$d" \
             "remote=$e" "phase-length=$f" >> $cfg

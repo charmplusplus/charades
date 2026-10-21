@@ -37,7 +37,7 @@ for path in sys.argv[1:]:
                 + ('+' + r['margin'] if r.get('margin') not in (None, '', '0') else '')
             rows[(int(r['nodes']), r['workload'], agg, r['arm'])].append(r)
 
-ARM_ORDER = {'w': 0, 'dry': 1, 'qb': 2, 'q': 3, 'hill': 4, 'hill1': 5}
+ARM_ORDER = {'blk': -1, 'w': 0, 'dry': 1, 'qb': 2, 'q': 3, 'hill': 4, 'hill1': 5}
 
 
 def order(key):

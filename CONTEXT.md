@@ -665,6 +665,40 @@ None of this touches the WPs path the SSSP client uses. GRAPH, GRAPH with compac
   - Low slack, W 50: 5.15–5.65 unpaced, 6.76–6.95 paced (1.27×).
   - A K that adapts (for example to buckets completed per wave) is the follow-up.
 
+### Gaussian PHOLD σ sweep (design, 2026-10-21; written before any runs)
+
+**Why.** Devastator (PADS'24) loses to ROSS by 8.7× (2 nodes) to 1.5× (16 nodes) on Gaussian PHOLD at σ = 10⁴, the remote-heavy end. This experiment asks where htram aggregation and the controller win on that benchmark, at 4 nodes.
+
+**What σ means here.** Destinations are LP id + round(N(0, σ)), wrapping around; LPs sit in contiguous blocks (128 per PE, 1,024 per process, 2,048 per node; 8,192 in all at 4 nodes). Share of events that leave each level (% of events, computed):
+
+| σ (LP ids) | leave the PE (%) | leave the process (%) | leave the node (%) |
+|---|---|---|---|
+| 100 | 54.9 | 7.8 | 3.9 |
+| 500 | 89.8 | 38.2 | 19.5 |
+| 1,000 | 94.9 | 62.4 | 38.2 |
+| 2,000 | 97.4 | 80.0 | 62.3 |
+| 4,000 | 98.4 | 87.3 | 74.6 |
+| uniform, remote 1.0 | 98.4 | 87.5 | 75.0 |
+
+- At 4 nodes, σ ≥ 8,000 is the same as uniform remote 1.0 (σ approaches the LP count). So the sweep stops at 4,000 and adds uniform remote 1.0 as the all-remote end.
+- The same calculation at Devastator's layout (100 LPs per core, 128 cores per node assumed) reproduces their 0.6% off-node at σ = 100 and 80.5% at σ = 25,600 on 16 nodes. Results are compared by off-node share, not by σ.
+
+**Setup.**
+- 4 nodes × 2 processes × 8 PEs, 128 LPs per PE, 15 start events per LP, end time 64,000, lookahead 100, mean delay 1,000, `+lci_ndevices 8`, 3 reps.
+- `ctl_sweep.sh`, once with direct sends and once with htram PP, 64-event buffers, deadline policy, margin 8.
+- Arms in each: blocking GVT; bucketed GVT with fixed W 50 / 100 / 250 / 500; the hill climb from W 250; the controller at ε 0.01.
+
+**Predictions.**
+1. Aggregation gain, best htram arm ÷ best direct arm (both in M committed events/s, higher is better), grows with the off-node share:
+   - at most 1.3× at σ 100;
+   - at least 2× by σ 1,000;
+   - 3–4× at σ 4,000 and uniform remote 1.0, as in the deadline-policy results (4.15× at remote 1.0).
+2. With direct sends, throughput falls about 4× from σ 100 to 2,000 and then flattens, as in the October 19 window sweep.
+3. The controller with htram lands within 10% of the best htram arm at every σ. Its mean window stays between 100 and 300 at every σ, because the delay distribution doesn't depend on σ and r only moves from about 0.55 to 0.98.
+4. A fixed W of 250 is also within 10% of the best at every σ. On this benchmark the controller's value is not needing the sweep, not beating it.
+5. The hill climb with htram reaches at most 0.85 of the best fixed W at σ ≥ 1,000.
+6. At this slack (lookahead 100, mean 1,000), blocking GVT with htram is within 10% of the controller with htram, as at remote 1.0 earlier (7.20 vs 7.30 M ev/s). Bucketed GVT should pull ahead only at low slack. If time allows, a second pass runs lookahead 10 / mean 200 at σ 500 and 2,000, predicting the controller with htram at ≥ 1.3× blocking with htram.
+
 ## Open issues
 
 1. **Event holding needs a realistic cutoff.** With the test configs'
