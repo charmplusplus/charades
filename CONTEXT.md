@@ -1106,6 +1106,44 @@ Devastator anchors in the same job (fixed W 1,000): 54.2 M ev/s at 64 ranks (two
 - The gain is smallest with direct sends on full nodes (1.13–1.18×), where the cost is per message in the network path, not in the runtime's CPU code.
 - Remaining gap 2.6–3.7×. Next, on the production build: pinning, a dedicated progress thread or core per process, `+lci_ndevices`, LCI packet size; then profile what remains.
 
+### Runtime settings on the production build (2026-10-21, idev job 3626832, 4 skx nodes)
+
+Setup: `charades-prod` (production runtime, 8bec616), Gaussian σ 2,000, high slack, end 512,000, htram PP 64, margin 8, W 250, 128 LPs per PE. Scripts `$WORK/charades-runs/rt_sweep{,2,3}.sh`; CSVs in `rtsweep/` and `rtsweep2/`. Node: 2 sockets × 24 cores, no SMT; socket 0 holds the even cores, socket 1 the odd ones. srun's default binding already confines each of 2 tasks per node to its socket.
+
+**Fix needed first (8bec616):** `+setcpuaffinity`, `+pemap` and `+showcpuaffinity` aborted every run with "Argument parse error". Charm++ consumes those flags from a per-PE copy of argv, so they survived in `main`'s argv, which Charades parsed. Charades now parses `CkGetArgv()`. `+pemap` is indexed by global PE modulo the list length, in OS core indices, so one node's list repeats on every node.
+
+**Full nodes, one factor at a time** (M committed events/s, median of 2–3 runs; higher is better):
+
+| configuration | M ev/s | ÷ old 2 × 24 layout |
+|---|---|---|
+| 2 × 23 PEs, `+pemap 2-46:2,3-47:2` (cores 0 and 1 free), `+lci_ndevices 4` | 45.1–46.2 | 1.32–1.35 |
+| 2 × 23, pinned, `+lci_ndevices 8` (base) | 43.2–43.9 | 1.26–1.28 |
+| 2 × 23, not pinned (one free core per socket) | 43.7 | 1.28 |
+| 2 × 22, pinned (two free cores), ndev 4 / 8 | 44.2 / 43.3 | 1.29 / 1.26 |
+| base with LCI packet size 16 K / 32 K | 44.3 / 43.1 | 1.29 / 1.26 |
+| base with `+backend_poll_freq` 16 / 256 | 43.6 / 43.2 | 1.27 / 1.26 |
+| base with `+backend_poll_thread 2` | 44.1 | 1.29 |
+| base with `+lci_ndevices` 2 / 16 / 23 / 1 | 42.2 / 42.5 / 40.7 / 33.2 | 1.23 / 1.24 / 1.19 / 0.97 |
+| 4 × 11, pinned | 36.7 | 1.07 |
+| 2 × 24, not pinned (every earlier full-node run) | 34.2 | 1.00 |
+| 1 × 46, pinned | 33.5 | 0.98 |
+| base with `+backend_poll_thread` 4 or 23 | hangs (180 s cap, 2 of 2) | – |
+
+64 PEs (2 × 8 per node): 21.1–21.2 pinned or not, with ndev 4 or 8; nothing here moves it.
+
+**Thread census** (2 × 23 pinned, mid-run): 24 threads per process, the 23 PE threads at 93–98% CPU and one `async` thread at 0%. So the freed core is not feeding a hidden helper thread; it most likely absorbs OS and daemon interruptions that otherwise land on a PE, and a stalled PE stalls everyone through GVT.
+
+**The controller on the best layout** (same run order, 3 reps each; ÷ W 250 at 44.8, higher is better): W 300 41.8 (0.93), event share 0.001 41.3 (0.92, mean W 278), event share 0.003 39.1 (0.87, mean W 322–348). Earlier on the Debug runtime the controller was 0.93–0.96: on the faster runtime throughput falls off more steeply above W 250 (W 350 0.91, W 500 0.59), so ε 0.003 now sets W too wide.
+
+**Devastator in the same allocation** (184 ranks, 23,552 LPs, fixed W 1,000): 96.7 and 104.4 M ev/s.
+
+**Where the gap stands** (Devastator ÷ Charades, each at its best configuration; lower is better for Charades):
+- Full nodes: about 100 / 45–46 = **2.2×** (Debug runtime 4.1×, production 2.8–3.0×). Charades and Devastator now run the same 23,552 LPs on 23 compute cores per socket.
+- 64 cores, high slack: 54.2 / 21.1 = 2.6× (unchanged by runtime settings).
+- Steps so far on full nodes: 23.2 (Debug) → 34.4 (production) → 43.9 (one free core per process) → 45–46 (`+lci_ndevices 4`).
+
+**Next.** Profile what remains (2.2–2.6×, about 2.3× in core time per committed event): the scheduler loop, entry-method and message overheads, and htram; and check whether ε should fall to 0.001 by default now that throughput is more sensitive to W. The `+backend_poll_thread` hang is a Reconverse issue to report (threads that don't poll seem never to get their messages progressed).
+
 ## Open issues
 
 1. **Event holding needs a realistic cutoff.** With the test configs'
