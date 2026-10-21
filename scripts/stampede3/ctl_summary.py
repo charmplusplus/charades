@@ -33,9 +33,10 @@ rows = defaultdict(list)
 for path in sys.argv[1:]:
     with open(path) as f:
         for r in csv.DictReader(f):
-            rows[(int(r['nodes']), r['workload'], r['agg'], r['arm'])].append(r)
+            agg = r['agg'] + ('/b' + r['bucket'] if r.get('bucket') else '')
+            rows[(int(r['nodes']), r['workload'], agg, r['arm'])].append(r)
 
-ARM_ORDER = {'w': 0, 'qb': 1, 'q': 2, 'hill': 3, 'hill1': 4}
+ARM_ORDER = {'w': 0, 'dry': 1, 'qb': 2, 'q': 3, 'hill': 4, 'hill1': 5}
 
 
 def order(key):
@@ -50,7 +51,7 @@ for k, v in rate.items():
     if k[3].startswith('w:') and v:
         best_fixed[k[:3]] = max(best_fixed.get(k[:3], 0), v)
 
-print('%5s %-34s %-6s %-10s %2s %2s %2s %8s %7s %5s %8s %8s %6s' % (
+print('%5s %-34s %-10s %-10s %2s %2s %2s %8s %7s %5s %8s %8s %6s' % (
     'nodes', 'workload', 'agg', 'arm', 'ok', 'st', 'fl', 'Mev/s', 'vs best',
     'eff%', 'window', 'strag/ev', 'alpha'))
 last = None
@@ -61,7 +62,7 @@ for key in sorted(rows, key=order):
         print()
     last = key[:3]
     v, b = rate[key], best_fixed.get(key[:3])
-    print('%5d %-34s %-6s %-10s %2d %2d %2d %8s %7s %5s %8s %8s %6s' % (
+    print('%5d %-34s %-10s %-10s %2d %2d %2d %8s %7s %5s %8s %8s %6s' % (
         key[0], key[1], key[2], key[3], len(ok),
         sum(r['status'] == 'stall' for r in rs),
         sum(r['status'] == 'fail' for r in rs),
