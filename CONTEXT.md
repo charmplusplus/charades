@@ -775,6 +775,44 @@ None of this touches the WPs path the SSSP client uses. GRAPH, GRAPH with compac
 5. Right: the hill climb reached 0.37–0.48 at σ ≥ 1,000.
 6. Wrong at high slack (blocking 0.61–0.66 against the controller's 0.75–0.92). Right at low slack: the controller is 1.31–1.60× blocking.
 
+### Controller on the GVT's count waves (implementation, 2026-10-21)
+
+- `--ctl-reduction=1` (commit 28281f3; the default stays 0, the separate `Controller` reduction, until measured).
+- **What rides on each wave.** `BucketGVT::contribute_counts` adds tuple elements to the count wave:
+  - the controller's 6 counters as `sum_ulong_long` deltas (48 B), on every wave;
+  - the delay histogram on every `--ctl-hist-waves`-th wave (default 8): whole (385 bins, 3 KB), or with `--ctl-hist-coarse=1` one bin per power of two (49 bins, 392 B). The receiver spreads a coarse bin evenly over its 8 sub-bins, which is what interpolating within the power of two would give.
+- **Why every PE agrees.** Each PE contributes exactly once per wave, so its k-th contribution is the same wave everywhere and all PEs agree which waves carry the histogram. `check_counts` passes the sums to the controller before advancing GVT, and each PE decides once per `--ctl-interval` waves.
+- **Fixed in passing:** `check_counts` never freed its reduction message, so every wave leaked one on every PE. `toTuple` copies the data out, so the message is now freed at once.
+- **Tests:** `ctl_quantile_shared` (decides every wave, full histogram every 8th), `ctl_hill_shared` (hill climb every wave, as Devastator runs it), `agg_ctl_shared_bucket_pp` (htram, ε 0.003, coarse histogram every wave). Mac gates: 588/588 together with the existing `ctl_*` configs; the full matrix 3,052/3,052; `--quick --repeat 20` on the three new configs and `bucket` 3,360/3,360.
+- **`ctl_sweep.sh` arms:**
+  - `qs[c]<N>:<ε>`: the quantile rule on the waves, histogram every Nth wave, coarse with `c`;
+  - `drys[c]<N>:<W>`: the same in a dry run (W fixed);
+  - `hills:<W0>`: the hill climb on the waves, deciding every wave;
+  - a new `count_waves` column.
+
+### External baselines, Mac feasibility (2026-10-21; details in `~/pdes-baselines/NOTES.md`)
+
+- **ROSS** (ROSS-org/ROSS `dc3a6a0`, 2026-06-23).
+  - Builds with no fixes (CMake, Open MPI).
+  - Its GVT is the blocking `mpi_allreduce`; 7 o'clock GVT is retired.
+  - New model `models/phold-gauss` (patch `~/pdes-baselines/ross-gauss-phold.patch`) follows our PHOLD draw for draw: the same delay semantics (integer timestamps), Gaussian step, contiguous LP blocks and clcg4 seeding.
+  - **It commits exactly the same events as Charades** (PHOLD test configs base / gaussian / long / wide: 2,055 / 16,389 / 16,370 / 4,085; plus σ 0 / 100 / 2,000 at both slack levels). This holds across sequential, conservative and optimistic runs on 2 and 4 ranks, so cross-engine runs can be checked by committed count.
+  - ROSS's own normal generator is unusable here: it caches a draw that reverse computation doesn't restore.
+  - The tuning knobs Devastator swept are `--batch` and `--gvt-interval` (grid not given in the paper); also `--extramem`.
+- **Devastator** (cychan-lbnl/devastator `2c32fda`, 2022-11-14, no later branches).
+  - **It contains the adaptive window** (`global_status_state::update()` in `src/devastator/pdes.cxx`, as in PADS'24 Sec. 2.1), so the real hill climb can be run.
+  - **Its PHOLD can't be compared with ours as it stands:**
+    - σ is in ranks, not LPs;
+    - the delay is hard-coded (lookahead 1, mean 10,001);
+    - runs stop after a wall-clock limit, with no end time;
+    - the paper's common ROSS harness isn't public.
+    - We need our own `bench/phold-gauss.cxx`.
+  - **Build:** its `brutal` tool, Python < 3.14, GCC with C++14. It downloads GASNet-EX, whose configure flags are hard-coded for Perlmutter (`cxi`). Rank, process and worker counts are compile-time constants, so one binary per layout. Each process runs workers plus a master thread that alone drives GASNet.
+  - Runs on the Mac in threads mode and on GASNet's smp conduit. With 4 threads it aborts at exit, cause unknown.
+- **Next, on Stampede3:**
+  - ROSS with `impi/21.11` or `mvapich/3.0`, one rank per core, a batch × GVT-interval sweep;
+  - Devastator with a GASNet conduit that works on Omni-Path (try ofi psm2, ofi `verbs;ofi_rxm`, ibv, udp), and our Gaussian PHOLD for it.
+
 ## Open issues
 
 1. **Event holding needs a realistic cutoff.** With the test configs'
