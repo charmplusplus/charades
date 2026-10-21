@@ -284,9 +284,14 @@ void Controller::apply(CkReductionMsg* msg) {
   Time w = g_tw_ctl == 2 ? hill_climb_window(sum) : quantile_window(sum);
   // The log shows this round's efficiency; the hill climb uses its average
   double round_eff = sum[EXECUTED] ? (double)sum[COMMITTED] / sum[EXECUTED] : 0;
-  window = w;
-  PE_VALUE(window) = w;
-  agg_set_window(w);
+  // --ctl-dry: every round runs and the log shows the window the policy
+  // chose, but the window in force stays put, so a run measures what the
+  // controller's machinery costs apart from what moving the window does
+  if (!g_tw_ctl_dry) {
+    window = w;
+    PE_VALUE(window) = w;
+    agg_set_window(w);
+  }
 
   if (g_tw_ctl_log && CkMyPe() == 0) {
     uint64_t samples = 0;

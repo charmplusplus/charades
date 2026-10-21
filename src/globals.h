@@ -65,6 +65,7 @@ extern unsigned g_tw_ctl;             ///< 0: fixed window, 1: delay quantile, 2
 extern double   g_tw_ctl_epsilon;     ///< quantile rule: target rolled-back share of executed events
 extern unsigned g_tw_ctl_calibrate;   ///< quantile rule: scale the bound by the waste seen
 extern unsigned g_tw_ctl_interval;    ///< GVT updates per controller round
+extern unsigned g_tw_ctl_dry;         ///< run the controller but never change the window
 extern unsigned g_tw_ctl_log;         ///< print every controller round on PE 0
 ///@}
 
