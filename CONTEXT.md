@@ -593,6 +593,22 @@ None of this touches the WPs path the SSSP client uses. GRAPH, GRAPH with compac
 
   - At end time 64,000, high-slack runs last under 1 s, so start-up and noise are ±15%. A confirmation at end time 256,000 with 3 reps is in `sweep4_long.csv`.
 
+### Two speeds of the bucketed GVT (2026-10-20, idev job 3623246)
+
+- **Runs with identical settings land in one of two modes, distinguished by the number of GVT computations.**
+  - High slack, fixed W 250, end 256,000: 7,348–7,642 GVTs at 12.8–13.3 M ev/s, or 12,000–13,100 GVTs at 9.0–9.6.
+  - Fewer, larger GVT steps are fast. The slow mode also has about 2× the urgent htram sends and 2× the rollbacks.
+- **Every arm shows it, fixed windows included** (`sweep5_modes.csv`: 6 reps, end 128,000, margin 8). Examples:
+  - phases, fixed W 50: 8.0 or 10.0–10.4;
+  - low slack, fixed W 25: 8.8–9.4 or 10.5–10.7;
+  - high slack, ε 0.01: 8.3–8.6 or 11.5–12.1.
+- **`--gvt-min-buckets` (pass k buckets before starting a round) does not select the mode.** At W 250 fast runs were 1/3, 0/3 and 2/3 for k = 1, 2 and 4.
+- **Consequences.**
+  - Medians over a few reps partly measure which mode runs fell into, so ±15% comparisons between arms are not resolved yet.
+  - Making the fast mode reliable could be worth 1.3–1.4× by itself. Next step is a trace of one run in each mode.
+- **Controller medians from sweep 5** (ratio to the best fixed median): ε 0.005 gives 0.91 / 0.82 / 1.16 and ε 0.01 gives 0.98 / 0.92 / 0.89 (low slack / high slack / phases).
+  - It is never catastrophic, where a wrong fixed W is 0.03–0.40, but it does not reliably beat a window tuned in hindsight.
+
 ## Open issues
 
 1. **Event holding needs a realistic cutoff.** With the test configs'
