@@ -934,33 +934,66 @@ What the sweep changes in the claim:
   - That is direct evidence that window control and aggregation have to be designed together.
   - The paper's "joint control" claim should rest on this.
 
-1. **Controller fixes**, checked on the Mac, then this sweep rerun on 4 nodes.
+1. **One reduction for GVT and the controller** (user decision, 2026-10-21). The controller's data rides on the bucketed GVT's count waves instead of its own `Controller` reduction, as Devastator piggybacks its efficiency counts on GVT.
+   - **Today:**
+     - a separate sum reduction once per 8 GVT updates (about 3 KB per PE: 385 histogram bins and 6 counters);
+     - up to about 5% cost (the dry run);
+     - 12–20% when it ran every GVT update.
+   - **Design:**
+     - Add the controller's counters (executed, rolled back, committed, remote sends, stragglers, elapsed time) as `sum_ulong_long` elements of the count-wave tuple, read as deltas since this PE's last wave.
+     - Every PE already contributes exactly once per wave, and every PE receives the same result, so each can compute the same W in `check_counts`, next to the GVT advance.
+   - **The delay histogram is the bulky part.** Choose among, by measurement:
+     - all 385 bins on every wave;
+     - all bins on every Nth wave, with counters on every wave;
+     - a coarser histogram, for example one bin per power of two (49 bins), which is enough for the quantiles the rule needs.
+   - **Cadence.** Waves come every few hundred µs, about one per 128 events per PE, so the window could change every wave.
+     - The quantile rule already folds only every 256 delays.
+     - The hill climb's 16-round average would cover milliseconds instead of hundreds of milliseconds.
+     - Keep a decision interval in waves as an option.
+   - **Scope.**
+     - The standalone `Controller` reduction stays for the other GVT managers (blocking GVT has no reduction to share). `--ctl-reduction=shared|separate` picks between them, for the comparison.
+     - The start reduction (`all_ready`) carries nothing new; the counters accumulate until the next wave.
+   - **Measure** (4 nodes, the σ-sweep workloads, both slack levels):
+     - cost in a dry run, shared vs. separate;
+     - throughput relative to the best fixed W;
+     - GVT waves per second (does the bigger tuple slow the waves?);
+     - how fast W settles after a phase change (phases PHOLD).
+   - **Predictions:**
+     - dry-run cost of 1% or less with counters every wave and the histogram every 8th wave;
+     - with the full histogram every wave, waves slow measurably (≥ 5% fewer waves per second);
+     - the hill climb fed every wave (Devastator's actual design) does better than at every 8 GVT updates, but still trails the quantile rule.
+   - **Gate:** Mac test matrix unchanged (committed counts), and `--repeat 20` on the `ctl_*` configs.
+2. **Controller fixes**, built on step 1 and checked on the Mac, then the σ sweep rerun on 4 nodes.
    - Default `--ctl-epsilon` 0.003; it is 0.05 now.
    - Floor guard: don't calibrate α, and don't shrink W, while F(W) ≈ 0. This is the ε 0.001 trap at about W 98.
-   - A cost-aware target: bound the share of *PE time* lost to rollbacks rather than the share of events. Use per-round estimates of the cost of a committed and of a rolled-back event, from a fit of round time against the two counts, or from timing rollback and anti-message sends directly.
+   - A cost-aware target: bound the share of *PE time* lost to rollbacks rather than the share of events.
+     - Estimate the cost of a committed and of a rolled-back event from a fit of time against the two counts. Per-wave counters (step 1) give many more points than rounds of 8 GVT updates. Alternatively, time rollback and anti-message sends directly.
    - Prediction: the htram high-slack gap closes from 0.86–0.92 to 0.95 or better, and nothing else drops below 0.95.
    - Gate: worst case of 0.95 or better of the best fixed W over 9 workloads × 2 transports.
-2. **Cheaper rollbacks under aggregation.** Anti-messages go through htram, with in-buffer annihilation: an event still in the sender's buffer is cancelled together with its anti-message.
+3. **Hill-climb fairness.** It stands in for Devastator in the paper and loses by 2–3×, so a reviewer may call it a strawman.
+   - With step 1 it can run as Devastator does, on the GVT reduction every round.
+   - Also rerun it from W 50 and from the bucket size.
+   - Compare it with Devastator's own code (step 7).
+4. **`--agg-scope` ablation** (other processes only, against all) at σ 100 and 2,000, in the same allocation as steps 1–3.
+   - It explains the 2.7× gain where only 3.9% of events go off-node.
+   - Devastator's in-process path is a cheap lock-free queue insert, so if most of that 2.7× is htram bypassing a slow in-process Charm++ message path, the claim must say so.
+5. **Cheaper rollbacks under aggregation.** Anti-messages go through htram, with in-buffer annihilation: an event still in the sender's buffer is cancelled together with its anti-message.
    - Measure the rollback ÷ committed cost ratio, now 11–21× with htram, and throughput at W 500.
    - Risk: a delayed anti-message lets wrong work spread further. Anti-messages may need urgent sends.
-3. **Hill-climb fairness.** It stands in for Devastator in the paper and loses by 2–3×, so a reviewer may call it a strawman.
-   - Rerun it from W 50 and from the bucket size, and at every GVT round.
-   - Compare it with Devastator's own code (step 6).
-4. **`--agg-scope` ablation** (other processes only, against all) at σ 100 and 2,000, to explain the 2.7× gain where only 3.9% of events go off-node.
-5. **Scale** to 16–32 nodes on skx-normal, as batch jobs after a short interactive check:
+6. **Scale** to 16–32 nodes on skx-normal, as batch jobs after a short interactive check:
    - Gaussian σ up to about 16,000 (32,768 LPs at 16 nodes), with Devastator's 100 LPs per core;
    - uniform remote 1.0;
    - the same policies, both slack levels.
-6. **Baselines:**
+7. **Baselines:**
    - ROSS on Stampede3;
    - Devastator's public code;
    - the PADS'19 static hold (open issue 1);
    - PADS'98 local-rate aggregation;
    - opportunistic aggregation.
-7. **Phase-changing workloads** (phases PHOLD) with the fixed controller. This is where it should beat every fixed W outright, not only in the worst case.
-8. **Housekeeping:**
+8. **Phase-changing workloads** (phases PHOLD) with the fixed controller. This is where it should beat every fixed W outright, not only in the worst case.
+9. **Housekeeping:**
    - SSSP parity check on htram `pdes`;
    - open issue 7;
    - 8 nodes and PPN 1 against 2;
    - units in the older tables of this file.
-9. Dragonfly port when needed.
+10. Dragonfly port when needed.
