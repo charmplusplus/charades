@@ -1074,6 +1074,38 @@ At end time 128,000 (about 2 s of execution, which is short for the controller) 
 - **The two engines want very different efficiency targets.** Devastator's best W runs at 96–99% efficiency (1–4% of events rolled back); Charades' at 99.97% (0.03%), and Charades at 96.4% efficiency loses a third of its throughput. A rolled-back event costs Charades far more (about 110 µs of PE time between W 250 and W 500 here, against about 8 µs per committed event), as in step 2: its rollbacks hold GVT back. So an event-share ε does not transfer between engines: Devastator would need ε of about 0.01–0.04 against Charades' 0.003. Porting the controller to Devastator (framing a) needs either a per-engine ε or a target that measures the throughput cost of rollbacks directly; the time-share target (step 2) did not.
 - **The gap to Devastator widens with fair tuning**: 4.1–6.1× with each engine at its best fixed W, against 3.2–4.0× before.
 
+### Production runtime build (2026-10-21, batch job 3626643, 4 skx nodes)
+
+**Finding.** Every Stampede3 number above used `$WORK/charm-pads-qd`, built without `--with-production`: `CMAKE_BUILD_TYPE=Debug`, so Reconverse, ck and LCI compiled `-g` with no `-O` (-O0), `CMK_ERROR_CHECKING 1`, `CMK_TRACE_ENABLED 1`, charmc `BUILDOPTS=" -g"`. Devastator is `-O3 -flto -DNDEBUG`. The Mac build was production all along.
+
+**Trees** (same sources: recharm 9d6a55780, Reconverse ff33b56, LCI ca88ce2c, Charades bcee55f):
+- `charades-qd` on `charm-pads-qd`: the Debug runtime (all earlier numbers).
+- `charades-prodrt` on `charm-pads-prod` (`--with-production`: Release, `-O3 -DNDEBUG` in Reconverse, ck and LCI; error checking and tracing off): Charades flags unchanged (`-O3`, asserts on, htram `PDES_TIMED`).
+- `charades-prod`: as prodrt, plus Charades and htram `-DNDEBUG` and no `PDES_TIMED`.
+- Script and CSVs: `$WORK/charades-runs/prod/` (`prod.slurm`). Two reps, interleaved across trees; htram PP 64, margin 8; Gaussian σ 2,000; 128 LPs per PE.
+- Two build lessons: a copied `config.mk` must also get its own `CHARADES_SRC` (otherwise it builds into the other tree's `src/build`), and a clean `make -j` of `src/` races on generated `.decl.h` files (build serially).
+
+**Results** (M committed events/s, median of 2; higher is better):
+
+| point | Debug runtime | production runtime | production + Charades NDEBUG, no PDES_TIMED | production ÷ Debug |
+|---|---|---|---|---|
+| 64 PEs, high slack (end 512,000), best fixed W 250 | 11.41 | 21.03 | 20.41 | 1.79–1.84 |
+| 64 PEs, low slack (end 128,000), best fixed W 50 | 8.56 | 14.06 | 14.27 | 1.64–1.67 |
+| full nodes weak-scaled (24,576 LPs, end 512,000), best fixed W 250 | 23.23 | 34.42 | 34.79 | 1.48–1.50 |
+| 64 PEs, direct sends, W 250 (end 128,000) | 2.07 | 3.26 | 3.22 | 1.56–1.57 |
+| full nodes, direct sends, W 250 (end 128,000) | 4.91 | 5.80 | 5.56 | 1.13–1.18 |
+
+Controller (event share 0.003) ÷ best fixed W, production + NDEBUG: 0.93 (64 high), 1.00 (64 low), 0.92 (full); Debug: 0.95, 0.98, 0.89. The best fixed W is unchanged by the build (250 / 50 / 250).
+
+Devastator anchors in the same job (fixed W 1,000): 54.2 M ev/s at 64 ranks (two runs) and 103.8 at 184 ranks; one 184-rank run took 25.8 s at 97% efficiency (7.0 M ev/s), a stall not seen before or since, excluded.
+
+**Gap to Devastator, each engine at its best fixed W** (Devastator ÷ Charades, lower is better for Charades): 64 cores high slack 54.2 / 20.4–21.0 = **2.6×** (was 4.7×); low slack 52.5 (job 3626388) / 14.1–14.3 = **3.7×** (was 6.1×); full nodes 96.9–103.8 / 34.4–34.8 = **2.8–3.0×** (was 4.1×). Core time per committed event at 64 cores high slack: about 3.1 µs for Charades (64 worker cores) against 1.3 µs for Devastator (64 workers plus 8 service threads).
+
+**What this means.**
+- The runtime build was worth 1.5–1.8× with htram; Charades-side asserts and `PDES_TIMED` are within run-to-run noise. All Stampede3 numbers from before this job understate Charades by that much; ratios within one build (htram ÷ direct, controller ÷ best fixed W) are about unchanged.
+- The gain is smallest with direct sends on full nodes (1.13–1.18×), where the cost is per message in the network path, not in the runtime's CPU code.
+- Remaining gap 2.6–3.7×. Next, on the production build: pinning, a dedicated progress thread or core per process, `+lci_ndevices`, LCI packet size; then profile what remains.
+
 ## Open issues
 
 1. **Event holding needs a realistic cutoff.** With the test configs'
