@@ -50,6 +50,7 @@ unsigned g_tw_agg_scope;
 unsigned g_tw_agg_gvt_flush;
 unsigned g_tw_agg_policy;
 Time     g_tw_agg_horizon;
+Time     g_tw_agg_horizon_margin;
 unsigned g_tw_ctl;
 double   g_tw_ctl_epsilon;
 unsigned g_tw_ctl_calibrate;
@@ -111,6 +112,7 @@ void clear_globals() {
   g_tw_agg_gvt_flush      = 2;
   g_tw_agg_policy         = 0;
   g_tw_agg_horizon        = 0;
+  g_tw_agg_horizon_margin = 0;
   g_tw_ctl                = 0;
   g_tw_ctl_epsilon        = 0.05;
   g_tw_ctl_calibrate      = 1;

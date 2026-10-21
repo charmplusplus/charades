@@ -58,6 +58,7 @@ extern unsigned g_tw_agg_scope;       ///< 0: all remote chares, 1: other proces
 extern unsigned g_tw_agg_gvt_flush;   ///< on each GVT update: 0 none, 1 stale, 2 all
 extern unsigned g_tw_agg_policy;      ///< 0: eager flushes, 1: flush by timestamp deadline
 extern Time     g_tw_agg_horizon;     ///< deadline policy: events with ts < GVT + this are due
+extern Time     g_tw_agg_horizon_margin; ///< deadline policy, horizon following the window: W + this
 ///@}
 
 /** \name Optimism-window controller (controller.h) *////@{

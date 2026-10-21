@@ -33,7 +33,8 @@ rows = defaultdict(list)
 for path in sys.argv[1:]:
     with open(path) as f:
         for r in csv.DictReader(f):
-            agg = r['agg'] + ('/b' + r['bucket'] if r.get('bucket') else '')
+            agg = r['agg'] + ('/b' + r['bucket'] if r.get('bucket') else '') \
+                + ('+' + r['margin'] if r.get('margin') not in (None, '', '0') else '')
             rows[(int(r['nodes']), r['workload'], agg, r['arm'])].append(r)
 
 ARM_ORDER = {'w': 0, 'dry': 1, 'qb': 2, 'q': 3, 'hill': 4, 'hill1': 5}

@@ -60,7 +60,13 @@ static Time urgent_window(Time window) {
     // events late (WPs: 8% stragglers, 47-62% efficiency); at the window,
     // 1.6% stragglers and 2.7-3.4x direct; above it, more events are due on
     // insert and messages shrink (2 x window: 1.9x).
-    w = g_tw_agg_horizon ? g_tw_agg_horizon : window;
+    // Following the window, plus --agg-horizon-margin: a held event ships
+    // when its sender learns of the GVT update that makes it due, and a
+    // receiver that learned of it first may already have run up to the new
+    // GVT + window. With h = W that left a waste floor that no window
+    // removes: 3% / 1.6% / 0.7% of events rolled back at buckets 4 / 8 / 16
+    // (4 nodes, lookahead 10 / mean 200), against none sent directly.
+    w = g_tw_agg_horizon ? g_tw_agg_horizon : window + g_tw_agg_horizon_margin;
   }
   return std::max<Time>(w, g_tw_gvt_scheme == 4 ? g_tw_gvt_bucket_size : 0);
 }
