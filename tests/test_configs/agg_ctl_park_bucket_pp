@@ -1,5 +1,5 @@
 # Optimistic w/Bucketed GVT, htram (PP), deadline policy with a margin, the
-# window set by the controller, blocked PEs parked
+# window set by the controller, blocked PEs parked, count waves paced (128)
 sync=3
 gvt=4
 buffer-size=655360
@@ -11,3 +11,4 @@ agg-horizon-margin=8
 ctl=1
 ctl-epsilon=0.01
 sched-park=1
+gvt-wave-events=128
