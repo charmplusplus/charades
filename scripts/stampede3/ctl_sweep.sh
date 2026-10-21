@@ -38,7 +38,9 @@
 #     --agg-horizon-margin values, the horizon being W + margin),
 #   AGG="pp:64" (htram mode:buffer with the deadline policy, so the horizon
 #     follows the window; "off" sends directly), TREE=charades-qd,
-#   EXTRA_ARGS="+lci_ndevices 8" (appended to every run).
+#   EXTRA_ARGS="+lci_ndevices 8" (appended to every run),
+#   CPT (cores per task for srun -c; default PEs per process), SRUN_ARGS
+#     (extra srun options, e.g. --cpu-bind=none with a +pemap in EXTRA_ARGS).
 # One CSV row per run; a run that hits CAP is cancelled with scancel (never
 # SIGKILL srun, which orphans the step) and recorded as status=stall.
 reps=${1:-2}
@@ -97,7 +99,7 @@ run_one() {  # nodes procs pes cfg arm label
             --agg-policy=1 --agg-horizon-margin=$margin)
   fi
   extra+=(${EXTRA_ARGS:-})
-  srun --mpi=pmi2 --kill-on-bad-exit=1 --wait=30 -N $N -n $n -c $((pe / n)) -J cs_$label \
+  srun --mpi=pmi2 --kill-on-bad-exit=1 --wait=30 -N $N -n $n -c ${CPT:-$((pe / n))} ${SRUN_ARGS:-} -J cs_$label \
       $C/models/phold/simple/phold +pe $pe $cfg $C/tests/test_configs/$gvtcfg "${extra[@]}" \
       > $f 2>&1 &
   local sp=$! t0=$(date +%s.%N) status=ok
