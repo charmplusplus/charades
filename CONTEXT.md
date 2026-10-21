@@ -813,6 +813,99 @@ None of this touches the WPs path the SSSP client uses. GRAPH, GRAPH with compac
   - ROSS with `impi/21.11` or `mvapich/3.0`, one rank per core, a batch × GVT-interval sweep;
   - Devastator with a GASNet conduit that works on Omni-Path (try ofi psm2, ofi `verbs;ofi_rxm`, ibv, udp), and our Gaussian PHOLD for it.
 
+### Controller on the GVT's count waves, results (2026-10-21, idev job 3625507, 4 skx nodes)
+
+**Setup.**
+- 4 nodes × 2 processes × 8 PEs, Gaussian σ 2,000 and uniform remote 1.0, htram PP 64 with deadline margin 8.
+- Two slack levels: lookahead 100 / mean 1,000 with end time 256,000, and lookahead 10 / mean 200 with end time 64,000.
+- 3–4 reps. CSVs in `$WORK/charades-runs/shared/`.
+- Shared arms decide every wave (`--ctl-interval=1`).
+- No run failed or stalled.
+
+**A. Cost**, with the controller running and the window held fixed (`--ctl-dry`). Throughput ÷ the same fixed W with no controller (median; higher is better):
+
+| controller data path | data per PE per wave (B) | high slack, W 250 | low slack, W 50 |
+|---|---|---|---|
+| separate reduction, every 8 GVT updates | 3,128 every 8th GVT update | 0.961 | 0.984 |
+| on waves, full histogram every 8th wave | 48 + 3,080 every 8th | 0.968 | 0.999 |
+| on waves, coarse histogram every 8th wave | 48 + 392 every 8th | 0.976 | 0.993 |
+| on waves, full histogram every wave | 3,128 | 0.940 | 0.963 |
+| on waves, coarse histogram every wave | 440 | 0.957 | 0.992 |
+
+- Run-to-run spread is 2–4%, so the cheaper variants are within noise of each other and of the separate reduction.
+- Only the full histogram on every wave costs clearly more: it slows waves by 6.4% at high slack.
+- Throughput follows waves per second almost exactly (rate ratio ≈ wave-rate ratio in every row): **the count waves are the pacing resource**, and anything that slows them slows the run.
+- Predictions:
+  - "≤ 1% with counters every wave and the histogram every 8th" held at low slack (0.1–0.7%), but not at high slack (2.4–3.2%, within noise of the separate reduction's 3.9%).
+  - "Full histogram every wave slows waves ≥ 5%" held at high slack (6.4%), but not at low (3.9%).
+
+**B. Live control at ε 0.003.** Throughput ÷ the best fixed W (W 250 at high slack, W 50 at low; median; higher is better):
+
+| controller data path | high slack, σ 2,000 | high slack, uniform | low slack, σ 2,000 | low slack, uniform |
+|---|---|---|---|---|
+| separate reduction | 0.917 | 0.894 | 0.970 | 0.990 |
+| on waves, full histogram every 8th | 0.906 | 0.894 | 0.985 | 0.987 |
+| on waves, coarse histogram every 8th | 0.897 | 0.908 | 0.974 | 0.973 |
+| on waves, coarse histogram every wave | 0.797 | 0.760 | 0.836 | 0.873 |
+| on waves, full histogram every wave | 0.762 | 0.747 | 0.816 | 0.830 |
+
+- With the histogram on every 8th wave, the shared reduction controls exactly as well as the separate one, and the coarse histogram is enough.
+- **A histogram on every wave hurts control, not cost.** Efficiency falls from 99.65% to about 98%. The rule folds new delays in, and recalibrates α, once 256 have arrived. A wave carries thousands, so it folds every wave, the decayed histogram remembers about two waves, and W jitters. Feeding per-wave histograms would need a fold sized in samples per wave, not a fixed 256.
+
+**C. The hill climb deciding more often** (÷ best fixed W, median; higher is better):
+
+| hill climb (from W 250 unless noted) | high slack, σ 2,000 | high slack, uniform | low slack, σ 2,000 | low slack, uniform |
+|---|---|---|---|---|
+| every 8 GVT updates, separate reduction | 0.45 | 0.48 | 0.33 | 0.38 |
+| every GVT update, separate reduction | 0.12 | 0.12 | 0.24 | 0.22 |
+| every count wave (Devastator's design) | 0.07 | 0.06 | 0.07 | 0.07 |
+| every count wave, from W 50 | 0.07 | 0.07 | 0.07 | 0.07 |
+
+- The prediction was wrong: deciding every wave makes the hill climb far worse, 25–31% efficiency with a mean W of about 950 at high slack.
+- The rule doubles W whenever its 16-round efficiency average is above 95%, and rollbacks show up some rounds after W grows. With a round every 0.1–0.6 ms, W doubles several times before the average reacts.
+- The rule's behaviour therefore depends on GVT round frequency. Devastator's asynchronous GVT is slower, so its rounds are longer. A fair comparison needs Devastator's own code, which builds.
+- The starting window makes no difference.
+
+**Conclusion for step 1.**
+- The controller can share the GVT's reduction at no loss, with counters every wave and a coarse histogram every 8th (440 B per PE at most). The shared reduction did not prove cheaper than the separate one.
+- `--ctl-reduction` stays 0 by default, pending the user's decision.
+
+### ROSS on Stampede3, first runs (same job)
+
+- **Build.** ROSS `dc3a6a0` + `phold-gauss`, built with `mvapich/3.0` (ch4:ofi) under `gcc/13.2.0`: `$WORK/ROSS/build/models/phold-gauss/phold-gauss`.
+  - Intel MPI needs `intel/24.0`, which swaps out gcc.
+  - Don't pipe `module load` (it then runs in a subshell and loads nothing).
+  - Launch with `srun --mpi=pmi2` after importing idev's `SLURM_*` variables (`scripts/stampede3/env.sh` does this, but also sets libfabric variables meant for LCI).
+- **Committed counts equal Charades' everywhere tried:**
+  - 7,861,362 (8,192 LPs, σ 2,000, lookahead 100 / mean 1,000, end time 64,000) at 1 to 64 ranks, sequential, conservative and optimistic;
+  - 8,106,901 and 40,655,555 at 8,448 LPs (high and low slack), conservative ROSS at 192 ranks and Charades at 192 PEs.
+- **Optimistic ROSS aborts across nodes**: `avl_tree.c:276: We never look for non-existent events!`, meaning an anti-message found no event.
+  - It fails with libfabric providers psm2 (the default) and tcp at 2 × 32 and 4 × 64 ranks, and with every provider at 4 × 192.
+  - It works within one node, and with `FI_PROVIDER="verbs;ofi_rxm"` at 2 × 32 and 4 × 64.
+  - Not yet diagnosed: ROSS may rely on an MPI message order that MPI doesn't guarantee across tags. Try Intel MPI, and read `network-mpi.c`.
+
+**Throughput** (M committed events/s, one or two runs each; higher is better; runs are short, about 0.7–5 s of execution):
+
+| engine and layout | high slack, σ 2,000 | low slack, σ 2,000 |
+|---|---|---|
+| ROSS conservative, psm2, 4 × 16 ranks | 5.54, 8.47 | 4.73 |
+| ROSS conservative, verbs, 4 × 16 ranks | 4.38 | – |
+| ROSS optimistic, verbs, 4 × 16 ranks | 3.94, 4.39 | – |
+| ROSS conservative, psm2, 4 × 48 ranks (8,448 LPs) | 10.40 | 7.31 |
+| ROSS sequential, 1 core | 0.80 | – |
+| Charades, htram, best fixed W, 4 × 16 PEs (8,192 LPs) | 11.4 | 8.4–8.5 |
+| Charades, htram, best fixed W, 4 × 48 PEs (8,448 LPs) | 11.15, 11.39 | 8.46, 9.04 |
+| Charades, htram, controller ε 0.003, 4 × 48 PEs | 7.49, 7.50 | 7.89, 8.56 |
+| Charades, direct sends, W 250, 4 × 48 PEs | 2.89, 2.99 | – |
+
+**What this means.**
+- **The biggest unknown is now partly known.** At this lookahead (100, a tenth of the mean delay), *conservative* ROSS is close to Charades with htram: 10.4 against 11.3 M ev/s on full nodes, and 7.3 against 8.7 at low slack.
+  - Charades' lead comes from aggregation alone; with direct sends it is 3–4× slower than ROSS.
+  - The paper's claim has to be made where conservative execution suffers: small lookahead relative to the delays.
+- **Charades did not get faster from 64 to 192 PEs** on these problem sizes. Runs execute for only about 0.7 s (high slack), so step 3 needs Devastator's sizes (100 LPs per core) and longer end times before scaling is judged.
+- **The controller is weak at full nodes and high slack** (0.66 of W 250) against 0.90 at 16 PEs per node. Step 2 has to look at this.
+- ROSS's own run-to-run spread is large (5.54 vs 8.47), so it needs repeats, and its batch and GVT-interval settings are untuned.
+
 ## Open issues
 
 1. **Event holding needs a realistic cutoff.** With the test configs'
@@ -972,7 +1065,7 @@ What the sweep changes in the claim:
   - That is direct evidence that window control and aggregation have to be designed together.
   - The paper's "joint control" claim should rest on this.
 
-1. **One reduction for GVT and the controller** (user decision, 2026-10-21). The controller's data rides on the bucketed GVT's count waves instead of its own `Controller` reduction, as Devastator piggybacks its efficiency counts on GVT.
+1. **DONE 2026-10-21** (see "Controller on the GVT's count waves, results"): the shared reduction controls as well as the separate one and costs about the same; a histogram on every wave hurts control; the hill climb gets worse the more often it decides. Open: whether to make `--ctl-reduction=1` (coarse histogram every 8th wave) the default. Original plan: **One reduction for GVT and the controller** (user decision, 2026-10-21). The controller's data rides on the bucketed GVT's count waves instead of its own `Controller` reduction, as Devastator piggybacks its efficiency counts on GVT.
    - **Today:**
      - a separate sum reduction once per 8 GVT updates (about 3 KB per PE: 385 histogram bins and 6 counters);
      - up to about 5% cost (the dry run);
@@ -1008,6 +1101,9 @@ What the sweep changes in the claim:
      - Estimate the cost of a committed and of a rolled-back event from a fit of time against the two counts. Per-wave counters (step 1) give many more points than rounds of 8 GVT updates. Alternatively, time rollback and anti-message sends directly.
    - Prediction: the htram high-slack gap closes from 0.86–0.92 to 0.95 or better, and nothing else drops below 0.95.
    - Gate: worst case of 0.95 or better of the best fixed W over 9 workloads × 2 transports.
+   - New from step 1:
+     - The controller reaches only 0.66 of W 250 at full nodes (4 × 48 PEs, high slack), against 0.90 at 16 PEs per node. Find out why before tuning ε.
+     - If per-wave histograms are wanted, fold by samples per wave rather than a fixed 256.
    - **In parallel with steps 1–2: the external baselines** (user decision, 2026-10-21; moved up because they are the paper's biggest unknown and don't depend on the controller work).
      - Build ROSS on Stampede3. Add Gaussian destinations to its PHOLD (it has only a remote-percent coin flip) with the same parameters as ours: exponential delay, lookahead, σ in LP ids, 15 start events per LP.
      - Try to build Devastator's public code (github.com/cychan-lbnl/devastator, last pushed 2022-11; needs GASNet-EX for Omni-Path). Check whether it has the adaptive window and Gaussian PHOLD.
@@ -1016,6 +1112,13 @@ What the sweep changes in the claim:
    - **Engines:** Charades (direct and htram) against ROSS, and Devastator if it built, on the σ-sweep workloads at both slack levels.
    - **Full nodes.** We have run 16 PEs per node on 48-core nodes, while ROSS uses all 48. Add Charades runs that use the full node (for example 2 processes × 23 PEs), and compare per node as well as per core.
    - **ROSS tuning.** Tune its batch and GVT-interval settings as Devastator did (a grid per node count), and report the tuning cost.
+   - **New from the first ROSS runs (2026-10-21):**
+     - **Fix or explain optimistic ROSS's multi-node abort** (`avl_tree.c:276`; psm2/tcp, and all providers at 192 ranks). Try Intel MPI, and read how `network-mpi.c` orders events and anti-messages.
+     - **Use psm2 for conservative ROSS**: about 2× faster than verbs.
+     - **Conservative ROSS is a serious baseline at lookahead 100** (10.4 vs Charades' 11.3 M ev/s on full nodes). Add small-lookahead workloads (lookahead 1–10 against mean 200–1,000), where conservative execution should collapse and optimism matters; that is the regime the claim needs.
+     - **Use Devastator's problem size** (100 LPs per core) and longer end times: current runs execute for about 0.7 s, and Charades didn't speed up from 64 to 192 PEs at that size.
+     - **Repeat ROSS runs**: two identical conservative runs gave 5.54 and 8.47 M ev/s.
+     - **The hill climb**: our rule degrades the more often it decides (0.45 → 0.07 from every 8 GVTs to every wave), so the fair Devastator arm is Devastator's own code. Build it on Stampede3 with a matched `phold-gauss` bench.
    - **Hill-climb fairness.** Our reimplementation stands in for Devastator and loses by 2–3×, so a reviewer may call it a strawman. Run it every GVT round on the shared reduction (step 1), from W 50 and from the bucket size, and against Devastator's own code if available.
    - **`--agg-scope` ablation** (other processes only, against all) at σ 100 and 2,000. It explains the 2.7× gain where only 3.9% of events go off-node. Devastator's in-process path is a cheap lock-free queue insert, so if most of that gain is htram bypassing a slow in-process Charm++ message path, the claim must say so.
 4. **Cheaper rollbacks under aggregation.** Anti-messages go through htram, with in-buffer annihilation: an event still in the sender's buffer is cancelled together with its anti-message.
