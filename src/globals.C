@@ -41,6 +41,7 @@ unsigned g_tw_gvt_trigger;
 unsigned g_tw_gvt_phases;
 unsigned g_tw_gvt_bucket_size;
 unsigned g_tw_gvt_min_buckets;
+unsigned g_tw_gvt_trace;
 Time     g_tw_optimism_window;
 unsigned g_tw_comm_stats;
 unsigned g_tw_aggregation;
@@ -104,6 +105,7 @@ void clear_globals() {
   g_tw_gvt_phases    = 2;
   g_tw_gvt_bucket_size    = 8;
   g_tw_gvt_min_buckets    = 1;
+  g_tw_gvt_trace          = 0;
   g_tw_optimism_window    = 0;
   g_tw_comm_stats         = 0;
   g_tw_aggregation        = 0;

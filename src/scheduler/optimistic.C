@@ -3,6 +3,7 @@
 #include "aggregation.h"
 #include "avl_tree.h"   // Temporary, should be moved to LP
 #include "globals.h"
+#include "statistics.h"
 #include "trigger.h"
 #include "util.h"
 
@@ -45,7 +46,9 @@ Time OptimisticScheduler::get_min_time() const {
 
 /** Execute events in batches until the trigger dictates it's GVT time */
 void OptimisticScheduler::execute() {
+  double t0 = g_tw_gvt_trace ? CmiWallTimer() : 0;
   unsigned num_executed = 0;
+  bool blocked = false;
   for (; num_executed < g_tw_mblock; num_executed++) {
     // With an optimism window, events past GVT + window wait for GVT to
     // advance. The iteration still completes, so the GVT trigger keeps
@@ -53,16 +56,25 @@ void OptimisticScheduler::execute() {
     Time window = PE_VALUE(window);
     if (window && next_lps.top() != NULL &&
         next_lps.top()->ts > PE_VALUE(g_last_gvt) + window) {
+      blocked = true;
       break;
     }
     if (!schedule_next_lp()) {
       break;
     }
   }
+  if (num_executed == g_tw_mblock) {
+    PE_STATS(iter_full)++;
+  } else if (blocked) {
+    PE_STATS(iter_window)++;
+  } else {
+    PE_STATS(iter_empty)++;
+  }
   // Nothing (more) this PE may execute: whatever it has buffered for other
   // PEs is now only delaying them
   if (num_executed < g_tw_mblock) agg_flush_idle();
   process_cancel_q();
+  if (g_tw_gvt_trace) PE_STATS(exec_time) += CmiWallTimer() - t0;
   iteration_done();
 }
 

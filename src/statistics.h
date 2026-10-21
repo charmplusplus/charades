@@ -111,6 +111,14 @@ class Statistics {
     uint64_t slack_hist[SLACK_BUCKETS];
     ///@}
 
+    /** \name Scheduler iterations (optimistic): how each execute() batch
+     *  ended -- a full batch, blocked by the optimism window, or out of
+     *  events -- and the seconds spent inside execute()
+     *////@{
+    uint64_t iter_full, iter_window, iter_empty;
+    double exec_time;
+    ///@}
+
     /** \name GVT stats
      *  \todo Move these to the GVT controllers and add more
      *////@{

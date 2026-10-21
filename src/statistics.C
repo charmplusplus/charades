@@ -71,6 +71,8 @@ void Statistics::clear() {
   agg_msgs_full = agg_msgs_urgent = agg_msgs_idle = agg_msgs_gvt = 0;
   agg_msgs_round = 0;
   remote_arrivals = remote_stragglers = 0;
+  iter_full = iter_window = iter_empty = 0;
+  exec_time = 0.0;
   for (int b = 0; b < SLACK_BUCKETS; b++) slack_hist[b] = 0;
   for (int c = 0; c < LAT_CLASSES; c++) {
     lat_count[c] = 0;
@@ -158,6 +160,10 @@ void Statistics::reduce(const Statistics* other) {
 }
 
 void Statistics::add_comm(const Statistics* other) {
+  iter_full += other->iter_full;
+  iter_window += other->iter_window;
+  iter_empty += other->iter_empty;
+  exec_time += other->exec_time;
   remote_holds += other->remote_holds;
   remote_cancels += other->remote_cancels;
   anti_cancels += other->anti_cancels;
@@ -283,6 +289,15 @@ void Statistics::print() const {
 
   print_section("GVT STATISTICS");
   print_int("Total GVT Computations", total_gvts);
+  if (iter_full + iter_window + iter_empty) {
+    print_section("SCHEDULER ITERATIONS");
+    print_int("Batches: Full", iter_full);
+    print_int("Batches: Window Blocked", iter_window);
+    print_int("Batches: Out of Events", iter_empty);
+    // exec_time is summed over PEs, total_time is the slowest PE's
+    print_double("Time in execute() %", total_time > 0
+        ? 100.0 * exec_time / (total_time * CkNumPes()) : 0.0);
+  }
 
   /** \todo Improve these stats to include remote % and also track the sent
    * events that were committed vs those sent and cancelled, or rolled back */

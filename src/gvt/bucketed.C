@@ -22,6 +22,9 @@ BucketGVT::BucketGVT() {
 
   curr_bucket = 0;
   prev_valid = 0;
+  start_reductions = 0;
+  count_reductions = 0;
+  wave_start = 0;
   bucket_size = g_tw_gvt_bucket_size;
   total_buckets = ceil(g_tw_ts_end / bucket_size);
   max_ts = total_buckets * bucket_size;
@@ -47,6 +50,16 @@ BucketGVT::BucketGVT() {
 }
 
 void BucketGVT::finalize() {
+  if (g_tw_gvt_trace && CkMyPe() == 0) {
+    std::ofstream t(std::string(g_output_dir) + "gvt_trace.csv");
+    t << "start_s,end_s,asked,passed0,valid,completed,bucket,lead0\n";
+    t << std::fixed << std::setprecision(7);
+    for (const WaveRecord& w : trace) {
+      t << w.start << "," << w.end << "," << w.asked << "," << w.passed0
+        << "," << w.valid << "," << w.completed << "," << w.bucket << ","
+        << w.lead0 << "\n";
+    }
+  }
   if (CkMyPe() == 0) {
     std::cout << std::endl;
     std::cout << "==== BUCKET GVT REDUCTION STATISTICS ========" << std::endl;
@@ -163,6 +176,11 @@ void BucketGVT::all_ready(int num_buckets) {
 
 void BucketGVT::send_counts(int num_buckets) {
   int num_passed = buckets_passed();
+  if (g_tw_gvt_trace && CkMyPe() == 0) {
+    wave_start = CmiWallTimer();
+    wave_asked = num_buckets;
+    wave_passed = num_passed;
+  }
 
   CkReduction::tupleElement tuple[] = {
       CkReduction::tupleElement(sizeof(int)*2*num_buckets,
@@ -214,6 +232,20 @@ void BucketGVT::check_counts(CkReductionMsg* msg) {
   prev_recv.resize(prev_valid);
   for (int i = 0; i < prev_valid; i++) {
     prev_recv[i] = counts[RECV_IDX(completed_buckets + i)];
+  }
+
+  if (g_tw_gvt_trace && CkMyPe() == 0) {
+    WaveRecord w;
+    w.start = wave_start;
+    w.end = CmiWallTimer();
+    w.asked = wave_asked;
+    w.passed0 = wave_passed;
+    w.valid = valid_buckets;
+    w.completed = completed_buckets;
+    w.bucket = curr_bucket;
+    w.lead0 = (long long)std::min(scheduler->get_min_time(), max_ts) -
+              (long long)curr_gvt;
+    trace.push_back(w);
   }
 
   /** Advance the GVT past the completed buckets */

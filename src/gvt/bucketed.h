@@ -104,6 +104,21 @@ class BucketGVT : public CBase_BucketGVT {
     int start_reductions;
     int count_reductions;
 
+    /**
+     * --gvt-trace, PE 0: one record per count wave -- when PE 0 contributed
+     * and when the result came back, the buckets asked about, how many PE 0
+     * and all PEs had passed, how many completed, the bucket GVT was at, and
+     * PE 0's lead over GVT (its earliest event minus GVT)
+     */
+    struct WaveRecord {
+      double start, end;
+      int asked, passed0, valid, completed, bucket;
+      long long lead0;
+    };
+    std::vector<WaveRecord> trace;
+    double wave_start;
+    int wave_asked, wave_passed;
+
     OffsetStats* stats;
     int reserve_buckets;
     int clear_buckets;
