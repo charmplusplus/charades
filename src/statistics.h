@@ -119,6 +119,13 @@ class Statistics {
     double exec_time;
     ///@}
 
+    /** \name Rollback cost (--ctl): nanoseconds inside rollbacks (reverse
+     *  handlers, cancellations, anti-messages), and the forward time of a
+     *  sample of events (every 16th), timed while the controller runs
+     *////@{
+    uint64_t rollback_ns, fwd_ns, fwd_timed;
+    ///@}
+
     /** \name GVT stats
      *  \todo Move these to the GVT controllers and add more
      *////@{

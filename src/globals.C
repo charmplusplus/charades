@@ -57,6 +57,7 @@ Time     g_tw_agg_horizon;
 Time     g_tw_agg_horizon_margin;
 unsigned g_tw_ctl;
 double   g_tw_ctl_epsilon;
+unsigned g_tw_ctl_cost;
 unsigned g_tw_ctl_calibrate;
 unsigned g_tw_ctl_interval;
 unsigned g_tw_ctl_dry;
@@ -127,7 +128,8 @@ void clear_globals() {
   g_tw_agg_horizon        = 0;
   g_tw_agg_horizon_margin = 0;
   g_tw_ctl                = 0;
-  g_tw_ctl_epsilon        = 0.05;
+  g_tw_ctl_epsilon        = -1;   // set in tw_init from --ctl-cost
+  g_tw_ctl_cost           = 1;
   g_tw_ctl_calibrate      = 1;
   g_tw_ctl_interval       = 8;
   g_tw_ctl_dry            = 0;

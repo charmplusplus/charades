@@ -906,6 +906,27 @@ None of this touches the WPs path the SSSP client uses. GRAPH, GRAPH with compac
 - **The controller is weak at full nodes and high slack** (0.66 of W 250) against 0.90 at 16 PEs per node. Step 2 has to look at this.
 - ROSS's own run-to-run spread is large (5.54 vs 8.47), so it needs repeats, and its batch and GVT-interval settings are untuned.
 
+### Controller step 2: cost-aware target and floor guard (design, 2026-10-21; written before the runs)
+
+**Changes.**
+- **`--ctl-cost=1` (default): ε is the share of PE time lost to rollbacks.** The rule allows a rolled-back share of ε / κ, where κ = (PE time per rolled-back event) ÷ (PE time per executed event), measured online:
+  - time inside `rollback_me` (reverse handlers, cancellations, anti-message sends), per rolled-back event;
+  - plus the mean forward time of an event, timed on every 16th forward;
+  - over elapsed PE time per executed event, which includes time blocked by the window: the more the window holds PEs back, the larger the waste budget.
+  - Both ride in the controller's counters (3 more fields), decayed like the others.
+- **ε defaults:** 0.01 as a time share; 0.003 with `--ctl-cost=0`, the best event share tried in the σ sweep. The old default was 0.05.
+- **Floor guard.** W ≥ F⁻¹(0.01), and α is not calibrated while F(W) < 0.01. Below the 1st percentile of delays the window can't cause stragglers, so the waste seen there is a floor. Calibrating against it trapped ε 0.001 at W ≈ 98.
+- Tests: `ctl_quantile_events` (event share); the existing `ctl_*` configs now use the time share.
+- Sweep arms: `q:` is now the time share; `qev:` the event share.
+
+**Predictions** (4 nodes × 2 × 8 PEs; σ-sweep workloads; ratios ÷ best fixed W, higher is better):
+1. **κ:** about 1.5–2.5 with direct sends and about 4–7 with htram at high slack. Lower at low slack, where PEs spend more time blocked.
+2. **Time share 0.01 reaches 0.95 or better of the best fixed W in all 9 workloads × 2 transports.**
+   - Rolled-back share about 0.15% with htram at high slack (the optimum was about 0.1%) and about 0.5% with direct sends.
+   - The event share 0.003 stays at 0.89–0.92 with htram at high slack.
+3. **Full nodes** (4 × 2 × 24 PEs): the 0.66 was mostly warm-up. A run 4× longer brings the controller to 0.9 or better. If it doesn't, `--ctl-log` shows whether W or κ is off.
+4. **ε sensitivity:** time shares 0.005 and 0.02 stay within 5% of 0.01 on most workloads. A flat optimum is what makes one default defensible.
+
 ## Open issues
 
 1. **Event holding needs a realistic cutoff.** With the test configs'

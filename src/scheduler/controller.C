@@ -25,6 +25,17 @@ static const double BATCH = 256;
 static const double ALPHA_GAIN = 0.25;
 /** ... and by at most this factor */
 static const double ALPHA_STEP = 1.25;
+/**
+ * Floor guard: W stays at least the delay distribution's Q_MIN quantile, and
+ * alpha is not calibrated below it. A window shorter than nearly every delay
+ * cannot cause stragglers, so the waste seen there is a floor the window does
+ * not control; calibrating against it drove W down until F(W) was 0 and
+ * alpha stopped moving (epsilon 0.001: W locked at 98 under a lookahead of
+ * 100, 0.72 of the best fixed window; 4 nodes, sigma 1000).
+ */
+static const double Q_MIN = 0.01;
+/** --ctl-cost: decayed rolled-back events needed before kappa is measured */
+static const double KAPPA_MIN_ROLLED_BACK = 16;
 /** Devastator's moving average: the last 16 rounds */
 static const size_t HILL_ROUNDS = 16;
 
@@ -65,11 +76,16 @@ Controller::Controller()
     : hist(BINS, 0), waves(0), waves_since(0), wave_sum(FIELDS, 0),
       contributed(false), gvts_since(0), last_executed(0),
       last_rolled_back(0), last_committed(0), last_remote(0),
-      last_stragglers(0),
+      last_stragglers(0), last_rollback_ns(0), last_fwd_ns(0),
+      last_fwd_timed(0),
       pending(BINS, 0.0), pending_total(0), pending_executed(0),
       pending_remote(0), pending_stragglers(0), pending_rolled_back(0),
+      pending_elapsed_ns(0), pending_rollback_ns(0), pending_fwd_ns(0),
+      pending_fwd_timed(0),
       dist(BINS, 0.0), dist_total(0), dist_executed(0), dist_remote(0),
-      dist_stragglers(0), dist_rolled_back(0), alpha(1),
+      dist_stragglers(0), dist_rolled_back(0), dist_elapsed_ns(0),
+      dist_rollback_ns(0), dist_fwd_ns(0), dist_fwd_timed(0), alpha(1),
+      kappa(1),
       q(0), rounds(0), run_executed(0), run_stragglers(0),
       window(g_tw_optimism_window), first_time(0),
       window_time_sum(0), window_time(0), last_rate(-1), efficiency(0) {
@@ -151,6 +167,9 @@ void Controller::read_counters(uint64_t* v) {
   double now = CmiWallTimer();
   v[ELAPSED_NS - BINS] = (uint64_t)((now - last_time) * 1e9);
   last_time = now;
+  v[ROLLBACK_NS - BINS] = delta(RUN_TOTAL(s, rollback_ns), &last_rollback_ns);
+  v[FWD_NS - BINS] = delta(RUN_TOTAL(s, fwd_ns), &last_fwd_ns);
+  v[FWD_TIMED - BINS] = delta(RUN_TOTAL(s, fwd_timed), &last_fwd_timed);
 }
 
 /**
@@ -269,6 +288,10 @@ Time Controller::quantile_window(const uint64_t* sum) {
   pending_remote += sum[REMOTE];
   pending_stragglers += sum[STRAGGLERS];
   pending_rolled_back += sum[ROLLED_BACK];
+  pending_elapsed_ns += sum[ELAPSED_NS];
+  pending_rollback_ns += sum[ROLLBACK_NS];
+  pending_fwd_ns += sum[FWD_NS];
+  pending_fwd_timed += sum[FWD_TIMED];
   if (pending_total < BATCH || pending_executed == 0) return window;
 
   dist_total = 0;
@@ -281,13 +304,20 @@ Time Controller::quantile_window(const uint64_t* sum) {
   dist_remote = dist_remote * DECAY + pending_remote;
   dist_stragglers = dist_stragglers * DECAY + pending_stragglers;
   dist_rolled_back = dist_rolled_back * DECAY + pending_rolled_back;
+  dist_elapsed_ns = dist_elapsed_ns * DECAY + pending_elapsed_ns;
+  dist_rollback_ns = dist_rollback_ns * DECAY + pending_rollback_ns;
+  dist_fwd_ns = dist_fwd_ns * DECAY + pending_fwd_ns;
+  dist_fwd_timed = dist_fwd_timed * DECAY + pending_fwd_timed;
   pending_total = pending_executed = pending_remote = pending_stragglers =
-      pending_rolled_back = 0;
+      pending_rolled_back = pending_elapsed_ns = pending_rollback_ns =
+      pending_fwd_ns = pending_fwd_timed = 0;
 
   double r = dist_remote / dist_executed;
-  if (g_tw_ctl_calibrate) {
+  // Below the floor (Q_MIN) the window does not cause the waste seen
+  double f_window = cdf(window ? window : g_tw_ts_end);
+  if (g_tw_ctl_calibrate && f_window >= Q_MIN) {
     // What the bound allows at the window in force (0: unbounded)
-    double bound = r * cdf(window ? window : g_tw_ts_end);
+    double bound = r * f_window;
     if (bound > 0) {
       // Geometric smoothing: a quarter of the way per fold, at most 1.25x.
       // Rollbacks come in bursts; moving alpha 2x per fold made W swing
@@ -298,7 +328,26 @@ Time Controller::quantile_window(const uint64_t* sum) {
       alpha *= std::min(ALPHA_STEP, std::max(1 / ALPHA_STEP, step));
     }
   }
-  q = std::min(Q_MAX, g_tw_ctl_epsilon / (r * alpha));
+  /**
+   * --ctl-cost (the default): epsilon is the share of PE time lost to
+   * rollbacks, so the rolled-back share allowed is epsilon / kappa. A
+   * rolled-back event costs about the same with direct sends and through
+   * htram (an anti-message is always a direct message), while htram makes an
+   * executed event several times cheaper: one rolled-back share was 2.4-5
+   * committed events' time with direct sends and 11-21 with htram (4 nodes,
+   * sigma 2000), so a share of events could not suit both. PE time per
+   * executed event includes time spent blocked by the window, so the more
+   * the window holds PEs back, the more waste the rule allows.
+   */
+  if (g_tw_ctl_cost && dist_rolled_back >= KAPPA_MIN_ROLLED_BACK &&
+      dist_fwd_timed > 0 && dist_elapsed_ns > 0) {
+    double per_rolled_back = dist_rollback_ns / dist_rolled_back +
+                             dist_fwd_ns / dist_fwd_timed;
+    double per_executed = dist_elapsed_ns / dist_executed;
+    kappa = std::min(1000.0, std::max(0.1, per_rolled_back / per_executed));
+  }
+  double share = g_tw_ctl_cost ? g_tw_ctl_epsilon / kappa : g_tw_ctl_epsilon;
+  q = std::min(Q_MAX, std::max(Q_MIN, share / (r * alpha)));
   return clamp_window((Time)std::ceil(inverse_cdf(q)));
 }
 
@@ -379,13 +428,13 @@ void Controller::decide(const uint64_t* sum) {
     for (int b = 0; b < BINS; b++) samples += sum[b];
     CkPrintf("CTL round %d gvt %llu window %llu delays %llu executed %llu "
         "rolled_back %llu committed %llu remote %llu stragglers %llu "
-        "round_ms %.3f q %.4f alpha %.4f eff %.3f\n", rounds, (unsigned long long)PE_VALUE(g_last_gvt),
+        "round_ms %.3f q %.4f alpha %.4f kappa %.2f eff %.3f\n", rounds, (unsigned long long)PE_VALUE(g_last_gvt),
         (unsigned long long)w, (unsigned long long)samples,
         (unsigned long long)sum[EXECUTED],
         (unsigned long long)sum[ROLLED_BACK],
         (unsigned long long)sum[COMMITTED], (unsigned long long)sum[REMOTE],
         (unsigned long long)sum[STRAGGLERS],
-        sum[ELAPSED_NS] / 1e6 / CkNumPes(), q, alpha,
+        sum[ELAPSED_NS] / 1e6 / CkNumPes(), q, alpha, kappa,
         g_tw_ctl == 2 ? efficiency : round_eff);
   }
 }
@@ -399,9 +448,14 @@ void Controller::finalize() {
   if (g_tw_ctl == 2) {
     CkPrintf("Policy                         hill climb (Devastator)\n");
   } else {
-    CkPrintf("Policy                         delay quantile, epsilon %g, %s\n",
-        g_tw_ctl_epsilon, g_tw_ctl_calibrate ? "calibrated" : "bound only");
+    CkPrintf("Policy                         delay quantile, epsilon %g "
+        "(share of %s), %s\n", g_tw_ctl_epsilon,
+        g_tw_ctl_cost ? "PE time lost to rollbacks" : "events rolled back",
+        g_tw_ctl_calibrate ? "calibrated" : "bound only");
     CkPrintf("Final alpha (calibration)      %.4f\n", alpha);
+    if (g_tw_ctl_cost) {
+      CkPrintf("Final kappa (rollback cost)    %.2f\n", kappa);
+    }
   }
   CkPrintf("Reduction                      %s\n", ctl_shared()
       ? (g_tw_ctl_hist_coarse ? "shared with GVT waves, coarse histogram"

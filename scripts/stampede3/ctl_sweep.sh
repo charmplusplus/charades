@@ -7,7 +7,7 @@
 # Usage: ctl_sweep.sh <reps> [out.csv]
 # Knobs (environment):
 #   NODES="4", PPN=2 (processes per node), PEPP=8 (PEs per process),
-#   LPS_PER_PE=128, START=15 (start events per LP), END=64000, CAP=180 (s),
+#   LPS_PER_PE=128, LPC=16 (LPs per chare; must divide LPS_PER_PE), START=15 (start events per LP), END=64000, CAP=180 (s),
 #   WORKLOADS="steady:10:200:0.5 steady:100:1000:0.5
 #              phases:10:200:100:1000:0.5:8000"
 #     steady:<lookahead>:<mean>:<remote>
@@ -24,7 +24,10 @@
 #     Since 2026-10-21 q, qb, hill, hill1 and dry use the default data path,
 #     the GVT's count waves (coarse histogram every 8th wave; a round is 8
 #     waves, or 1 for hill1); qsep:, drysep:, hillsep: the same three on the
-#     controller's own reduction (--ctl-reduction=0), as before that date;
+#     controller's own reduction (--ctl-reduction=0), as before that date.
+#     Since step 2 (2026-10-21) q's epsilon is a share of PE time lost to
+#     rollbacks (--ctl-cost=1); qev:<epsilon> is the earlier share of events
+#     rolled back (--ctl-cost=0);
 #     blk: blocking GVT, no window (the value is ignored);
 #     qs[c]<N>:<epsilon> the quantile rule on the GVT's count waves
 #     (--ctl-reduction=1, deciding every wave), the histogram on every Nth
@@ -40,7 +43,7 @@
 # SIGKILL srun, which orphans the step) and recorded as status=stall.
 reps=${1:-2}
 source "$(dirname "$0")/env.sh"
-NODES=${NODES:-4} PPN=${PPN:-2} PEPP=${PEPP:-8} LPS_PER_PE=${LPS_PER_PE:-128}
+NODES=${NODES:-4} PPN=${PPN:-2} PEPP=${PEPP:-8} LPS_PER_PE=${LPS_PER_PE:-128} LPC=${LPC:-16}
 START=${START:-15} END=${END:-64000} CAP=${CAP:-180} TREE=${TREE:-charades-qd}
 WORKLOADS=${WORKLOADS:-"steady:10:200:0.5 steady:100:1000:0.5 phases:10:200:100:1000:0.5:8000"}
 ARMS=${ARMS:-"w:25 w:50 w:100 w:250 w:500 q:0.02 q:0.05 q:0.1 hill:250"}
@@ -49,7 +52,7 @@ EXTRA_ARGS=${EXTRA_ARGS-"+lci_ndevices 8"}
 C=$WORK/$TREE
 out=${RUNS:-$WORK/charades-runs}/ctl_sweep; mkdir -p $out/logs; cd $out
 csv=${2:-$out/sweep_$(date +%Y%m%d_%H%M%S).csv}
-echo "rep,nodes,procs,pes,lps,workload,agg,bucket,margin,arm,status,wall_s,exec_s,committed,rolled_back,efficiency,event_rate,gvts,remote_sends,agg_events_per_msg,ctl_rounds,final_window,mean_window,stragglers_per_event,alpha,count_waves" > $csv
+echo "rep,nodes,procs,pes,lps,workload,agg,bucket,margin,arm,status,wall_s,exec_s,committed,rolled_back,efficiency,event_rate,gvts,remote_sends,agg_events_per_msg,ctl_rounds,final_window,mean_window,stragglers_per_event,alpha,count_waves,kappa" > $csv
 echo "writing $csv (tree $TREE, $(git -C $C log --oneline -1 | cut -c1-40))"
 
 stat() { awk -v k="$1" 'index($0, k) {print $NF; exit}' "$2"; }
@@ -69,6 +72,7 @@ run_one() {  # nodes procs pes cfg arm label
     dry)  extra+=(--optimism-window=$val --ctl=1 --ctl-dry=1) ;;
     hills) extra+=(--optimism-window=$val --ctl=2 --ctl-reduction=1 --ctl-interval=1) ;;
     qsep) extra+=(--ctl=1 --ctl-epsilon=$val --ctl-reduction=0) ;;
+    qev)  extra+=(--ctl=1 --ctl-epsilon=$val --ctl-cost=0) ;;
     drysep) extra+=(--optimism-window=$val --ctl=1 --ctl-dry=1 --ctl-reduction=0) ;;
     hillsep) extra+=(--optimism-window=$val --ctl=2 --ctl-reduction=0) ;;
   esac
@@ -114,7 +118,7 @@ run_one() {  # nodes procs pes cfg arm label
   [ $kind = w ] && fw=$val mw=$val
   [[ $kind =~ ^drys ]] && fw=$val mw=$val
   [ $kind = blk ] && fw=none mw=none
-  echo "$rep,$N,$n,$pe,$lps,$wl,$AGG,$bucket,$margin,$arm,$status,$(printf %.2f $wall),$(stat 'Execution Time' $f),$(stat 'Events Committed' $f),$(stat 'Events Rolled Back' $f),$(stat 'Efficiency' $f),$(stat 'Event Rate' $f),$(stat 'Total GVT Computations' $f),$(stat 'Remote Sends' $f),$(stat 'Events per htram Message' $f),$(stat 'Rounds' $f),$fw,$mw,$(stat 'Stragglers per executed event' $f),$(stat 'Final alpha' $f),$(stat 'Count Reductions :' $f)" >> $csv
+  echo "$rep,$N,$n,$pe,$lps,$wl,$AGG,$bucket,$margin,$arm,$status,$(printf %.2f $wall),$(stat 'Execution Time' $f),$(stat 'Events Committed' $f),$(stat 'Events Rolled Back' $f),$(stat 'Efficiency' $f),$(stat 'Event Rate' $f),$(stat 'Total GVT Computations' $f),$(stat 'Remote Sends' $f),$(stat 'Events per htram Message' $f),$(stat 'Rounds' $f),$fw,$mw,$(stat 'Stragglers per executed event' $f),$(stat 'Final alpha' $f),$(stat 'Count Reductions :' $f),$(stat 'Final kappa' $f)" >> $csv
   printf "%-60s %-5s %7.2fs\n" $label $status $wall
 }
 
@@ -124,7 +128,7 @@ for rep in $(seq $reps); do
     for wl in $WORKLOADS; do
       IFS=: read -r kind a b c d e f <<< "$wl"
       cfg=$out/${wl//:/_}_${lps}_${START}_${END}
-      printf '%s\n' "num-lps=$lps" "lps-per-chare=16" "end-time=$END" \
+      printf '%s\n' "num-lps=$lps" "lps-per-chare=$LPC" "end-time=$END" \
           "start-events=$START" > $cfg
       if [ $kind = steady ]; then
         printf '%s\n' "lookahead=$a" "mean=$b" "remote=$c" >> $cfg

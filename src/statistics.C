@@ -73,6 +73,7 @@ void Statistics::clear() {
   remote_arrivals = remote_stragglers = 0;
   iter_full = iter_window = iter_empty = 0;
   exec_time = 0.0;
+  rollback_ns = fwd_ns = fwd_timed = 0;
   for (int b = 0; b < SLACK_BUCKETS; b++) slack_hist[b] = 0;
   for (int c = 0; c < LAT_CLASSES; c++) {
     lat_count[c] = 0;
@@ -164,6 +165,9 @@ void Statistics::add_comm(const Statistics* other) {
   iter_window += other->iter_window;
   iter_empty += other->iter_empty;
   exec_time += other->exec_time;
+  rollback_ns += other->rollback_ns;
+  fwd_ns += other->fwd_ns;
+  fwd_timed += other->fwd_timed;
   remote_holds += other->remote_holds;
   remote_cancels += other->remote_cancels;
   anti_cancels += other->anti_cancels;

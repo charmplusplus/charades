@@ -71,7 +71,7 @@ class Controller : public CBase_Controller {
     static const int COARSE_BINS = 1 + MAX_EXP;
     /** Reduction layout: the histogram, then these counters */
     enum { EXECUTED = BINS, ROLLED_BACK, COMMITTED, REMOTE, STRAGGLERS,
-           ELAPSED_NS, FIELDS };
+           ELAPSED_NS, ROLLBACK_NS, FWD_NS, FWD_TIMED, FIELDS };
     static const int COUNTERS = FIELDS - BINS;
 
     Controller();
@@ -99,17 +99,24 @@ class Controller : public CBase_Controller {
     bool contributed;            ///< in the current round, awaiting apply()
     unsigned gvts_since;         ///< GVT updates since the last result
     uint64_t last_executed, last_rolled_back, last_committed, last_remote,
-             last_stragglers;
+             last_stragglers, last_rollback_ns, last_fwd_ns, last_fwd_timed;
     double last_time;
 
     /** Identical on every PE: computed only from reduced data */
     std::vector<double> pending; ///< global delays not yet folded into dist
     double pending_total, pending_executed, pending_remote,
-           pending_stragglers, pending_rolled_back;
+           pending_stragglers, pending_rolled_back, pending_elapsed_ns,
+           pending_rollback_ns, pending_fwd_ns, pending_fwd_timed;
     std::vector<double> dist;    ///< decayed global histogram
     double dist_total, dist_executed, dist_remote, dist_stragglers,
-           dist_rolled_back;
+           dist_rolled_back, dist_elapsed_ns, dist_rollback_ns, dist_fwd_ns,
+           dist_fwd_timed;
     double alpha;                ///< calibration: waste seen / r * F(W)
+    /**
+     * --ctl-cost: PE time a rolled-back event costs (its forward work plus
+     * its share of rollback processing) over the PE time per executed event
+     */
+    double kappa;
     double q;                    ///< last quantile the rule asked for
     int rounds;
     double run_executed, run_stragglers;  ///< over every round, for the summary
