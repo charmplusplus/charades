@@ -24,6 +24,9 @@ BucketGVT::BucketGVT() {
   prev_valid = 0;
   start_reductions = 0;
   count_reductions = 0;
+  pending_wave = -1;
+  executed_at_wave = 0;
+  last_starved = true;
   wave_start = 0;
   bucket_size = g_tw_gvt_bucket_size;
   total_buckets = ceil(g_tw_ts_end / bucket_size);
@@ -174,7 +177,39 @@ void BucketGVT::all_ready(int num_buckets) {
   send_counts(num_buckets);
 }
 
+/**
+ * Count waves run back to back, so their pace is set by how soon every PE
+ * handles the previous result. With 16-event batches PEs answer quickly,
+ * waves come every ~230 us and each completes ~2.7 buckets; with 64-event
+ * batches a wave takes ~390 us and completes ~6.6, and the run is 1.35x
+ * faster (4 nodes, PHOLD lookahead 100 / mean 1000, W 250) -- and at 16,
+ * runs flipped between the two paces. --gvt-wave-events=K paces waves by
+ * progress instead: a PE holds its contribution until it has executed K
+ * events since its last one, or until it cannot execute (iteration_end).
+ */
 void BucketGVT::send_counts(int num_buckets) {
+  if (g_tw_gvt_wave_events && !last_starved &&
+      get_statistics()->events_executed - executed_at_wave <
+          g_tw_gvt_wave_events) {
+    pending_wave = num_buckets;
+    return;
+  }
+  contribute_counts(num_buckets);
+}
+
+void BucketGVT::iteration_end(bool starved) {
+  last_starved = starved;
+  if (pending_wave >= 0 && (starved ||
+      get_statistics()->events_executed - executed_at_wave >=
+          g_tw_gvt_wave_events)) {
+    int n = pending_wave;
+    pending_wave = -1;
+    contribute_counts(n);
+  }
+}
+
+void BucketGVT::contribute_counts(int num_buckets) {
+  executed_at_wave = get_statistics()->events_executed;
   int num_passed = buckets_passed();
   if (g_tw_gvt_trace && CkMyPe() == 0) {
     wave_start = CmiWallTimer();

@@ -42,6 +42,7 @@ extern unsigned g_tw_gvt_phases;      ///< number of phases in a phased gvt
 extern unsigned g_tw_gvt_bucket_size; ///< size of each bucket in a bucketed gvt
 extern unsigned g_tw_gvt_min_buckets; ///< bucketed gvt: buckets a PE passes before a round
 extern unsigned g_tw_gvt_trace;       ///< bucketed gvt: PE 0 logs every count wave; time execute()
+extern unsigned g_tw_gvt_wave_events; ///< bucketed gvt: events a PE runs between count waves (0: none)
 extern Time     g_tw_optimism_window; ///< execute no event past GVT + this (0: off)
 extern unsigned g_tw_comm_stats;      ///< time remote sends and send->receive latency
 extern unsigned g_tw_async_reduction; ///< use asynchronous reductions in GVTs

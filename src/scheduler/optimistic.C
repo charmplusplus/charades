@@ -75,6 +75,7 @@ void OptimisticScheduler::execute() {
   if (num_executed < g_tw_mblock) agg_flush_idle();
   process_cancel_q();
   if (g_tw_gvt_trace) PE_STATS(exec_time) += CmiWallTimer() - t0;
+  gvt_manager->iteration_end(num_executed < g_tw_mblock);
   // --sched-park: blocked by the window, stop re-enqueuing execute() until
   // something can unblock this PE: a GVT update (gvt_done), an event or a
   // rollback inside the window (maybe_wake), a cancellation

@@ -54,6 +54,12 @@ class GVTManager : public CBase_GVTManager {
     /** Methods for producing and consuming events for GVTs that need to know */
     virtual void consume(RemoteEvent* e) {}
     virtual bool produce(RemoteEvent* e) { return true; }
+
+    /**
+     * The scheduler finished an execute() batch; starved when it stopped
+     * early (blocked by the window or out of events)
+     */
+    virtual void iteration_end(bool starved) {}
 };
 
 #endif

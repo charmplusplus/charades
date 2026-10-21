@@ -86,6 +86,9 @@ class BucketGVT : public CBase_BucketGVT {
     void consume(RemoteEvent* e); ///< Increment recvd and attempt GVT
     bool produce(RemoteEvent* e); ///< Increment sent and attempt GVT
 
+    /** --gvt-wave-events: contribute a held wave once enough has run */
+    void iteration_end(bool starved);
+
   private:
     Time bucket_size;   ///< Size of each bucket
     Time max_ts;        ///< Max end ts used when bucket size doesn't divide end
@@ -103,6 +106,16 @@ class BucketGVT : public CBase_BucketGVT {
 
     int start_reductions;
     int count_reductions;
+
+    /**
+     * --gvt-wave-events: a count wave this PE has not contributed to yet
+     * (-1: none), the executed-event count at its last contribution, and
+     * whether its last execute() batch stopped early
+     */
+    int pending_wave;
+    uint64_t executed_at_wave;
+    bool last_starved;
+    void contribute_counts(int num_buckets);
 
     /**
      * --gvt-trace, PE 0: one record per count wave -- when PE 0 contributed
