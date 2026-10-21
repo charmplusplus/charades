@@ -42,8 +42,10 @@ int tw_ismaster();
 #define DEBUG_LP(format, ...) {}
 #endif
 
-// Tracing functionality
-#if CMK_TRACE_ENABLED
+// Tracing functionality. -DCHARADES_NO_BRACKETS keeps Projections tracing but
+// drops the per-event forward/rollback brackets (two timer reads and a log
+// record per event), which inflate short events and the logs.
+#if CMK_TRACE_ENABLED && !defined(CHARADES_NO_BRACKETS)
 #define BRACKET_TRACE(code,event) \
 double start = CmiWallTimer(), end; \
 code \
