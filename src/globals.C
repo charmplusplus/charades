@@ -108,7 +108,9 @@ void clear_globals() {
   g_tw_gvt_bucket_size    = 8;
   g_tw_gvt_min_buckets    = 1;
   g_tw_gvt_trace          = 0;
-  g_tw_gvt_wave_events    = 0;
+  // Paced count waves are 1.0-1.38x faster on 4 nodes and remove the
+  // run-to-run flip between two GVT paces (CONTEXT.md, "Two speeds")
+  g_tw_gvt_wave_events    = 128;
   g_tw_sched_park         = 0;
   g_tw_optimism_window    = 0;
   g_tw_comm_stats         = 0;
