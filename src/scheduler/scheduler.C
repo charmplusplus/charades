@@ -28,6 +28,7 @@ Scheduler::Scheduler() {
   CpvAccess(g_scheduler) = this;
 
   running = false;
+  parked = false;
 
   // Initialize rng // TODO: Definitely doesn't belong here
   tw_rand_init(31, 41);
@@ -228,9 +229,16 @@ void DistributedScheduler::iteration_done() {
  * going to do load balancing this iteration after the current iteration.
  */
 void DistributedScheduler::next_iteration() {
-  if (!running) {
+  if (!running && !parked) {
     running = true;
     thisProxy[CkMyPe()].execute();
+  }
+}
+
+void DistributedScheduler::wake() {
+  if (parked) {
+    parked = false;
+    next_iteration();
   }
 }
 
@@ -250,6 +258,8 @@ void DistributedScheduler::gvt_done(Time gvt, bool lb) {
   TW_ASSERT(gvt >= PE_VALUE(g_last_gvt), "GVT Causality Violation\n");
   PE_STATS(total_gvts)++;
   PE_VALUE(g_last_gvt) = gvt;
+  // The window moved with GVT: a parked PE may run again
+  parked = false;
   // Buffered events may now be at GVT, holding up the next advance
   agg_flush_gvt();
 

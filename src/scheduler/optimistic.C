@@ -75,7 +75,25 @@ void OptimisticScheduler::execute() {
   if (num_executed < g_tw_mblock) agg_flush_idle();
   process_cancel_q();
   if (g_tw_gvt_trace) PE_STATS(exec_time) += CmiWallTimer() - t0;
+  // --sched-park: blocked by the window, stop re-enqueuing execute() until
+  // something can unblock this PE: a GVT update (gvt_done), an event or a
+  // rollback inside the window (maybe_wake), a cancellation
+  // (update_min_cancel), or a wider window (the controller). Spinning instead
+  // ran a no-op iteration and an idle flush hundreds of thousands of times
+  // per PE per run, ahead of the GVT and event messages that unblock it.
+  // Only under a continuous GVT: a blocking one needs every PE to keep
+  // iterating until its trigger fires. Joining a round first (gvt_begin)
+  // lets the last PE to reach the window still start one.
+  if (blocked && g_tw_sched_park && gvt_manager->is_continuous()) {
+    parked = true;
+    gvt_manager->gvt_begin();
+  }
   iteration_done();
+}
+
+void OptimisticScheduler::maybe_wake(Time ts) {
+  Time window = PE_VALUE(window);
+  if (!window || ts <= PE_VALUE(g_last_gvt) + window) wake();
 }
 
 void OptimisticScheduler::gvt_resume() {
@@ -123,4 +141,5 @@ void OptimisticScheduler::update_min_cancel(Time t) {
   if (t < min_cancel_time) {
     min_cancel_time = t;
   }
+  wake();  // the cancellation is processed in execute()
 }

@@ -291,6 +291,8 @@ void Controller::apply(CkReductionMsg* msg) {
     window = w;
     PE_VALUE(window) = w;
     agg_set_window(w);
+    // A wider window may unblock a parked PE (--sched-park)
+    ((DistributedScheduler*)CpvAccess(g_scheduler))->wake();
   }
 
   if (g_tw_ctl_log && CkMyPe() == 0) {

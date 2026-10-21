@@ -26,6 +26,7 @@ class OptimisticScheduler : public CBase_OptimisticScheduler {
     void balancing_complete();
     void process_cancel_q();        /**< Process the LPs in the cancel_q*/
     void update_min_cancel(Time);   /**< Update min_cancel_time */
+    void maybe_wake(Time ts);       /**< --sched-park: ts inside the window */
     Time get_min_time() const;      /**< Overriden to include min_cancel_time */
 };
 

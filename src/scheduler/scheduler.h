@@ -41,6 +41,12 @@ class Scheduler : public CBase_Scheduler {
     double end_time;        /**< End wall time for the simulation */
 
     PEQueue next_lps; /**< queue storing LPTokens ordered by next event ts */
+    /**
+     * --sched-park: blocked by the optimism window, this PE stopped
+     * re-enqueuing execute() and waits for something that can unblock it
+     * (OptimisticScheduler::execute)
+     */
+    bool parked;
 
   public:
     // TODO: Globals may not be needed once event handling is moved to scheduler
@@ -82,7 +88,10 @@ class Scheduler : public CBase_Scheduler {
     }
     void update_next(LPToken* token, Time ts) {
       next_lps.update(token, ts);
+      if (parked) maybe_wake(ts);
     }
+    /** Parked: an LP's next event is now at ts; wake if it may run */
+    virtual void maybe_wake(Time ts) {}
 
     // TODO: Move to distributed/optimistic
     virtual void consume(RemoteEvent* e) {}
@@ -129,6 +138,8 @@ class DistributedScheduler : public CBase_DistributedScheduler {
     /** Local methods for iteration control flow */
     void iteration_done();
     void next_iteration();
+    /** Unpark (--sched-park) and start the next iteration */
+    void wake();
 
     /** Methods for load balancing synchronization */
     void start_balancing();
