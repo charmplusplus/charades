@@ -568,6 +568,31 @@ None of this touches the WPs path the SSSP client uses. GRAPH, GRAPH with compac
 - **The remaining ~10% cost at a given mean W** is to be split with `--ctl-dry=1`: rounds and computation run, but W stays fixed.
 
 
+### Waste floor, controller cost, horizon margin (2026-10-20, idev job 3623246, 4 skx nodes)
+
+`$WORK/charades-runs/ctl_sweep/{floor_pp,floor_direct,dry,margin,sweep3_m8}.csv`. Setup as in sweep 1 (lookahead 10 / mean 200 unless noted).
+
+- **The waste floor comes from htram's deadline holding, not the window.**
+  - With htram (PP, h = W), efficiency is flat in W (8–25) at 96.6–97.2%, 98.3–98.5% and 99.3% for buckets 4, 8 and 16.
+  - Sent directly, it is 99.9–100% everywhere.
+  - Mechanism: a held event ships when its sender learns of the GVT update that makes it due. A receiver that learned of it first may already have run to the new GVT + W, and the waste per GVT update scales as 1 / bucket size.
+  - My skew hypothesis (bound off by the GVT skew, floor growing with bucket size) was wrong in direction.
+- **Fix: `--agg-horizon-margin` (h = W + m).**
+  - With m ≥ 8, fixed W 25 runs at 99.9–100% efficiency, and controller stragglers fall from 0.004–0.011 to 0.0013 per event.
+  - Throughput barely moves (the floor was small), and larger margins shrink messages. Fixed W 25 at bucket 8: m 0 / 8 / 16 / 32 → 9.32 / 9.78 / 8.63 / 6.81 M ev/s (2 reps). m = 8 (one bucket) is about neutral.
+- **Controller machinery costs at most about 5%.** `--ctl-dry` against the same fixed W gives 0.95–1.00 (3 reps; one outlier at 1.35).
+  - The rest of the earlier ~10% gap is the window choice: at ε 0.02 the rule spends its waste budget on a bigger W, which does not pay at low slack.
+- **Bucket size is a knob too.** Bucket 16 with W 25 gives 10.2–10.4 M ev/s at low slack, the best so far, against 9.3–9.6 at bucket 8.
+- **With m = 8, small ε becomes reachable and works** (sweep 3, 2 reps, ratio to the best fixed W):
+
+| ε | lookahead 10 / mean 200 | lookahead 100 / mean 1000 | phases |
+|---|---|---|---|
+| 0.005 | 1.00 (W 43) | 0.83 (W 199) | **1.13** (W 71) |
+| 0.01 | 0.84 (W 45) | 0.96 (W 256) | **1.14** (W 86) |
+| 0.02 | 0.82 (W 54) | 0.93 (W 310) | 1.06 (W 101) |
+
+  - At end time 64,000, high-slack runs last under 1 s, so start-up and noise are ±15%. A confirmation at end time 256,000 with 3 reps is in `sweep4_long.csv`.
+
 ## Open issues
 
 1. **Event holding needs a realistic cutoff.** With the test configs'

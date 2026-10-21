@@ -39,6 +39,7 @@ extern unsigned g_tw_gvt_interval;    ///< distance between GVT calls
 extern unsigned g_tw_gvt_trigger;     ///< unit of the GVT interval (time or events)
 extern unsigned g_tw_gvt_phases;      ///< number of phases in a phased gvt
 extern unsigned g_tw_gvt_bucket_size; ///< size of each bucket in a bucketed gvt
+extern unsigned g_tw_gvt_min_buckets; ///< bucketed gvt: buckets a PE passes before a round
 extern Time     g_tw_optimism_window; ///< execute no event past GVT + this (0: off)
 extern unsigned g_tw_comm_stats;      ///< time remote sends and send->receive latency
 extern unsigned g_tw_async_reduction; ///< use asynchronous reductions in GVTs

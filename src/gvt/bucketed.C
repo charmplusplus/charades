@@ -135,9 +135,21 @@ int BucketGVT::buckets_passed() const {
   return (std::min(scheduler->get_min_time(), max_ts) - curr_gvt) / bucket_size;
 }
 
+/**
+ * Join a GVT round once this PE has passed --gvt-min-buckets buckets (1 by
+ * default). Runs settled into either many small GVT steps or few large ones
+ * (4 nodes, PHOLD lookahead 100 / mean 1000, the same settings: 13,474 GVTs
+ * at 8.5 M ev/s or 7,635 at 12.9), so this asks for the large ones. Capped
+ * by what the window lets a PE pass and by the buckets left, so a round can
+ * always start.
+ */
 void BucketGVT::attempt_gvt() {
   int num_passed = buckets_passed();
-  if (num_passed > 0 && !active) {
+  int need = g_tw_gvt_min_buckets;
+  Time window = PE_VALUE(window);
+  if (window) need = std::min<int>(need, std::max<Time>(1, window / bucket_size));
+  need = std::max(1, std::min(need, total_buckets - curr_bucket));
+  if (num_passed >= need && !active) {
     active = true;
     contribute(sizeof(int), &num_passed, CkReduction::min_int,
         CkCallback(CkReductionTarget(BucketGVT, all_ready), thisProxy));
