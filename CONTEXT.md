@@ -970,30 +970,31 @@ What the sweep changes in the claim:
      - Estimate the cost of a committed and of a rolled-back event from a fit of time against the two counts. Per-wave counters (step 1) give many more points than rounds of 8 GVT updates. Alternatively, time rollback and anti-message sends directly.
    - Prediction: the htram high-slack gap closes from 0.86–0.92 to 0.95 or better, and nothing else drops below 0.95.
    - Gate: worst case of 0.95 or better of the best fixed W over 9 workloads × 2 transports.
-3. **Hill-climb fairness.** It stands in for Devastator in the paper and loses by 2–3×, so a reviewer may call it a strawman.
-   - With step 1 it can run as Devastator does, on the GVT reduction every round.
-   - Also rerun it from W 50 and from the bucket size.
-   - Compare it with Devastator's own code (step 7).
-4. **`--agg-scope` ablation** (other processes only, against all) at σ 100 and 2,000, in the same allocation as steps 1–3.
-   - It explains the 2.7× gain where only 3.9% of events go off-node.
-   - Devastator's in-process path is a cheap lock-free queue insert, so if most of that 2.7× is htram bypassing a slow in-process Charm++ message path, the claim must say so.
-5. **Cheaper rollbacks under aggregation.** Anti-messages go through htram, with in-buffer annihilation: an event still in the sender's buffer is cancelled together with its anti-message.
+   - **In parallel with steps 1–2: the external baselines** (user decision, 2026-10-21; moved up because they are the paper's biggest unknown and don't depend on the controller work).
+     - Build ROSS on Stampede3. Add Gaussian destinations to its PHOLD (it has only a remote-percent coin flip) with the same parameters as ours: exponential delay, lookahead, σ in LP ids, 15 start events per LP.
+     - Try to build Devastator's public code (github.com/cychan-lbnl/devastator, last pushed 2022-11; needs GASNet-EX for Omni-Path). Check whether it has the adaptive window and Gaussian PHOLD.
+     - Why now: with htram at σ 2,000 we commit about 178 K events/s per PE. Devastator's Fig. 3 puts ROSS in a similar per-core range at σ = 10⁴ (read off the plot). If tuned pure-MPI ROSS matches or beats us, the framing has to change.
+3. **4-node comparison across engines**, together with the hill-climb fairness check and the `--agg-scope` ablation.
+   - **Engines:** Charades (direct and htram) against ROSS, and Devastator if it built, on the σ-sweep workloads at both slack levels.
+   - **Full nodes.** We have run 16 PEs per node on 48-core nodes, while ROSS uses all 48. Add Charades runs that use the full node (for example 2 processes × 23 PEs), and compare per node as well as per core.
+   - **ROSS tuning.** Tune its batch and GVT-interval settings as Devastator did (a grid per node count), and report the tuning cost.
+   - **Hill-climb fairness.** Our reimplementation stands in for Devastator and loses by 2–3×, so a reviewer may call it a strawman. Run it every GVT round on the shared reduction (step 1), from W 50 and from the bucket size, and against Devastator's own code if available.
+   - **`--agg-scope` ablation** (other processes only, against all) at σ 100 and 2,000. It explains the 2.7× gain where only 3.9% of events go off-node. Devastator's in-process path is a cheap lock-free queue insert, so if most of that gain is htram bypassing a slow in-process Charm++ message path, the claim must say so.
+4. **Cheaper rollbacks under aggregation.** Anti-messages go through htram, with in-buffer annihilation: an event still in the sender's buffer is cancelled together with its anti-message.
    - Measure the rollback ÷ committed cost ratio, now 11–21× with htram, and throughput at W 500.
    - Risk: a delayed anti-message lets wrong work spread further. Anti-messages may need urgent sends.
-6. **Scale** to 16–32 nodes on skx-normal, as batch jobs after a short interactive check:
+5. **Scale** to 16–32 nodes on skx-normal, all engines, as batch jobs after a short interactive check:
    - Gaussian σ up to about 16,000 (32,768 LPs at 16 nodes), with Devastator's 100 LPs per core;
    - uniform remote 1.0;
    - the same policies, both slack levels.
-7. **Baselines:**
-   - ROSS on Stampede3;
-   - Devastator's public code;
-   - the PADS'19 static hold (open issue 1);
-   - PADS'98 local-rate aggregation;
-   - opportunistic aggregation.
-8. **Phase-changing workloads** (phases PHOLD) with the fixed controller. This is where it should beat every fixed W outright, not only in the worst case.
-9. **Housekeeping:**
+6. **In-Charades baselines and phase-changing workloads.**
+   - The PADS'19 static hold (open issue 1: its cutoff needs tuning per model first).
+   - PADS'98 local-rate aggregation.
+   - Opportunistic aggregation (ship whatever is queued on every pass, as Devastator's service thread does).
+   - Phases PHOLD with the fixed controller, where it should beat every fixed W outright, not only in the worst case.
+7. **Housekeeping:**
    - SSSP parity check on htram `pdes`;
    - open issue 7;
    - 8 nodes and PPN 1 against 2;
    - units in the older tables of this file.
-10. Dragonfly port when needed.
+8. Dragonfly port when needed.
