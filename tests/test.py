@@ -6,13 +6,26 @@ and reports success. Each model configuration is run under every
 synchronization configuration in test_configs/, at several PE counts, in one
 process and across processes.
 
-Usage: python3 test.py [--quick] [--all] [--no-build] [--launcher lcrun|srun]
-                       [--nodes N] [--launch PxQ ...] [--timeout SECONDS]
-                       [--repeat N] [test_config ...]
+Usage: python3 test.py [--tier change|engine|full] [--quick] [--all]
+                       [--no-build] [--launcher lcrun|srun] [--nodes N]
+                       [--launch PxQ ...] [--timeout SECONDS] [--repeat N]
+                       [test_config ...]
+
+Tiers (--tier; the whole matrix is ~3,250 runs and rarely needed):
+  change  the named test_configs on the core model configs (CORE_MODEL_CFGS)
+          at the core shapes (1 PE, 4 PEs, 2 processes x 2 PEs): a routine
+          change, 1-3 minutes on the Mac.
+  engine  (the default) every working test_config on the core model configs
+          at the core shapes (~400 runs), then the named test_configs, if any,
+          again --repeat times (default 20) at the multi-PE shapes on
+          REPEAT_MODEL_CFGS (80 runs per named config): a change to a GVT,
+          the scheduler, aggregation or the controller.
+  full    every test_config on every model config at seven shapes: before
+          merging a large branch or starting a paper's runs.
 
 Races in the optimistic engine and the GVT algorithms show up in a few percent
-of runs or fewer, so one pass can miss them; --repeat N runs every case N times
-(e.g. --quick --repeat 50 bucket).
+of runs or fewer, and repeats find them where breadth does not, so one pass
+can miss them; --repeat N runs every case N times.
 """
 
 import argparse
@@ -31,6 +44,25 @@ model_dir = os.path.abspath(os.path.join(test_dir, '..', 'models'))
 # Known to hang at more than one PE on every runtime (not Reconverse-specific):
 # the CD GVT, and the phased GVT (issue #11). Run them with --all.
 KNOWN_BROKEN = {'cd', 'phased'}
+
+# The change and engine tiers run these model configs only. Every bug the
+# full matrix has found showed up in one of them: PHOLD base (the engine),
+# phases (the controller's phase changes), Imbalanced combo (load imbalance
+# and the 24 B payload slot), Traffic base (sensitive to the order of
+# equal-timestamp events; it found the non-strict comparator). The others
+# differ mostly in size and end time.
+CORE_MODEL_CFGS = {
+  'Simple PHOLD': ['base', 'phases'],
+  'Imbalanced PHOLD': ['combo'],
+  'Traffic': ['base'],
+}
+# The engine tier's repeat pass looks for races, which need concurrency and
+# depend on timing more than on the model: multi-PE shapes only, on PHOLD
+# base and the imbalanced combo.
+REPEAT_MODEL_CFGS = {
+  'Simple PHOLD': ['base'],
+  'Imbalanced PHOLD': ['combo'],
+}
 
 
 def config_value(name):
@@ -103,7 +135,12 @@ MODELS = [
 def main():
   parser = argparse.ArgumentParser(description='Run the Charades test matrix.')
   parser.add_argument('configs', nargs='*',
-                      help='test_configs to run (default: all working ones)')
+                      help='test_configs: those to run (change, full) or to '
+                      'repeat after the full pass (engine); default all '
+                      'working ones (full) or none (engine)')
+  parser.add_argument('--tier', choices=['change', 'engine', 'full'],
+                      default='engine',
+                      help='how much to run (see the module docstring)')
   parser.add_argument('--quick', action='store_true',
                       help='only +pe 1, +pe 4 and 2 processes x 2 PEs')
   parser.add_argument('--all', action='store_true',
@@ -123,8 +160,10 @@ def main():
   parser.add_argument('--launch', action='append', metavar='PxQ',
                       help='run only these shapes: P processes of Q PEs '
                       '(repeatable; e.g. --launch 4x4 --launch 1x8)')
-  parser.add_argument('--repeat', type=int, default=1,
-                      help='run every case this many times (finds races)')
+  parser.add_argument('--repeat', type=int, default=None,
+                      help='run every case this many times (finds races); '
+                      'with --tier engine, the repeat pass over the named '
+                      'test_configs (default 20)')
   parser.add_argument('--timeout', type=float, default=180.0,
                       help='seconds before a run counts as hung')
   opts = parser.parse_args()
@@ -138,24 +177,29 @@ def main():
       (':' + env[libvar] if env.get(libvar) else '')
 
   cfg_path = os.path.join(test_dir, 'test_configs')
-  names = sorted(os.listdir(cfg_path))
-  if opts.configs:
-    unknown = set(opts.configs) - set(names)
-    if unknown:
-      sys.exit('Unknown test configs: ' + ', '.join(sorted(unknown)))
-    names = [n for n in names if n in opts.configs]
-  elif not opts.all:
-    names = [n for n in names if n not in KNOWN_BROKEN]
+  all_names = sorted(os.listdir(cfg_path))
+  unknown = set(opts.configs) - set(all_names)
+  if unknown:
+    sys.exit('Unknown test configs: ' + ', '.join(sorted(unknown)))
+  if opts.tier == 'change' and not opts.configs:
+    sys.exit('--tier change runs the test_configs you name; name at least one')
+  working = all_names if opts.all else \
+      [n for n in all_names if n not in KNOWN_BROKEN]
+  named = [n for n in all_names if n in opts.configs]
   # The agg_* configs send events through htram, which is built in only when
   # src/config.mk sets HTRAM_DIR (see src/htram.mk)
   if not config_value('HTRAM_DIR'):
-    skipped = [n for n in names if n.startswith('agg_')]
+    skipped = sorted({n for n in working + named if n.startswith('agg_')})
     if skipped:
       print('HTRAM_DIR not set in src/config.mk; skipping ' + ', '.join(skipped))
-    names = [n for n in names if not n.startswith('agg_')]
+    working = [n for n in working if not n.startswith('agg_')]
+    named = [n for n in named if not n.startswith('agg_')]
 
-  launches = [Launch(1, 1), Launch(1, 2), Launch(1, 3), Launch(1, 4),
-              Launch(2, 2), Launch(2, 4), Launch(4, 4)]
+  if opts.tier == 'full':
+    launches = [Launch(1, 1), Launch(1, 2), Launch(1, 3), Launch(1, 4),
+                Launch(2, 2), Launch(2, 4), Launch(4, 4)]
+  else:
+    launches = [Launch(1, 1), Launch(1, 4), Launch(2, 4)]
   if opts.quick:
     launches = [Launch(1, 1), Launch(1, 4), Launch(2, 4)]
   if opts.launch:
@@ -173,20 +217,38 @@ def main():
     for m in MODELS:
       subprocess.run(['make', '-s', '-C', m.root], check=True)
 
+  # Passes of (test_configs, repeats, model configs, shapes): full and change
+  # run what was named (or, for full, everything) at --repeat; engine runs
+  # everything once, then repeats what was named where races can show
+  if opts.tier == 'full':
+    passes = [(named or working, opts.repeat or 1, None, launches)]
+  elif opts.tier == 'change':
+    passes = [(named, opts.repeat or 1, CORE_MODEL_CFGS, launches)]
+  else:
+    passes = [(working, 1, CORE_MODEL_CFGS, launches)]
+    if named:
+      passes.append((named, opts.repeat or 20, REPEAT_MODEL_CFGS,
+                     [l for l in launches if l.pes > 1] or launches))
+
   results = []
-  for m in MODELS:
-    for mcfg in m.cfgs:
-      for name in names:
-        if name in m.skip:
-          continue
-        tcfg = os.path.join(cfg_path, name)
-        for launch in launches:
-          # The sequential scheduler only runs on one PE.
-          if name == 'sequential' and launch.pes > 1:
+  for names, repeat, model_cfgs, shapes in passes:
+    for m in MODELS:
+      mcfgs = m.cfgs
+      if model_cfgs is not None:
+        keep = model_cfgs.get(m.name, [])
+        mcfgs = [c for c in m.cfgs if os.path.basename(c) in keep]
+      for mcfg in mcfgs:
+        for name in names:
+          if name in m.skip:
             continue
-          for rep in range(opts.repeat):
-            results.append(run(m, mcfg, name, tcfg, launch, launcher, env,
-                               opts.timeout, rep if opts.repeat > 1 else None))
+          tcfg = os.path.join(cfg_path, name)
+          for launch in shapes:
+            # The sequential scheduler only runs on one PE.
+            if name == 'sequential' and launch.pes > 1:
+              continue
+            for rep in range(repeat):
+              results.append(run(m, mcfg, name, tcfg, launch, launcher, env,
+                                 opts.timeout, rep if repeat > 1 else None))
 
   passed = sum(r == 'pass' for r in results)
   failed = sum(r == 'fail' for r in results)

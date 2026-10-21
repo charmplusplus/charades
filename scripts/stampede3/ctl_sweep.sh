@@ -20,7 +20,11 @@
 #     climb from W0, deciding every 8 GVT updates like the quantile rule;
 #     hill1:<W0> the same deciding after every GVT update (Devastator's
 #     design, where the counts ride on the GVT reduction); dry:<W> fixed W
-#     with the quantile rule running but not applied (--ctl-dry, its cost);
+#     with the quantile rule running but not applied (--ctl-dry, its cost).
+#     Since 2026-10-21 q, qb, hill, hill1 and dry use the default data path,
+#     the GVT's count waves (coarse histogram every 8th wave; a round is 8
+#     waves, or 1 for hill1); qsep:, drysep:, hillsep: the same three on the
+#     controller's own reduction (--ctl-reduction=0), as before that date;
 #     blk: blocking GVT, no window (the value is ignored);
 #     qs[c]<N>:<epsilon> the quantile rule on the GVT's count waves
 #     (--ctl-reduction=1, deciding every wave), the histogram on every Nth
@@ -64,11 +68,18 @@ run_one() {  # nodes procs pes cfg arm label
     hill1) extra+=(--optimism-window=$val --ctl=2 --ctl-interval=1) ;;
     dry)  extra+=(--optimism-window=$val --ctl=1 --ctl-dry=1) ;;
     hills) extra+=(--optimism-window=$val --ctl=2 --ctl-reduction=1 --ctl-interval=1) ;;
+    qsep) extra+=(--ctl=1 --ctl-epsilon=$val --ctl-reduction=0) ;;
+    drysep) extra+=(--optimism-window=$val --ctl=1 --ctl-dry=1 --ctl-reduction=0) ;;
+    hillsep) extra+=(--optimism-window=$val --ctl=2 --ctl-reduction=0) ;;
   esac
   if [[ $kind =~ ^(qs|drys)(c?)([0-9]+)$ ]]; then
     extra+=(--ctl=1 --ctl-reduction=1 --ctl-interval=1
             --ctl-hist-waves=${BASH_REMATCH[3]})
-    [ -n "${BASH_REMATCH[2]}" ] && extra+=(--ctl-hist-coarse=1)
+    if [ -n "${BASH_REMATCH[2]}" ]; then
+      extra+=(--ctl-hist-coarse=1)
+    else
+      extra+=(--ctl-hist-coarse=0)
+    fi
     if [ ${BASH_REMATCH[1]} = qs ]; then
       extra+=(--ctl-epsilon=$val)
     else

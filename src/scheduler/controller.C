@@ -38,8 +38,13 @@ void ctl_gvt_done() {
   if (g_tw_ctl && !ctl_shared()) CpvAccess(g_controller)->gvt_done();
 }
 
+/**
+ * The default under the bucketed GVT: it controls as well as the separate
+ * reduction at about the same cost (4 nodes, coarse histogram every 8th
+ * wave). Other GVTs have no count waves, so they keep the separate one.
+ */
 bool ctl_shared() {
-  return g_tw_ctl && g_tw_ctl_reduction == 1;
+  return g_tw_ctl && g_tw_ctl_reduction == 1 && g_tw_gvt_scheme == 4;
 }
 
 void ctl_wave_contribute(std::vector<uint64_t>* counters,

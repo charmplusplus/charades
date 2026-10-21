@@ -132,9 +132,9 @@ void clear_globals() {
   g_tw_ctl_interval       = 8;
   g_tw_ctl_dry            = 0;
   g_tw_ctl_log            = 0;
-  g_tw_ctl_reduction      = 0;
+  g_tw_ctl_reduction      = 1;
   g_tw_ctl_hist_waves     = 8;
-  g_tw_ctl_hist_coarse    = 0;
+  g_tw_ctl_hist_coarse    = 1;
   g_tw_async_reduction = 0;
   g_tw_reserve_threshold = 1.0;
   g_tw_reserve_buckets = 0;

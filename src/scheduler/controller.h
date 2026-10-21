@@ -20,9 +20,12 @@
  * committed-event rate.
  *
  * Each PE samples d on its remote sends and counts executed, committed and
- * rolled-back events. After a GVT update it contributes those, once per
- * round, to a sum reduction; the result goes to every PE, and each computes
- * the same window from the same data. The window sets PE_VALUE(window) and,
+ * rolled-back events. Under the bucketed GVT (by default) those ride on the
+ * GVT's count waves: counters on every wave, the histogram, coarse, on every
+ * 8th. Otherwise (--ctl-reduction=0, or another GVT) a PE contributes them,
+ * once per round of GVT updates, to a reduction of its own. Either way the
+ * result goes to every PE, and each computes the same window from the same
+ * data. The window sets PE_VALUE(window) and,
  * under the deadline flush policy, the aggregation horizon.
  *
  * Under the bucketed GVT the window is at least the bucket size: a PE that
@@ -45,8 +48,8 @@ void ctl_gvt_done();
 void ctl_finalize();
 
 /**
- * --ctl-reduction=1: the controller's data rides on the bucketed GVT's count
- * waves instead of its own reduction. The wave's k-th contribution is the same
+ * --ctl-reduction=1 (the default) under the bucketed GVT: the controller's
+ * data rides on the GVT's count waves instead of its own reduction. The wave's k-th contribution is the same
  * wave on every PE, so every PE agrees on which waves carry the histogram.
  */
 bool ctl_shared();

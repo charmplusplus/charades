@@ -1,0 +1,6 @@
+# Optimistic w/Blocking GVT, the delay-quantile rule: no count waves, so the
+# controller keeps its own reduction even with the shared default
+sync=3
+gvt=1
+optimism-window=2000
+ctl=1

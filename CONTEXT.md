@@ -868,7 +868,7 @@ None of this touches the WPs path the SSSP client uses. GRAPH, GRAPH with compac
 
 **Conclusion for step 1.**
 - The controller can share the GVT's reduction at no loss, with counters every wave and a coarse histogram every 8th (440 B per PE at most). The shared reduction did not prove cheaper than the separate one.
-- `--ctl-reduction` stays 0 by default, pending the user's decision.
+- The user made `--ctl-reduction=1` (coarse histogram every 8th wave) the default the same day.
 
 ### ROSS on Stampede3, first runs (same job)
 
@@ -1040,11 +1040,16 @@ node takes the job's `SLURM_*` variables from idev's environment file so
 
 - Every model config sets `expected-events`; the simulator aborts on a
   mismatch, so a passing run has the right committed count.
-- The races fixed so far failed in 0.5–20% of runs, which one pass usually
-  misses. Use `python3 tests/test.py --quick --repeat 20 bucket` (or any
-  configs) after touching the engine or a GVT.
-- `python3 tests/test.py --help` lists the rest (`--quick`, `--all`,
-  `--no-build`, `--timeout`). Output goes to `tests/test_output/`.
+- **Tiers** (`--tier`, added 2026-10-21, because the whole matrix is about 3,250 runs and mostly redundant). Run counts and approximate Mac times:
+
+| tier | when | what runs | runs (count) | time (min) |
+|---|---|---|---|---|
+| `change` | a routine change | the named test_configs on 4 core model configs (PHOLD base and phases, Imbalanced combo, Traffic base) at 1 PE, 4 PEs and 2 × 2 | 12 per config | 1–3 |
+| `engine` (default) | GVT, scheduler, aggregation or controller | every working test_config on the core model configs at those shapes, then the named ones `--repeat` times (default 20) at the multi-PE shapes on PHOLD base and Imbalanced combo | 400 + 80 per named config | ~6 + ~1 per named config |
+| `full` | before merging a large branch or starting a paper's runs | every test_config × every model config × 7 shapes | ~3,250 | ~50 |
+
+- The races fixed so far failed in 0.5–20% of runs, which one pass usually misses. Repeats find them; breadth doesn't. So name the configs you touched, e.g. `python3 tests/test.py bucket` for a GVT change.
+- `python3 tests/test.py --help` lists the rest (`--quick`, `--launch`, `--all`, `--no-build`, `--timeout`). Output goes to `tests/test_output/`.
 
 ## Next steps, in order (revised 2026-10-21 after the Gaussian σ sweep)
 
@@ -1065,7 +1070,7 @@ What the sweep changes in the claim:
   - That is direct evidence that window control and aggregation have to be designed together.
   - The paper's "joint control" claim should rest on this.
 
-1. **DONE 2026-10-21** (see "Controller on the GVT's count waves, results"): the shared reduction controls as well as the separate one and costs about the same; a histogram on every wave hurts control; the hill climb gets worse the more often it decides. Open: whether to make `--ctl-reduction=1` (coarse histogram every 8th wave) the default. Original plan: **One reduction for GVT and the controller** (user decision, 2026-10-21). The controller's data rides on the bucketed GVT's count waves instead of its own `Controller` reduction, as Devastator piggybacks its efficiency counts on GVT.
+1. **DONE 2026-10-21** (see "Controller on the GVT's count waves, results"): the shared reduction controls as well as the separate one and costs about the same; a histogram on every wave hurts control; the hill climb gets worse the more often it decides. **Default since 2026-10-21 (user decision):** `--ctl-reduction=1` with the coarse histogram on every 8th wave and rounds of 8 waves under the bucketed GVT. Other GVTs fall back to the separate reduction; `ctl_quantile_separate` and `ctl_quantile_blocking` cover both paths. Original plan: **One reduction for GVT and the controller** (user decision, 2026-10-21). The controller's data rides on the bucketed GVT's count waves instead of its own `Controller` reduction, as Devastator piggybacks its efficiency counts on GVT.
    - **Today:**
      - a separate sum reduction once per 8 GVT updates (about 3 KB per PE: 385 histogram bins and 6 counters);
      - up to about 5% cost (the dry run);
