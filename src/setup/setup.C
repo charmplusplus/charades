@@ -10,7 +10,12 @@
 void tw_init(int argc, char** argv) {
   clear_globals();
   charm_init(argc, argv);
-  parse_command_line(CmiGetArgc(argv), argv);
+  // Parse Charm's copy of the arguments, not main's: under Reconverse, Charm
+  // consumes its own flags (+setcpuaffinity, +pemap, +showcpuaffinity, ...)
+  // from a per-PE copy, so they survive in main's argv and would be read as
+  // configuration files.
+  char** ck_argv = CkGetArgv();
+  parse_command_line(CmiGetArgc(ck_argv), ck_argv);
   get_msg_id<void *>();
 
   // Derive the load balancing schedule here, once per process, rather than in
