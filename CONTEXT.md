@@ -609,6 +609,62 @@ None of this touches the WPs path the SSSP client uses. GRAPH, GRAPH with compac
 - **Controller medians from sweep 5** (ratio to the best fixed median): ε 0.005 gives 0.91 / 0.82 / 1.16 and ε 0.01 gives 0.98 / 0.92 / 0.89 (low slack / high slack / phases).
   - It is never catastrophic, where a wrong fixed W is 0.03–0.40, but it does not reliably beat a window tuned in hindsight.
 
+### Two GVT speeds: cause and fix (2026-10-21, idev job 3624457, 4 skx nodes)
+
+**Cause.**
+- The bucketed GVT runs its count waves back to back, each starting when the previous result reaches a PE, so wave pace is set by how quickly every PE handles the broadcast.
+- A bucket needs two waves (Mattern's four-counter rule), so frequent waves each confirm only a sliver of progress.
+- With 16-event batches, PEs answer quickly. In a slow run, waves come every ~230 µs (round trip, PE 0), complete 2.67 buckets each, and the slowest PE leads GVT by only ~8 buckets. PEs spend 72% of their time outside `execute()`, mostly re-queuing window-blocked batches (23.7 M of them).
+- Runs settled into one of two paces, and the wave pace sets the whole simulation's speed: PEs sit at the window edge waiting for GVT.
+
+**What did not fix it.**
+- `--gvt-min-buckets`: it gates only the first reduction of a round, and waves then run continuously.
+- `--sched-park=1`: window-blocked PEs wait instead of spinning, and blocked batches drop 10×. Throughput is unchanged (batch 16: 1 of 4 runs fast, as before). Kept as an option, default off.
+
+**Batch size changes it** (high slack, W 250, 4 reps unless noted; M committed events/s, higher is better):
+
+| `--batch` (events per execute()) | throughput (M ev/s) | GVT computations (count) | waves/s (count/s) | buckets per wave (count) |
+|---|---|---|---|---|
+| 4 | 6.67–7.03 | 9,655–9,949 | 4,678 | 1.53 |
+| 16 (default) | 8.90–9.94 (20 traced runs) | 5,803–6,534 | 3,662 | 2.67 |
+| 64 | 12.63–13.21 | 2,418–2,605 | 2,035 | 6.61 |
+| 256 | 10.67–11.08 | 2,065–2,083 | – | – |
+
+**Fix: `--gvt-wave-events=K`, default 128 (commit ccead4d).**
+- A PE holds its contribution to the next count wave until it has executed K events since its last one, or until an `execute()` batch stops early (blocked or out of events), so it cannot hold a wave forever.
+- At batch 16 and high slack, W 250, K 0 / 64 / 128 / 256 gives the throughputs below. Higher is better; each range is over 4 runs, and the default row over 8 unflagged runs.
+
+| K (events per PE between waves) | throughput (M ev/s) | spread |
+|---|---|---|
+| 0 (old behaviour) | 8.88–12.73 | bimodal |
+| 64 | 10.75–12.97 | — |
+| **128** | **13.21–13.59** | — |
+| 256 | 12.80–13.29 | — |
+| 128, the new default, unflagged | 13.40–13.98 | 4% |
+
+- **Three workloads, 4 nodes, margin 8, 4 reps** (`wave0.csv`, `wave128.csv`; median M committed events/s, higher is better):
+
+| workload | arm | K 0 | K 128 | K 128 ÷ K 0 |
+|---|---|---|---|---|
+| lookahead 10 / mean 200 | fixed W 25 | 9.17 | 9.89 | 1.08 |
+| | fixed W 50 | 8.35 | **11.49** | 1.38 |
+| | fixed W 100 | 5.51 | 7.32 | 1.33 |
+| | controller ε 0.01 | 8.34 | 10.95 | 1.31 |
+| lookahead 100 / mean 1000 | fixed W 50 | 6.89 | 6.90 | 1.00 |
+| | fixed W 100 | 10.23 | 10.41 | 1.02 |
+| | controller ε 0.01 | 8.49 | **11.55** | 1.36 |
+| phases | fixed W 25 | 7.55 | 7.77 | 1.03 |
+| | fixed W 50 | 8.09 | **10.41** | 1.29 |
+| | fixed W 100 | 6.17 | 8.25 | 1.34 |
+| | controller ε 0.01 | 7.93 | 9.66 | 1.22 |
+
+  - No arm got slower, and the spread over 4 reps is 1–5% (unpaced: up to 10% here, 50% in earlier sweeps).
+  - With pacing, the controller is 0.95 / 1.11 / 0.93 of the best fixed W (low slack / high slack / phases).
+- **2 nodes, 3 reps** (M committed events/s, higher is better):
+  - High slack, W 100: 6.72–6.86 unpaced, 6.40–6.65 paced (0.96×). The GVT count barely moved there (5,470 → 5,290), so waves were not the limit, and holding them back costs a little.
+  - Low slack, W 50: 5.15–5.65 unpaced, 6.76–6.95 paced (1.27×).
+  - A K that adapts (for example to buckets completed per wave) is the follow-up.
+
 ## Open issues
 
 1. **Event holding needs a realistic cutoff.** With the test configs'
