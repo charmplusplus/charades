@@ -28,9 +28,9 @@ void tw_init(int argc, char** argv) {
   // rollback storm that slows GVT, and with it the controller, for most of a
   // run (4 nodes, lookahead 10 / mean 200, from W 2000: 6% efficiency).
   if (g_tw_ctl_interval == 0) g_tw_ctl_interval = 1;
-  // Defaults from the 4-node Gaussian sweep: 0.003 was the best share of
-  // events tried; the time share is predicted from the rollback costs seen
-  // there (CONTEXT.md, step 2)
+  // Defaults from the 4-node Gaussian sweeps: 0.003 as a share of events was
+  // within 0.87-1.01 of the best fixed window on both transports; the time
+  // share (--ctl-cost=1) is experimental (CONTEXT.md, step 2 results)
   if (g_tw_ctl_epsilon < 0) g_tw_ctl_epsilon = g_tw_ctl_cost ? 0.01 : 0.003;
   if (g_tw_ctl_hist_waves == 0) g_tw_ctl_hist_waves = 1;
   if (g_tw_ctl == 1 && g_tw_optimism_window == 0) {

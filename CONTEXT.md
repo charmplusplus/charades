@@ -927,6 +927,98 @@ None of this touches the WPs path the SSSP client uses. GRAPH, GRAPH with compac
 3. **Full nodes** (4 × 2 × 24 PEs): the 0.66 was mostly warm-up. A run 4× longer brings the controller to 0.9 or better. If it doesn't, `--ctl-log` shows whether W or κ is off.
 4. **ε sensitivity:** time shares 0.005 and 0.02 stay within 5% of 0.01 on most workloads. A flat optimum is what makes one default defensible.
 
+### Controller step 2, results (2026-10-21, idev job 3626068, 4 skx nodes)
+
+**Setup.**
+- CSVs in `$WORK/charades-runs/step2/` and `$WORK/charades-runs/compare_long/`.
+- 4 nodes × 2 × 8 PEs unless noted; htram PP 64, margin 8.
+- Ratios are ÷ the best fixed W (W 250 at high slack, W 50 at low), median; higher is better.
+
+**1. The time-share target failed.**
+- **κ was nowhere near the prediction**: 0.26–1.02 with htram and 0.23–0.57 with direct sends (predicted 4–7 and 1.5–2.5). The measured direct cost of a rolled-back event is only about 3 µs: its reverse handler, anti-message send and forward work.
+- **The real cost is indirect.** A rolled-back event costs 60–120 µs of throughput (σ-sweep estimate), so over 95% of a rollback's cost is not CPU work: rollbacks hold GVT back, and PEs wait at the window edge. A target built on timed rollback work can't see that.
+- **Results**, time share 0.01 against event share 0.003 (÷ best fixed W, higher is better):
+
+| workloads | time share 0.01 | event share 0.003 |
+|---|---|---|
+| htram, high slack (6) | 0.64–0.88 | 0.87–0.93 |
+| htram, low slack (3) | 0.74–0.90 | 0.97–0.99 |
+| direct, high slack (6) | 0.78–0.97 | 0.92–1.01 |
+| direct, low slack (3) | 0.97–0.99 | 0.97–1.01 |
+| htram, full nodes, high slack | 0.2–0.4 (W ran away to 1,100–3,300; 38–62% efficiency) | 0.57 (W 85) |
+
+**2. The floor guard works at 16 PEs per node.**
+- Event share 0.001 no longer traps (W 251–277 at high slack, 36 at low).
+- With htram: 0.92–1.02 at high slack (0.92 is a single run at σ 100), and 0.95–0.98 at low slack.
+- In the longer runs (end time 512,000 / 128,000): 0.95 at high slack and 0.96–0.97 at low.
+- So ε 0.001 beats 0.003 with htram at high slack (0.87–0.93) and is slightly behind at low slack (0.97–0.99). It is untested with direct sends.
+
+**3. Full nodes (4 × 2 × 24 PEs) break the event-share target.**
+- About 0.45% of events roll back whether W is 109 or 250, so the rolled-back share barely depends on W. Most waste there is not window-caused.
+- Event share 0.003 pins W to the floor guard (0.56–0.67). Event share 0.01 overshoots to W 550–580 (0.82–0.85).
+- **The coarse histogram puts the floor below the lookahead**: W 84 against 109 with the full histogram. Delays start at 100, but the coarse bin [64, 128) spreads mass down to 64. The full histogram should be the default.
+
+**4. A run that stalled:** a full-node fixed W 50 run took 27.7 s against 4.9 s, with the same wave count. Probably the system; noted as an outlier.
+
+**Predictions checked:**
+1. κ: wrong (0.2–1.0 against 4–7).
+2. Time share 0.01 at 0.95 or better everywhere: wrong (0.64–0.99).
+3. Full-node 0.66 was warm-up: wrong. A 4× longer run is no better; the cause is the rollback floor (point 3).
+4. ε sensitivity: not run (part 3 was dropped once the time share had failed).
+
+**Defaults reverted (same day):** `--ctl-cost=0` (event share), ε 0.003 (tested on both transports), full histogram (`--ctl-hist-coarse=0`). The floor guard stays.
+
+### Three engines on Gaussian PHOLD, 4 nodes (same job; first real comparison)
+
+**ROSS optimistic multi-node abort: diagnosed and fixed** (`~/pdes-baselines/ross-debug/REPORT.md`).
+- ROSS processes `MPI_Testsome` completions in index order and assumes an anti-message never completes before its event. MPI orders matching, not completion.
+- On Stampede3 the stock control aborts at 2 × 16 (2 of 2). The patched ROSS passes, and it counted 6–217 anti-messages that arrived before their events: **MVAPICH really does reorder completions.**
+- Stock ROSS with `--read-buffer=1` also passes, and is about 2× faster than the patch: 7.7 against 3.8 M ev/s at 2 × 16, 36.2 against 18.3 at 4 × 48.
+- All counts exact (7,861,362 and 8,106,901).
+
+**Devastator** (`~/pdes-baselines/` Part C; `$WORK/devastator`).
+- Built for every GASNet conduit; ofi-psm2 passes the exact-count check (29,338 with Charades' RNG) and is used below.
+- Its Gaussian PHOLD with Devastator's own RNG commits within 0.1% of Charades' count (62,931,069 vs 62,941,466).
+- Its adaptive window (the hill climb) is on.
+
+**Throughput**, Gaussian σ 2,000, 4 nodes, runs of 2–10 s; M committed events/s, higher is better:
+
+| engine and layout | high slack (lookahead 100 / mean 1,000, end 512,000) | low slack (lookahead 10 / mean 200, end 128,000) |
+|---|---|---|
+| Charades + htram, best fixed W, 64 PEs (4 × 2 × 8) | 11.40, 11.51 | 8.60, 8.64 |
+| Charades + htram, controller (event share 0.001), 64 PEs | 10.88, 10.95 | 8.22, 8.39 |
+| Charades + htram, W 250, 192 PEs (4 × 2 × 24) | 10.09 | – |
+| ROSS optimistic `--read-buffer=1`, 64 ranks | 12.24, 12.27 | 12.02, 12.03 |
+| ROSS optimistic `--read-buffer=1`, 192 ranks | 26.83 | – |
+| Devastator, adaptive window, 64 ranks (8 processes × 8 workers) | 36.94, 37.37 | 34.55, 34.63 |
+| Devastator, adaptive window, 184 ranks (8 × 23) | 9.60 (38% efficiency) | – |
+
+**Weak scaling on full nodes** (about 128 LPs per core, high slack, end time 128,000; Charades and ROSS commit the same 47,176,098 events; M committed events/s and K committed events/s per core, higher is better):
+
+| engine and layout | M ev/s | K ev/s per core |
+|---|---|---|
+| Charades + htram W 250, 64 PEs (8 × 8), 8,192 LPs | 11.3 | 177 |
+| Charades + htram W 250, 128 PEs (8 × 16), 16,384 LPs | 18.0–18.5 | 143 |
+| Charades + htram W 250, 192 PEs (8 × 24), 24,576 LPs | 22.0–23.2 | 118 |
+| Charades + htram W 250, 192 PEs (16 × 12) | 19.5–19.6 | 101 |
+| Charades + htram W 250, 192 PEs (32 × 6) | 10.1–10.3 | 53 |
+| Charades, direct sends, 64 / 192 PEs | 1.89 / 5.13 | 30 / 27 |
+| ROSS optimistic `--read-buffer=1`, 192 ranks, 24,576 LPs | 32.9–33.4 | 172 |
+| Devastator, fixed W 250, 184 ranks, 23,552 LPs | 80.5 | 437 |
+| Devastator, adaptive window, 184 ranks | 0.37 (2.8% efficiency, 123 s) | 2 |
+
+- Charades does scale when the problem grows with it. The earlier "no gain from 64 to 192 PEs" came from spreading 8,448 LPs over 192 PEs (44 per PE). Per-PE rate still falls by a third from 64 to 192 PEs.
+- Fewer, larger processes are better: 8 × 24 beats 16 × 12 beats 32 × 6.
+- On full nodes, ROSS is 1.46× Charades, and **Devastator with a fixed window is 3.6× Charades**. Devastator's own adaptive window collapses into a rollback storm there, its PADS'24 weakness reproduced, so a fixed W 250 is what makes it fast.
+
+**What this means.**
+- **At 64 cores, Devastator is 3.2× (high slack) to 4.0× (low slack) faster than Charades.** Its window runs at 78–80% efficiency and still wins.
+- **ROSS is 1.07–1.4× faster** than Charades at 64 cores, and **2.7× faster on full nodes**, where Charades doesn't scale (11.4 at 64 PEs, 10.1 at 192).
+- **Devastator's hill-climbed window collapses on full nodes** (38% efficiency, 9.6 M ev/s). That fits its own paper's remote-heavy weakness, but we have one run.
+- **The paper's premise needs rethinking.** Charades' per-event cost is 3–4× Devastator's at equal cores, so "Charades with htram and the controller beats Devastator in its weak regime" holds at best on full nodes, against Devastator's collapsing window. Even there ROSS is 2.7× faster than Charades.
+- **Devastator's weakness is real, but it is its window, not its engine**: with a fixed window it is the fastest engine by 2.4–3.6×. So the controller's value is clearest *as a window for Devastator-like engines*. Our quantile rule kept Charades at 0.95–0.97 of its best fixed window where Devastator's hill climb fell to 2.8% efficiency.
+- **Before choosing the framing**, find where Charades loses per event against Devastator (about 5.6 µs of core time per committed event at 64 cores, against 1.7–1.9 µs: 64 workers plus 8 master threads): the scheduler, Charm++/Reconverse entry methods, or htram.
+
 ## Open issues
 
 1. **Event holding needs a realistic cutoff.** With the test configs'
@@ -1120,7 +1212,17 @@ What the sweep changes in the claim:
      - with the full histogram every wave, waves slow measurably (≥ 5% fewer waves per second);
      - the hill climb fed every wave (Devastator's actual design) does better than at every 8 GVT updates, but still trails the quantile rule.
    - **Gate:** Mac test matrix unchanged (committed counts), and `--repeat 20` on the `ctl_*` configs.
-2. **Controller fixes**, built on step 1 and checked on the Mac, then the σ sweep rerun on 4 nodes.
+2. **DONE 2026-10-21, partly** (see "Controller step 2, results" and "Three engines on Gaussian PHOLD"):
+   - the floor guard works;
+   - the time-share target failed (rollbacks cost mostly through GVT, not CPU work), so the defaults went back to event share 0.003 with the full histogram;
+   - open: full nodes, where a waste floor of about 0.45% makes the event share uninformative (an affine model, rolled-back share = floor + α·r·F(W), could fix it), and ε 0.001, which is better with htram at high slack but untested with direct sends.
+
+   **DECISION NEEDED before step 3 (the user): the paper's framing.** Devastator is 3.2–4.0× faster than Charades at 64 cores, and 3.6× on full nodes with a fixed window. ROSS is 1.1–1.5× faster. But Devastator's own hill-climbed window collapses on full nodes (2.8% efficiency), where our rule kept Charades at 0.95–0.97 of its best fixed window. Options:
+   - (a) the window controller as the contribution, shown in Devastator itself (its `global_status_state::update()` is the hook) and in Charades;
+   - (b) close Charades' per-event gap first (profile scheduler, entry methods, htram);
+   - (c) keep the Charades-only framing and report the absolute gap.
+
+   Original plan for this step: **Controller fixes**, built on step 1 and checked on the Mac, then the σ sweep rerun on 4 nodes.
    - Default `--ctl-epsilon` 0.003; it is 0.05 now.
    - Floor guard: don't calibrate α, and don't shrink W, while F(W) ≈ 0. This is the ε 0.001 trap at about W 98.
    - A cost-aware target: bound the share of *PE time* lost to rollbacks rather than the share of events.

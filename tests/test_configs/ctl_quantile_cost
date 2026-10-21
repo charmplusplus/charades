@@ -1,0 +1,9 @@
+# Optimistic w/Bucketed GVT, the delay-quantile rule with epsilon a share of
+# PE time lost to rollbacks (--ctl-cost=1, experimental) instead of a share
+# of events rolled back (the default)
+sync=3
+gvt=4
+buffer-size=655360
+optimism-window=2000
+ctl=1
+ctl-cost=1

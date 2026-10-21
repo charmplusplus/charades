@@ -21,8 +21,7 @@
  *
  * Each PE samples d on its remote sends and counts executed, committed and
  * rolled-back events. Under the bucketed GVT (by default) those ride on the
- * GVT's count waves: counters on every wave, the histogram, coarse, on every
- * 8th. Otherwise (--ctl-reduction=0, or another GVT) a PE contributes them,
+ * GVT's count waves: counters on every wave, the histogram on every 8th. Otherwise (--ctl-reduction=0, or another GVT) a PE contributes them,
  * once per round of GVT updates, to a reduction of its own. Either way the
  * result goes to every PE, and each computes the same window from the same
  * data. The window sets PE_VALUE(window) and,

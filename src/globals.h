@@ -68,7 +68,7 @@ extern Time     g_tw_agg_horizon_margin; ///< deadline policy, horizon following
 /** \name Optimism-window controller (controller.h) *////@{
 extern unsigned g_tw_ctl;             ///< 0: fixed window, 1: delay quantile, 2: hill climb
 extern double   g_tw_ctl_epsilon;     ///< quantile rule: target share of PE time lost to rollbacks (--ctl-cost=0: of executed events rolled back)
-extern unsigned g_tw_ctl_cost;        ///< quantile rule: 1 epsilon is a share of PE time, 0 a share of events
+extern unsigned g_tw_ctl_cost;        ///< quantile rule: 0 (default) epsilon is a share of events rolled back, 1 of PE time (experimental)
 extern unsigned g_tw_ctl_calibrate;   ///< quantile rule: scale the bound by the waste seen
 extern unsigned g_tw_ctl_interval;    ///< GVT updates per controller round
 extern unsigned g_tw_ctl_dry;         ///< run the controller but never change the window

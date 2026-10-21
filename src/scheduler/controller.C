@@ -51,8 +51,11 @@ void ctl_gvt_done() {
 
 /**
  * The default under the bucketed GVT: it controls as well as the separate
- * reduction at about the same cost (4 nodes, coarse histogram every 8th
- * wave). Other GVTs have no count waves, so they keep the separate one.
+ * reduction at about the same cost (4 nodes, histogram every 8th wave). The
+ * coarse histogram (--ctl-hist-coarse) is off by default: spreading the
+ * power-of-two bin [64, 128) evenly put the delays' 1st percentile at 84
+ * under a lookahead of 100, so the floor guard let W fall below every delay.
+ * Other GVTs have no count waves, so they keep the separate one.
  */
 bool ctl_shared() {
   return g_tw_ctl && g_tw_ctl_reduction == 1 && g_tw_gvt_scheme == 4;
@@ -329,8 +332,13 @@ Time Controller::quantile_window(const uint64_t* sum) {
     }
   }
   /**
-   * --ctl-cost (the default): epsilon is the share of PE time lost to
-   * rollbacks, so the rolled-back share allowed is epsilon / kappa. A
+   * --ctl-cost=1 (experimental, off by default): epsilon is the share of PE
+   * time lost to rollbacks, so the rolled-back share allowed is epsilon /
+   * kappa. It failed on 4 nodes: kappa came out 0.2-1.0, because the work a
+   * rollback does (about 3 us per rolled-back event) is a small part of what
+   * it costs (60-120 us of throughput, mostly GVT held back and PEs waiting
+   * at the window edge), so the rule allowed far too much waste (0.64-0.90
+   * of the best fixed window with htram, 0.2-0.4 on full nodes). A
    * rolled-back event costs about the same with direct sends and through
    * htram (an anti-message is always a direct message), while htram makes an
    * executed event several times cheaper: one rolled-back share was 2.4-5
