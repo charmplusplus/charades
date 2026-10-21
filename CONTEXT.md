@@ -699,6 +699,82 @@ None of this touches the WPs path the SSSP client uses. GRAPH, GRAPH with compac
 5. The hill climb with htram reaches at most 0.85 of the best fixed W at σ ≥ 1,000.
 6. At this slack (lookahead 100, mean 1,000), blocking GVT with htram is within 10% of the controller with htram, as at remote 1.0 earlier (7.20 vs 7.30 M ev/s). Bucketed GVT should pull ahead only at low slack. If time allows, a second pass runs lookahead 10 / mean 200 at σ 500 and 2,000, predicting the controller with htram at ≥ 1.3× blocking with htram.
 
+### Gaussian PHOLD σ sweep, results (2026-10-21, idev job 3624866, 4 skx nodes)
+
+**Runs.**
+- CSVs are in `$WORK/charades-runs/gauss/`:
+  - main sweep: `pp.csv` (3 reps), `off.csv` (2 reps);
+  - ε and fine-window pass: `pp_eps.csv`, `off_eps.csv`;
+  - low slack, lookahead 10 / mean 200, end time 64,000: `pp_low.csv`, `off_low.csv`, `off_low_eps.csv`;
+  - gap fill: `pp_gap.csv`, `pp_low_gap.csv`.
+- Summarize with `scripts/stampede3/gauss_summary.py <csvs>`.
+- 414 runs. None failed. The only stalls were fixed W 250 at low slack, 6 of 6, stopped at 90 s; normal runs take about 5 s.
+- Committed counts are identical across arms for each workload. Spread over reps is 1–5% for most arms; up to 1.19× for W 500 and 1.7× for the hill climb.
+
+**1. Aggregation wins everywhere, and more as locality falls.** Best arm with htram ÷ best arm with direct sends (both M committed events/s, median; higher is better):
+
+| workload | off-node share (% of events) | best direct (M ev/s) | best htram (M ev/s) | htram ÷ direct |
+|---|---|---|---|---|
+| σ 100, lookahead 100 / mean 1,000 | 3.9 | 5.49 | 14.81 | 2.70 |
+| σ 500 | 19.5 | 3.07 | 12.66 | 4.12 |
+| σ 1,000 | 38.2 | 2.35 | 11.86 | 5.04 |
+| σ 2,000 | 62.3 | 1.91 | 11.37 | 5.95 |
+| σ 4,000 | 74.6 | 1.73 | 11.39 | 6.58 |
+| uniform remote 1.0 | 75.0 | 1.77 | 11.57 | 6.54 |
+| σ 500, lookahead 10 / mean 200 | 19.5 | 3.14 | 10.60 | 3.37 |
+| σ 2,000, low slack | 62.3 | 1.85 | 8.39 | 4.54 |
+| uniform remote 1.0, low slack | 75.0 | 1.72 | 8.14 | 4.74 |
+
+- With direct sends, throughput falls 3.1× from σ 100 to the all-remote end. With htram it falls only 1.28×, so htram removes most of the cost of communication.
+- At low slack, messages carry fewer events (17–28 per message, against 42–54 at high slack), so the gain is smaller.
+- The gain at σ 100 is 2.7×, not the predicted ≤ 1.3×. Even at σ 100, 55% of events leave their PE, nearly all to another PE in the same process, and htram aggregates those too (`--agg-scope=0`).
+
+**2. The controller is the only policy that is good in every regime.** Each policy's committed-event rate ÷ the best fixed W in the same workload and transport (medians; higher is better). Each range covers 6 high-slack and 3 low-slack workloads:
+
+| policy | htram, high slack | htram, low slack | htram, worst case | direct, high slack | direct, low slack | direct, worst case |
+|---|---|---|---|---|---|---|
+| controller ε 0.003 | 0.86–0.92 | 0.97–0.99 | **0.86** | 0.95–1.00 | 0.97–0.98 | **0.95** |
+| controller ε 0.01 | 0.75–0.84 | 0.90–0.94 | 0.75 | 0.84–0.99 | 0.99–1.00 | 0.84 |
+| controller ε 0.001 | 0.72–0.95 | 0.94–0.98 | 0.72 | – | – | – |
+| fixed W 25 | 0.27–0.34 | 0.90–0.98 | 0.27 | – | 0.94–0.97 | – |
+| fixed W 50 | 0.47–0.55 | **1.00** | 0.47 | 0.66–0.85 | 0.99–1.00 | 0.66 |
+| fixed W 100 | 0.72–0.79 | 0.34–0.40 | 0.34 | 0.81–0.93 | 0.59–0.62 | 0.59 |
+| fixed W 250 | **1.00** | stalls (storm) | 0 | 0.99–1.00 | not run (storm expected) | – |
+| blocking GVT | 0.61–0.66 | 0.61–0.74 | 0.61 | 0.77–0.93 | 0.85–0.91 | 0.77 |
+| hill climb from W 250 (Devastator's rule) | 0.36–0.48 | 0.32–0.38 | 0.32 | 0.73–0.80 | – | 0.73 |
+
+- The best fixed W moves from 250 (lookahead 100 / mean 1,000) to 50 (lookahead 10 / mean 200).
+  - Every single fixed W fails in one regime: at best 0.47 of the best fixed W, and W 250 at low slack is a rollback storm.
+  - At ε 0.003 the controller reaches 0.86 or better everywhere with htram, and 0.95 or better with direct sends.
+- **Blocking GVT is not competitive** once count waves are paced: 0.61–0.74 with htram. Prediction 6 was wrong at high slack; it expected a tie.
+- **The hill climb loses everywhere**, at 0.32–0.48 with htram. Above 95% efficiency it doubles W, so it settles near twice the best fixed W: mean W about 500 at high slack and about 100 at low slack, at 84–91% and 68–77% efficiency.
+
+**3. Why the controller trails with htram at high slack: aggregation makes rollbacks relatively expensive.** σ 2,000, run 1, PE time per event (µs = Δexecution time × 64 PEs ÷ Δevents):
+
+| transport | per committed event, W 250 (µs) | per extra rolled-back event, controller ε 0.01 vs W 250 (µs) | same, W 500 vs W 250 (µs) | rollback ÷ committed cost |
+|---|---|---|---|---|
+| direct | 33 | 166 | 78 | 2.4–5× |
+| htram | 5.6 | 118 | 60 | 11–21× |
+
+- A rolled-back event costs about the same absolute time with either transport. Anti-messages bypass htram, so each one is a direct message. What changes is the cost of a committed event, which is 6× cheaper with htram.
+- So a fixed ε, a share of *events* rolled back, means different things on each transport. At 1%, rollbacks cost about 4% of throughput with direct sends and about 16% with htram.
+- The throughput peak is also narrow: W 200 and 300 already give 0.93–0.98 of W 250.
+
+**4. A rollback floor traps ε 0.001.**
+- About 0.1–0.13% of events roll back even at W 50, below the lookahead of 100, where the window bound rules out window stragglers. So the floor comes from something the window doesn't control.
+- At σ 1,000, ε 0.001 sat at that floor in 3 of 3 runs:
+  - the controller kept shrinking W and α rose to 1.2–3.8 (about 0.01 elsewhere);
+  - W locked at about 98, where F(W) = 0 and calibration stops updating;
+  - throughput was 0.72 of the best fixed W.
+
+**Predictions checked:**
+1. Aggregation gain: wrong at σ 100 (2.7×, not ≤ 1.3×); right by σ 1,000 (5.0×); above the predicted range at the remote end (6.6×, not 3–4×).
+2. Direct sends fall 2.9× from σ 100 to 2,000, not 4×, and flatten after: roughly right.
+3. Wrong at ε 0.01: the controller reached 0.75–0.84, with W 326–381.
+4. Right: W 250 was the best fixed W at every high-slack σ.
+5. Right: the hill climb reached 0.37–0.48 at σ ≥ 1,000.
+6. Wrong at high slack (blocking 0.61–0.66 against the controller's 0.75–0.92). Right at low slack: the controller is 1.31–1.60× blocking.
+
 ## Open issues
 
 1. **Event holding needs a realistic cutoff.** With the test configs'
@@ -839,51 +915,52 @@ node takes the job's `SLURM_*` variables from idev's environment file so
 - `python3 tests/test.py --help` lists the rest (`--quick`, `--all`,
   `--no-build`, `--timeout`). Output goes to `tests/test_output/`.
 
-## Next steps, in order
+## Next steps, in order (revised 2026-10-21 after the Gaussian σ sweep)
 
-1. DONE 2026-10-20 (see "Aggregation through htram"): events go through htram
-   in all four modes, with a correctness gate on the Mac and on 4 Stampede3
-   nodes, and stage 1 of the sweep. Remaining from the original plan:
-   - SSSP parity check on htram `pdes` before merging it into master;
-   - stage 2 at 8+ nodes (skx-dev allows at most 4) and PPN 1 vs 2;
-   - payload slot size for models with larger messages (Imbalanced PHOLD needs 24 B).
-   
-   DONE 2026-10-20: deadline flush policy (see "Deadline flush policy"). Next: the controller that sets the window and horizon from the timestamp distribution; then the htram hold (#3) and in-buffer annihilation of anti-messages (#4) from the flush-policy brainstorm; dragonfly port after that.
+Done:
+- Charades on Reconverse, SMP-safe.
+- Aggregation through htram in all four modes, with the deadline flush policy.
+- The window controller and the hill-climb baseline.
+- Paced count waves.
+- The 4-node Gaussian σ sweep (see "Gaussian PHOLD σ sweep, results").
 
-   The original options for this step:
-   - per-destination minimum bucket tracking, so a GVT advance flushes only destinations holding now-current events (htram min-key query);
-   - then the histogram controller choosing urgency and cadence.
-   
-   The original plan's notes for this step:
-   - htram `pdes` (built with `-DPDES -DBUCKETS_BY_DEST`):
-     - `PdesItem` (event header + 16 B payload, ~64 B);
-     - `sendUrgent(item, pe)`;
-     - `flushDest` for WsP and PP, so one flush policy runs in all modes;
-     - fix the WW `receiveOnPE` leak of `buf`, which also skips `tot_recv_count`;
-     - make `receiveOnProc` abort (it drops items in BUCKETS_BY_DEST builds);
-     - SSSP parity check before merging to master.
-   - Charades branch `htram`:
-     - Options: `--aggregation`, `--agg-mode`, `--agg-buffer`, `--agg-urgent=k` (ship events within k buckets of GVT now), `--agg-scope`.
-     - Send path: `produce()`, then insert into htram. Receive: rebuild a `RemoteEvent` and call `recv_remote_event`. Anti-messages and GVT control bypass htram.
-     - Flush rules:
-       - `flushIdle` when `execute()` finds no ready LP or is window-blocked. The scheduler never goes idle in Charm's sense, so `[whenidle]` won't fire.
-       - `flushStale` each GVT round.
-       - `tflush` in `gvt_begin` before QD for blocking GVT. Otherwise QD can complete with events still buffered.
-     - Event holding off with aggregation for now.
-     - Gate: every `test.py` config in all four modes, with the committed count unchanged.
-   - Sweep:
-     - mode × buffer {16, 64, 256, 1024} at remote 0.5, 4 nodes;
-     - then the best two modes × urgency × remote {0.1, 0.5, 1} × nodes {2, 4, 8};
-     - then PPN 1 vs 2.
-     
-     Full design and predictions are in the research plan, "Current phase".
-2. Window sweep on a model with different lookahead/delay and a
-   phase-changing PHOLD (e.g. remote 0 ↔ 0.5 phases), to show the best static
-   window moves; then the histogram controller. Include the remote-0 case,
-   where w=250 costs 2× at 8 nodes.
-3. Event holding: realistic cutoff and bucket size per model (open issue 1);
-   the PADS'19 baseline.
-4. Gaussian PHOLD at Devastator's scale (100 LPs per core, 15 start events,
-   σ 100 → 25,600) and 16+ nodes, `+lci_ndevices 8`, `--comm-stats=1`.
-5. ROSS baseline build on Stampede3; check whether Devastator builds.
-6. Dragonfly port when needed.
+What the sweep changes in the claim:
+- On steady workloads the controller does not beat the best fixed window; the best fixed W wins by 1–14%. The defensible claim is its worst case.
+  - With htram, the controller at ε 0.003 is 0.86 or better of the best fixed W in every regime.
+  - Any single fixed W is 0.47 or worse somewhere.
+  - Blocking GVT is 0.61 and the hill climb 0.32.
+- Aggregation is the large effect: 2.7–6.6×, growing with the off-node share.
+- The transport changes the right optimism target: a rolled-back event costs 2.4–5 committed events with direct sends and 11–21 with htram.
+  - That is direct evidence that window control and aggregation have to be designed together.
+  - The paper's "joint control" claim should rest on this.
+
+1. **Controller fixes**, checked on the Mac, then this sweep rerun on 4 nodes.
+   - Default `--ctl-epsilon` 0.003; it is 0.05 now.
+   - Floor guard: don't calibrate α, and don't shrink W, while F(W) ≈ 0. This is the ε 0.001 trap at about W 98.
+   - A cost-aware target: bound the share of *PE time* lost to rollbacks rather than the share of events. Use per-round estimates of the cost of a committed and of a rolled-back event, from a fit of round time against the two counts, or from timing rollback and anti-message sends directly.
+   - Prediction: the htram high-slack gap closes from 0.86–0.92 to 0.95 or better, and nothing else drops below 0.95.
+   - Gate: worst case of 0.95 or better of the best fixed W over 9 workloads × 2 transports.
+2. **Cheaper rollbacks under aggregation.** Anti-messages go through htram, with in-buffer annihilation: an event still in the sender's buffer is cancelled together with its anti-message.
+   - Measure the rollback ÷ committed cost ratio, now 11–21× with htram, and throughput at W 500.
+   - Risk: a delayed anti-message lets wrong work spread further. Anti-messages may need urgent sends.
+3. **Hill-climb fairness.** It stands in for Devastator in the paper and loses by 2–3×, so a reviewer may call it a strawman.
+   - Rerun it from W 50 and from the bucket size, and at every GVT round.
+   - Compare it with Devastator's own code (step 6).
+4. **`--agg-scope` ablation** (other processes only, against all) at σ 100 and 2,000, to explain the 2.7× gain where only 3.9% of events go off-node.
+5. **Scale** to 16–32 nodes on skx-normal, as batch jobs after a short interactive check:
+   - Gaussian σ up to about 16,000 (32,768 LPs at 16 nodes), with Devastator's 100 LPs per core;
+   - uniform remote 1.0;
+   - the same policies, both slack levels.
+6. **Baselines:**
+   - ROSS on Stampede3;
+   - Devastator's public code;
+   - the PADS'19 static hold (open issue 1);
+   - PADS'98 local-rate aggregation;
+   - opportunistic aggregation.
+7. **Phase-changing workloads** (phases PHOLD) with the fixed controller. This is where it should beat every fixed W outright, not only in the worst case.
+8. **Housekeeping:**
+   - SSSP parity check on htram `pdes`;
+   - open issue 7;
+   - 8 nodes and PPN 1 against 2;
+   - units in the older tables of this file.
+9. Dragonfly port when needed.
