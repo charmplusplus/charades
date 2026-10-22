@@ -1392,6 +1392,50 @@ Same picture as on verbs (0.87–0.95 of the best fixed W; no single W is safe e
 2. Elsewhere it is within ±3% of `--ctl-floor=0`.
 3. At W 250, late stragglers are ≥ 80% of all stragglers at σ 4,000 (the floor dominates there) and ≤ 50% at σ 100.
 
+### Floor-aware controller, results (2026-10-22, idev job 3628811, 4 skx nodes)
+
+**Runs.** `floor_ab.sh` (`--ctl-floor` 0 / 1; charades bc5055d) and `floor_ab2.sh` (0 / 1 / 2; f24c55c), 3 reps each, interleaved. CSVs are in `$WORK/charades-runs/floor_ab{,2}/`. 162 runs; none failed.
+
+**The far flag misses most of the floor (prediction 3 wrong).** At W 250, *no* straggler was far: 0–2 of 54,592–58,014 at σ 4,000 and remote 1.0. The floor's stragglers have send delays below the window. They are short-delay events, so they become due soon after they are buffered, and the GVT-update race catches them. They are flagged far only once W shrinks below their delays, so `--ctl-floor=1` only stops the descent part-way.
+
+**`--ctl-floor=2`** (f24c55c) also leaves out stragglers that htram's deadline policy *held* (not due when sent; `PdesItem` flag bit 1). A held event that straggles became due while buffered or in flight. At W 250, σ 4,000: 54,587 of 54,592 stragglers were held. A storm guard counts everything once more than 5% of executed events roll back.
+
+Controller ε 0.003 ÷ the best fixed W (median of 3 from `floor_ab2.sh`; higher is better; mean W in parentheses):
+
+| workload | best fixed W (M ev/s) | floor = 0 | floor = 1 | floor = 2 |
+|---|---|---|---|---|
+| σ 4,000, high slack | 49.1 | 0.75 (122) | 0.85 (143–256) | 0.87 (337) |
+| uniform remote 1.0 | 52.7 | 0.68 (110) | 0.79 (142) | 0.87 (335) |
+| σ 100 | 54.9 | 0.87 (340) | 0.87 (341) | 0.86 (355) |
+| σ 1,000 | 49.8 | 0.91 (306) | 0.92 (309) | 0.88 (333) |
+| σ 2,000, low slack | 37.4 | 0.95 (56) | 0.96 (56) | 0.96 (57) |
+| full nodes, σ 2,000 | 108.0 | 0.88 (362) | 0.86 (367) | 0.86 (388) |
+
+- `floor_ab.sh` agrees for floor 0 and 1 (σ 4,000: 0.74 against 0.93 there; remote 1.0: 0.72 against 0.79).
+- **With `--ctl-floor=2` the collapse is gone:** 0.86–0.96 everywhere. But at high slack W now settles at 335–390, above the best fixed W of 250. That is the rollback-cost gap of the σ sweep (a rollback costs 15–30 committed events with htram), which ε 0.003 does not account for. Before this change a smaller ε was trapped by the floor.
+
+**Next, ε 0.001 and 0.002 with `--ctl-floor=2`** (`floor_eps.sh`; predictions written before the runs):
+1. At ε 0.001, W 250–300 at high slack and ≥ 0.92 of the best fixed W in every high-slack workload, full nodes included.
+2. At low slack, ε 0.001 stays ≥ 0.93 (W near 50).
+3. ε 0.002 falls between ε 0.001 and 0.003.
+
+**ε results** (`floor_eps.sh`, CSVs in `$WORK/charades-runs/floor_eps/`; 63 runs, none failed). `--ctl-floor=2`, each ε ÷ the best fixed W in the same run set (medians of 3; higher is better; mean W in parentheses):
+
+| workload | best fixed W (M ev/s) | ε 0.001 | ε 0.002 |
+|---|---|---|---|
+| σ 100 | 54.4 | 0.91 (319) | 0.88 (339) |
+| σ 1,000 | 49.5 | 0.92 (306) | 0.90 (321) |
+| σ 4,000 | 48.6 | 0.91 (311) | 0.89 (329) |
+| uniform remote 1.0 | 52.4 | 0.89 (311) | 0.87 (323) |
+| σ 2,000, low slack | 37.4 | 0.95 (50) | 0.96 (54) |
+| uniform remote 1.0, low slack | 38.8 | 0.96 (50) | 0.95 (54) |
+| full nodes, σ 2,000 | 107.0 | 0.87 (340) | 0.86 (366) |
+
+- **Predictions:** 1 wrong. W came down to 305–340, not 250–300; 0.89–0.92 at 64 cores and 0.87 on full nodes, not ≥ 0.92. 2 right (0.95–0.96). 3 right.
+- **Worst case against the σ sweep's ε 0.003 without the floor fix: 0.68 → 0.87.** ε 0.001 with `--ctl-floor=2` is at least as good in every workload but full nodes (0.87 against 0.88, within noise).
+- **ε has little leverage now.** From 0.003 to 0.001 W moves only from ~335 to ~310. Whether an event is held depends on the horizon W + margin, so the share of stragglers left in the calibration grows with W. The fixed point is set more by that classification than by ε.
+- **Not yet measured:** ε 0.001 with direct sends on this stack (the held flag never applies there), and the hill climb and fixed W at the new settings on full nodes beyond W 250. Defaults unchanged: `--ctl-floor=0`, ε 0.003.
+
 ## Open issues
 
 1. **Event holding needs a realistic cutoff.** With the test configs'
