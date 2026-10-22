@@ -1451,10 +1451,10 @@ Controller ε 0.003 ÷ the best fixed W (median of 3 from `floor_ab2.sh`; higher
 
 ### Phase-changing PHOLD and traffic characterisation (design, 2026-10-22; written before any runs)
 
-Run side by side in one 8-node allocation, each on its own 4 nodes (`srun -w`). Both use 2 × 8 PEs per node, psm2 64 KB packets, `+lci_ndevices 8` and pinning; htram PP 256 against direct sends; 3 reps. The controller is the new default (`--ctl-floor=2`, ε 0.001).
+Run back to back in one 4-node interactive allocation (idev job 3628935). Both use 2 × 8 PEs per node, psm2 64 KB packets, `+lci_ndevices 8` and pinning; htram PP 256 against direct sends; 3 reps. The controller is the new default (`--ctl-floor=2`, ε 0.001).
 
 **Phase-changing PHOLD.**
-- The workload alternates high slack (lookahead 100 / mean 1,000) and low slack (lookahead 10 / mean 200) every 32,000 time units, over an end time of 256,000 (8 phases).
+- The workload alternates low slack (lookahead 10 / mean 200; even phases, starting at 0) and high slack (lookahead 100 / mean 1,000) every 32,000 time units, over an end time of 256,000 (8 phases). PHOLD requires the alternate lookahead to be at least the base one, so low slack is the base (`phases:10:200:100:1000:<remote>:32000`); a first launch the other way round aborted at startup.
 - Uniform remote 1.0 and 0.5; 128 LPs per PE.
 - Arms: blocking GVT; fixed W 25, 50, 100, 250; the controller; the hill climb from W 250.
 - **Why:** on steady workloads the controller's case is robustness: 0.87–0.96 of the best fixed W, which you only know after a sweep. Here no fixed W suits both phases, so the controller can beat every fixed W.
@@ -1479,6 +1479,52 @@ Run side by side in one 8-node allocation, each on its own 4 nodes (`srun -w`). 
   2. The best fixed W is larger than PHOLD's at the same lookahead/mean (≥ 250 at high slack), because fewer events can straggle.
   3. The controller reaches ≥ 0.9 of the best fixed W in every traffic workload.
   4. The congested workload is ≥ 1.5× slower than uniform 128 × 64 (load imbalance from the corner block).
+
+### Phase-changing PHOLD and traffic, results (2026-10-22, idev job 3628935, 4 skx nodes)
+
+**Runs.** `phase_ab.sh`, `traffic_char.sh`, then `traffic_blk.sh`, back to back; CSVs are in `$WORK/charades-runs/{phase_ab,traffic_char,traffic_char_blk}/`. 294 runs; none failed in the end.
+- Traffic's blocking-GVT arm first failed 24 of 24 at startup with an assertion: the event pool ran out. The `blocking` test config keeps the default event buffer, while every other arm gets 655,360 from `bucket`. Rerun with `--buffer-size=655360`: 24 of 24 ok. (PHOLD's blocking arm has always run with the default buffer.)
+- Committed counts are identical across arms within each workload.
+
+**Phase-changing PHOLD** (rate ÷ the best fixed W in the same workload and transport, medians of 3; higher is better):
+
+| policy | htram, remote 0.5 | htram, remote 1.0 | direct, remote 0.5 | direct, remote 1.0 |
+|---|---|---|---|---|
+| best fixed W (M ev/s) | 42.6 (W 100) | 35.3 (W 50) | 25.5 (W 250) | 15.2 (W 250) |
+| **controller** (default) | **1.08** | **1.08** | 0.99 | 1.00 |
+| fixed W 25 | 0.72 | 0.78 | 0.76 | 0.84 |
+| fixed W 50 | 0.97 | 1.00 | 0.94 | 0.98 |
+| fixed W 100 | 1.00 | 0.92 | 0.98 | 0.99 |
+| fixed W 250 | 0.61 | 0.43 | 1.00 | 1.00 |
+| blocking GVT | 0.60 | 0.42 | 0.82 | 0.90 |
+| hill climb | 0.38 | 0.24 | 0.98 | 0.99 |
+
+- **With htram the controller beats every fixed W, by 8%.** It is the best arm in both workloads, at 46.1 and 38.1 M ev/s.
+- With direct sends a large fixed W loses nothing: W 250 is best even with the low-slack phases, and the controller matches it.
+- htram ÷ direct (best arms): 1.80 at remote 0.5, 2.51 at remote 1.0.
+- **Predictions:**
+  1. Wrong: W 250 did not storm. It reached 0.43–0.61 with htram, and was the best fixed W with direct sends.
+  2. Right for htram (50 or 100); wrong for direct (250).
+  3. Just short for htram: 1.08×, not ≥ 1.1×. Right for direct (0.99–1.00).
+  4. Right (0.24–0.38).
+
+**Traffic** (rate ÷ the best fixed W in the same workload and transport; higher is better):
+
+| workload | events leaving their chare (% of committed) | best direct (M ev/s) | best htram (M ev/s) | htram ÷ direct | best fixed W | controller, htram / direct | hill climb, htram / direct | blocking, htram / direct |
+|---|---|---|---|---|---|---|---|---|
+| 128 × 64, uniform | 12.4 | 43.5 | 48.0 | 1.10 | 1,000 | 1.02 / 0.99 | 0.77 / 1.01 | 0.63 / 0.65 |
+| 128 × 64, congested | 11.1 | 36.2 | 38.9 | 1.08 | 500 | 0.99 / 1.00 | 0.68 / 0.97 | 0.46 / 0.45 |
+| 2,048 × 4, high slack | 2.3 | 89.5 | 86.5 | 0.97 | 1,000 | 0.92 / 0.94 | 0.91 / 0.96 | 0.33 / 0.32 |
+| 2,048 × 4, low slack | 2.3 | 88.0 | 84.7 | 0.96 | 250 | 0.92 / 0.94 | 0.92 / 0.96 | 0.31 / 0.29 |
+
+- **Traffic, laid out row-major, is communication-light.** Only 2.3–12.4% of events leave their *chare*, and fewer leave the node. So aggregation hardly matters (0.96–1.10×) and rollbacks are rare: no arm had enough extra rollbacks to measure their cost.
+- The off-node estimate in the design was wrong for 2,048 × 4. Destinations span only 4 rows, so routes run almost entirely east–west along rows a single PE holds, and north–south moves, the ones that cross nodes, are rare.
+- **Predictions:**
+  1. Right at 128 × 64 (1.08–1.10); wrong at 2,048 × 4 (0.96–0.97, not 1.5–2.5).
+  2. Right (best W 250 at low slack, 500–1,000 at high slack).
+  3. Right (0.92–1.02).
+  4. Wrong: congested is 1.20–1.23× slower than uniform, not ≥ 1.5×.
+- **Implication:** with a locality-preserving layout, this model shows that the engine and the controller cost nothing on local workloads (controller 0.92–1.02), not that aggregation helps. To exercise communication it needs a layout or partition that splits neighbours across nodes (more nodes, fewer intersections per PE, or a block or graph partition of a real road network), or a model with longer-range interactions.
 
 ## Open issues
 
