@@ -160,6 +160,7 @@ void Aggregator::deliver(void* self, PdesItem* items, int n) {
     msg->phase = it.phase;
     msg->offset = it.offset;
     msg->far = it.flags & 1;
+    msg->held = (it.flags & 2) != 0;
     msg->type_id = it.type_id;
     msg->type_size = it.type_size;
     memcpy(msg->data, it.payload, it.type_size);
@@ -272,7 +273,11 @@ bool agg_send(RemoteEvent* msg, uint64_t dest_chare) {
   it.dest_lp = msg->dest_lp;
   it.phase = msg->phase;
   it.offset = msg->offset;
-  it.flags = msg->far ? 1 : 0;
+  // Due: sent at once (flushTo below). Otherwise held until a buffer fills or
+  // a GVT update makes it due (flush_due); the receiver counts a held event
+  // that straggles as late (--ctl-floor=2)
+  bool due = it.ts - PE_VALUE(g_last_gvt) < a->urgent;
+  it.flags = (msg->far ? 1 : 0) | (due ? 0 : 2);
   it.type_id = msg->type_id;
   it.type_size = msg->type_size;
   memcpy(it.payload, msg->data, msg->type_size);
@@ -292,7 +297,7 @@ bool agg_send(RemoteEvent* msg, uint64_t dest_chare) {
   }
   unsigned long long m1 = tram->msgs_sent;
   s->agg_msgs_full += m1 - m0;
-  if (it.ts - PE_VALUE(g_last_gvt) < a->urgent) {
+  if (due) {
     tram->flushTo(pe);
     s->agg_msgs_urgent += tram->msgs_sent - m1;
     s->agg_urgent++;

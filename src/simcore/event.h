@@ -28,6 +28,7 @@ struct RemoteEvent : public CMessage_RemoteEvent {
       phase = 0;
       anti = false;
       far = false;
+      held = false;
       offset = 0;
       send_ns = 0;
       src_pe = -1;
@@ -50,6 +51,10 @@ struct RemoteEvent : public CMessage_RemoteEvent {
     // past the GVT update that let its receiver pass it): --ctl-floor
     // counts such stragglers as waste the window does not control.
     bool far;
+    // Sent through htram and held there by the deadline policy (not due when
+    // sent): if it straggles, it became due while buffered or in flight
+    // (--ctl-floor=2). Set on receipt only; the sender's message is gone.
+    bool held;
     uint32_t offset;
 
     // With --comm-stats: wall-clock send time (ns, CLOCK_REALTIME, so only
@@ -69,6 +74,7 @@ struct RemoteEvent : public CMessage_RemoteEvent {
       p | phase;
       p | anti;
       p | far;
+      p | held;
       p | offset;
       p | send_ns;
       p | src_pe;

@@ -53,6 +53,7 @@ void Statistics::clear() {
   total_rollback_calls = 0;
   ts_rollback_calls = 0;
   late_stragglers = 0;
+  held_stragglers = 0;
   event_rollback_calls = 0;
 
   // Send stats
@@ -110,6 +111,7 @@ void Statistics::add(const Statistics* other) {
   total_rollback_calls += other->total_rollback_calls;
   ts_rollback_calls += other->ts_rollback_calls;
   late_stragglers += other->late_stragglers;
+  held_stragglers += other->held_stragglers;
   event_rollback_calls += other->event_rollback_calls;
 
   // Send stats
@@ -145,6 +147,7 @@ void Statistics::reduce(const Statistics* other) {
   total_rollback_calls += other->total_rollback_calls;
   ts_rollback_calls += other->ts_rollback_calls;
   late_stragglers += other->late_stragglers;
+  held_stragglers += other->held_stragglers;
   event_rollback_calls += other->event_rollback_calls;
 
   // Send stats
@@ -319,6 +322,7 @@ void Statistics::print() const {
   print_int("Total Rollback Calls ", total_rollback_calls);
   print_int("Timestamp Rollback Calls ", ts_rollback_calls);
   print_int("Late Stragglers (delay >= window)", late_stragglers);
+  print_int("Held Stragglers (late or held by htram)", held_stragglers);
   print_int("Event Rollback Calls ", event_rollback_calls);
 
   if (remote_holds) {

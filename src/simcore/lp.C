@@ -288,8 +288,9 @@ void LPChare::recv_remote_event(RemoteEvent* event) {
 
   if (g_tw_comm_stats && isOptimistic) comm_record_slack(e->ts, get_current_time());
   // A straggler the window could not have caused: it arrived late
-  if (isOptimistic && event->far && e->ts <= get_current_time()) {
-    PE_STATS(late_stragglers)++;
+  if (isOptimistic && e->ts <= get_current_time()) {
+    if (event->far) PE_STATS(late_stragglers)++;
+    if (event->far || event->held) PE_STATS(held_stragglers)++;
   }
 
   /**
