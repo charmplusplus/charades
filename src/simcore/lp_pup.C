@@ -80,7 +80,7 @@ void LPChare::reconstruct_pending_event(Event* e) {
 
   // Add the event to the avl_tree if necessary
   if (e->state.avl_tree) {
-    avlInsert(&all_events, e);
+    index_insert(e);
   }
 
   // Add the event to the cancel_q if necessary.
@@ -98,7 +98,7 @@ void LPChare::reconstruct_processed_event(Event* e, Event** pending, Event** pro
 
   // Add the event to the avl_tree if necessary
   if (e->state.avl_tree) {
-    avlInsert(&all_events, e);
+    index_insert(e);
   }
 
   // Add the event to the cancel_q if necessary.

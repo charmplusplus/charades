@@ -37,6 +37,11 @@ bool agg_send(RemoteEvent* msg, uint64_t dest_chare);
 
 /** This PE has nothing it may execute: ship what it has buffered */
 void agg_flush_idle();
+/**
+ * Take the events htram's node receives left in this PE's inbox (--agg-inbox).
+ * The optimistic scheduler calls it at the start of every iteration.
+ */
+void agg_drain();
 /** GVT moved: ship per --agg-gvt-flush */
 void agg_flush_gvt();
 /** Ship everything this PE has buffered (before a blocking GVT round) */

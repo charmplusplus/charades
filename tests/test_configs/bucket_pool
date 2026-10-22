@@ -1,0 +1,5 @@
+# Optimistic w/Bucketed GVT, event messages recycled through a per-PE pool
+sync=3
+gvt=4
+buffer-size=655360
+msg-pool=1

@@ -15,6 +15,7 @@ void agg_create(CkCallback) {
 }
 bool agg_send(RemoteEvent*, uint64_t) { return false; }
 void agg_flush_idle() {}
+void agg_drain() {}
 void agg_flush_gvt() {}
 void agg_flush_all() {}
 void agg_collect_stats(Statistics*) {}
@@ -69,6 +70,19 @@ static Time urgent_window(Time window) {
     w = g_tw_agg_horizon ? g_tw_agg_horizon : window + g_tw_agg_horizon_margin;
   }
   return std::max<Time>(w, g_tw_gvt_scheme == 4 ? g_tw_gvt_bucket_size : 0);
+}
+
+/**
+ * --agg-inbox: a node-level receive hands each PE its share through an inbox
+ * the PE drains in its own loop (agg_drain), instead of a receivePerPE message
+ * carrying ~2.5 events. Only where nothing waits on quiescence: the bucketed
+ * GVT counts each event when its chare receives it, so an event still in an
+ * inbox is in transit, but a QD-based GVT would not see it; and only with
+ * the optimistic scheduler, whose loop never stops (hence not --sched-park).
+ */
+static bool agg_inbox_on() {
+  return g_tw_agg_inbox && g_tw_gvt_scheme == 4 &&
+         g_tw_synchronization_protocol == OPTIMISTIC;
 }
 
 class Aggregator : public CBase_Aggregator {
@@ -129,13 +143,14 @@ Aggregator::Aggregator(CkGroupID tram_gid) {
   tram->setAggregationMode(g_tw_agg_mode);
   // Node-level receives (WPs, PP) send nothing to PEs that get no items
   tram->setSkipEmptyDeliveries(true);
+  if (agg_inbox_on()) tram->setInboxDelivery(true);
 }
 
 void Aggregator::deliver(void* self, PdesItem* items, int n) {
   Aggregator* a = (Aggregator*)self;
   for (int i = 0; i < n; i++) {
     const PdesItem& it = items[i];
-    RemoteEvent* msg = new (it.type_size) RemoteEvent();
+    RemoteEvent* msg = remote_event_new(it.type_size);
     msg->ts = it.ts;
     msg->event_id = it.event_id;
     msg->src_lp = it.src_lp;
@@ -222,6 +237,11 @@ void agg_create(CkCallback done) {
     CkAbort("--aggregation=1 with the bucketed GVT needs --agg-gvt-flush=2: "
             "an event waits for its bucket to become current\n");
   }
+  if (agg_inbox_on() && g_tw_sched_park) {
+    CkAbort("--agg-inbox=1 cannot be used with --sched-park: a parked PE "
+            "would not drain its inbox\n");
+  }
+  if (agg_inbox_on()) CkPrintf("Aggregation: node receives deliver through per-PE inboxes\n");
   agg_done = done;
   agg_recv_gid = CProxy_HTramRecv::ckNew();
   agg_src_gid = CProxy_HTramNodeGrp::ckNew();
@@ -260,7 +280,7 @@ bool agg_send(RemoteEvent* msg, uint64_t dest_chare) {
   it.send_ns = t0;
   it.src_pe = g_tw_comm_stats ? CkMyPe() : -1;
 #endif
-  delete msg;
+  remote_event_delete(msg);
 
   // Sends are never earlier than GVT, so the difference cannot wrap
   HTram* tram = a->tram;
@@ -299,6 +319,11 @@ void agg_flush_idle() {
     a->tram->flushIdle();
   }
   get_statistics()->agg_msgs_idle += a->tram->msgs_sent - m0;
+}
+
+void agg_drain() {
+  if (!g_tw_aggregation) return;
+  CpvAccess(g_aggregator)->tram->drainInbox();
 }
 
 void agg_flush_gvt() {

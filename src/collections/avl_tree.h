@@ -1,3 +1,6 @@
+#ifndef AVL_TREE_H
+#define AVL_TREE_H
+
 #include "event.h"
 #include "typedefs.h"
 
@@ -47,3 +50,5 @@ Event * avlInsertOrDelete(AvlTree *t, Event *key);
 AvlTree avl_alloc(void);
 
 void avl_free(AvlTree t);
+
+#endif

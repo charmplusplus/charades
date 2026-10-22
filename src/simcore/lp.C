@@ -278,7 +278,7 @@ void LPChare::recv_remote_event(RemoteEvent* event) {
    * immediately freed and ignored.
    */
   if (isOptimistic) {
-    Event* anti_event = avlInsertOrDelete(&all_events, e);
+    Event* anti_event = index_insert_or_remove(e);
     if (anti_event != NULL) {
       tw_event_free(anti_event,false);
       tw_event_free(e,false);
@@ -357,7 +357,7 @@ void LPChare::recv_anti_event(RemoteEvent* event) {
    * Attempt to insert the key into the AVL hash, which returns an actual event
    * if there was already one that matched the key in the tree.
    */
-  Event* real_event = avlInsertOrDelete(&all_events, key);
+  Event* real_event = index_insert_or_remove(key);
 
   /** If there was already a real event, then cancel that event */
   if (real_event != NULL) {

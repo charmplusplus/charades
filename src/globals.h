@@ -12,6 +12,10 @@
 
 #include "typedefs.h"
 
+#include <vector>
+
+struct RemoteEvent;
+
 /** \name LP Configuration *////@{
 extern unsigned g_total_lps;     ///< total number of LPs
 extern unsigned g_num_chares;    ///< total number of chares
@@ -59,6 +63,9 @@ extern unsigned g_tw_agg_mode;        ///< htram mode: WPs=0, WsP=1, PP=2, WW=3
 extern unsigned g_tw_agg_buffer;      ///< htram buffer size, in events
 extern Time     g_tw_agg_urgent;      ///< events with ts < GVT + this ship at once
 extern unsigned g_tw_agg_scope;       ///< 0: all remote chares, 1: other processes only
+extern unsigned g_tw_agg_inbox;       ///< node-level receives hand items to PEs through inboxes
+extern unsigned g_tw_event_index;     ///< remote events indexed for cancellation by 0: AVL tree, 1: hash
+extern unsigned g_tw_msg_pool;        ///< recycle RemoteEvent messages through a per-PE pool
 extern unsigned g_tw_agg_gvt_flush;   ///< on each GVT update: 0 none, 1 stale, 2 all
 extern unsigned g_tw_agg_policy;      ///< 0: eager flushes, 1: flush by timestamp deadline
 extern Time     g_tw_agg_horizon;     ///< deadline policy: events with ts < GVT + this are due
@@ -133,6 +140,11 @@ class Globals {
      * Starts at --optimism-window; the controller (--ctl) moves it.
      */
     Time window;
+    /**
+     * Event messages kept for reuse (--msg-pool), so the per-event path does
+     * not allocate and free a Charm message for every event.
+     */
+    std::vector<RemoteEvent*> msg_pool;
 
     Globals() : g_last_gvt(0),
                 abort_event(NULL),

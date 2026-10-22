@@ -49,6 +49,8 @@ void OptimisticScheduler::execute() {
   double t0 = g_tw_gvt_trace ? CmiWallTimer() : 0;
   unsigned num_executed = 0;
   bool blocked = false;
+  // Events htram's node receives left for this PE (--agg-inbox)
+  agg_drain();
   for (; num_executed < g_tw_mblock; num_executed++) {
     // With an optimism window, events past GVT + window wait for GVT to
     // advance. The iteration still completes, so the GVT trigger keeps

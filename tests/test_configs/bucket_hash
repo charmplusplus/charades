@@ -1,0 +1,6 @@
+# Optimistic w/Bucketed GVT, received events indexed for cancellation by a
+# hash instead of the AVL tree
+sync=3
+gvt=4
+buffer-size=655360
+event-index=1

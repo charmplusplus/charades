@@ -276,6 +276,10 @@ Event* event_alloc();
 void tw_event_send(Event* event);
 void tw_event_free(Event* e, bool commit);
 void tw_event_rollback(Event* event);
+/** An event message with room for size bytes of data (--msg-pool: reused) */
+RemoteEvent* remote_event_new(size_t size);
+/** Free an event message (--msg-pool: keep it for reuse); NULL is ignored */
+void remote_event_delete(RemoteEvent* m);
 
 // TODO: After unifying events this won't be needed
 // API for Charm++ specific event usage, to be used by original ROSS code
@@ -335,7 +339,7 @@ public:
  */
 template <typename MsgType, typename... Args>
 Event* tw_event_new(uint64_t dest_gid, Time offset, LPBase* sender, Args&&... args) {
-  RemoteEvent* msg = new (sizeof(MsgType)) RemoteEvent();
+  RemoteEvent* msg = remote_event_new(sizeof(MsgType));
   msg->type_id = get_msg_id<MsgType>();
   msg->type_size = sizeof(MsgType);
   new (msg->data) MsgType(std::forward<Args>(args)...);

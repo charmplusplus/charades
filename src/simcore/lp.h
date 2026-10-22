@@ -7,7 +7,10 @@
 
 #include "lp.decl.h"
 
+#include "avl_tree.h"
 #include "event.h"
+#include "event_hash.h"
+#include "globals.h"
 #include "pending_heap.h"
 #include "processed_queue.h"
 #include "random.h"
@@ -128,10 +131,27 @@ class LPChare : public CBase_LPChare {
 
   public:
     /**
-     * A pointer to the PE level AVL tree for hashing remote events.
-     * \todo should this be move to the LP level?
+     * Index of the remote events (and early anti-messages) this chare holds,
+     * so an anti-message can find its event: an AVL tree (--event-index=0)
+     * or a hash (--event-index=1). An indexed event has state.avl_tree set.
      */
     AvlTree all_events;
+    EventHash event_hash;
+    /** Insert e, or remove and return the indexed event with e's key */
+    Event* index_insert_or_remove(Event* e) {
+      return g_tw_event_index ? event_hash.insert_or_remove(e)
+                              : avlInsertOrDelete(&all_events, e);
+    }
+    /** Remove e, which is indexed */
+    void index_remove(Event* e) {
+      if (g_tw_event_index) event_hash.remove(e);
+      else avlDelete(&all_events, e);
+    }
+    /** Re-index e after migration */
+    void index_insert(Event* e) {
+      if (g_tw_event_index) event_hash.insert(e);
+      else avlInsert(&all_events, e);
+    }
 
     /** Default constructor */
     LPChare();

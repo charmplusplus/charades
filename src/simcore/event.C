@@ -45,8 +45,54 @@ bool CustomEventComparator::operator()(const Event* e1, const Event* e2) {
   }
 }
 
+/**
+ * --msg-pool: event messages come from and go back to a per-PE pool, skipping
+ * a Charm allocation and free per event (with htram, every remote event's
+ * message is built on its receiver and freed when committed). Pooled messages
+ * hold at least MSG_POOL_DATA bytes of event data; a message from anywhere
+ * else is pooled if it is at least that big, so its capacity is read from its
+ * envelope rather than assumed.
+ */
+static const size_t MSG_POOL_DATA = 32;
+static const size_t MSG_POOL_MAX = 1 << 16;
+
+static size_t remote_event_capacity(RemoteEvent* m) {
+  envelope* env = UsrToEnv(m);
+  size_t head = (size_t)(m->data - (char*)env);
+  size_t total = env->getTotalsize();
+  return total > head ? total - head : 0;
+}
+
+RemoteEvent* remote_event_new(size_t size) {
+  if (g_tw_msg_pool && size <= MSG_POOL_DATA) {
+    std::vector<RemoteEvent*>& pool = PE_VALUE(msg_pool);
+    if (!pool.empty()) {
+      RemoteEvent* m = pool.back();
+      pool.pop_back();
+      m->clear();
+      // It may have been received: sending it again needs it marked unused
+      _SET_USED(UsrToEnv(m), 0);
+      return m;
+    }
+    return new (MSG_POOL_DATA) RemoteEvent();
+  }
+  return new (size) RemoteEvent();
+}
+
+void remote_event_delete(RemoteEvent* m) {
+  if (m == NULL) return;
+  if (g_tw_msg_pool) {
+    std::vector<RemoteEvent*>& pool = PE_VALUE(msg_pool);
+    if (pool.size() < MSG_POOL_MAX && remote_event_capacity(m) >= MSG_POOL_DATA) {
+      pool.push_back(m);
+      return;
+    }
+  }
+  delete m;
+}
+
 Event* tw_event_new(uint64_t dest_gid, Time offset, LPBase* sender, size_t size) {
-  RemoteEvent* msg = new (size) RemoteEvent();
+  RemoteEvent* msg = remote_event_new(size);
   msg->type_id = get_msg_id<void*>();
   msg->type_size = size;
   return event_alloc(msg, dest_gid, offset, sender);
@@ -84,7 +130,7 @@ void tw_event_free(Event *e, bool commit) {
   // as well as freeing any events caused by it.
   if (g_tw_synchronization_protocol == OPTIMISTIC) {
     if(e->state.avl_tree == 1) {
-      avlDelete(&(e->owner)->owner->all_events, e);
+      e->owner->owner->index_remove(e);
     }
 
     Event* event = e->caused_by_me;
@@ -99,7 +145,7 @@ void tw_event_free(Event *e, bool commit) {
     }
   }
 
-  delete e->msg;
+  remote_event_delete(e->msg);
   e->msg = NULL;
   PE_VALUE(event_buffer)->free_event(e);
 }
