@@ -1526,6 +1526,36 @@ Run back to back in one 4-node interactive allocation (idev job 3628935). Both u
   4. Wrong: congested is 1.20–1.23× slower than uniform, not ≥ 1.5×.
 - **Implication:** with a locality-preserving layout, this model shows that the engine and the controller cost nothing on local workloads (controller 0.92–1.02), not that aggregation helps. To exercise communication it needs a layout or partition that splits neighbours across nodes (more nodes, fewer intersections per PE, or a block or graph partition of a real road network), or a model with longer-range interactions.
 
+### Devastator's own window on phase-changing PHOLD (design, 2026-10-22; written before any runs)
+
+**Why.** Our hill climb (`--ctl=2`) is a reimplementation of Devastator's rule, and it reached only 0.24–0.38 of the best fixed W on phase-changing PHOLD with htram. A reviewer can call that a strawman. The fair arm is Devastator's own adaptive window (`global_status_state::update()`), in its own engine, on the same workload.
+
+**Bench.** `~/pdes-baselines/devastator/bench/phold-gauss.cxx` gains Charades' phase options: `--phase-length`, `--alt-lookahead`, `--alt-mean`, `--alt-remote`, with Charades' defaults and checks. An event executed at time t uses the alternate parameters when (t / phase length) is odd, as in `alt_phase()` in `models/phold/simple/phold.C`.
+- Mac check (`--rng=clcg4`, 1,024 LPs, 15 start events, end 4,000; threads world, 4 ranks): committed counts equal Charades' sequential run in all three configs, with 1,786–11,976 events rolled back:
+
+  | remote | lookahead / mean | alt lookahead / alt mean | phase length | Charades committed | Devastator committed |
+  |---|---|---|---|---|---|
+  | 0.5 | 10 / 200 | 100 / 1,000 | 500 | 140,491 | 140,491 |
+  | 1.0 | 10 / 200 | 100 / 1,000 | 500 | 141,289 | 141,289 |
+  | 0.25 | 5 / 100 | 50 / 1,000 | 300 | 174,194 | 174,194 |
+
+- Configs without phases still give the reference counts (29,338 and 152,687).
+- The updated bench is in `devastator-phold-gauss.patch` and `devastator-bench/`.
+
+**Runs** (one 4-node interactive allocation).
+- Workload as in "Phase-changing PHOLD and traffic characterisation": `phases:10:200:100:1000:<remote>:32000` at remote 0.5 and 1.0, end time 256,000, 128 LPs per rank (8,192 LPs), 15 start events.
+- Devastator: GASNet ofi-psm2, 8 processes × 8 workers (64 ranks, plus a service thread per process), its own xorshift RNG.
+  - Arms: its adaptive window (the default), and fixed W (`deva_static_look_dt`) 50, 100, 250, 500, 1,000, 2,000.
+  - 3 reps each.
+- Charades in the same allocation, as an anchor against node variance: htram PP 256, the controller (default) and fixed W 50 and 100 (the best fixed W in job 3628935), 3 reps, same launch as job 3628935.
+- Metrics: committed events/s (higher is better); each engine's arms ÷ its own best fixed W; efficiency; Devastator's window statistics (mean, geometric mean, minimum, maximum).
+
+**Predictions:**
+1. Devastator's adaptive window reaches 0.5–0.8 of its own best fixed W, a smaller loss than our reimplementation's 0.24–0.38 in Charades. Its rollbacks are cheap, so a window that overshoots costs it less. On steady Gaussian PHOLD at 64 cores it reached 0.66–0.69.
+2. Devastator's best fixed W is larger than Charades' best (≥ 250 against 50–100), for the same reason.
+3. Devastator's best fixed W is 1.1–1.4× Charades' best fixed W, the steady-workload gap at 64 cores.
+4. Charades' controller beats Devastator's adaptive window in committed events/s at both remote shares.
+
 ## Open issues
 
 1. **Event holding needs a realistic cutoff.** With the test configs'
