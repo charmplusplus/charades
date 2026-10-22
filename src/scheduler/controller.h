@@ -17,7 +17,8 @@
  * late (e.g. held in an htram buffer past the GVT update that let its
  * receiver pass it), and no smaller window removes those. --ctl-floor=2
  * also leaves out stragglers that htram's deadline policy held (not due
- * when sent): they became due while buffered or in flight.
+ * when sent): they became due while buffered or in flight. The default is
+ * --ctl-floor=2 with epsilon 0.001.
  *
  * --ctl=2, the hill climb of Devastator (Bachan et al., PADS'24), as a
  * baseline in the same loop: from the efficiency (committed / executed)
@@ -119,7 +120,7 @@ class Controller : public CBase_Controller {
     double dist_total, dist_executed, dist_remote, dist_stragglers,
            dist_rolled_back, dist_elapsed_ns, dist_rollback_ns, dist_fwd_ns,
            dist_fwd_timed, dist_late, dist_held;
-    double alpha;                ///< calibration: waste seen / r * F(W)
+    double alpha;                ///< calibration: window waste seen / r * F(W)
     /**
      * --ctl-cost: PE time a rolled-back event costs (its forward work plus
      * its share of rollback processing) over the PE time per executed event

@@ -1434,7 +1434,19 @@ Controller ε 0.003 ÷ the best fixed W (median of 3 from `floor_ab2.sh`; higher
 - **Predictions:** 1 wrong. W came down to 305–340, not 250–300; 0.89–0.92 at 64 cores and 0.87 on full nodes, not ≥ 0.92. 2 right (0.95–0.96). 3 right.
 - **Worst case against the σ sweep's ε 0.003 without the floor fix: 0.68 → 0.87.** ε 0.001 with `--ctl-floor=2` is at least as good in every workload but full nodes (0.87 against 0.88, within noise).
 - **ε has little leverage now.** From 0.003 to 0.001 W moves only from ~335 to ~310. Whether an event is held depends on the horizon W + margin, so the share of stragglers left in the calibration grows with W. The fixed point is set more by that classification than by ε.
-- **Not yet measured:** ε 0.001 with direct sends on this stack (the held flag never applies there), and the hill climb and fixed W at the new settings on full nodes beyond W 250. Defaults unchanged: `--ctl-floor=0`, ε 0.003.
+- **Direct sends** (`direct_eps.sh`, idev job 3628877; 54 runs, none failed; criterion set before the runs: ≥ 0.9 of the best fixed W everywhere and within 3% of the old default). Each controller ÷ the best fixed W (medians of 3; higher is better):
+
+| workload | best fixed W (M ev/s) | ε 0.003, `--ctl-floor=0` (old default) | ε 0.001, `--ctl-floor=2` |
+|---|---|---|---|
+| σ 100 | 28.44 | 0.95 (W 341) | 0.96 (W 308) |
+| σ 2,000 | 16.14 | 0.98 (342) | 0.98 (315) |
+| uniform remote 1.0 | 15.59 | 0.99 (349) | 0.99 (315) |
+| σ 2,000, low slack | 15.95 | 0.98 (59) | 0.98 (54) |
+| uniform remote 1.0, low slack | 15.44 | 0.98 (60) | 0.99 (54) |
+| full nodes, σ 2,000 | 32.01 (W 250, the only W run) | 1.05 (381) | 1.03 (337) |
+
+  Passed: 0.96–1.03, and within 1.4% of the old default everywhere.
+- **New defaults (2026-10-22): `--ctl-floor=2`, ε 0.001.** Runs before this used `--ctl-floor=0` and ε 0.003. Mac: the controller configs at `--tier change --repeat 2`, 264/264.
 
 ## Open issues
 

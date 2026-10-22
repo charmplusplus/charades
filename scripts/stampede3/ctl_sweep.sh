@@ -21,6 +21,8 @@
 #     hill1:<W0> the same deciding after every GVT update (Devastator's
 #     design, where the counts ride on the GVT reduction); dry:<W> fixed W
 #     with the quantile rule running but not applied (--ctl-dry, its cost).
+#     Since 2026-10-22 the q arms calibrate with --ctl-floor=2 (the new
+#     default); runs before used 0 (add --ctl-floor=0 to EXTRA_ARGS to match).
 #     Since 2026-10-21 q, qb, hill, hill1 and dry use the default data path,
 #     the GVT's count waves (histogram every 8th wave; a round is 8
 #     waves, or 1 for hill1); qsep:, drysep:, hillsep: the same three on the

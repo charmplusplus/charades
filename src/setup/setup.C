@@ -33,10 +33,12 @@ void tw_init(int argc, char** argv) {
   // rollback storm that slows GVT, and with it the controller, for most of a
   // run (4 nodes, lookahead 10 / mean 200, from W 2000: 6% efficiency).
   if (g_tw_ctl_interval == 0) g_tw_ctl_interval = 1;
-  // Defaults from the 4-node Gaussian sweeps: 0.003 as a share of events was
-  // within 0.87-1.01 of the best fixed window on both transports; the time
-  // share (--ctl-cost=1) is experimental (CONTEXT.md, step 2 results)
-  if (g_tw_ctl_epsilon < 0) g_tw_ctl_epsilon = g_tw_ctl_cost ? 0.01 : 0.003;
+  // Defaults from the 4-node Gaussian sweeps on psm2 (2026-10-22, CONTEXT.md
+  // "Floor-aware controller"): 0.001 as a share of events, with
+  // --ctl-floor=2, was 0.87-0.96 of the best fixed window through htram and
+  // 0.97-1.03 sent directly. 0.003 without the floor fix fell to 0.68
+  // through htram. The time share (--ctl-cost=1) is experimental.
+  if (g_tw_ctl_epsilon < 0) g_tw_ctl_epsilon = g_tw_ctl_cost ? 0.01 : 0.001;
   if (g_tw_ctl_hist_waves == 0) g_tw_ctl_hist_waves = 1;
   if (g_tw_ctl == 1 && g_tw_optimism_window == 0) {
     g_tw_optimism_window = g_tw_gvt_scheme == 4 ? g_tw_gvt_bucket_size : 1;
