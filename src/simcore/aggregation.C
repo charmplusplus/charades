@@ -78,11 +78,13 @@ static Time urgent_window(Time window) {
  * carrying ~2.5 events. Only where nothing waits on quiescence: the bucketed
  * GVT counts each event when its chare receives it, so an event still in an
  * inbox is in transit, but a QD-based GVT would not see it; and only with
- * the optimistic scheduler, whose loop never stops (hence not --sched-park).
+ * the optimistic scheduler, whose loop never stops (hence not --sched-park,
+ * where a parked PE would not drain). On by default; elsewhere node receives
+ * fall back to a receivePerPE message per PE.
  */
 static bool agg_inbox_on() {
   return g_tw_agg_inbox && g_tw_gvt_scheme == 4 &&
-         g_tw_synchronization_protocol == OPTIMISTIC;
+         g_tw_synchronization_protocol == OPTIMISTIC && !g_tw_sched_park;
 }
 
 class Aggregator : public CBase_Aggregator {
@@ -236,10 +238,6 @@ void agg_create(CkCallback done) {
   if (g_tw_agg_policy == 0 && g_tw_gvt_scheme == 4 && g_tw_agg_gvt_flush != 2) {
     CkAbort("--aggregation=1 with the bucketed GVT needs --agg-gvt-flush=2: "
             "an event waits for its bucket to become current\n");
-  }
-  if (agg_inbox_on() && g_tw_sched_park) {
-    CkAbort("--agg-inbox=1 cannot be used with --sched-park: a parked PE "
-            "would not drain its inbox\n");
   }
   if (agg_inbox_on()) CkPrintf("Aggregation: node receives deliver through per-PE inboxes\n");
   agg_done = done;

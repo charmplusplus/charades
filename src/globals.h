@@ -63,9 +63,9 @@ extern unsigned g_tw_agg_mode;        ///< htram mode: WPs=0, WsP=1, PP=2, WW=3
 extern unsigned g_tw_agg_buffer;      ///< htram buffer size, in events
 extern Time     g_tw_agg_urgent;      ///< events with ts < GVT + this ship at once
 extern unsigned g_tw_agg_scope;       ///< 0: all remote chares, 1: other processes only
-extern unsigned g_tw_agg_inbox;       ///< node-level receives hand items to PEs through inboxes
-extern unsigned g_tw_event_index;     ///< remote events indexed for cancellation by 0: AVL tree, 1: hash
-extern unsigned g_tw_msg_pool;        ///< recycle RemoteEvent messages through a per-PE pool
+extern unsigned g_tw_agg_inbox;       ///< node-level receives hand items to PEs through inboxes (default 1)
+extern unsigned g_tw_event_index;     ///< remote events indexed for cancellation by 0: AVL tree, 1: hash (default)
+extern unsigned g_tw_msg_pool;        ///< recycle RemoteEvent messages through a per-PE pool (default 1)
 extern unsigned g_tw_agg_gvt_flush;   ///< on each GVT update: 0 none, 1 stale, 2 all
 extern unsigned g_tw_agg_policy;      ///< 0: eager flushes, 1: flush by timestamp deadline
 extern Time     g_tw_agg_horizon;     ///< deadline policy: events with ts < GVT + this are due

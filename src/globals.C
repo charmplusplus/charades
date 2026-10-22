@@ -126,9 +126,9 @@ void clear_globals() {
   g_tw_agg_buffer         = 64;
   g_tw_agg_urgent         = 0;
   g_tw_agg_scope          = 0;
-  g_tw_agg_inbox          = 0;
-  g_tw_event_index        = 0;
-  g_tw_msg_pool           = 0;
+  g_tw_agg_inbox          = 1;
+  g_tw_event_index        = 1;
+  g_tw_msg_pool           = 1;
   g_tw_agg_gvt_flush      = 2;
   g_tw_agg_policy         = 0;
   g_tw_agg_horizon        = 0;

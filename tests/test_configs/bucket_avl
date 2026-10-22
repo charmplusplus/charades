@@ -1,0 +1,7 @@
+# Optimistic w/Bucketed GVT with the pre-2026-10-21 per-event paths: received
+# events indexed by the AVL tree, event messages allocated and freed each time
+sync=3
+gvt=4
+buffer-size=655360
+event-index=0
+msg-pool=0

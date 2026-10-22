@@ -37,9 +37,9 @@ void parse_command_line(int argc, char** argv) {
   kernel.register_argument("agg-buffer",           "htram buffer size in events (PP: a multiple of 16)", g_tw_agg_buffer);
   kernel.register_argument("agg-urgent",           "Ship an event at once if its ts < GVT + this (0 = never)", g_tw_agg_urgent);
   kernel.register_argument("agg-scope",            "Aggregate events to - ALL REMOTE CHARES=0, OTHER PROCESSES ONLY=1", g_tw_agg_scope);
-  kernel.register_argument("agg-inbox",            "Bucketed GVT: htram node receives hand events to PEs through inboxes, not messages - NO=0, YES=1", g_tw_agg_inbox);
-  kernel.register_argument("event-index",          "Optimistic: index received events for cancellation by - AVL TREE=0, HASH=1", g_tw_event_index);
-  kernel.register_argument("msg-pool",             "Recycle event messages through a per-PE pool - NO=0, YES=1", g_tw_msg_pool);
+  kernel.register_argument("agg-inbox",            "Optimistic, bucketed GVT, not --sched-park: htram node receives hand events to PEs through inboxes, not messages - NO=0, YES=1 (default)", g_tw_agg_inbox);
+  kernel.register_argument("event-index",          "Optimistic: index received events for cancellation by - AVL TREE=0, HASH=1 (default)", g_tw_event_index);
+  kernel.register_argument("msg-pool",             "Recycle event messages through a per-PE pool - NO=0, YES=1 (default)", g_tw_msg_pool);
   kernel.register_argument("agg-gvt-flush",        "On each GVT update flush - NOTHING=0, DESTINATIONS NOT FILLING=1, EVERYTHING=2", g_tw_agg_gvt_flush);
   kernel.register_argument("agg-policy",           "When htram buffers ship - EAGER (idle PEs and GVT updates flush everything)=0, DEADLINE (only events with ts < GVT + agg-horizon)=1", g_tw_agg_policy);
   kernel.register_argument("agg-horizon",          "Deadline policy: events with ts < GVT + this are due (0 = the optimism window)", g_tw_agg_horizon);
