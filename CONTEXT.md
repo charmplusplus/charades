@@ -1556,6 +1556,59 @@ Run back to back in one 4-node interactive allocation (idev job 3628935). Both u
 3. Devastator's best fixed W is 1.1–1.4× Charades' best fixed W, the steady-workload gap at 64 cores.
 4. Charades' controller beats Devastator's adaptive window in committed events/s at both remote shares.
 
+### Devastator's own window on phase-changing PHOLD, results (2026-10-22, idev job 3629361, 4 skx nodes)
+
+**Runs.** `$WORK/charades-runs/phase_deva.sh`, then `phase_anchor.sh`, back to back. Devastator rows are in `$WORK/charades-runs/phase_deva/results.txt` (one `.out` per run); Charades CSVs in `phase_anchor/`. Devastator rebuilt on the node (ofi-psm2, 8 × 8; the binary before the phase options is kept as `phold-gauss-p8w8.pre-phases`).
+- 40 of 42 Devastator runs ok. Fixed W 2,000 at remote 1.0 stalled twice (reps 2 and 3, killed at the 180 s cap); rep 1 finished at 62% efficiency. All 18 Charades runs ok.
+- Committed counts are identical within each engine and workload: Devastator 93,588,382 (remote 0.5) and 93,596,142 (1.0) with its own RNG; Charades 93,585,342 and 93,611,686 (clcg4; within 0.02%).
+- Runs are short: Devastator drains in 1.4–3.4 s, Charades in 2.0–2.9 s.
+
+**Devastator** (M committed events/s, median of 3; ÷ its own best fixed W; higher is better):
+
+| arm | remote 0.5 | ÷ best | efficiency | remote 1.0 | ÷ best | efficiency |
+|---|---|---|---|---|---|---|
+| **adaptive window (its default)** | 52.4 | **0.77** | 82.5% | 33.9 | **0.70** | 77.7% |
+| fixed W 50 | 46.3 | 0.68 | 99.97% | 34.9 | 0.72 | 99.9% |
+| fixed W 100 | 55.8 | 0.82 | 99.7% | 41.4 | 0.85 | 99.0% |
+| fixed W 250 | **67.9** | 1.00 | 98.5% | **48.5** | 1.00 | 94.5% |
+| fixed W 500 | 66.4 | 0.98 | 95.4% | 45.0 | 0.93 | 87.9% |
+| fixed W 1,000 | 60.7 | 0.89 | 90.0% | 34.3 | 0.71 | 72.5% |
+| fixed W 2,000 | 54.9 | 0.81 | 86.2% | 27.5 (1 of 3; 2 stalled) | 0.57 | 62.1% |
+
+- Its window swings over the whole range in both workloads: minimum 1 in every run. At remote 0.5 it runs away to the 2⁵⁸ clamp (geometric mean 10¹¹–10¹⁴): high-slack phases keep efficiency above 95%, so it doubles every epoch and runs unbounded until a low-slack phase collapses it. At remote 1.0 its geometric mean is 260–340 (mean 650–990, maximum 17,000–39,000).
+- At remote 1.0 it does no better than fixed W 50.
+
+**Charades in the same allocation** (htram PP 256; M committed events/s, median of 3; ÷ the better of W 50 and W 100, which were the best fixed W in job 3628935; higher is better):
+
+| arm | remote 0.5 | ÷ best | remote 1.0 | ÷ best |
+|---|---|---|---|---|
+| **controller (default)** | 46.7 | **1.10** | 38.3 | **1.09** |
+| fixed W 50 | 41.5 | 0.98 | 35.0 | 1.00 |
+| fixed W 100 | 42.5 | 1.00 | 32.3 | 0.92 |
+
+These reproduce job 3628935 (46.1 and 38.1; 1.08) within 1–2%.
+
+**Across engines** (ratios of medians):
+
+| | remote 0.5 | remote 1.0 |
+|---|---|---|
+| adaptive policy ÷ the engine's own best fixed W: Charades controller / Devastator window (higher is better) | 1.10 / 0.77 | 1.09 / 0.70 |
+| Devastator best fixed W ÷ Charades best fixed W (lower is better for Charades) | 1.60 | 1.38 |
+| Devastator best fixed W ÷ Charades controller (lower is better for Charades) | 1.46 | 1.27 |
+| Charades controller ÷ Devastator adaptive window (higher is better for Charades) | 0.89 | 1.13 |
+
+**Predictions:**
+1. Right: Devastator's window reaches 0.77 and 0.70 of its best fixed W (predicted 0.5–0.8).
+2. Right: its best fixed W is 250 in both (predicted ≥ 250).
+3. Right at remote 1.0 (1.38); wrong at remote 0.5 (1.60, predicted 1.1–1.4). The gap on phase-changing PHOLD is larger than on steady Gaussian PHOLD at 64 cores.
+4. Right at remote 1.0 (1.13×); wrong at remote 0.5 (0.89×).
+
+**What this means:**
+- **Our reimplementation understated Devastator's rule.** In its own engine the hill climb reaches 0.70–0.77 of the best fixed W, against 0.24–0.38 for the same rule in Charades with htram, and 0.98–0.99 in Charades with direct sends. The rule's thresholds (quarter below 33% efficiency, double above 95%) tolerate waste that is cheap in Devastator and expensive in Charades with htram, where a rolled-back event costs 6.5–30 committed events. The paper should report Devastator's own window as the baseline, and present the in-Charades hill climb only as evidence that the rule's thresholds don't transfer across transports.
+- **The controller's claim holds against the fair baseline.** On the same workload, each engine's adaptive policy against its own best fixed W: our controller is 1.09–1.10, Devastator's window 0.70–0.77. Its window leaves 1.3–1.4× on the table; ours gains 9–10% over any fixed W.
+- **Absolute throughput still favours Devastator** at its best fixed W (1.27–1.46× our controller). Its adaptive window, as shipped, is beaten by Charades' controller only at remote 1.0.
+- **Next, if the framing goes this way:** port the controller into Devastator (`global_status_state::update()`). It would need Devastator's own ε, since its best W runs at 94.5–98.5% efficiency where Charades' runs at about 99.7%. If it recovers most of the 1.3–1.4×, that is the cleanest evidence for the controller, independent of engine.
+
 ## Open issues
 
 1. **Event holding needs a realistic cutoff.** With the test configs'
