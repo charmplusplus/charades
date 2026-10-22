@@ -13,6 +13,10 @@
 #     steady:<lookahead>:<mean>:<remote>
 #     phases:<lookahead>:<mean>:<alt lookahead>:<alt mean>:<remote>:<length>
 #     gauss:<lookahead>:<mean>:<sigma> (Gaussian destinations, sigma in LP ids)
+#     traffic:<lookahead>:<mean>:<num-x>:<cars per intersection>:<share>:<size>
+#       the traffic model on a num-x by (LPs / num-x) grid; with share > 0,
+#       that share of cars starts in a size x size block at the top-left
+#       corner and ends in one at the bottom-right (congestion)
 #   ARMS="w:25 w:50 w:100 w:250 w:500 q:0.02 q:0.05 q:0.1 hill:250"
 #     w:<W> a fixed window; q:<epsilon> the quantile rule (calibrated: the
 #     share of events rolled back; from the smallest window); qb:<epsilon>
@@ -102,7 +106,7 @@ run_one() {  # nodes procs pes cfg arm label
   fi
   extra+=(${EXTRA_ARGS:-})
   srun --mpi=pmi2 --kill-on-bad-exit=1 --wait=30 -N $N -n $n -c ${CPT:-$((pe / n))} ${SRUN_ARGS:-} -J cs_$label \
-      $C/models/phold/simple/phold +pe $pe $cfg $C/tests/test_configs/$gvtcfg "${extra[@]}" \
+      $bin +pe $pe $cfg $C/tests/test_configs/$gvtcfg "${extra[@]}" \
       > $f 2>&1 &
   local sp=$! t0=$(date +%s.%N) status=ok
   while kill -0 $sp 2>/dev/null; do
@@ -135,7 +139,17 @@ for rep in $(seq $reps); do
       cfg=$out/${wl//:/_}_${lps}_${START}_${END}
       printf '%s\n' "num-lps=$lps" "lps-per-chare=$LPC" "end-time=$END" \
           "start-events=$START" > $cfg
-      if [ $kind = steady ]; then
+      bin=$C/models/phold/simple/phold
+      if [ $kind = traffic ]; then
+        bin=$C/models/traffic/traffic
+        ny=$((lps / c))
+        printf '%s\n' "num-x=$c" "num-y=$ny" "lps-per-chare=$LPC" "end-time=$END" \
+            "lookahead=$a" "mean=$b" "total-cars=$((lps * d))" > $cfg
+        if [ "$e" != 0 ]; then
+          printf '%s\n' "percent-start=$e" "start-size=$f" "start-x=0" "start-y=0" \
+              "percent-end=$e" "end-size=$f" "end-x=$((c - f))" "end-y=$((ny - f))" >> $cfg
+        fi
+      elif [ $kind = steady ]; then
         printf '%s\n' "lookahead=$a" "mean=$b" "remote=$c" >> $cfg
       elif [ $kind = gauss ]; then
         printf '%s\n' "lookahead=$a" "mean=$b" "sigma=$c" >> $cfg

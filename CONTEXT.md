@@ -1448,6 +1448,38 @@ Controller ε 0.003 ÷ the best fixed W (median of 3 from `floor_ab2.sh`; higher
   Passed: 0.96–1.03, and within 1.4% of the old default everywhere.
 - **New defaults (2026-10-22): `--ctl-floor=2`, ε 0.001.** Runs before this used `--ctl-floor=0` and ε 0.003. Mac: the controller configs at `--tier change --repeat 2`, 264/264.
 
+
+### Phase-changing PHOLD and traffic characterisation (design, 2026-10-22; written before any runs)
+
+Run side by side in one 8-node allocation, each on its own 4 nodes (`srun -w`). Both use 2 × 8 PEs per node, psm2 64 KB packets, `+lci_ndevices 8` and pinning; htram PP 256 against direct sends; 3 reps. The controller is the new default (`--ctl-floor=2`, ε 0.001).
+
+**Phase-changing PHOLD.**
+- The workload alternates high slack (lookahead 100 / mean 1,000) and low slack (lookahead 10 / mean 200) every 32,000 time units, over an end time of 256,000 (8 phases).
+- Uniform remote 1.0 and 0.5; 128 LPs per PE.
+- Arms: blocking GVT; fixed W 25, 50, 100, 250; the controller; the hill climb from W 250.
+- **Why:** on steady workloads the controller's case is robustness: 0.87–0.96 of the best fixed W, which you only know after a sweep. Here no fixed W suits both phases, so the controller can beat every fixed W.
+- **Predictions:**
+  1. W 250 storms (stalls or falls below 0.3 of the best fixed W) with both transports, because of the low-slack phases.
+  2. The best fixed W is 50 or 100, a compromise.
+  3. With htram the controller reaches ≥ 1.1× the best fixed W, and with direct sends ≥ 1.0×.
+  4. The hill climb reaches ≤ 0.6 of the best fixed W with htram.
+
+**Traffic characterisation** (`ctl_sweep.sh` `traffic:` workloads; `models/traffic`).
+- 8,192 intersections (128 per PE), 15 cars per intersection (122,880 cars), end time 512,000.
+- A car's three events are Arrival, then Direction (to itself), then Departure (to itself), which sends an Arrival to a grid neighbour. So at most a third of events leave their LP, and north/south moves cross rows. Cars leave the simulation at their destination.
+- LPs are laid out row-major in blocks of 2,048 per node, so the grid width sets the off-node share. Estimated: about 1% of events at 128 × 64, up to about 17% at 2,048 × 4.
+- Workloads:
+  - 128 × 64 uniform. A route is about 64 hops of three events with mean delay 1,100 each, about 210,000 time units, so most cars finish within the run and the load falls;
+  - 128 × 64 congested: half the cars start in a 32 × 32 block at one corner and end in one at the other;
+  - 2,048 × 4 uniform, high slack. Routes are about 680 hops, so few cars finish;
+  - 2,048 × 4 at low slack (lookahead 10 / mean 200).
+- Arms: blocking GVT; fixed W 50, 100, 250, 500, 1,000; the controller; the hill climb.
+- **Predictions:**
+  1. htram ÷ direct (best arms) is ≤ 1.3× at 128 × 64 and 1.5–2.5× at 2,048 × 4, below PHOLD at a similar off-node share (σ 500: 2.45×), because two thirds of events never leave their LP.
+  2. The best fixed W is larger than PHOLD's at the same lookahead/mean (≥ 250 at high slack), because fewer events can straggle.
+  3. The controller reaches ≥ 0.9 of the best fixed W in every traffic workload.
+  4. The congested workload is ≥ 1.5× slower than uniform 128 × 64 (load imbalance from the corner block).
+
 ## Open issues
 
 1. **Event holding needs a realistic cutoff.** With the test configs'
