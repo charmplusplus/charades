@@ -1184,6 +1184,31 @@ Both engines poll on every core, so these include polling.
 
 Even all of this together is unlikely to close 2.2×; items 1–3 are Charades/htram changes worth an estimated 1.2–1.3×, items 4–5 are Reconverse work.
 
+### Per-event fast paths (2026-10-21, idev job 3627053, 4 skx nodes)
+
+Three changes from the profile's ranked list (charades 4bb324b, htram 50acab7 on `pdes`), each behind a switch, all off by default:
+- `--agg-inbox=1` (htram `setInboxDelivery` / `drainInbox`): a PP/WPs node receive puts each PE's share of a node message in that PE's inbox (a mutex-protected vector in the `HTramRecv` node group) instead of sending it a `receivePerPE` message; the optimistic scheduler drains it at the start of every iteration, and the receiving PE's own share is delivered in place. Only with the bucketed GVT (which counts each event when its chare receives it, so an event in an inbox is in transit) and the optimistic scheduler; refused with `--sched-park`. QD-based GVTs would not see inbox items.
+- `--event-index=1`: received events indexed for cancellation by an open-addressing hash per chare (`collections/event_hash.h`; linear probing, tombstones, key (ts, event_id, src_lp)) instead of the AVL tree. Same insert-or-annihilate contract.
+- `--msg-pool=1`: event messages (`RemoteEvent`) recycled through a per-PE pool (`remote_event_new` / `remote_event_delete` in event.C) on the hot paths: model sends, htram delivery, fossil frees, `agg_send`. Capacity is read from the envelope; reused messages are marked unused so they can be sent again.
+
+Tests (Mac): change tier on the new configs 60/60; inbox configs repeated 10× on 2×2, 1×4, 2×4: 360/360; existing aggregation configs 84/84; engine tier 484/484. Committed counts identical in every Stampede3 run below.
+
+**Throughput** (production runtime, 2 × 23 PEs per node pinned, `+lci_ndevices 4`, Gaussian σ 2,000; M committed events/s, median of 3; higher is better):
+
+| configuration | full nodes, W 250 | ÷ base | 64 PEs high slack, W 250 | 64 PEs low slack, W 50 |
+|---|---|---|---|---|
+| base (all off) | 43.7 | 1.00 | 20.7 | 14.2 |
+| hash index only | 48.7 | 1.11 | | |
+| message pool only | 48.9 | 1.12 | | |
+| inbox only | 45.2 | 1.03 | | |
+| all three | **56.0** | **1.28** | **27.3** (1.32×) | **17.6** (1.24×) |
+
+With all three on full nodes (2 runs each; ÷ W 250 at 56.9): W 175 0.93, W 350 0.85; controller ε 0.003 51.7 (0.91, mean W 309), ε 0.001 39.7 (0.70, pinned at W 110 near the floor). So ε 0.003 stays the default.
+
+**Gap to Devastator** (each at its best fixed W; Devastator ÷ Charades, lower is better for Charades): full nodes ~100 / 56 = **1.8×** (was 2.2×); 64 cores high slack 54.2 / 27.3 = **2.0×** (was 2.6×); low slack 52.5 / 17.6 = **3.0×** (was 3.7×). A longer full-node run (end 2,048,000) reached 61.0 M ev/s.
+
+**Profile with all three** (one process, DWARF stacks): about 8,300 cycles and 9,200 instructions per committed event (was 11,100 / 12,100; Devastator ~5,300 / 7,500). The AVL tree is gone; fossil collection is down to 6%; event execution is 26% of PE time (the model's forward work ~8%). What remains is mostly communication: LCI/libfabric progress 15%, sends through the node queue (`CkSendMsgNodeBranch` → `CldNodeEnqueue`, PP's node messages) 7%, `issueAm` 7.6%, mutexes 8% (libfabric CQ, node queue), Converse queue polling and TLS ~6%.
+
 ## Open issues
 
 1. **Event holding needs a realistic cutoff.** With the test configs'
