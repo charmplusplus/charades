@@ -1272,7 +1272,104 @@ Devastator runs on psm2 through GASNet-EX, so it already had this transport; mos
 | 64 cores, high slack | 48.5 (W 250) | 44.6 (mean W 299), **0.92** | 12.8, 0.26 | 17.1 (W 1000), 0.35 |
 | 64 cores, low slack | 37.3 (W 50) | 35.5 (mean W 56), **0.95** | 9.1, 0.24 | 13.5 (W 250), 0.36 |
 
-Same picture as on verbs (0.87–0.95 of the best fixed W; no single W is safe everywhere; the hill climb trails at 0.24–0.30). **Recommended launch now:** `XPORT=psm2 LCI_ATTR_PACKET_SIZE=65536 PPN=2 PEPP=23 CPT=24 AGG=pp:512 EXTRA_ARGS="+lci_ndevices 16 +pemap 2-46:2,3-47:2"` (at 8 PEs per process: `+lci_ndevices 8`, PP 256), on `charades-exp`.
+Same picture as on verbs (0.87–0.95 of the best fixed W; no single W is safe everywhere; the hill climb trails at 0.24–0.30).
+
+### Gaussian PHOLD σ sweep on the fast stack (design, 2026-10-22; written before any runs)
+
+**Why.** Every core result of the σ sweep (2026-10-21, job 3624866) came from the Debug runtime on verbs: aggregation 2.7–6.6×, rollback ÷ committed cost 11–21× with htram against 2.4–5× direct, the controller at ≥ 0.86 of the best fixed W. Since then the runtime is 1.5–1.8× faster (production, fast paths, TLS) and psm2 gave the htram arm another 1.5–2×. The direct arm has not been measured on psm2, and psm2's small-message rate may help it more, which would shrink the aggregation factor and change the rollback-cost ratio behind the joint-control argument.
+
+**Setup.** As on 2026-10-21, changing only the stack:
+- Same: 4 nodes × 2 processes × 8 PEs, 128 LPs per PE, 15 start events per LP, end time 64,000, margin 8; high slack (lookahead 100 / mean 1,000) at σ 100, 500, 1,000, 2,000, 4,000 and uniform remote 1.0; low slack (lookahead 10 / mean 200) at σ 500, 2,000 and uniform remote 1.0; direct sends against htram PP.
+- Arms, high slack: blocking GVT; fixed W 50, 100, 250, 500; controller ε 0.003 and 0.01; hill climb from W 250. Low slack: the same with W 25, 50, 100 (W 250 storms there).
+- New stack: `charades-exp` (fast paths, TLS Reconverse, LCI ofi-psm2-native), native psm2 with 64 KB packets, `+lci_ndevices 8`, pinned `+pemap 2-16:2,3-17:2`; htram PP 256 (best at 8 PEs per process; it was PP 64).
+- Transport attribution: at σ 2,000 and uniform remote 1.0 (high slack), W 250, direct and htram on verbs;ofi_rxm too (4 devices, 8 KB packets).
+- 3 reps, interleaved by rep.
+
+**Predictions.**
+1. Direct sends gain more than htram from the new stack, so the aggregation factor (best htram ÷ best direct, M committed events/s) shrinks to about 1.5–4×. It is still above 1 everywhere and still grows with the off-node share.
+2. The rollback ÷ committed cost ratio (PE time per event, as in section 3 of the results) falls with htram to about 5–15×, because anti-messages, which go direct, also get cheaper on psm2. With direct sends it stays at 2–5×.
+3. The controller at ε 0.003 reaches ≥ 0.85 of the best fixed W in every workload with htram, and ≥ 0.9 with direct sends.
+4. The hill climb reaches ≤ 0.5 of the best fixed W with htram at every σ.
+5. The best fixed W is still 250 at high slack and 50 at low slack.
+6. Blocking GVT with htram stays ≤ 0.75 of the best fixed W.
+
+### Gaussian PHOLD σ sweep on the fast stack, results (2026-10-22, idev job 3628587, 4 skx nodes)
+
+**Runs.**
+- CSVs are in `$WORK/charades-runs/gauss2/`: `{pp,off}_{hi,lo,verbs}_r{1,2,3}.csv`; script `gauss2_frozen.sh`.
+- Summaries: `summary_gauss.txt` (`gauss_summary.py`) and `summary_policy.txt` (new `scripts/stampede3/policy_summary.py`: each arm ÷ the best fixed W in the same transport, and rollback cost).
+- 426 runs. None failed or stalled. In every workload, all arms on both transports committed the same number of events.
+- **Change from the design:** end time 512,000 at high slack and 128,000 at low slack, not 64,000. At 64,000 the fast stack executes a run in 0.2–0.4 s, too short to measure and too few GVT rounds for the controllers. That gives about 63 M and 79 M committed events per run, as in `final_cmp2.sh`.
+- A first attempt was discarded unread: killing its tmux session left the sweep running on the node, alongside the restart.
+
+**1. Aggregation still wins everywhere, by less** (best arm per transport, M committed events/s, median of 3; htram ÷ direct, higher is better):
+
+| workload | off-node share (% of events) | best direct | best htram | htram ÷ direct | was (Debug, verbs) |
+|---|---|---|---|---|---|
+| σ 100, high slack | 3.9 | 28.6 | 55.3 | 1.94 | 2.70 |
+| σ 500 | 19.5 | 21.5 | 52.6 | 2.45 | 4.12 |
+| σ 1,000 | 38.2 | 18.3 | 50.5 | 2.76 | 5.04 |
+| σ 2,000 | 62.3 | 16.2 | 48.9 | 3.02 | 5.95 |
+| σ 4,000 | 74.6 | 15.3 | 49.2 | 3.21 | 6.58 |
+| uniform remote 1.0 | 75.0 | 15.6 | 53.3 | 3.41 | 6.54 |
+| σ 500, low slack | 19.5 | 21.2 | 45.2 | 2.13 | 3.37 |
+| σ 2,000, low slack | 62.3 | 15.9 | 37.9 | 2.37 | 4.54 |
+| uniform remote 1.0, low slack | 75.0 | 15.5 | 39.1 | 2.52 | 4.74 |
+
+- **Most of the change is the transport.** At W 250 (median of 3; psm2 ÷ verbs, both on the fast stack):
+  - direct sends: 2.89 on verbs against 16.17 on psm2 at σ 2,000, 5.6×; 2.63 against 15.61 at remote 1.0, 5.9×;
+  - htram: 27.5 against 48.9, 1.8×; 24.3 against 53.3, 2.2×.
+  - On verbs the fast stack's aggregation factor is 9.5× and 9.3×. psm2's small-message rate is what narrows it.
+- A committed event now costs 2.2–4.2 µs of PE time with direct sends, against 1.2–1.7 µs with htram: 1.8–3.2× more, where it was 6×.
+
+**2. Policies ÷ the best fixed W, same workload and transport** (medians; higher is better):
+
+| policy | htram, high slack | htram, low slack | htram, worst case | direct, high slack | direct, low slack | direct, worst case |
+|---|---|---|---|---|---|---|
+| controller ε 0.003 | 0.89–0.92, but **0.74** (σ 4,000) and **0.68** (remote 1.0) | 0.94–0.96 | **0.68** | 0.96–1.00 | 0.98–0.99 | **0.96** |
+| controller ε 0.01 | 0.77–0.87 | 0.90–0.94 | 0.77 | 0.91–0.99 | 0.99–1.00 | 0.91 |
+| fixed W 50 | 0.43–0.47 | **1.00** | 0.43 | 0.61–0.71 | **1.00** | 0.61 |
+| fixed W 100 | 0.67–0.72 | 0.64–0.80 | 0.64 | 0.81–0.86 | 0.89–0.99 | 0.81 |
+| fixed W 250 | **1.00** | not run (storms) | – | **1.00** | not run | – |
+| fixed W 500 | 0.72–0.76 | not run | – | 0.86–0.99 | not run | – |
+| blocking GVT | 0.55–0.65 | 0.35–0.59 | 0.35 | 0.81–0.88 | 0.85–0.88 | 0.81 |
+| hill climb from W 250 | 0.19–0.37 | 0.23–0.55 | 0.19 | 0.85–0.95 | 0.89–0.98 | 0.85 |
+
+- The best fixed W is again 250 at high slack and 50 at low slack, with both transports.
+- With direct sends, every adaptive policy is now good: the hill climb is 0.85–0.98 (was 0.73–0.80). With htram it stays poor (0.19–0.55). **The case for the controller is now the htram case**, where the fixed-W and hill-climb alternatives fail.
+
+**3. Rollback cost** (PE µs per event; `policy_summary.py`; per extra rolled-back event against W 500 or the controller, divided by the cost of a committed event at the best fixed W):
+- htram: 6.5–9.1× from W 500 at σ ≥ 500 (22× at σ 100); 15–30× from the controller at ε 0.01.
+- Direct: 0.4–2.0× from W 500 at σ ≥ 1,000 (7.5× at σ 100); 0.8–3.0× from the controller.
+- The transport gap behind the joint-control argument is wider than before: with direct sends on psm2 an extra rollback costs about as much as a committed event, with htram an order of magnitude more.
+
+**4. The htram rollback floor, and why ε 0.003 fails at the remote end.**
+- With htram, a share of events rolls back whatever the window, even at W 50, below the lookahead of 100. With direct sends nothing rolls back at W ≤ 250. Share rolled back (% of committed events, median):
+
+| | W 50 | W 100 | W 250 | W 500 |
+|---|---|---|---|---|
+| htram, σ 100 / 500 / 1,000 | 0.04 / 0.09 / 0.12 | 0.05 / 0.11 / 0.17 | 0.06 / 0.15 / 0.23 | 1.4 / 4.3 / 5.5 |
+| htram, σ 2,000 / 4,000 / remote 1.0 | 0.21 / 0.25 / 0.28 | 0.24 / 0.30 / 0.34 | 0.24 / 0.26 / 0.28 | 5.5 / 5.8 / 5.6 |
+| htram, 2026-10-21 (PP 64, verbs, Debug), same three | 0.09 / 0.02 / 0.02 | 0.09 / 0.02 / 0.02 | 0.08 / 0.04 / 0.04 | 11.6 / 11.6 / 11.9 |
+| direct, all six σ | 0.000 | 0.000 | 0.000 | 2.1–4.5 |
+
+- At σ 4,000 and remote 1.0 the floor (0.25–0.34%) sits just under ε 0.003. The controller shrinks W to about 110 (mean W 110–120 in 5 of 6 runs; the best fixed W is 250). Below W 250 the rollbacks don't fall, so it never meets its target: 0.68–0.74 of the best fixed W, at 99.6% efficiency.
+- **What causes it** (`floor.sh` and `floor_margin.sh`, σ 4,000, 2 runs each; share rolled back, %):
+  - Not the fast paths: `--agg-inbox=0` 0.21–0.24, `--event-index=0` 0.20–0.27, `--msg-pool=0` 0.21–0.26, against 0.24–0.28.
+  - htram residence time: PP 64 gives 0.010–0.026 (rate at W 250: 47.5–47.9 against 48.9–49.4). verbs, which delivers more slowly, gives 0.63–0.66 at W 50 and 2.98 at W 250.
+  - **The deadline margin removes it:** at W 250, margin 8 gives 0.25 (48.9–49.1 M ev/s), 64 gives 0.001–0.002 (41.2–41.3), 250 and 1,000 give 0.000 (25.3–25.5 and 12.9–13.0).
+- **Mechanism.** The window is GVT + W, and lookahead keeps a positive event from being a straggler only while GVT is no later than its sender's time. An event waiting in an htram buffer holds GVT back only to its own timestamp. If it waits long enough, GVT reaches that timestamp, its receiver runs up to W past it, and the event arrives as a straggler. The deadline policy ships an event at once only if it is already within W + margin of GVT *when inserted*; nothing re-checks buffered events as GVT advances toward them. A wider margin removes the floor by shipping more events unaggregated, which costs 16% at margin 64.
+- **Implication for the controller.** Its event-share ε counts rollbacks that no window can remove. Two fixes to test:
+  1. **Flush by timestamp as GVT advances.** Ship a buffered event once GVT + W + margin passes its timestamp. That is htram's bucket-keyed hold (`sendItemPrioDeferredDest` + `changeThreshold`), plan step 4 and the PADS'19-hold item. Prediction: floor near 0 at margin 8, at no loss of aggregation, and ε 0.003 back to ≥ 0.9.
+  2. **Measure the floor in the controller and target ε above it** (the existing floor guard did not catch a floor just under ε).
+
+**Predictions checked:**
+1. Right: 1.94–3.41×, above 1 everywhere, growing with the off-node share.
+2. Mixed. htram from W 500 is 6.5–9× (in range); from the controller 15–30× (above it). Direct is 0.4–2× at σ ≥ 1,000, below the predicted 2–5×: on psm2 a direct rollback costs about one committed event.
+3. Wrong for htram at σ 4,000 (0.74) and remote 1.0 (0.68), because of the floor in section 4; right everywhere else, and right for direct (≥ 0.96).
+4. Right except σ 500 at low slack (0.55).
+5. Right.
+6. Right (0.35–0.65). **Recommended launch now:** `XPORT=psm2 LCI_ATTR_PACKET_SIZE=65536 PPN=2 PEPP=23 CPT=24 AGG=pp:512 EXTRA_ARGS="+lci_ndevices 16 +pemap 2-46:2,3-47:2"` (at 8 PEs per process: `+lci_ndevices 8`, PP 256), on `charades-exp`.
 
 ## Open issues
 
