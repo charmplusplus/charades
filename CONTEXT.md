@@ -1373,6 +1373,25 @@ Same picture as on verbs (0.87–0.95 of the best fixed W; no single W is safe e
 5. Right.
 6. Right (0.35–0.65). **Recommended launch now:** `XPORT=psm2 LCI_ATTR_PACKET_SIZE=65536 PPN=2 PEPP=23 CPT=24 AGG=pp:512 EXTRA_ARGS="+lci_ndevices 16 +pemap 2-46:2,3-47:2"` (at 8 PEs per process: `+lci_ndevices 8`, PP 256), on `charades-exp`.
 
+
+### Floor-aware controller, `--ctl-floor` (design, 2026-10-22; written before any runs)
+
+**Change.**
+- A sender marks a remote event `far` when its send delay d (ts − the sender's time) is at least its current window W. This is one byte, in padding that already exists in both `RemoteEvent` and htram's `PdesItem`.
+- The receiver counts a far event that arrives behind its chare as a **late straggler** (new statistic "Late Stragglers").
+- Under a window, a straggler needs d < W, so a far straggler arrived late: buffered, or in flight, past the GVT update that let its receiver pass it.
+- With `--ctl-floor=1`, the controller calibrates α on rolled-back events scaled by the share of primary stragglers that were *not* late. So ε bounds the waste the window causes, and the floor no longer drives W down.
+- Off by default until measured.
+
+**A/B** (4 nodes, 2 × 8 PEs, psm2 64 KB, `+lci_ndevices 8`, htram PP 256, margin 8, 3 reps): the controller at ε 0.003 with `--ctl-floor=0` and `=1`, against the best fixed W, at:
+- σ 4,000 and uniform remote 1.0, high slack: where it failed;
+- σ 100 and σ 1,000, high slack, and σ 2,000 at low slack: where it worked.
+
+**Predictions.**
+1. With `--ctl-floor=1`, the controller reaches ≥ 0.9 of the best fixed W at σ 4,000 and remote 1.0 (from 0.74 and 0.68), with mean W 200–300 (from ~110).
+2. Elsewhere it is within ±3% of `--ctl-floor=0`.
+3. At W 250, late stragglers are ≥ 80% of all stragglers at σ 4,000 (the floor dominates there) and ≤ 50% at σ 100.
+
 ## Open issues
 
 1. **Event holding needs a realistic cutoff.** With the test configs'

@@ -77,6 +77,7 @@ extern unsigned g_tw_ctl;             ///< 0: fixed window, 1: delay quantile, 2
 extern double   g_tw_ctl_epsilon;     ///< quantile rule: target share of PE time lost to rollbacks (--ctl-cost=0: of executed events rolled back)
 extern unsigned g_tw_ctl_cost;        ///< quantile rule: 0 (default) epsilon is a share of events rolled back, 1 of PE time (experimental)
 extern unsigned g_tw_ctl_calibrate;   ///< quantile rule: scale the bound by the waste seen
+extern unsigned g_tw_ctl_floor;       ///< quantile rule: calibrate only on stragglers the window can cause
 extern unsigned g_tw_ctl_interval;    ///< GVT updates per controller round
 extern unsigned g_tw_ctl_dry;         ///< run the controller but never change the window
 extern unsigned g_tw_ctl_log;         ///< print every controller round on PE 0

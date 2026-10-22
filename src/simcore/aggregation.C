@@ -159,6 +159,7 @@ void Aggregator::deliver(void* self, PdesItem* items, int n) {
     msg->dest_lp = it.dest_lp;
     msg->phase = it.phase;
     msg->offset = it.offset;
+    msg->far = it.flags & 1;
     msg->type_id = it.type_id;
     msg->type_size = it.type_size;
     memcpy(msg->data, it.payload, it.type_size);
@@ -271,6 +272,7 @@ bool agg_send(RemoteEvent* msg, uint64_t dest_chare) {
   it.dest_lp = msg->dest_lp;
   it.phase = msg->phase;
   it.offset = msg->offset;
+  it.flags = msg->far ? 1 : 0;
   it.type_id = msg->type_id;
   it.type_size = msg->type_size;
   memcpy(it.payload, msg->data, msg->type_size);

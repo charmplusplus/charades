@@ -1,0 +1,16 @@
+# Optimistic w/Bucketed GVT, htram (PP), deadline policy with a margin, the
+# window set by the delay-quantile rule on the GVT's count waves, calibrated
+# only on stragglers the window can cause (--ctl-floor=1)
+sync=3
+gvt=4
+buffer-size=655360
+optimism-window=2000
+aggregation=1
+agg-mode=2
+agg-buffer=16
+agg-policy=1
+agg-horizon-margin=8
+ctl=1
+ctl-epsilon=0.003
+ctl-reduction=1
+ctl-floor=1

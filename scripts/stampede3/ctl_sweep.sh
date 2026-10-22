@@ -54,7 +54,7 @@ EXTRA_ARGS=${EXTRA_ARGS-"+lci_ndevices 8"}
 C=$WORK/$TREE
 out=${RUNS:-$WORK/charades-runs}/ctl_sweep; mkdir -p $out/logs; cd $out
 csv=${2:-$out/sweep_$(date +%Y%m%d_%H%M%S).csv}
-echo "rep,nodes,procs,pes,lps,workload,agg,bucket,margin,arm,status,wall_s,exec_s,committed,rolled_back,efficiency,event_rate,gvts,remote_sends,agg_events_per_msg,ctl_rounds,final_window,mean_window,stragglers_per_event,alpha,count_waves,kappa" > $csv
+echo "rep,nodes,procs,pes,lps,workload,agg,bucket,margin,arm,status,wall_s,exec_s,committed,rolled_back,efficiency,event_rate,gvts,remote_sends,agg_events_per_msg,ctl_rounds,final_window,mean_window,stragglers_per_event,alpha,count_waves,kappa,ts_rollbacks,late_stragglers" > $csv
 echo "writing $csv (tree $TREE, $(git -C $C log --oneline -1 | cut -c1-40))"
 
 stat() { awk -v k="$1" 'index($0, k) {print $NF; exit}' "$2"; }
@@ -121,7 +121,7 @@ run_one() {  # nodes procs pes cfg arm label
   [ $kind = w ] && fw=$val mw=$val
   [[ $kind =~ ^drys ]] && fw=$val mw=$val
   [ $kind = blk ] && fw=none mw=none
-  echo "$rep,$N,$n,$pe,$lps,$wl,$AGG,$bucket,$margin,$arm,$status,$(printf %.2f $wall),$(stat 'Execution Time' $f),$(stat 'Events Committed' $f),$(stat 'Events Rolled Back' $f),$(stat 'Efficiency' $f),$(stat 'Event Rate' $f),$(stat 'Total GVT Computations' $f),$(stat 'Remote Sends' $f),$(stat 'Events per htram Message' $f),$(stat 'Rounds' $f),$fw,$mw,$(stat 'Stragglers per executed event' $f),$(stat 'Final alpha' $f),$(stat 'Count Reductions :' $f),$(stat 'Final kappa' $f)" >> $csv
+  echo "$rep,$N,$n,$pe,$lps,$wl,$AGG,$bucket,$margin,$arm,$status,$(printf %.2f $wall),$(stat 'Execution Time' $f),$(stat 'Events Committed' $f),$(stat 'Events Rolled Back' $f),$(stat 'Efficiency' $f),$(stat 'Event Rate' $f),$(stat 'Total GVT Computations' $f),$(stat 'Remote Sends' $f),$(stat 'Events per htram Message' $f),$(stat 'Rounds' $f),$fw,$mw,$(stat 'Stragglers per executed event' $f),$(stat 'Final alpha' $f),$(stat 'Count Reductions :' $f),$(stat 'Final kappa' $f),$(stat 'Timestamp Rollback Calls' $f),$(stat 'Late Stragglers' $f)" >> $csv
   printf "%-60s %-5s %7.2fs\n" $label $status $wall
 }
 

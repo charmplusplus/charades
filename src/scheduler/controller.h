@@ -12,6 +12,10 @@
  * of the model rather than of the window. By default the bound is calibrated
  * against the events actually rolled back, and epsilon is then the share of
  * executed events that may be rolled back (see quantile_window).
+ * With --ctl-floor=1, only rollbacks of stragglers that the window could
+ * have caused count: a straggler sent with a delay of at least W arrived
+ * late (e.g. held in an htram buffer past the GVT update that let its
+ * receiver pass it), and no smaller window removes those.
  *
  * --ctl=2, the hill climb of Devastator (Bachan et al., PADS'24), as a
  * baseline in the same loop: from the efficiency (committed / executed)
@@ -70,7 +74,8 @@ class Controller : public CBase_Controller {
     static const int COARSE_BINS = 1 + MAX_EXP;
     /** Reduction layout: the histogram, then these counters */
     enum { EXECUTED = BINS, ROLLED_BACK, COMMITTED, REMOTE, STRAGGLERS,
-           ELAPSED_NS, ROLLBACK_NS, FWD_NS, FWD_TIMED, FIELDS };
+           ELAPSED_NS, ROLLBACK_NS, FWD_NS, FWD_TIMED, LATE_STRAGGLERS,
+           FIELDS };
     static const int COUNTERS = FIELDS - BINS;
 
     Controller();
@@ -98,18 +103,20 @@ class Controller : public CBase_Controller {
     bool contributed;            ///< in the current round, awaiting apply()
     unsigned gvts_since;         ///< GVT updates since the last result
     uint64_t last_executed, last_rolled_back, last_committed, last_remote,
-             last_stragglers, last_rollback_ns, last_fwd_ns, last_fwd_timed;
+             last_stragglers, last_rollback_ns, last_fwd_ns, last_fwd_timed,
+             last_late;
     double last_time;
 
     /** Identical on every PE: computed only from reduced data */
     std::vector<double> pending; ///< global delays not yet folded into dist
     double pending_total, pending_executed, pending_remote,
            pending_stragglers, pending_rolled_back, pending_elapsed_ns,
-           pending_rollback_ns, pending_fwd_ns, pending_fwd_timed;
+           pending_rollback_ns, pending_fwd_ns, pending_fwd_timed,
+           pending_late;
     std::vector<double> dist;    ///< decayed global histogram
     double dist_total, dist_executed, dist_remote, dist_stragglers,
            dist_rolled_back, dist_elapsed_ns, dist_rollback_ns, dist_fwd_ns,
-           dist_fwd_timed;
+           dist_fwd_timed, dist_late;
     double alpha;                ///< calibration: waste seen / r * F(W)
     /**
      * --ctl-cost: PE time a rolled-back event costs (its forward work plus
@@ -118,7 +125,7 @@ class Controller : public CBase_Controller {
     double kappa;
     double q;                    ///< last quantile the rule asked for
     int rounds;
-    double run_executed, run_stragglers;  ///< over every round, for the summary
+    double run_executed, run_stragglers, run_late;  ///< over every round, for the summary
     Time window;
     /** Time-weighted mean W, from the first round on */
     double first_time, window_time_sum, window_time;
@@ -133,6 +140,8 @@ class Controller : public CBase_Controller {
     /** One round of data (FIELDS long): choose and apply the window */
     void decide(const uint64_t* sum);
     Time quantile_window(const uint64_t* sum);
+    /** Decayed rolled-back events the calibration attributes to the window */
+    double window_waste() const;
     double cdf(Time w) const;
     double inverse_cdf(double q) const;
     Time hill_climb_window(const uint64_t* sum);

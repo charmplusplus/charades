@@ -62,6 +62,7 @@ class Statistics {
     /** \name Rollback stats *////@{
     uint64_t total_rollback_calls; ///< total number of times a rollback is called
     uint64_t ts_rollback_calls;    ///< number of rollbacks to a certain timestamp
+    uint64_t late_stragglers;      ///< stragglers sent with delay >= the window: late, not window-caused
     uint64_t event_rollback_calls; ///< number of rollbacks to a specific event
     ///@}
 

@@ -80,16 +80,17 @@ Controller::Controller()
       contributed(false), gvts_since(0), last_executed(0),
       last_rolled_back(0), last_committed(0), last_remote(0),
       last_stragglers(0), last_rollback_ns(0), last_fwd_ns(0),
-      last_fwd_timed(0),
+      last_fwd_timed(0), last_late(0),
       pending(BINS, 0.0), pending_total(0), pending_executed(0),
       pending_remote(0), pending_stragglers(0), pending_rolled_back(0),
       pending_elapsed_ns(0), pending_rollback_ns(0), pending_fwd_ns(0),
-      pending_fwd_timed(0),
+      pending_fwd_timed(0), pending_late(0),
       dist(BINS, 0.0), dist_total(0), dist_executed(0), dist_remote(0),
       dist_stragglers(0), dist_rolled_back(0), dist_elapsed_ns(0),
-      dist_rollback_ns(0), dist_fwd_ns(0), dist_fwd_timed(0), alpha(1),
+      dist_rollback_ns(0), dist_fwd_ns(0), dist_fwd_timed(0), dist_late(0),
+      alpha(1),
       kappa(1),
-      q(0), rounds(0), run_executed(0), run_stragglers(0),
+      q(0), rounds(0), run_executed(0), run_stragglers(0), run_late(0),
       window(g_tw_optimism_window), first_time(0),
       window_time_sum(0), window_time(0), last_rate(-1), efficiency(0) {
   CpvInitialize(Controller*, g_controller);
@@ -173,6 +174,8 @@ void Controller::read_counters(uint64_t* v) {
   v[ROLLBACK_NS - BINS] = delta(RUN_TOTAL(s, rollback_ns), &last_rollback_ns);
   v[FWD_NS - BINS] = delta(RUN_TOTAL(s, fwd_ns), &last_fwd_ns);
   v[FWD_TIMED - BINS] = delta(RUN_TOTAL(s, fwd_timed), &last_fwd_timed);
+  v[LATE_STRAGGLERS - BINS] =
+      delta(RUN_TOTAL(s, late_stragglers), &last_late);
 }
 
 /**
@@ -295,6 +298,7 @@ Time Controller::quantile_window(const uint64_t* sum) {
   pending_rollback_ns += sum[ROLLBACK_NS];
   pending_fwd_ns += sum[FWD_NS];
   pending_fwd_timed += sum[FWD_TIMED];
+  pending_late += sum[LATE_STRAGGLERS];
   if (pending_total < BATCH || pending_executed == 0) return window;
 
   dist_total = 0;
@@ -311,9 +315,10 @@ Time Controller::quantile_window(const uint64_t* sum) {
   dist_rollback_ns = dist_rollback_ns * DECAY + pending_rollback_ns;
   dist_fwd_ns = dist_fwd_ns * DECAY + pending_fwd_ns;
   dist_fwd_timed = dist_fwd_timed * DECAY + pending_fwd_timed;
+  dist_late = dist_late * DECAY + pending_late;
   pending_total = pending_executed = pending_remote = pending_stragglers =
       pending_rolled_back = pending_elapsed_ns = pending_rollback_ns =
-      pending_fwd_ns = pending_fwd_timed = 0;
+      pending_fwd_ns = pending_fwd_timed = pending_late = 0;
 
   double r = dist_remote / dist_executed;
   // Below the floor (Q_MIN) the window does not cause the waste seen
@@ -325,7 +330,7 @@ Time Controller::quantile_window(const uint64_t* sum) {
       // Geometric smoothing: a quarter of the way per fold, at most 1.25x.
       // Rollbacks come in bursts; moving alpha 2x per fold made W swing
       // 12-60 around a best fixed W of 25 (4 nodes, lookahead 10 / mean 200).
-      double seen = std::min(1e4, std::max(dist_rolled_back / dist_executed /
+      double seen = std::min(1e4, std::max(window_waste() / dist_executed /
           bound, 1e-4));
       double step = std::pow(seen / alpha, ALPHA_GAIN);
       alpha *= std::min(ALPHA_STEP, std::max(1 / ALPHA_STEP, step));
@@ -357,6 +362,24 @@ Time Controller::quantile_window(const uint64_t* sum) {
   double share = g_tw_ctl_cost ? g_tw_ctl_epsilon / kappa : g_tw_ctl_epsilon;
   q = std::min(Q_MAX, std::max(Q_MIN, share / (r * alpha)));
   return clamp_window((Time)std::ceil(inverse_cdf(q)));
+}
+
+/**
+ * --ctl-floor=1: the rolled-back events, scaled by the share of stragglers
+ * sent with a delay below the window. Only those can come from the window;
+ * the rest arrived late. With htram (4 nodes, sigma 4000, W 250, deadline
+ * margin 8) about 0.25% of events rolled back at every W from 50 up, none
+ * sent directly: events made due by a GVT update reach receivers that
+ * already passed them. Calibrated against that floor, epsilon 0.003 drove W
+ * to ~110 and reached 0.68-0.74 of the best fixed window. Rollbacks are
+ * split in proportion to primary stragglers; a late straggler sent with a
+ * delay below W still counts as the window's, so this errs toward a
+ * smaller window.
+ */
+double Controller::window_waste() const {
+  if (!g_tw_ctl_floor || dist_stragglers <= 0) return dist_rolled_back;
+  double share = std::max(0.0, dist_stragglers - dist_late) / dist_stragglers;
+  return dist_rolled_back * share;
 }
 
 /**
@@ -416,6 +439,7 @@ void Controller::decide(const uint64_t* sum) {
   rounds++;
   run_executed += sum[EXECUTED];
   run_stragglers += sum[STRAGGLERS];
+  run_late += sum[LATE_STRAGGLERS];
 
   Time w = g_tw_ctl == 2 ? hill_climb_window(sum) : quantile_window(sum);
   // The log shows this round's efficiency; the hill climb uses its average
@@ -436,12 +460,13 @@ void Controller::decide(const uint64_t* sum) {
     for (int b = 0; b < BINS; b++) samples += sum[b];
     CkPrintf("CTL round %d gvt %llu window %llu delays %llu executed %llu "
         "rolled_back %llu committed %llu remote %llu stragglers %llu "
-        "round_ms %.3f q %.4f alpha %.4f kappa %.2f eff %.3f\n", rounds, (unsigned long long)PE_VALUE(g_last_gvt),
+        "late %llu round_ms %.3f q %.4f alpha %.4f kappa %.2f eff %.3f\n", rounds, (unsigned long long)PE_VALUE(g_last_gvt),
         (unsigned long long)w, (unsigned long long)samples,
         (unsigned long long)sum[EXECUTED],
         (unsigned long long)sum[ROLLED_BACK],
         (unsigned long long)sum[COMMITTED], (unsigned long long)sum[REMOTE],
         (unsigned long long)sum[STRAGGLERS],
+        (unsigned long long)sum[LATE_STRAGGLERS],
         sum[ELAPSED_NS] / 1e6 / CkNumPes(), q, alpha, kappa,
         g_tw_ctl == 2 ? efficiency : round_eff);
   }
@@ -478,6 +503,11 @@ void Controller::finalize() {
   if (run_executed > 0) {
     CkPrintf("Stragglers per executed event  %.4f\n",
         run_stragglers / run_executed);
+  }
+  if (run_stragglers > 0) {
+    CkPrintf("Late share of stragglers       %.3f%s\n",
+        run_late / run_stragglers,
+        g_tw_ctl_floor ? " (excluded from calibration)" : "");
   }
 }
 

@@ -193,8 +193,11 @@ void tw_event_send(Event* e) {
     dest_chare->recv_local_event(e);
   } else {
     PE_STATS(remote_sends)++;
-    ctl_record_delay(e->ts - e->owner->get_current_time());
+    Time delay = e->ts - e->owner->get_current_time();
+    ctl_record_delay(delay);
     RemoteEvent* msg = e->get_msg();
+    Time window = PE_VALUE(window);
+    msg->far = window && delay >= window;
     // The bucketed GVT may hold the event back and send it later
     // (charm_event_release) or delete it with its anti-message.
     bool send_now = scheduler->produce(msg);

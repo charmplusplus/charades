@@ -27,6 +27,7 @@ struct RemoteEvent : public CMessage_RemoteEvent {
       dest_lp = 0;
       phase = 0;
       anti = false;
+      far = false;
       offset = 0;
       send_ns = 0;
       src_pe = -1;
@@ -43,6 +44,12 @@ struct RemoteEvent : public CMessage_RemoteEvent {
     // b mod 256, so later buckets completed with events still in transit.
     uint32_t phase;
     bool anti;
+    // The send delay (ts - sender's time) was at least the sender's optimism
+    // window. Under a window W a straggler needs a delay below W, so one of
+    // these straggles only by arriving late (e.g. held in an htram buffer
+    // past the GVT update that let its receiver pass it): --ctl-floor
+    // counts such stragglers as waste the window does not control.
+    bool far;
     uint32_t offset;
 
     // With --comm-stats: wall-clock send time (ns, CLOCK_REALTIME, so only
@@ -61,6 +68,7 @@ struct RemoteEvent : public CMessage_RemoteEvent {
       p | dest_lp;
       p | phase;
       p | anti;
+      p | far;
       p | offset;
       p | send_ns;
       p | src_pe;
