@@ -1609,6 +1609,27 @@ These reproduce job 3628935 (46.1 and 38.1; 1.08) within 1–2%.
 - **Absolute throughput still favours Devastator** at its best fixed W (1.27–1.46× our controller). Its adaptive window, as shipped, is beaten by Charades' controller only at remote 1.0.
 - **Next, if the framing goes this way:** port the controller into Devastator (`global_status_state::update()`). It would need Devastator's own ε, since its best W runs at 94.5–98.5% efficiency where Charades' runs at about 99.7%. If it recovers most of the 1.3–1.4×, that is the cleanest evidence for the controller, independent of engine.
 
+### Full-node reruns (design, 2026-10-22; written before any runs)
+
+**Why.** Every result from "Gaussian PHOLD σ sweep on the fast stack" through "Devastator's own window on phase-changing PHOLD" ran 2 × 8 PEs per node, 16 of 48 cores. That layout was inherited from early debugging and kept for comparability; there is no defensible reason for it in the paper. Only the psm2 gap to Devastator (0.97×) and a few controller anchors were measured on full nodes. Full nodes change what the controller sees: about 3× the events per node, more events stay on the node, bigger htram messages. **Full nodes are now the default** (`ctl_sweep.sh`, 2026-10-22): 2 processes × 23 PEs per node (one core per process free), `+pemap 2-46:2,3-47:2`, psm2 with 64 KB packets, `+lci_ndevices 16`, htram PP 512, margin 8, `charades-exp`. The 2 × 8 results above are provisional until these reruns replace them. Also new: the blocking-GVT arm gets the bucket config's event pool (`--buffer-size=655360`), so it no longer needs the per-run workaround from the traffic runs.
+
+**Setup.** 4 nodes, 184 PEs, 128 LPs per PE (23,552 LPs), 15 start events, 3 reps interleaved. Charades controller = the defaults (ε 0.001, `--ctl-floor=2`). Devastator: ofi-psm2, 8 processes × 23 workers (184 ranks, plus a service thread per process), 128 LPs per rank, its own RNG; rebuilt with the phase options. Stages in priority order, so a short allocation still finishes the most important one:
+- **A. Phase-changing PHOLD**, both engines: `phases:10:200:100:1000:<remote>:32000`, remote 0.5 and 1.0, end 256,000. Charades, htram and direct: blocking GVT; fixed W 25, 50, 100, 250; controller; hill climb from W 250. Devastator: adaptive; fixed W 50, 100, 250, 500, 1,000, 2,000.
+- **B. Gaussian σ sweep**, both engines. High slack (lookahead 100 / mean 1,000, end 512,000): σ 100, 500, 1,000, 2,000, 4,000, uniform remote 1.0. Low slack (10 / 200, end 128,000): σ 500, 2,000, uniform remote 1.0. Charades, htram and direct: blocking GVT; fixed W 50, 100, 250, 500 (low slack 25, 50, 100, 250); controller; hill climb from W 250. Devastator: adaptive; fixed W 250, 500, 1,000, 2,000 (low slack 50, 100, 200, 500).
+- **C. Traffic**, Charades only: 23,552 intersections, 15 cars each. 128 × 184 uniform and congested (half the cars in 32 × 32 corner blocks), and 5,888 × 4 (one row per node, as 2,048 × 4 was), at high slack (end 512,000) and low slack (end 128,000). Arms as in job 3628935.
+
+**Predictions:**
+- A1. With htram, Charades' controller reaches 0.95–1.05 of its best fixed W. It gains less than at 2 × 8 (1.09–1.10), because on steady full-node runs it settled above the best W (0.87).
+- A2. Devastator's adaptive window reaches ≤ 0.5 of its best fixed W. On full nodes at σ 2,000 it collapsed to 0.004 (job 3626388).
+- A3. Devastator's best fixed W ÷ Charades' best fixed W is 0.9–1.3 (parity on steady high slack; phases include low slack).
+- A4. Charades' controller beats Devastator's adaptive window by ≥ 1.5× at both remote shares.
+- B1. Aggregation (best htram ÷ best direct) is 2–5× and grows with the off-node share; larger than at 2 × 8 (1.9–3.4×), since more PEs share each node's htram buffers.
+- B2. With htram the controller reaches ≥ 0.85 of the best fixed W everywhere; with direct sends ≥ 0.95.
+- B3. The hill climb in Charades reaches ≤ 0.4 with htram.
+- B4. Devastator's adaptive window reaches ≤ 0.3 of its best fixed W at high slack. Charades' controller beats it in committed events/s in every workload.
+- B5. Devastator best ÷ Charades best: 0.8–1.3 at high slack, 1.1–1.6 at low slack.
+- C1. htram ÷ direct stays ≤ 1.2 on every traffic workload, and the controller reaches ≥ 0.9.
+
 ## Open issues
 
 1. **Event holding needs a realistic cutoff.** With the test configs'

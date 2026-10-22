@@ -6,7 +6,10 @@
 #
 # Usage: ctl_sweep.sh <reps> [out.csv]
 # Knobs (environment):
-#   NODES="4", PPN=2 (processes per node), PEPP=8 (PEs per process),
+#   Defaults are full nodes (since 2026-10-22; runs before used PEPP=8,
+#   CPT=8, AGG=pp:64, TREE=charades-qd, verbs and "+lci_ndevices 8"):
+#   NODES="4", PPN=2 (processes per node), PEPP=23 (PEs per process; one
+#   core per process stays free),
 #   LPS_PER_PE=128, LPC=16 (LPs per chare; must divide LPS_PER_PE), START=15 (start events per LP), END=64000, CAP=180 (s),
 #   WORKLOADS="steady:10:200:0.5 steady:100:1000:0.5
 #              phases:10:200:100:1000:0.5:8000"
@@ -40,23 +43,29 @@
 #     wave, coarse (one bin per power of two) with c; drys[c]<N>:<W> the same
 #     with fixed W (--ctl-dry, its cost); hills:<W0> the hill climb on the
 #     count waves, deciding every wave (Devastator's design)
-#   BUCKETS="8" (bucketed GVT bucket sizes), MARGINS="0" (deadline policy:
+#   BUCKETS="8" (bucketed GVT bucket sizes), MARGINS="8" (deadline policy:
 #     --agg-horizon-margin values, the horizon being W + margin),
-#   AGG="pp:64" (htram mode:buffer with the deadline policy, so the horizon
-#     follows the window; "off" sends directly), TREE=charades-qd,
-#   EXTRA_ARGS="+lci_ndevices 8" (appended to every run),
-#   CPT (cores per task for srun -c; default PEs per process), SRUN_ARGS
+#   AGG="pp:512" (htram mode:buffer with the deadline policy, so the horizon
+#     follows the window; "off" sends directly), TREE=charades-exp (production
+#     runtime with the psm2 LCI patch),
+#   XPORT=psm2 with LCI_ATTR_PACKET_SIZE=65536 (env.sh; XPORT=verbs for the old
+#     transport),
+#   EXTRA_ARGS="+lci_ndevices 16 +pemap 2-46:2,3-47:2" (appended to every run;
+#     the pemap puts each process's PEs on its own socket),
+#   CPT=24 (cores per task for srun -c), SRUN_ARGS
 #     (extra srun options, e.g. --cpu-bind=none with a +pemap in EXTRA_ARGS).
 # One CSV row per run; a run that hits CAP is cancelled with scancel (never
 # SIGKILL srun, which orphans the step) and recorded as status=stall.
 reps=${1:-2}
+export XPORT=${XPORT:-psm2}
+[ $XPORT = psm2 ] && export LCI_ATTR_PACKET_SIZE=${LCI_ATTR_PACKET_SIZE:-65536}
 source "$(dirname "$0")/env.sh"
-NODES=${NODES:-4} PPN=${PPN:-2} PEPP=${PEPP:-8} LPS_PER_PE=${LPS_PER_PE:-128} LPC=${LPC:-16}
-START=${START:-15} END=${END:-64000} CAP=${CAP:-180} TREE=${TREE:-charades-qd}
+NODES=${NODES:-4} PPN=${PPN:-2} PEPP=${PEPP:-23} CPT=${CPT:-24} LPS_PER_PE=${LPS_PER_PE:-128} LPC=${LPC:-16}
+START=${START:-15} END=${END:-64000} CAP=${CAP:-180} TREE=${TREE:-charades-exp}
 WORKLOADS=${WORKLOADS:-"steady:10:200:0.5 steady:100:1000:0.5 phases:10:200:100:1000:0.5:8000"}
 ARMS=${ARMS:-"w:25 w:50 w:100 w:250 w:500 q:0.02 q:0.05 q:0.1 hill:250"}
-AGG=${AGG:-pp:64} BUCKETS=${BUCKETS:-8} MARGINS=${MARGINS:-0}
-EXTRA_ARGS=${EXTRA_ARGS-"+lci_ndevices 8"}
+AGG=${AGG:-pp:512} BUCKETS=${BUCKETS:-8} MARGINS=${MARGINS:-8}
+EXTRA_ARGS=${EXTRA_ARGS-"+lci_ndevices 16 +pemap 2-46:2,3-47:2"}
 C=$WORK/$TREE
 out=${RUNS:-$WORK/charades-runs}/ctl_sweep; mkdir -p $out/logs; cd $out
 csv=${2:-$out/sweep_$(date +%Y%m%d_%H%M%S).csv}
@@ -71,7 +80,7 @@ run_one() {  # nodes procs pes cfg arm label
   local f=logs/$label.out kind=${arm%%:*} val=${arm##*:}
   local extra=() gvtcfg=bucket
   case $kind in
-    blk)  gvtcfg=blocking ;;
+    blk)  gvtcfg=blocking; extra+=(--buffer-size=655360) ;;  # the bucket config's pool (since 2026-10-22)
     w)    extra+=(--optimism-window=$val) ;;
     q)    extra+=(--ctl=1 --ctl-epsilon=$val) ;;
     qb)   extra+=(--ctl=1 --ctl-epsilon=$val --ctl-calibrate=0) ;;

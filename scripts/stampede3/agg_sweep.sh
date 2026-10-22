@@ -1,4 +1,7 @@
 #!/bin/bash
+# SUPERSEDED (2026-10-22): use ctl_sweep.sh, whose defaults are full nodes
+# (2 x 23 PEs, psm2, charades-exp). This script keeps the old 2 x 8 PE
+# layout on the Debug-runtime tree and is kept only to reproduce old runs.
 # Aggregation sweep on uniform PHOLD: remote events sent directly vs. through
 # htram, over htram's aggregation modes, buffer sizes and urgency, for each
 # GVT setup, remote fraction and node count. Needs a tree built with

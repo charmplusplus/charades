@@ -1,4 +1,7 @@
 #!/bin/bash
+# SUPERSEDED (2026-10-22): use ctl_sweep.sh, whose defaults are full nodes
+# (2 x 23 PEs, psm2, charades-exp). This script keeps the old 2 x 8 PE
+# layout on the Debug-runtime tree and is kept only to reproduce old runs.
 # Optimism-window sweep on Gaussian PHOLD: blocking GVT vs. bucketed GVT
 # without a window vs. bucketed GVT with windows, over sigma and node count.
 # Run on the idev master node of an allocation with at least max(NODES) nodes.
