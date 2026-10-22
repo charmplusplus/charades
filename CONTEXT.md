@@ -1209,6 +1209,36 @@ With all three on full nodes (2 runs each; ÷ W 250 at 56.9): W 175 0.93, W 350 
 
 **Profile with all three** (one process, DWARF stacks): about 8,300 cycles and 9,200 instructions per committed event (was 11,100 / 12,100; Devastator ~5,300 / 7,500). The AVL tree is gone; fossil collection is down to 6%; event execution is 26% of PE time (the model's forward work ~8%). What remains is mostly communication: LCI/libfabric progress 15%, sends through the node queue (`CkSendMsgNodeBranch` → `CldNodeEnqueue`, PP's node messages) 7%, `issueAm` 7.6%, mutexes 8% (libfabric CQ, node queue), Converse queue polling and TLS ~6%.
 
+### Runtime tuning (2026-10-21 night, idev job 3627274, 4 skx nodes)
+
+Code: charades 0a4c53a (fast paths on by default); `charades-prod` = production runtime; `charades-exp` = production runtime built from Reconverse branch `pads-runtime` (`$WORK/charm-pads-exp`). Scripts in `$WORK/charades-runs/`: `tune1.sh`, `session{1,2,3}.sh`, `tls_ab.sh`, `xport_try.sh`, `final_cmp.sh`, `pt_fix.sh`. Mac tests before: engine tier 508/508, change tier (old paths, --sched-park, all htram modes, ×3) 216/216.
+
+**Step 1, existing knobs re-swept** (full nodes, 2 × 23 PEs pinned, W 250; M committed events/s, median of 3; ÷ base PP 64 = 58.5):
+- htram PP buffer: **256 1.10, 512 1.18 (70.9 in session 2), 1024 1.08, 2048 1.12**; events per message 34 (64) → 80 (256) → 113 (512) → 145 (1024). At 64 PEs the buffer barely matters (high slack 27.0–27.5, low slack 19.0–19.5 for 64–1024).
+- WPs 64 1.06, WPs 256 0.98, **WW 64 0.36** (9 events per message).
+- `+lci_ndevices` 2: 0.91; 8: 0.99 (4 stays). Packet size 16 K, `+backend_poll_freq` 16/256, `--batch` 8/32/64: 0.97–1.02 (noise). `--gvt-wave-events` 64: 0.77, 256: 0.87 (128 stays).
+
+**Step 2, the transport:**
+- **Fewer pollers is slower.** `+backend_poll_thread` (every k-th PE polls; PP 512): k = 1 72.7, 2 70.6, 4 69.9, 6 62.3; k = 12 and 23 hung. Cause of the hang: `progress()` polls only the caller's own LCI device (threads are assigned to devices in blocks of 6), so for k past 6 some devices had no poller. **Fixed on Reconverse `pads-runtime`** (76f5a07, 78eedbf): the first thread of each device always polls (`comm_backend::threadMustPoll`); k = 12 and 23 then finish (66.5, 63.8), k = 1 unchanged (71.4–73.0). The earlier hang at k = 4 (before the fast paths) did not recur.
+- **psm2 is out of reach without LCI work.** LCI's `fi_getinfo` hints declare no mode bits, and native psm2 (`FI_PROTO_PSMX2`) requires `FI_CONTEXT`; so LCI gets `psm2;ofi_rxd`, which aborts at startup with "Invalid remote handler (rhandler: 4294967295)". With `FI_CONTEXT` declared, the native entries offer only 0 or 4 bytes of CQ data, and LCI puts the source rank in the upper 32 bits of 8. Using native psm2 needs LCI to pass an `fi_context` with every operation and to carry the rank another way. (Probe: `$WORK/charades-runs/fiprobe/probe.c`; a progress-mode patch to LCI, `lci-progress-unspec.patch`, was not the cause.)
+- **LCI's native ibv backend** (`LCI_ATTR_BACKEND=ibv LCI_ATTR_MAX_INJECT_SIZE=0 LCI_ATTR_IBV_TD_STRATEGY=none`) works across nodes but fails between two processes on one node ("Network completion failed for peer rank 1"), so only 1 process per node: 54.5–74.4, median 60.6, against verbs;ofi_rxm 2 × 23 at 66–72 (median 70). Not better.
+
+**Step 3, Reconverse:**
+- **TLS: compiling libreconverse with `-ftls-model=initial-exec`** (`pads-runtime` dda8c70; `__tls_get_addr` call sites 294 → 0): 6 interleaved pairs, 72.7 against 69.9 (+4.1%), faster in 6 of 6 (+1.0 to +6.8%).
+- `CcdRaiseCondition` per iteration is already cheap when no callbacks are registered (returns on an empty list); its cost was the TLS access. Nothing further taken.
+
+**Combined, same job as Devastator** (Charades: fast paths, TLS build, pinned, `+lci_ndevices 4`; PP 512 on full nodes, 256 at 64 PEs; Devastator at its best fixed W; M committed events/s, median of 3; Devastator ÷ Charades, lower is better):
+
+| | Charades | Devastator | gap |
+|---|---|---|---|
+| full nodes, 23,552 LPs | 72.2 | 104.3 | **1.45×** |
+| 64 cores, high slack | 27.4 | 53.9 | **1.97×** |
+| 64 cores, low slack | 19.4 | 52.7 | **2.72×** |
+
+From the start of the day on full nodes: 23.2 (Debug runtime) → 34.4 (production) → 43.9 (free core) → 45–46 (ndev 4) → 56–58 (fast paths) → 70 (PP 512) → 72–73 (TLS). The 64-core gaps shrink less: there the htram buffer does not matter and the runtime costs are a larger share.
+
+**Recommended launch** (Stampede3 skx, 4 nodes): `PPN=2 PEPP=23 CPT=24 AGG=pp:512 EXTRA_ARGS="+lci_ndevices 4 +pemap 2-46:2,3-47:2"`, TREE built on a Reconverse with the TLS change.
+
 ## Open issues
 
 1. **Event holding needs a realistic cutoff.** With the test configs'
