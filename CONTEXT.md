@@ -1237,7 +1237,42 @@ Code: charades 0a4c53a (fast paths on by default); `charades-prod` = production 
 
 From the start of the day on full nodes: 23.2 (Debug runtime) → 34.4 (production) → 43.9 (free core) → 45–46 (ndev 4) → 56–58 (fast paths) → 70 (PP 512) → 72–73 (TLS). The 64-core gaps shrink less: there the htram buffer does not matter and the runtime costs are a larger share.
 
-**Recommended launch** (Stampede3 skx, 4 nodes): `PPN=2 PEPP=23 CPT=24 AGG=pp:512 EXTRA_ARGS="+lci_ndevices 4 +pemap 2-46:2,3-47:2"`, TREE built on a Reconverse with the TLS change.
+**Recommended launch** (Stampede3 skx, 4 nodes): `PPN=2 PEPP=23 CPT=24 AGG=pp:512 EXTRA_ARGS="+lci_ndevices 4 +pemap 2-46:2,3-47:2"`, TREE built on a Reconverse with the TLS change. Superseded by native psm2, below.
+
+### Native psm2 through a patched LCI (2026-10-22, idev jobs 3628343 (2 nodes) and 3628358 (4 nodes))
+
+The step 2 diagnosis said psm2 needed LCI work; this is that work. **LCI branch `ofi-psm2-native`** (`~/lci_pr`, 45bc2faf on ca88ce2c, Reconverse's LCI pin; the same change on LCI master is 0d36acd1, branch `ofi-psm2-native-master`). On Stampede3 it is applied in place in `$WORK/charm-pads-exp/reconverse-linux-x86_64/_deps/lci-src` (patch `$WORK/charades-runs/lci-psm2.patch`), so `charades-exp` uses it. Four things kept LCI off native psm2:
+- psm2 requires `FI_CONTEXT`. LCI now offers `FI_CONTEXT | FI_CONTEXT2` and, when the provider requires either, wraps each operation's context in a provider-owned `fi_context2` slot (thread-cached) that also records the operation.
+- psm2 lists a variant with 0 bytes of CQ data first (its 64-bit tag layout). The hints now ask for 4 bytes.
+- 4 bytes of CQ data cannot carry LCI's `rank << 32 | imm`. With under 8 bytes, LCI re-queries the provider with `FI_SOURCE`, uses an `FI_AV_TABLE` (fi_addr = rank), reads completions with `fi_cq_readfrom`, and sends the immediate alone.
+- psm2 completes a receive with `FI_REMOTE_CQ_DATA` alone, without `FI_RECV`, so LCI misread receives as reads (segfault) or remote writes ("Unknown matching policy"). With wrapped contexts, completions are now classified by the recorded operation.
+
+Providers that need none of this (verbs;ofi_rxm, tcp, cxi) keep the old paths. LCI ctest over ofi tcp on the Mac (master branch, warnings as errors): 25/25. Charades: `XPORT=psm2` in `scripts/stampede3/env.sh` selects psm2 with the system libfabric (the 2.7.0 build has no psm2 provider). Every run on either transport committed the same number of events.
+
+**Settings** (one run each unless noted; M committed events/s, higher is better):
+- **LCI packet size is the lever.** At 2 nodes, full nodes, 4 devices: psm2 with the 8 KB default 37.2 (3 interleaved runs: 37.3–37.6, against verbs 39.3–42.9), 16 KB 41.3, 32 KB 42.1, **64 KB 54.9–56.3**, 128 KB 51.7; verbs 40.6–43.8 at 8, 32 or 64 KB. An htram PP 512 message carries about 136 events (~10 KB); above the packet size LCI uses its rendezvous, a write with immediate data, which psm2 emulates in software.
+- **More LCI devices help psm2 and not verbs.** At 4 nodes, 64 KB packets, full nodes: 4 devices 92.7, 8 97.5, 12 105.2, **16 109.2**, 23 108.8 (verbs 71.7, 72.2, 69.2 at 4, 8, 12). 2 × 8 PEs: 2, 4, 8 devices 41.4, 44.5, **48.7** (high slack), 27.1, 31.7, **37.6** (low slack); verbs 27.5 and 26.7, 19.4 and 19.0 at 4 and 8.
+- No effect: `PSM2_RCVTHREAD=0`. Worse: htram PP 1024 (51.9), 256 (56.3, against 54.9 for 512, within noise at 2 nodes).
+
+**Same job as Devastator** (`final_cmp2.sh`; Charades: everything above, verbs at 4 devices and 8 KB packets, psm2 at 64 KB packets with 16 devices on full nodes and 8 at 64 cores; Devastator at its best fixed W; M committed events/s, median of 3 interleaved; Devastator ÷ Charades psm2, lower is better):
+
+| | Charades verbs | Charades psm2 | psm2 ÷ verbs | Devastator | gap (was) |
+|---|---|---|---|---|---|
+| full nodes, 23,552 LPs | 71.9 (71.2–75.1) | 107.6 (107.0–108.5) | 1.50× | 104.2 | **0.97×** (1.45×) |
+| 64 cores, high slack | 27.1 (25.8–28.0) | 48.3 (48.3–48.8) | 1.79× | 53.8 | **1.11×** (1.97×) |
+| 64 cores, low slack | 19.0 (19.0–19.4) | 37.7 (37.6–37.8) | 1.98× | 52.4 | **1.39×** (2.72×) |
+
+Devastator runs on psm2 through GASNet-EX, so it already had this transport; most of the remaining gap was the transport.
+
+**The controller on psm2** (same job, `ctl_psm2.sh`, one run each; M committed events/s; ÷ best fixed W, higher is better):
+
+| | best fixed W | controller ε 0.003 | hill climb | worst fixed W tried |
+|---|---|---|---|---|
+| full nodes | 106.9 (W 250) | 92.9 (mean W 358), **0.87** | 32.3, 0.30 | 7.2 (W 1000), 0.07 |
+| 64 cores, high slack | 48.5 (W 250) | 44.6 (mean W 299), **0.92** | 12.8, 0.26 | 17.1 (W 1000), 0.35 |
+| 64 cores, low slack | 37.3 (W 50) | 35.5 (mean W 56), **0.95** | 9.1, 0.24 | 13.5 (W 250), 0.36 |
+
+Same picture as on verbs (0.87–0.95 of the best fixed W; no single W is safe everywhere; the hill climb trails at 0.24–0.30). **Recommended launch now:** `XPORT=psm2 LCI_ATTR_PACKET_SIZE=65536 PPN=2 PEPP=23 CPT=24 AGG=pp:512 EXTRA_ARGS="+lci_ndevices 16 +pemap 2-46:2,3-47:2"` (at 8 PEs per process: `+lci_ndevices 8`, PP 256), on `charades-exp`.
 
 ## Open issues
 
