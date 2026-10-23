@@ -1692,6 +1692,41 @@ These reproduce job 3628935 (46.1 and 38.1; 1.08) within 1–2%.
 - The cross-engine story is better than at 2 × 8: parity or better against Devastator's best fixed W in the remote-heavy regime, and an order of magnitude against its adaptive window there.
 - The full-node htram high-slack gap (0.84–0.87) is now the controller's weakest result, and it is in the workloads the paper leads with. Fixing it (a rollback-cost-aware target, or calibrating on GVT-limiting rollbacks) is the next controller task.
 
+### Controller level, `--agg-scope`, σ 100 profile (design, 2026-10-23; written before any runs)
+
+**Why.** Two gaps remain on full nodes (Charades' speedup; higher is better for Charades):
+- The controller with htram at high slack: 0.84–0.87 of the best fixed W.
+- Best fixed W ÷ Devastator's best fixed W where traffic is local: 0.63–0.88.
+
+**Stage A, level or dynamics.** In the full-node sweep, throughput peaks sharply at W 250: W 100 reaches 0.52–0.58 of it and W 500 0.68–0.84. The controller settles at a mean W of 337–381. If a fixed W at that mean is as slow as the controller, the controller's target (ε 0.001) is set too permissively on full nodes. If the fixed W is faster, the problem is how W moves between waves.
+- Workloads: high slack (lookahead 100, mean 1,000, end 512,000) at σ 100, σ 2,000 and uniform remote 1.0.
+- Arms, htram PP 512: fixed W 200, 250, 300, 350, 400; controller at ε 0.001 (the default), 0.0005 and 0.0003.
+- 3 reps, interleaved.
+
+**Stage B, `--agg-scope`.** With `--agg-scope=1`, events to PEs in the same process go as direct Charm++ messages and only events to other processes go through htram. Estimated shares of events by destination, Gaussian over LP ids with 128 LPs per PE, 23 PEs per process, 2 processes per node:
+
+| σ | leave their PE | leave their process | leave their node |
+|---|---|---|---|
+| 100 | 55% | 2.7% | 1.3% |
+| 500 | 90% | 13.5% | 6.7% |
+| 1,000 | 95% | 27% | 14% |
+| 2,000 | 97% | 50% | 27% |
+| 4,000 | 99% | 72% | 50% |
+
+Where Charades loses to Devastator (σ ≤ 1,000), most traffic stays in the process. There, Devastator does a lock-free queue insert and Charades goes through htram.
+- Workloads: high-slack σ 100 and 2,000 at W 250; low-slack σ 500 at W 50.
+- Arms: scope 0 against 1, plus direct sends.
+- 3 reps, interleaved.
+
+**Stage C, profile at σ 100.** perf on node 0 for Charades (W 250, PP 512, end 4,096,000, so that the run outlasts the sample) and Devastator (W 1,000). Collected: counters, LBR call stacks, and one DWARF capture of one Charades process.
+
+**Predictions:**
+- A1. A fixed W at the controller's mean (300–400) runs within 5% of the controller, so the problem is the target, not the dynamics.
+- A2. On the finer grid the best fixed W is 200–300, and W 250 stays within 5% of it.
+- A3. ε 0.0005 brings the mean W to 250–300 and the controller to 0.92–0.97 of the best fixed W. ε 0.0003 overshoots at σ 100, falling below W 200.
+- B1. At σ 100, `--agg-scope=1` reaches ≤ 0.6 of scope 0. Same-process Charm++ messages are the expensive part, since htram over direct is 2.27× at σ 100, where 1.3% of events leave the node. At σ 2,000 scope 1 reaches 0.7–0.9, and at low-slack σ 500 ≤ 0.6.
+- C1. At σ 100, same-process delivery takes ≥ 25% of Charades' PE time: htram insert, inbox drain and its mutex, the node queue and per-PE messages. LCI and libfabric progress take < 10%. Cycles per committed event: Charades 1.4–1.7× Devastator.
+
 ## Open issues
 
 1. **Event holding needs a realistic cutoff.** With the test configs'
