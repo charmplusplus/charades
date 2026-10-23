@@ -1,16 +1,27 @@
 include ../../src/config.mk
 
-CFLAGS := -O2 -g
-LIBDIR := ../../src/build/
+# -module is a charmc option, so the model always builds with charmc.
+CC=$(CHARMC)
+
+OBJS = dragonfly.o router.o terminal.o
+# The statistics group is a Charm++ module, linked with -module
+STATS_LIB = libmoduledragonfly_stats.a
 
 all: dragonfly
-
-dragonfly.o: dragonfly.C $(LIBDIR)/libcharades.a
-	$(CHARMC) $(CFLAGS) $(OPTIONS) $(OPTS) dragonfly.C -c -o dragonfly.o
-
-dragonfly: dragonfly.o $(LIBDIR)/libcharades.a
-	$(CHARMC) $(CFLAGS) $(OPTIONS) $(OPTS) dragonfly.o -o $@ $(LDFLAGS) -L$(LIBDIR) -lcharades
-
 clean:
-	rm -f dragonfly
-	rm -f *.o *~ core*
+	rm -f dragonfly charmrun $(STATS_LIB)
+	rm -f *.o *.d *~ core* *.decl.h *.def.h
+	rm -f output ross.csv
+
+dragonfly_stats.decl.h: dragonfly_stats.ci
+	$(CHARMC) $<
+
+stats.o: dragonfly_stats.decl.h
+
+$(STATS_LIB): stats.o
+	$(CHARMC) stats.o -o $@
+
+dragonfly: $(OBJS) $(STATS_LIB) $(BUILD_DIR)/libcharades.a
+	$(CHARMC) $(CFLAGS) $(OPTIONS) $(OPTS) $(OBJS) -o dragonfly $(LDFLAGS) -L. -module dragonfly_stats -L$(BUILD_DIR) -lcharades
+
+include ../../src/model.mk

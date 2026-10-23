@@ -1,0 +1,24 @@
+# As base, but worst-case traffic (every terminal sends to the next group)
+# with non-minimal routing through a random intermediate group
+routers-per-group=4
+global-channels=2
+terminals-per-router=2
+traffic=2
+routing=1
+arrive-rate=200
+# end-time stops the run at 3 us, while packets are still in flight (the
+# processes inject for ~3.2 us and the network drains by ~4-6 us). This works
+# around an engine race: when every event drains before end-time, a process
+# can finalize (and report its committed count) before it has applied the
+# last bucketed-GVT advance, so runs across processes intermittently commit
+# too few events and the other process then waits forever. The model
+# statistics still match; traffic does the same when all its cars arrive
+# before end-time.
+end-time=3000000
+lookahead=100
+# Bucketed GVT: 1 ns buckets. The default (8 units) is 8 ps here, and
+# bucket_hold then holds nearly every remote event for thousands of buckets
+# (base at 4 PEs: 75% done after 180 s; 0.5 s with 1 ns buckets)
+gvt-bucket-size=1000
+buffer-size=65536
+expected-events=278966

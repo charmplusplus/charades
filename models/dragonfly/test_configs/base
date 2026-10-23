@@ -1,0 +1,26 @@
+# 9 groups of 4 routers (2 global channels and 2 terminals per router): 36
+# routers, 72 terminals and 72 MPI processes, one router (with its terminals
+# and processes) per chare. Uniform random traffic, minimal routing; each
+# process sends 3000 / 200 = 15 one-packet messages. Time is in ps.
+routers-per-group=4
+global-channels=2
+terminals-per-router=2
+traffic=1
+routing=0
+arrive-rate=200
+# end-time stops the run at 3 us, while packets are still in flight (the
+# processes inject for ~3.2 us and the network drains by ~4-6 us). This works
+# around an engine race: when every event drains before end-time, a process
+# can finalize (and report its committed count) before it has applied the
+# last bucketed-GVT advance, so runs across processes intermittently commit
+# too few events and the other process then waits forever. The model
+# statistics still match; traffic does the same when all its cars arrive
+# before end-time.
+end-time=3000000
+lookahead=100
+# Bucketed GVT: 1 ns buckets. The default (8 units) is 8 ps here, and
+# bucket_hold then holds nearly every remote event for thousands of buckets
+# (base at 4 PEs: 75% done after 180 s; 0.5 s with 1 ns buckets)
+gvt-bucket-size=1000
+buffer-size=65536
+expected-events=206031
