@@ -68,6 +68,12 @@ int main(int argc, char** argv) {
   if (g_tw_lookahead > MIN_DELAY) {
     CkAbort("Dragonfly: lookahead must be at most 100 (0.1 ns, the smallest delay)\n");
   }
+  if (g_tw_gvt_scheme == 4 && g_tw_gvt_bucket_size < 1000 && CkMyPe() == 0) {
+    CkPrintf("WARNING: Dragonfly time is in ps; --gvt-bucket-size=%u is %.3f ns. "
+             "Use about 1000 (1 ns): small buckets hold remote events for "
+             "thousands of buckets and the run crawls (see dragonfly.h)\n",
+             g_tw_gvt_bucket_size, g_tw_gvt_bucket_size / 1000.0);
+  }
 
   g_num_packets = MESSAGE_SIZE / PACKET_SIZE;
   g_num_chunks = PACKET_SIZE / CHUNK_SIZE;

@@ -1844,7 +1844,7 @@ A build mistake, fixed before any run used it: the new tree's copied `config.mk`
 3. Load balancing / migration never run on Reconverse or with several PEs per
    process; anti-message lookup trees draw nodes from a per-PE pool, flagged in
    the code as a migration problem. The paper runs with LB off.
-4. Dragonfly and PCS still use the pre-2019 `ross_api.h` and don't build.
+4. PCS still uses the pre-2019 `ross_api.h` and doesn't build. Dragonfly was ported 2026-10-23 (merge 4c88814): time is integer ps, so under the bucketed GVT it needs `--gvt-bucket-size=1000` (1 ns; the default 8 is 8 ps and the run crawls). Its test configs set this, and a smaller bucket prints a warning. Every cross-LP message fits htram's 24 B slot.
    Traffic builds but has no test configs.
 5. **Unthrottled bucketed GVT is unstable in the remote-heavy regime**
    (σ = 2000, 2 × 8 PEs): a rollback storm that never settles (see "First
@@ -2077,4 +2077,4 @@ What the sweep changes in the claim:
    - open issue 7;
    - 8 nodes and PPN 1 against 2;
    - units in the older tables of this file.
-8. Dragonfly port when needed.
+8. Dragonfly port: done 2026-10-23 (see open issue 4). Next: performance runs on Stampede3 after the controller work, with `--gvt-bucket-size=1000`.

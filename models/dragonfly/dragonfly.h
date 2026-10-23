@@ -30,6 +30,12 @@
  * event is ever scheduled with zero delay. --lookahead must not exceed
  * MIN_DELAY (checked at startup), so the conservative scheduler can run it.
  *
+ * GVT buckets: under the bucketed GVT, set --gvt-bucket-size to about 1 ns
+ * (1000). The engine's default of 8 units is 8 ps here, and bucket_hold then
+ * holds nearly every remote event for thousands of buckets (base at 4 PEs:
+ * 75% done after 180 s, against 0.5 s with 1 ns buckets). The test configs
+ * set 1000, and a smaller bucket gets a warning at startup.
+ *
  * Message sizes (sizeof, see the static_asserts in dragonfly.C): every
  * message that can go to another LP (generate, router arrival, terminal
  * arrival, credit) fits the 24-byte htram payload slot (PDES_PAYLOAD_BYTES).
