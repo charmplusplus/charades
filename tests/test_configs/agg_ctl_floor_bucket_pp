@@ -14,3 +14,5 @@ ctl=1
 ctl-epsilon=0.003
 ctl-reduction=1
 ctl-floor=1
+# The waste bound alone (no aggregation bound)
+ctl-agg-kappa=0

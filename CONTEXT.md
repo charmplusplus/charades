@@ -254,9 +254,10 @@ node takes the job's `SLURM_*` variables from idev's environment file so
 
 Results behind each step are in `RESULTS.md` ("Current numbers" at the top). The list as of 2026-10-21 is kept there as "Plan history".
 
-1. **Controller: a target that prices a rollback's indirect cost.** The open problem: 0.84–0.87 of the best fixed W with htram at high slack, the headline workloads. No single ε suits every regime, and PE time misses most of a rollback's cost (GVT held back). Write the design and predictions in `RESULTS.md` before any run. Alongside:
-   - the histogram on every 32nd wave (free in long runs);
-   - find the controller's remaining 2–3% per-event cost.
+1. **Controller.** Done in part (job 3633379). With htram, a wider window costs aggregation before rollbacks. The new default bound on remote sends inside the window (`--ctl-agg-kappa=0.20`), sparse controller waves and the histogram every 32nd wave raise the worst case from 0.84 to 0.94 of the best fixed W, with no workload worse (`RESULTS.md`). Still open:
+   - κ is one constant. Long delays want about 0.17 and short ones about 0.22; a κ that adapts would close the last 6% at lookahead 100.
+   - The start: α from 1 holds W low for the first rounds; starting it lower hurt traffic.
+   - Test κ on dragonfly, a model it was not fitted to.
 2. **Paper-grade 4-node comparison, one allocation:**
    - Devastator with `--rng=clcg4`;
    - ROSS on full nodes, tuned (batch × GVT interval; it has not been rerun since the Debug-runtime days);

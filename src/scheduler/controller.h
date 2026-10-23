@@ -130,7 +130,8 @@ class Controller : public CBase_Controller {
     double kappa;
     double q;                    ///< last quantile the rule asked for
     int rounds;
-    int agg_rounds;              ///< rounds in which --ctl-agg-kappa set W
+    int folds;                   ///< rounds with new delays, which recompute W
+    int agg_rounds;              ///< of those, the ones in which --ctl-agg-kappa set W
     double run_executed, run_stragglers, run_late, run_held;  ///< over every round, for the summary
     Time window;
     /** Time-weighted mean W, from the first round on */

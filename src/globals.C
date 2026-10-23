@@ -145,13 +145,18 @@ void clear_globals() {
   g_tw_ctl_floor          = 2;
   g_tw_ctl_alpha_gain     = 0.25;
   g_tw_ctl_alpha_init     = 1;
-  g_tw_ctl_agg_kappa      = 0;
-  g_tw_ctl_sparse_waves   = 0;
+  // With htram's deadline policy, a wider window costs aggregation before it
+  // costs rollbacks. kappa 0.20 with sparse waves and the histogram every
+  // 32nd wave: 0.94-1.11 of the best fixed window over 10 htram workloads,
+  // against 0.84-1.08 for the waste bound alone; unchanged with direct sends
+  // (4 nodes, full nodes, job 3633379; RESULTS.md)
+  g_tw_ctl_agg_kappa      = 0.20;
+  g_tw_ctl_sparse_waves   = 1;
   g_tw_ctl_interval       = 8;
   g_tw_ctl_dry            = 0;
   g_tw_ctl_log            = 0;
   g_tw_ctl_reduction      = 1;
-  g_tw_ctl_hist_waves     = 8;
+  g_tw_ctl_hist_waves     = 32;
   g_tw_ctl_hist_coarse    = 0;
   g_tw_async_reduction = 0;
   g_tw_reserve_threshold = 1.0;

@@ -40,12 +40,12 @@ Full nodes (4 Stampede3 skx nodes, 2 processes × 23 PEs per node, 184 PEs, 128 
 
 | policy | where | ratio |
 |---|---|---|
-| Charades controller, htram | high-slack σ sweep | 0.84–0.87 |
-| | low slack | 0.92–0.96 |
-| | phase-changing PHOLD | 1.04, 1.08 |
-| | traffic | 0.90–0.97 |
-| Charades controller, direct sends | σ sweep | 0.96–1.02 |
-| Charades controller, 15 s runs, ε 0.0003 + coarse histogram every 32nd wave | high slack, htram | 0.93–0.98 |
+| Charades controller (revised default, job 3633379), htram | lookahead 100, mean 1,000 (σ 100, σ 2,000, uniform) | 0.94 (15 s runs: 0.95–0.98) |
+| | lookahead 10, mean 200 | 0.97–0.98 |
+| | phase-changing PHOLD | 1.02, 1.11 |
+| | traffic | 0.98–1.01 |
+| Charades controller (revised), direct sends | lookahead 100 and 10 | 0.97–0.98 |
+| Charades controller before 2026-10-23 (job 3629781), htram | lookahead 100 / lookahead 10 / phases / traffic | 0.84–0.87 / 0.92–0.96 / 1.04, 1.08 / 0.90–0.97 |
 | Charades hill climb (Devastator's rule), htram | σ sweep | 0.17–0.50 |
 | Devastator's own adaptive window | σ ≤ 500, both slack levels | 0.64–0.81 |
 | | σ ≥ 1,000, both slack levels | 0.06–0.28 (stalls) |
@@ -102,6 +102,7 @@ Charades' controller ÷ Devastator's adaptive window: 0.68–1.03 at σ ≤ 500 
 | 37 | 2026-10-23 | — | Controller level, `--agg-scope`, σ 100 profile | design |
 | 38 | 2026-10-23 | 3632385 | Controller level, `--agg-scope`, σ 100 profile, results | current |
 | 39 | 2026-10-23 | — | Controller: an aggregation bound, cheaper bookkeeping, a faster start | design |
+| 40 | 2026-10-23 | 3633379 | Controller: an aggregation bound, cheaper bookkeeping, a faster start, results | current |
 
 ## Stampede3 runs, in order
 
@@ -2000,6 +2001,110 @@ With direct sends it is fine (0.96–1.02), and it leads every fixed W on phase-
 - If κ helps at high slack but costs at low slack (or the reverse), the quantile that suits each differs, and κ needs a model of how aggregation cost scales with the delay distribution rather than a constant.
 - If the full proposal loses on phases at remote 0.5, scaling by 1/r is wrong for mixed self/remote traffic.
 - Dragonfly, run after this, tests κ on a model it was not fitted to.
+
+### Controller: an aggregation bound, cheaper bookkeeping, a faster start, results (2026-10-23, idev job 3633379, 4 skx nodes)
+
+> **Status: current.** The revised controller tested here (κ 0.20, sparse waves, histogram every 32nd wave) is the default since these runs.
+
+**Runs.** Scripts in `$WORK/charades-runs/`, run back to back in one allocation; CSVs in `ctl2/` (copied to `~/charades-data/ctl2/`, summaries by `summ.py` there):
+- `ctl2.sh`: every designed arm, 3 reps, then 15 s runs (end 4,096,000), 2 reps.
+- `ctl2b.sh`: perf of the controller's cost, then κ 0.20 with and without a lower starting α, 3 reps.
+- `ctl2c.sh`: the controller's cost with sparse waves (new option, 9063017), then the revised controller against the old one on every htram group, 3 reps.
+- `ctl2d.sh`: the revised controller with direct sends (3 reps) and in 15 s runs (2 reps).
+
+Builds:
+- Old: `charades-exp` (fe3a4ac, the controller as shipped).
+- New: `charades-ctl` at 7ad0f97, plus the sparse-waves patch for `ctl2c` and `ctl2d`.
+
+Setup: full nodes (2 × 23 PEs per node), htram PP 512 unless noted. Workloads:
+- PHOLD with lookahead 100 and mean delay 1,000 (end 512,000), or lookahead 10 and mean delay 200 (end 128,000);
+- phase-changing PHOLD (end 256,000);
+- traffic 128 × 184 (end 512,000).
+
+No run failed or stalled. Ratios are median rate ÷ the median rate of the best fixed W in the same workload and script; higher is better. Mean W in parentheses.
+
+**1. The designed arms** (`ctl2.sh`):
+
+| workload (htram) | best fixed W (M ev/s) | old controller | new build, κ off | κ 0.13 | κ 0.17 | κ 0.22 | full proposal (κ 0.17, histogram every 32nd wave, α from 0.003) | controller computing, W pinned at the best W |
+|---|---|---|---|---|---|---|---|---|
+| lookahead 100, mean 1,000, σ 100 | 122.1 (W 250) | 0.84 (346) | 0.84 | 0.90 (232) | 0.95 (276) | 0.89 (333) | **0.97** (280) | 0.94 |
+| σ 2,000 | 108.8 (250) | 0.87 (339) | 0.87 | 0.88 (223) | 0.93 (264) | 0.91 (318) | **0.97** (268) | 0.93 |
+| uniform remote 1.0 | 105.1 (250) | 0.81 (383) | 0.80 | 0.86 (222) | 0.91 (264) | 0.88 (317) | **0.94** (267) | 0.90 |
+| lookahead 10, mean 200, σ 500 | 97.5 (50) | 0.93 (56) | 0.94 | 0.83 (37) | 0.90 (46) | **0.95** (57) | 0.93 (46) | 0.95 |
+| σ 2,000 | 84.6 (50) | 0.93 (56) | 0.95 | 0.80 (37) | 0.91 (45) | **0.97** (57) | 0.93 (46) | 0.94 |
+| uniform remote 1.0 | 69.1 (50) | 0.95 (54) | 0.97 | 0.84 (37) | 0.89 (45) | **0.97** (54) | 0.93 (46) | 0.96 |
+| phase-changing, remote 0.5 | 79.9 (100) | 1.02 (120) | 1.03 | 1.07 (108) | 1.04 (118) | 1.01 (118) | 1.05 (126) | 0.96 |
+| phase-changing, remote 1.0 | 60.4 (100) | 1.12 (96) | 1.10 | 0.98 (59) | 1.07 (73) | 1.13 (91) | 1.07 (78) | 0.98 |
+| traffic, congested | 52.5 (250) | 0.94 (253) | 0.96 | 0.96 | 0.94 | 0.94 | **0.86** (488) | 0.89 |
+| traffic, uniform | 103.5 (500) | 0.96 (464) | 0.97 | 0.99 | 0.98 | 0.98 | **0.92** (799) | 0.94 |
+
+The same with direct sends (κ does not apply): old 0.98, 0.98, 0.98; full proposal 0.99, 0.98, 1.00 (lookahead 100 σ 2,000 and uniform; lookahead 10 uniform).
+
+How often κ set W (κ 0.17): 97–98.5% of updates on PHOLD at remote 1.0, 10% on phase-changing PHOLD at remote 0.5, none on traffic.
+
+15 s runs (÷ fixed W 250 in the same runs): old 0.84, 0.86, 0.89; full proposal 0.95, 0.99, 0.98 (σ 100, σ 2,000, uniform).
+
+**2. What the controller's machinery costs.**
+- **Gating the timers changed nothing** (the "new build, κ off" column matches the old controller).
+- **perf** (fixed W 250 against the same with the controller computing, σ 2,000, end 4,096,000; node 0):
+  - 111.9 against 105.1 M ev/s (0.94); about 6% more cycles per committed event.
+  - The controller's own code is about 1%: the delay histogram 0.33%, the window computation 0.16%, allocation and reduction sends about 0.5%.
+  - The rest is spread over what PEs do while waiting: network progress +0.7 points (self), htram's deadline flushes +0.5, idle flushes, queue polling. So the count waves had slowed.
+- **Sparse waves** (`--ctl-sparse-waves=1`, 9063017): the counters ride only on the wave that ends a round. Controller computing with W pinned at 250, ÷ fixed W 250:
+
+| | σ 100 | σ 2,000 | uniform |
+|---|---|---|---|
+| counters every wave, histogram every 8th (before) | 0.95 | 0.95 | 0.94 |
+| sparse waves, histogram every 8th | 0.96 | 0.95 | 0.95 |
+| sparse waves, histogram every 32nd | 0.96 | 0.98 | 0.98 |
+
+**3. κ 0.20, with the histogram every 32nd wave** (`ctl2b.sh`; with and without α starting at 0.006):
+
+| workload (htram) | κ 0.20 | κ 0.20, α from 0.006 |
+|---|---|---|
+| lookahead 100, mean 1,000: σ 100, σ 2,000, uniform | 0.91, 0.92, 0.92 (W 283–296) | 0.96, 0.94, 0.92 |
+| lookahead 10, mean 200: σ 500, σ 2,000, uniform | 0.96, 0.98, 0.98 (W 50–51) | 0.97, 0.96, 0.99 |
+| phase-changing, remote 0.5 / 1.0 | 0.98 / 1.11 | 1.00 / 1.14 |
+| traffic, congested / uniform | 0.97 / 1.00 | 0.94 / 0.98 |
+
+**4. The revised controller** (κ 0.20, sparse waves, histogram every 32nd wave; α from 1), same-job comparison with the old one (`ctl2c.sh`, `ctl2d.sh`):
+
+| workload | best fixed W (M ev/s) | old controller | revised controller |
+|---|---|---|---|
+| htram, lookahead 100, mean 1,000, σ 100 | 121.6 (W 250) | 0.84 (W 350) | **0.94** (298) |
+| σ 2,000 | 108.0 (300) | 0.88 (342) | **0.94** (285) |
+| uniform remote 1.0 | 102.7 (250) | 0.84 (370) | **0.94** (283) |
+| htram, lookahead 10, mean 200, σ 500 | 97.4 (50) | 0.94 (55) | **0.98** (51) |
+| σ 2,000 | 82.6 (50) | 0.96 (56) | 0.97 (50) |
+| uniform remote 1.0 | 68.2 (50) | 0.94 (53) | **0.98** (51) |
+| htram, phase-changing, remote 0.5 | 80.7 (100) | 1.02 (117) | 1.02 (117) |
+| remote 1.0 | 61.1 (100) | 1.08 (96) | **1.11** (87) |
+| htram, traffic congested | 52.5 (250) | 0.93 (250) | **0.98** (238) |
+| traffic uniform | 102.5 (500) | 0.98 (464) | **1.01** (440) |
+| direct, lookahead 100, σ 2,000 | 33.8 (500) | 0.98 | 0.98 |
+| direct, uniform remote 1.0 | 25.2 (500) | 0.97 | 0.97 |
+| direct, lookahead 10, σ 500 | 40.4 (50) | 0.98 | 0.98 |
+| direct, lookahead 10, uniform | 25.0 (100) | 0.97 | 0.98 |
+
+15 s runs (÷ fixed W 250 in the same runs): **0.95, 0.98, 0.97** (σ 100, σ 2,000, uniform; W 299–314), against 0.84–0.89 for the old controller earlier in the job.
+
+The revised controller is at least as good as the old one in all 14 workloads. Its worst case rises from 0.84 to 0.94 of the best fixed W.
+
+**Predictions:**
+- P1. **Wrong.** Gating the timers did nothing; the cost was slower count waves. Sparse waves with the histogram every 32nd wave cut it to 2–4%.
+- P2. **Partly wrong.** κ 0.17 reached 0.91–0.95 with lookahead 100 (≥ 0.95 in 1 of 3) and 0.89–0.91 with lookahead 10. κ 0.13 fell to 0.80–0.90. A too-small window costs more with short delays. With short delays the best κ is about 0.22; with long ones about 0.17.
+- P3. Right for lookahead 100 (0.94–0.97; 0.95–0.99 in 15 s runs), phases (1.05, 1.07) and direct sends. **Wrong for lookahead 10** (0.93, not 0.95–1.0) **and traffic** (0.86 and 0.92, not within 2%). The low starting α left traffic's window at 488–799 while α climbed back. Dropping it, and κ 0.20, fixed both.
+- P4. Right: mean W with κ 0.17 was 264–280 (lookahead 100) and 45–46 (lookahead 10).
+- P5. Right: κ set W in 97–98.5% of updates on PHOLD at remote 1.0 and in none on traffic.
+
+**What this means:**
+- **Aggregation, not waste, limits the window with htram.** A bound on how many remote sends per executed event fall inside the window takes the controller from 0.81–0.88 to 0.94 of the best fixed W with long delays, and helps every other htram workload.
+- **κ 0.20 is a compromise.** With long delays it holds W at about 285 against a best of 250 (0.94). With short delays it holds W at 50, the best. A κ that adapts to how aggregation cost grows with W would close the remaining 6%.
+- **Not adopted:**
+  - The lower starting α helps with long delays and hurts traffic.
+  - Warm start and W damping were already dropped.
+  - Time spent in the first rounds remains a cost in short runs.
+- **Defaults since these runs** (charades, after 9063017): `--ctl-agg-kappa=0.20`, `--ctl-sparse-waves=1`, `--ctl-hist-waves=32`. The old paths stay covered by the test configs `agg_ctl_floor_bucket_pp` (κ off) and `ctl_quantile_shared` (counters every wave). The finalize report now counts how often κ set W per update, not per round: with the histogram every 32nd wave, only one round in four recomputes W.
 
 ## Baseline verification on the Mac
 

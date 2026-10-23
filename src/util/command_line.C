@@ -52,13 +52,13 @@ void parse_command_line(int argc, char** argv) {
   kernel.register_argument("ctl-floor",            "Delay quantile rule: calibrate only on the rollbacks of stragglers the window can cause - NO=0, leave out stragglers sent with a delay of at least the window=1, also those htram held (not due when sent)=2 (default)", g_tw_ctl_floor);
   kernel.register_argument("ctl-alpha-gain",       "Delay quantile rule: share of the way (in log) the calibration moves per fold, at most 1.25x (default 0.25)", g_tw_ctl_alpha_gain);
   kernel.register_argument("ctl-alpha-init",       "Delay quantile rule: starting value of the calibration alpha (default 1)", g_tw_ctl_alpha_init);
-  kernel.register_argument("ctl-agg-kappa",        "Delay quantile rule with htram's deadline policy: at most this many remote sends per executed event with a delay inside the window, W = F^-1(min(kappa / r, ...)) (default 0 = off)", g_tw_ctl_agg_kappa);
-  kernel.register_argument("ctl-sparse-waves",     "With --ctl-reduction=1: the controller's counters (and histogram) ride only on the count wave that ends a round, not on every wave - NO=0 (default), YES=1", g_tw_ctl_sparse_waves);
+  kernel.register_argument("ctl-agg-kappa",        "Delay quantile rule with htram's deadline policy: at most this many remote sends per executed event with a delay inside the window, W = F^-1(min(kappa / r, ...)) (default 0.20; 0 = off)", g_tw_ctl_agg_kappa);
+  kernel.register_argument("ctl-sparse-waves",     "With --ctl-reduction=1: the controller's counters (and histogram) ride only on the count wave that ends a round, not on every wave - NO=0, YES=1 (default)", g_tw_ctl_sparse_waves);
   kernel.register_argument("ctl-interval",         "Controller round: count waves under the bucketed GVT (shared reduction), else GVT updates; at least 1", g_tw_ctl_interval);
   kernel.register_argument("ctl-dry",              "Run the controller but keep the window fixed (measures its cost) - NO=0, YES=1", g_tw_ctl_dry);
   kernel.register_argument("ctl-log",              "Print every controller round - NO=0, YES=1", g_tw_ctl_log);
   kernel.register_argument("ctl-reduction",        "Controller data - OWN REDUCTION=0, ON THE BUCKETED GVT'S COUNT WAVES=1 (default; other GVTs use their own)", g_tw_ctl_reduction);
-  kernel.register_argument("ctl-hist-waves",       "With --ctl-reduction=1: the delay histogram rides on every Nth count wave (at least 1)", g_tw_ctl_hist_waves);
+  kernel.register_argument("ctl-hist-waves",       "With --ctl-reduction=1: the delay histogram rides on every Nth count wave (at least 1; default 32)", g_tw_ctl_hist_waves);
   kernel.register_argument("ctl-hist-coarse",      "With --ctl-reduction=1: one histogram bin per power of two instead of eight - NO=0 (default), YES=1", g_tw_ctl_hist_coarse);
   kernel.register_argument("gvt-async-reduction",  "Use asynchronous reductions in GVT - NO=0, YES=1", g_tw_async_reduction);
   kernel.register_argument("ldb-interval",         "Number of GVT computations between each LB call", g_tw_ldb_interval);

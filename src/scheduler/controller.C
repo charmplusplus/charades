@@ -59,7 +59,11 @@ void ctl_gvt_done() {
 
 /**
  * The default under the bucketed GVT: it controls as well as the separate
- * reduction at about the same cost (4 nodes, histogram every 8th wave). The
+ * reduction at about the same cost (4 nodes, histogram every 8th wave). On
+ * full nodes the waves themselves cost: since job 3633379 the counters ride
+ * only on the wave that ends a round (--ctl-sparse-waves) and the histogram
+ * on every 32nd, which cut the cost of running the controller from 5-6% to
+ * 2-4%. The
  * coarse histogram (--ctl-hist-coarse) is off by default: spreading the
  * power-of-two bin [64, 128) evenly put the delays' 1st percentile at 84
  * under a lookahead of 100, so the floor guard let W fall below every delay.
@@ -99,7 +103,7 @@ Controller::Controller()
       dist_held(0),
       alpha(1),
       kappa(1),
-      q(0), rounds(0), agg_rounds(0), run_executed(0), run_stragglers(0), run_late(0),
+      q(0), rounds(0), folds(0), agg_rounds(0), run_executed(0), run_stragglers(0), run_late(0),
       run_held(0),
       window(g_tw_optimism_window), first_time(0),
       window_time_sum(0), window_time(0), last_rate(-1), efficiency(0) {
@@ -335,6 +339,7 @@ Time Controller::quantile_window(const uint64_t* sum) {
   pending_held += sum[HELD_STRAGGLERS];
   if (pending_total < BATCH || pending_executed == 0) return window;
 
+  folds++;
   dist_total = 0;
   for (int b = 0; b < BINS; b++) {
     dist[b] = dist[b] * DECAY + pending[b];
@@ -540,8 +545,9 @@ void Controller::finalize() {
         g_tw_ctl_calibrate ? "calibrated" : "bound only");
     CkPrintf("Final alpha (calibration)      %.4f\n", alpha);
     if (agg_bound()) {
-      CkPrintf("Aggregation bound (kappa)      %g, bound in %.1f%% of rounds\n",
-          g_tw_ctl_agg_kappa, rounds ? 100.0 * agg_rounds / rounds : 0.0);
+      // Only rounds with new delays (a fold) recompute W
+      CkPrintf("Aggregation bound (kappa)      %g, set W in %.1f%% of %d updates\n",
+          g_tw_ctl_agg_kappa, folds ? 100.0 * agg_rounds / folds : 0.0, folds);
     }
     if (g_tw_ctl_cost) {
       CkPrintf("Final kappa (rollback cost)    %.2f\n", kappa);

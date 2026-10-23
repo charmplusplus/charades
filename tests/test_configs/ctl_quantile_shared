@@ -9,3 +9,5 @@ ctl=1
 ctl-reduction=1
 ctl-interval=1
 ctl-hist-waves=8
+# The counters on every wave (the path before --ctl-sparse-waves)
+ctl-sparse-waves=0
