@@ -33,7 +33,7 @@ void tw_init(int argc, char** argv) {
   // rollback storm that slows GVT, and with it the controller, for most of a
   // run (4 nodes, lookahead 10 / mean 200, from W 2000: 6% efficiency).
   if (g_tw_ctl_interval == 0) g_tw_ctl_interval = 1;
-  // Defaults from the 4-node Gaussian sweeps on psm2 (2026-10-22, CONTEXT.md
+  // Defaults from the 4-node Gaussian sweeps on psm2 (2026-10-22, RESULTS.md
   // "Floor-aware controller"): 0.001 as a share of events, with
   // --ctl-floor=2, was 0.87-0.96 of the best fixed window through htram and
   // 0.97-1.03 sent directly. 0.003 without the floor fix fell to 0.68
