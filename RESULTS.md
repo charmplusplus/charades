@@ -101,6 +101,7 @@ Charades' controller ÷ Devastator's adaptive window: 0.68–1.03 at σ ≤ 500 
 | 36 | 2026-10-22/23 | 3629783, 3629781 | Full-node reruns, results | current |
 | 37 | 2026-10-23 | — | Controller level, `--agg-scope`, σ 100 profile | design |
 | 38 | 2026-10-23 | 3632385 | Controller level, `--agg-scope`, σ 100 profile, results | current |
+| 39 | 2026-10-23 | — | Controller: an aggregation bound, cheaper bookkeeping, a faster start | design |
 
 ## Stampede3 runs, in order
 
@@ -1914,6 +1915,91 @@ A build mistake, fixed before any run used it: the new tree's copied `config.mk`
 - The same ε cannot suit high slack with htram, where a rolled-back event costs 13–29 committed events between W 250 and 500, and phases or low slack. The target has to scale with what a rolled-back event costs in each regime. Measuring that cost as PE time failed before (`--ctl-cost=1`, step 2), because most of a rollback's cost is GVT held back. **The next controller step is a target that measures that indirect cost**, for example from how GVT advance per round responds to the rolled-back share across rounds. Design it before running anything.
 - Cheap and safe now: none of today's changes is a default. `--ctl-alpha-gain` stays as an option at 0.25. `--ctl-warm` and `--ctl-w-gain` were removed after measuring worse.
 - For the paper: run headline workloads longer than 1.9 s. In 15 s runs every adaptive arm gains a few percent and the noise is smaller.
+
+### Controller: an aggregation bound, cheaper bookkeeping, a faster start (design, 2026-10-23; written before any runs)
+
+> **Status: design.** Written before any runs. Every number in "What the data says" comes from logs of jobs 3629781 and 3632385; no new runs.
+
+**Why.** The user's goal (2026-10-23) is to make Charades the best implementation in as many cases as possible. The controller is where Charades loses most against itself. Its ratio to the best fixed W on full nodes:
+- 0.84–0.87 with htram at high slack (the σ sweep);
+- 0.92–0.96 with htram at low slack;
+- 0.90–0.97 on traffic.
+
+With direct sends it is fine (0.96–1.02), and it leads every fixed W on phase-changing PHOLD (1.04–1.08). "Controller level, …, results" showed the high-slack gap is bookkeeping (4–5%), the start (about 2.5% of a 1.9 s run), and a waste target ε whose right value differs between regimes.
+
+**What the data says.**
+1. **Throughput can't steer the window directly; it is too noisy.** Per-round committed events/s from the W traces (job 3632385) vary by a coefficient of variation of 0.15 per round and 0.09–0.12 over 8-round blocks (about 16 ms). Comparing adjacent blocks cancels little: the difference has a standard deviation of 0.08–0.15. So telling a 4% gradient from noise at 2σ needs 15–60 block pairs, 0.5–1.5 s, which is most of a run. A throughput-seeking outer loop is ruled out.
+2. **Time blocked at the window is throughput seen from the idle side.** Batches ending blocked by the window (σ 100, millions): W 200 217, W 250 178, W 300 175, W 350 204, W 400 247. The count is U-shaped, with its minimum at the best W: above the knee, GVT slows and PEs block again. Not a monotone signal.
+3. **With htram, a larger W mostly costs aggregation, not rollbacks.** Uniform remote 1.0, high slack, job 3632385, rep 1:
+
+| fixed W | 200 | 250 | 300 | 350 | 400 | controller ε 0.001 |
+|---|---|---|---|---|---|---|
+| events shipped urgently (count) | 35 | 998 | 23,809 | 236,065 | 825,434 | 823,089 |
+| htram messages (M) | 1.16 | 1.23 | 1.36 | 1.77 | 2.58 | 2.54 |
+| events per htram message | 157 | 148 | 134 | 103 | 71 | 72 |
+| rolled back (% of executed, median of 3) | 0.55 | 0.90 | 1.09 | 1.15 | 1.18 | 1.11 |
+| M committed events/s | 96.1 | 101.1 | 100.9 | 94.9 | 89.5 | 87.1 |
+
+   From W 250 to 400 the rolled-back share barely moves, while messages double. The controller, which targets waste, can't see this cost.
+4. **The urgency count does not carry over.** At low slack (lookahead 10, mean 200, job 3629781, rep 1), urgent events rise steadily with W: σ 2,000: W 25 2.2 M, W 50 5.0 M, W 100 12.3 M; best W 50. There is no knee at the best W, so a fixed budget on urgent sends tuned at high slack would pick about W 25 at low slack.
+5. **The best fixed W sits at about the same quantile of the send-delay distribution, with htram on PHOLD.** PHOLD's send delay is lookahead + Exp(mean − lookahead); traffic's is lookahead + Exp(mean). F is that delay's CDF, and r is remote sends per executed event (from the CSVs).
+
+| workload, full nodes | best fixed W | F(best W) | r | r · F(best W) |
+|---|---|---|---|---|
+| htram, high slack (lookahead 100, mean 1,000), σ 100–uniform | 250 (300 within 2%) | 0.15 (0.20) | 0.93–1.0 | 0.14–0.20 |
+| htram, low slack (lookahead 10, mean 200) | 50 | 0.19 | 1.0 | 0.19 |
+| htram, traffic 128 × 184, uniform / congested | 500 / 250 | 0.33 / 0.14 | 0.20 | 0.066 / 0.027 |
+| htram, traffic 5,888 × 4 | 500–1,000 | ≥ 0.33 | 0.023 | ≥ 0.008 |
+| direct, high slack | 250 (σ ≤ 500), 500 (σ ≥ 1,000) | 0.15–0.36 | 0.93–1.0 | 0.14–0.36 |
+| direct, low slack | 50–100 | 0.19–0.38 | 1.0 | 0.19–0.38 |
+
+   With htram on PHOLD, r · F(best W) is 0.14–0.20 at both slack levels. On traffic r · F at the best W is far lower, and there the waste bound, not aggregation, should bind. Direct sends tolerate a larger W, so the bound should apply only with aggregation.
+
+**Design.**
+1. **An aggregation bound** (`--ctl-agg-kappa=κ`; default 0 = off until measured; applies only with htram and the deadline policy).
+   - The quantile rule now takes q = min(κ / r, ε / (r · α)), so W = F⁻¹(q).
+   - In words: of the remote events a PE sends, at most κ per executed event may fall inside the window. With the deadline policy those events are flushed as soon as they come due, at each GVT update or at once, rather than waiting to fill a buffer. Larger W means more such flushes and smaller messages (finding 3).
+   - Like the straggler bound, it bounds r · F(W). It is uncalibrated: no α, so no α noise and no slow start while it binds. It follows phase changes through the histogram, as now.
+   - The waste bound stays as the safety cap against rollback storms, and it is the one that binds where few events are remote (traffic) or without htram.
+   - Mean W predicted for κ 0.17 (from F⁻¹, before the waste cap): high slack 268 (σ 100: 281), low slack 45; phases at remote 1.0: 45 in the low-slack phase and 268 in the high; at remote 0.5 (r = 0.5): 89 and 474.
+   - The finalize report gets the share of rounds in which each bound bound.
+2. **Cheaper bookkeeping.**
+   - The forward-event timer (every 16th event) and the rollback timers feed only κ of the experimental `--ctl-cost=1`. They now run only under it.
+   - The histogram every 32nd count wave (`--ctl-hist-waves=32`) is measured against every 8th as an arm. Not a default yet.
+3. **A faster start.** `--ctl-alpha-init` (default 1, as now) starts α lower, so the waste bound doesn't hold W at 110–200 for the first ~25 folds. Arm: 0.003 (α settles at 0.003–0.006 at high slack in the traces).
+
+**Experiment** (one 4-node allocation, full nodes, htram PP 512 unless noted, 3 reps interleaved, end times as in "Full-node reruns"):
+- Workloads:
+  - htram, high slack: σ 100, σ 2,000, uniform;
+  - htram, low slack: σ 500, σ 2,000, uniform;
+  - phase-changing PHOLD at remote 0.5 and 1.0;
+  - traffic 128 × 184 uniform and congested;
+  - direct sends: high-slack σ 2,000 and uniform, and low-slack uniform.
+- Arms:
+  - the best fixed W and its neighbours as anchors;
+  - the controller as shipped (ε 0.001);
+  - `--ctl-cost=0` timers gated (the new build), otherwise as shipped;
+  - κ 0.13, 0.17 and 0.22, each with ε 0.001;
+  - κ 0.17 with the histogram every 32nd wave and α starting at 0.003 (the full proposal);
+  - `dry:` at the best W, the cost check.
+- Then 15 s runs (end × 8) of the anchors, the shipped controller and the full proposal on the three high-slack workloads.
+
+**Predictions:**
+- P1. With the timers gated, the dry run costs ≤ 3% (it was 4–5%), and ≤ 1.5% with the histogram every 32nd wave.
+- P2. κ 0.17 with ε 0.001 reaches ≥ 0.95 of the best fixed W with htram at both slack levels; κ 0.13 and 0.22 stay ≥ 0.90 (the optimum is broad in q).
+- P3. The full proposal:
+  - htram high slack: 0.95–1.0 in short runs, ≥ 0.97 in 15 s runs;
+  - low slack: 0.95–1.0;
+  - phases: ≥ 1.04 (it was 1.04–1.08), possibly lower at remote 0.5 if W 474 in the high-slack phase is too wide;
+  - traffic: within 2% of the shipped controller (the waste bound binds there);
+  - direct sends: unchanged within 2% (κ applies only with htram).
+- P4. Mean W with κ 0.17: high slack 260–300, low slack 40–55.
+- P5. The κ bound binds in ≥ 80% of rounds on htram PHOLD at remote 1.0, and in ≤ 20% on traffic.
+
+**What would change the plan.**
+- If κ helps at high slack but costs at low slack (or the reverse), the quantile that suits each differs, and κ needs a model of how aggregation cost scales with the delay distribution rather than a constant.
+- If the full proposal loses on phases at remote 0.5, scaling by 1/r is wrong for mixed self/remote traffic.
+- Dragonfly, run after this, tests κ on a model it was not fitted to.
 
 ## Baseline verification on the Mac
 
