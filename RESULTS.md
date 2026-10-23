@@ -2264,6 +2264,7 @@ Committed events (count). The Charades/ROSS column comes from Part A; the clcg4 
 | 16 | 4.06, 4.02, 4.04 | 4.32, 4.20, 4.16 | 1.04 |
 | 23 | hung 3 of 3 (23.6–23.9 M "no posted recvs" alerts, killed) | 4.21, 4.04, 4.11 (2 harmless alerts per rank at bind time) | — |
 
+- **Reverted from the PR (2026-10-23, 16cbcaf2)** at the maintainer's request: out of scope, and LCI can't know how many devices will be created when it creates the first, so setting `net_max_recvs` is the upper layer's job (here, Reconverse). The cap stays on LCI branch `recv-fair-share` (c2241fd0); no follow-up PR yet.
 - The 23-device hang was pool starvation: the default pool is 65,536 packets and each device posts up to 4,096 receives, so the first ~16 devices hold every packet and the rest post none. The cap is min(`net_max_recvs`, 7/8 × packets ÷ bound devices); nothing changes up to 14 devices.
 - The other hang, 1 thread sending 4 M messages, is psm2's lack of receiver backpressure: the sender exhausts `PSM2_MQ_RECVREQS_MAX` (1 M unexpected messages), and raising it moves the abort to send descriptors. tcp finishes the same run. That is the benchmark's missing flow control, not LCI.
 - LCI ctest on the Mac (ofi tcp): 25/25 on the psm2 build, 33/33 in a full build. Under `srun --mpi=pmi2` on Stampede3, the collective, loopback and cxx11 tests fail identically over tcp (a bootstrap `decode_value` assert): a launcher problem, separate from the PR.
