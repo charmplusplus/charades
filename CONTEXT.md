@@ -1593,8 +1593,8 @@ These reproduce job 3628935 (46.1 and 38.1; 1.08) within 1–2%.
 | | remote 0.5 | remote 1.0 |
 |---|---|---|
 | adaptive policy ÷ the engine's own best fixed W: Charades controller / Devastator window (higher is better) | 1.10 / 0.77 | 1.09 / 0.70 |
-| Devastator best fixed W ÷ Charades best fixed W (lower is better for Charades) | 1.60 | 1.38 |
-| Devastator best fixed W ÷ Charades controller (lower is better for Charades) | 1.46 | 1.27 |
+| Charades best fixed W ÷ Devastator best fixed W (speedup; higher is better for Charades) | 0.63 | 0.72 |
+| Charades controller ÷ Devastator best fixed W (speedup; higher is better for Charades) | 0.69 | 0.79 |
 | Charades controller ÷ Devastator adaptive window (higher is better for Charades) | 0.89 | 1.13 |
 
 **Predictions:**
@@ -1652,26 +1652,26 @@ These reproduce job 3628935 (46.1 and 38.1; 1.08) within 1–2%.
 | Devastator adaptive window | 18.5 (1 of 3; 2 stalled) | **0.18** | 10.1 (1 of 3; 2 stalled) | **0.17** |
 | Devastator best fixed W | 101.4 (W 250) | 1.00 | 60.1 (W 100) | 1.00 |
 
-- Devastator best ÷ Charades best fixed W: 1.35 (remote 0.5), 0.99 (1.0). Devastator best ÷ Charades controller: 1.29, 0.92 (lower is better for Charades).
+- Charades' speedup over Devastator (Charades ÷ Devastator, higher is better for Charades): best fixed W ÷ best fixed W 0.74 (remote 0.5), 1.01 (1.0); Charades controller ÷ Devastator best fixed W 0.78, 1.08.
 - Charades controller ÷ Devastator adaptive: 4.3× and 6.4× over the runs that finished; the stalled runs make it larger.
 - Predictions: A1 right at remote 0.5 (1.04), just above the range at 1.0 (1.08); A2 right (0.17–0.18); A3 right at 1.0 (0.99), wrong at 0.5 (1.35); A4 right (≥ 4.3×).
 
 **B. Gaussian σ sweep** (M committed events/s, median of 3; higher is better). Ratios are ÷ the engine's own best fixed W:
 
-| workload | Charades htram: best fixed W | controller (÷, mean W) | hill climb | blocking | Charades direct: best | controller ÷ | htram ÷ direct | Devastator: best fixed W | adaptive (÷; ok of 3) | Devastator ÷ Charades, best vs best |
-|---|---|---|---|---|---|---|---|---|---|---|
-| σ 100, high slack | 121.9 (W 250) | 104.0 (0.85, 348) | 0.17 | 0.53 | 53.8 | 1.01 | 2.27 | 188.9 (W 1,000) | 152.3 (0.81; 3) | 1.55 |
-| σ 500 | 118.1 (250) | 101.5 (0.86, 337) | 0.22 | 0.54 | 39.0 | 1.02 | 3.03 | 154.2 (1,000) | 98.5 (0.64; 2) | 1.31 |
-| σ 1,000 | 114.5 (250) | 98.0 (0.86, 347) | 0.24 | 0.55 | 37.8 | 1.01 | 3.03 | 130.3 (1,000) | 36.1 (0.28; 1) | 1.14 |
-| σ 2,000 | 108.5 (250) | 94.3 (0.87, 346) | 0.32 | 0.52 | 33.9 | 0.96 | 3.20 | 106.7 (1,000) | 7.7 (0.07; 1) | 0.98 |
-| σ 4,000 | 98.4 (250) | 84.9 (0.86, 371) | 0.35 | 0.50 | 28.2 | 0.97 | 3.49 | 79.6 (1,000) | 11.2 (0.14; 3) | 0.81 |
-| uniform remote 1.0 | 100.6 (250) | 84.2 (0.84, 381) | 0.33 | 0.46 | 25.1 | 0.97 | 4.01 | 69.6 (500) | 7.2 (0.10; 3) | 0.69 |
-| σ 500, low slack | 96.0 (50) | 88.3 (0.92, 55) | 0.33 | 0.58 | 39.1 | 0.98 | 2.46 | 152.7 (200) | 101.3 (0.66; 3) | 1.59 |
-| σ 2,000, low slack | 80.7 (50) | 77.7 (0.96, 56) | 0.50 | 0.62 | 33.2 | 0.96 | 2.43 | 99.9 (200) | 6.2 (0.06; 1) | 1.24 |
-| uniform 1.0, low slack | 68.7 (50) | 62.9 (0.92, 52) | 0.47 | 0.35 | 25.1 | 0.96 | 2.74 | 65.2 (100) | 11.2 (0.17; 3) | 0.95 |
+| workload | Charades htram: best fixed W | controller (÷, mean W) | hill climb | blocking | Charades direct: best | controller ÷ | htram ÷ direct | Devastator: best fixed W | adaptive (÷; ok of 3) | Charades speedup over Devastator, best ÷ best | Charades controller ÷ Devastator adaptive |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| σ 100, high slack | 121.9 (W 250) | 104.0 (0.85, 348) | 0.17 | 0.53 | 53.8 | 1.01 | 2.27 | 188.9 (W 1,000) | 152.3 (0.81; 3) | 0.65 | 0.68 |
+| σ 500 | 118.1 (250) | 101.5 (0.86, 337) | 0.22 | 0.54 | 39.0 | 1.02 | 3.03 | 154.2 (1,000) | 98.5 (0.64; 2) | 0.77 | 1.03 |
+| σ 1,000 | 114.5 (250) | 98.0 (0.86, 347) | 0.24 | 0.55 | 37.8 | 1.01 | 3.03 | 130.3 (1,000) | 36.1 (0.28; 1) | 0.88 | 2.71 |
+| σ 2,000 | 108.5 (250) | 94.3 (0.87, 346) | 0.32 | 0.52 | 33.9 | 0.96 | 3.20 | 106.7 (1,000) | 7.7 (0.07; 1) | 1.02 | 12.3 |
+| σ 4,000 | 98.4 (250) | 84.9 (0.86, 371) | 0.35 | 0.50 | 28.2 | 0.97 | 3.49 | 79.6 (1,000) | 11.2 (0.14; 3) | 1.24 | 7.58 |
+| uniform remote 1.0 | 100.6 (250) | 84.2 (0.84, 381) | 0.33 | 0.46 | 25.1 | 0.97 | 4.01 | 69.6 (500) | 7.2 (0.10; 3) | 1.45 | 11.7 |
+| σ 500, low slack | 96.0 (50) | 88.3 (0.92, 55) | 0.33 | 0.58 | 39.1 | 0.98 | 2.46 | 152.7 (200) | 101.3 (0.66; 3) | 0.63 | 0.87 |
+| σ 2,000, low slack | 80.7 (50) | 77.7 (0.96, 56) | 0.50 | 0.62 | 33.2 | 0.96 | 2.43 | 99.9 (200) | 6.2 (0.06; 1) | 0.81 | 12.5 |
+| uniform 1.0, low slack | 68.7 (50) | 62.9 (0.92, 52) | 0.47 | 0.35 | 25.1 | 0.96 | 2.74 | 65.2 (100) | 11.2 (0.17; 3) | 1.05 | 5.62 |
 
-- **Charades is faster than Devastator in the remote-heavy regime**: σ ≥ 2,000 and uniform, at both slack levels except σ 2,000 low slack (0.69–0.98). Devastator is faster where communication is mostly local (1.14–1.59 at σ ≤ 1,000 and at low-slack σ 500). That is the crossover the paper is about: Devastator's weak regime is Charades' strong one, and aggregation (2.3–4.0×, growing with the off-node share) is what moves it.
-- **Charades' controller against Devastator's own window**: Charades wins by 2.7–15× from σ 1,000 up and at low-slack σ 2,000 and uniform, where Devastator's window collapses (0.06–0.28 of its best, and stalls). Devastator's window holds up only where communication is local: σ 100 (0.81, Charades controller 0.68× of it), σ 500 (0.64; about equal), low-slack σ 500 (0.66; Charades 0.87×).
+- **Charades is faster than Devastator in the remote-heavy regime**: σ ≥ 2,000 and uniform, at both slack levels except σ 2,000 low slack: Charades' speedup over Devastator's best fixed W is 1.02–1.45. Devastator is faster where communication is mostly local: Charades' speedup is 0.63–0.88 at σ ≤ 1,000 and at low-slack σ 500 and 2,000. That is the crossover the paper is about: Devastator's weak regime is Charades' strong one, and aggregation (2.3–4.0×, growing with the off-node share) is what moves it.
+- **Charades' controller against Devastator's own window**: Charades' speedup is 2.7–12.5× from σ 1,000 up and at low-slack σ 2,000 and uniform, where Devastator's window collapses (0.06–0.28 of its best, and stalls). Devastator's window holds up only where communication is local: σ 100 (0.81, Charades controller 0.68× of it), σ 500 (0.64; Charades 1.03×), low-slack σ 500 (0.66; Charades 0.87×).
 - **The controller's own gap is back on full nodes with htram at high slack: 0.84–0.87 of the best fixed W**, everywhere W 250 is best. W settles at 337–381. By `policy_summary.py`'s fit, a rolled-back event costs 13–29 committed events between W 250 and W 500 (6.5–30 at 2 × 8 on the fast stack), and 50–86 between W 250 and the controller's W. That the controller's extra rollbacks cost more than W 500's is unexplained (a guess, not checked: they are the ones that hold GVT back). With direct sends the controller is 0.96–1.02; at low slack with htram 0.92–0.96. This is the main open problem for the controller.
 - Predictions: B1 right (2.3–4.0×, grows with off-node share); B2 wrong for htram at high slack (0.84–0.87, ≥ 0.85 in only 5 of 6) and right for direct (0.96–1.02); B3 right at high slack (0.17–0.35), wrong at low slack (0.33–0.50); B4 wrong at σ 100 and 500 (0.81, 0.64) and right elsewhere (≤ 0.28), and Charades' controller does not beat Devastator's window at σ 100 or low-slack σ 500; B5 mixed (in range at σ 1,000–4,000 and low-slack σ 500/2,000; outside at σ 100 and 500 (Devastator faster) and uniform (Charades faster)).
 
