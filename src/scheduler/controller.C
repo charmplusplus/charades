@@ -21,9 +21,15 @@ static const double Q_MAX = 0.99;
  */
 static const double DECAY = 0.5;
 static const double BATCH = 256;
-/** Calibration moves alpha this share of the way (in log) per fold, ... */
-static const double ALPHA_GAIN = 0.25;
-/** ... and by at most this factor */
+/**
+ * Calibration moves alpha this share of the way (in log) per fold
+ * (--ctl-alpha-gain, default 0.25), and by at most a factor of 1.25. From
+ * alpha = 1 that takes about 25 folds on full nodes (sigma 2000: 5% of a
+ * 1.9 s run at W 110-200). Letting the first folds jump all the way made W
+ * overshoot (0.82-0.86 of the best fixed W against 0.84-0.87), and damping W
+ * itself lost 2-4% (job 3632385), so neither is kept. Gain 0.1 gained 1-3%
+ * at high slack with htram; not checked elsewhere, so 0.25 stays.
+ */
 static const double ALPHA_STEP = 1.25;
 /**
  * Floor guard: W stays at least the delay distribution's Q_MIN quantile, and
@@ -289,7 +295,7 @@ double Controller::inverse_cdf(double q) const {
  * may be rolled back, and alpha is that share as seen at the current W over
  * r * F(W): the delay distribution gives how waste grows with W, and the
  * waste seen gives the scale, cascades included. alpha moves slowly (see
- * ALPHA_GAIN): the histogram follows phase changes, alpha only the scale.
+ * --ctl-alpha-gain): the histogram follows phase changes, alpha only the scale.
  */
 Time Controller::quantile_window(const uint64_t* sum) {
   for (int b = 0; b < BINS; b++) {
@@ -340,7 +346,7 @@ Time Controller::quantile_window(const uint64_t* sum) {
       // 12-60 around a best fixed W of 25 (4 nodes, lookahead 10 / mean 200).
       double seen = std::min(1e4, std::max(window_waste() / dist_executed /
           bound, 1e-4));
-      double step = std::pow(seen / alpha, ALPHA_GAIN);
+      double step = std::pow(seen / alpha, g_tw_ctl_alpha_gain);
       alpha *= std::min(ALPHA_STEP, std::max(1 / ALPHA_STEP, step));
     }
   }

@@ -1727,6 +1727,109 @@ Where Charades loses to Devastator (σ ≤ 1,000), most traffic stays in the pro
 - B1. At σ 100, `--agg-scope=1` reaches ≤ 0.6 of scope 0. Same-process Charm++ messages are the expensive part, since htram over direct is 2.27× at σ 100, where 1.3% of events leave the node. At σ 2,000 scope 1 reaches 0.7–0.9, and at low-slack σ 500 ≤ 0.6.
 - C1. At σ 100, same-process delivery takes ≥ 25% of Charades' PE time: htram insert, inbox drain and its mutex, the node queue and per-PE messages. LCI and libfabric progress take < 10%. Cycles per committed event: Charades 1.4–1.7× Devastator.
 
+### Controller level, `--agg-scope`, σ 100 profile, results (2026-10-23, idev job 3632385, 4 skx nodes)
+
+**Runs.** All scripts are in `$WORK/charades-runs/` and write to `diag1/` (copied to `~/charades-data/diag1/`):
+- `diag1.sh`: the three designed stages.
+- Follow-ups in the same allocation:
+  - `diag1b.sh`: W traces.
+  - `diag1c.sh`: RNG and pollers.
+  - `diag1d.sh` to `diag1i.sh`: controller variants.
+
+The variants ran on `$WORK/charades-ctl`, a worktree of `charades-exp` with three new options: `--ctl-alpha-gain`, `--ctl-warm` and `--ctl-w-gain`. Every option defaults to the old behaviour.
+
+All runs finished; there were no stalls. M committed events/s, median of 3 unless noted; higher is better. Full nodes, htram PP 512, high slack (lookahead 100, mean 1,000), end 512,000 (about 1.9 s) unless noted.
+
+A build mistake, fixed before any run used it: the new tree's copied `config.mk` pointed at `charades-exp/src`, so its first build compiled into `charades-exp`'s library. The `charades-exp` binary used by every run here (built 2026-10-22 11:36) was never relinked. Its library was rebuilt from its own sources, and contains no new symbols.
+
+**A. Fixed W around the peak, and the controller** (÷ fixed W 250; higher is better):
+
+| arm | σ 100 | σ 2,000 | uniform |
+|---|---|---|---|
+| W 200 | 0.92 | 0.90 | 0.93 |
+| W 250 (M ev/s) | 1.00 (121.6) | 1.00 (107.4) | 1.00 (102.4) |
+| W 300 | 0.98 | 0.98 | 0.99 |
+| W 350 | 0.94 | 0.96 | 0.94 |
+| W 400 | 0.85 | 0.91 | 0.88 |
+| controller ε 0.001 (mean W) | 0.84 (347) | 0.88 (345) | 0.83 (374) |
+| ε 0.0005 | 0.87 (323) | 0.88 (321) | 0.85 (348) |
+| ε 0.0003 | 0.89 (306) | 0.90 (308) | 0.86 (327) |
+
+- The peak is flat from W 250 to 300 and falls on both sides. Below it the window caps throughput: at W 100 the run needs about twice the GVT rounds. Above it, rollbacks grow fast: rolled-back events rise from 0.003–0.9% of executed at W 250 to 1.3–2.4% at W 500.
+- **A1 wrong.** A fixed W at the controller's mean runs 6–10% faster than the controller (σ 100: W 350 gives 0.94 against the controller's 0.84 at mean 347).
+- **A2 right.** W 250 stays the best on the finer grid.
+- **A3 wrong.** Lowering ε moves the mean W only from about 345 to about 307, and gains 2–5%.
+
+**Where the controller loses** (follow-ups; ÷ fixed W 250 or 300 in the same job):
+- **Its bookkeeping costs 4–5%.**
+  - With the controller running but W fixed (`dry:300`), throughput is 0.95–0.96 of fixed W 300.
+  - Sending the histogram on every 32nd count wave (`--ctl-hist-waves=32`) instead of every 8th recovers 1–2%; coarse bins (`--ctl-hist-coarse=1`) recover about the same.
+  - The counters that ride on every wave are not the cost: `drysep`, with no counters on the waves, costs the same.
+  - About 2–3% remains with neither histogram nor decisions (`--ctl-hist-waves` and `--ctl-interval` set to 10⁶). That is the per-event part: a histogram bin per remote send, a timer on every 16th forward event and on each rollback. It is not located further.
+- **Startup.** α starts at 1 and falls at most 1.25× per fold. For the first ~25 folds, about 95 ms or 5% of a 1.9 s run, W sits at 110–200 and runs at half speed. `--ctl-warm=4` (α jumps to the waste seen) does not help: W then overshoots, giving 0.82–0.86.
+- **W moves between rounds.** Rollbacks are bursty, 90 to 2,700 per round, so α and W swing: W runs 260–460 from round to round (p10–p90 273–415 at σ 2,000).
+  - Even at ε 0.0001 (mean W 265–276, inside the flat peak) the controller reaches only 0.89–0.91.
+  - Slower calibration (`--ctl-alpha-gain=0.1`) gains 1–3%.
+  - Damping W (`--ctl-w-gain=0.3`) loses 2–4%. At 0.1 the start from W 8 never finishes, giving 0.42–0.48. Both W-damping settings are worse.
+- **Long runs** (end 4,096,000, about 15 s, 2 reps; ÷ fixed W 250):
+
+| arm | σ 100 | σ 2,000 | uniform |
+|---|---|---|---|
+| controller as shipped (ε 0.001) | 0.86 | 0.92 | 0.88 |
+| ε 0.001, coarse histogram every 32nd wave | 0.88 | 0.95 | 0.91 |
+| ε 0.0003, coarse histogram every 32nd wave | **0.93** | **0.98** | **0.94** |
+| fixed W 300 | 1.00 | 1.03 | 0.99 |
+
+  In 15 s runs, the start matters less and the cheaper histogram plus ε 0.0003 closes most of the gap: 0.93–0.98 of W 250, or 0.93–0.95 of the better of W 250 and 300. The 1.9 s runs of the paper sweeps understate every adaptive arm by a few percent.
+
+**B. `--agg-scope`** (÷ htram for all remote events; higher is better):
+
+| workload | htram for all (M ev/s) | scope 1: same-process events direct | all events direct |
+|---|---|---|---|
+| σ 100, W 250 | 120.3 | 0.84 | 0.46 |
+| σ 2,000, W 250 | 107.4 | 0.80 | 0.30 |
+| σ 500 low slack, W 50 | 96.9 | 0.88 | 0.41 |
+
+**B1 wrong.** Same-process Charm++ messages are not the expensive part: sending them directly costs 12–20%. At σ 100 only 2.7% of events leave their process, yet sending those directly instead of through htram is most of the drop from 0.84 to 0.46. The 2.27× of htram over direct sends at σ 100 is mostly the off-process events. Per event, an off-process direct send costs far more than a same-process one.
+
+**C. Profile at σ 100** (perf on node 0, W 250; Devastator at W 1,000):
+- Per committed event: Charades about 4,000 cycles and 4,850 instructions; Devastator about 3,170 and 3,920. Charades ÷ Devastator: 1.27× the cycles (**C1 wrong**, below 1.4).
+- At σ 2,000 two days ago (before psm2 and PP 512), Charades took 8,300 cycles and Devastator 5,300.
+- Charades' PE time (inclusive):
+  - event execution 38%, of which the model's forward handler is 15%, including `log` and `sin` from the CLCG4 Gaussian and exponential draws;
+  - network progress polled by every PE 13%;
+  - htram delivery (inbox drain, `Aggregator::deliver`, `recv_remote_event`) 11%;
+  - sends 9%;
+  - GVT count waves 7.5%, including fossil collection 4%.
+- Devastator: `drain` 21%, malloc/free about 17%, thread-channel reaping 9%, event execution 7.6%.
+- **C1 wrong for same-process delivery too.** No single runtime path dominates.
+- **Fewer network pollers is slower.** `+backend_poll_thread` 2 and 4 reach 0.98–0.99 of all PEs polling at σ 100, and 0.95 at σ 2,000.
+
+**RNG fairness.** Devastator's default generator is xorshift; Charades uses CLCG4, and Devastator's `--rng=clcg4` gives it identical committed counts. With CLCG4, Devastator runs at 0.90 of its xorshift rate at σ 100 (168.6 against 185.9 M ev/s) and 0.98 at σ 2,000 (104.2 against 106.3). Every Devastator number above "Full-node reruns, results" used xorshift. With the same generator, Charades' speedup over Devastator at σ 100 is 0.71 (120 ÷ 168.6), not 0.65. **Paper comparisons should run Devastator with `--rng=clcg4`.**
+
+**Validation: can ε 0.0003 become the default?** (`diag1i.sh`; short runs as in the full-node reruns; ÷ the workload's best fixed W in the same job; higher is better)
+
+| workload | ε 0.001 (as shipped) | ε 0.001, histogram every 32nd wave | ε 0.0003, histogram every 32nd wave |
+|---|---|---|---|
+| phases, remote 0.5, htram | 1.00 | 0.97 | 0.94 |
+| phases, remote 1.0, htram | 1.08 | 1.08 | 1.01 |
+| low slack σ 500, htram | 0.92 | 0.92 | 0.92 |
+| low slack σ 2,000, htram | 0.96 | 0.95 | 0.94 |
+| low slack uniform, htram | 0.95 | 0.98 | 0.91 |
+| high slack σ 2,000, direct | 0.97 | 0.97 | 0.95 |
+| high slack uniform, direct | 0.96 | 0.96 | 0.96 |
+
+**No.** ε 0.0003 gains about 5% with htram at high slack, and loses 2–7% on phases and at low slack. The histogram every 32nd wave is within noise in short runs: −3% to +3%.
+
+**What this means:**
+- The controller's gap at high slack with htram has three parts, and none is fixed by tuning:
+  - **Bookkeeping, 4–5%**: 1–2% from the histogram, about 2–3% per event and not yet located.
+  - **The start**: about 2.5% of a 1.9 s run.
+  - **The target**: the rolled-back share that suits a regime differs between regimes, by about 3× between high slack with htram and the rest.
+- The same ε cannot suit high slack with htram, where a rolled-back event costs 13–29 committed events between W 250 and 500, and phases or low slack. The target has to scale with what a rolled-back event costs in each regime. Measuring that cost as PE time failed before (`--ctl-cost=1`, step 2), because most of a rollback's cost is GVT held back. **The next controller step is a target that measures that indirect cost**, for example from how GVT advance per round responds to the rolled-back share across rounds. Design it before running anything.
+- Cheap and safe now: none of today's changes is a default. `--ctl-alpha-gain` stays as an option at 0.25. `--ctl-warm` and `--ctl-w-gain` were removed after measuring worse.
+- For the paper: run headline workloads longer than 1.9 s. In 15 s runs every adaptive arm gains a few percent and the noise is smaller.
+
 ## Open issues
 
 1. **Event holding needs a realistic cutoff.** With the test configs'

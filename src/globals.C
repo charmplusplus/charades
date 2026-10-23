@@ -63,6 +63,7 @@ double   g_tw_ctl_epsilon;
 unsigned g_tw_ctl_cost;
 unsigned g_tw_ctl_calibrate;
 unsigned g_tw_ctl_floor;
+double   g_tw_ctl_alpha_gain;
 unsigned g_tw_ctl_interval;
 unsigned g_tw_ctl_dry;
 unsigned g_tw_ctl_log;
@@ -139,6 +140,7 @@ void clear_globals() {
   g_tw_ctl_cost           = 0;
   g_tw_ctl_calibrate      = 1;
   g_tw_ctl_floor          = 2;
+  g_tw_ctl_alpha_gain     = 0.25;
   g_tw_ctl_interval       = 8;
   g_tw_ctl_dry            = 0;
   g_tw_ctl_log            = 0;

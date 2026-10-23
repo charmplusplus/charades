@@ -50,6 +50,7 @@ void parse_command_line(int argc, char** argv) {
   kernel.register_argument("ctl-cost",             "Delay quantile rule: epsilon is a share of - EVENTS ROLLED BACK=0 (default), PE TIME LOST TO ROLLBACKS=1 (experimental: misses the indirect cost of rollbacks)", g_tw_ctl_cost);
   kernel.register_argument("ctl-calibrate",        "Delay quantile rule: scale the straggler bound by the events seen rolled back - NO=0, YES=1", g_tw_ctl_calibrate);
   kernel.register_argument("ctl-floor",            "Delay quantile rule: calibrate only on the rollbacks of stragglers the window can cause - NO=0, leave out stragglers sent with a delay of at least the window=1, also those htram held (not due when sent)=2 (default)", g_tw_ctl_floor);
+  kernel.register_argument("ctl-alpha-gain",       "Delay quantile rule: share of the way (in log) the calibration moves per fold, at most 1.25x (default 0.25)", g_tw_ctl_alpha_gain);
   kernel.register_argument("ctl-interval",         "Controller round: count waves under the bucketed GVT (shared reduction), else GVT updates; at least 1", g_tw_ctl_interval);
   kernel.register_argument("ctl-dry",              "Run the controller but keep the window fixed (measures its cost) - NO=0, YES=1", g_tw_ctl_dry);
   kernel.register_argument("ctl-log",              "Print every controller round - NO=0, YES=1", g_tw_ctl_log);
