@@ -99,17 +99,22 @@ Controller::Controller()
       dist_held(0),
       alpha(1),
       kappa(1),
-      q(0), rounds(0), run_executed(0), run_stragglers(0), run_late(0),
+      q(0), rounds(0), agg_rounds(0), run_executed(0), run_stragglers(0), run_late(0),
       run_held(0),
       window(g_tw_optimism_window), first_time(0),
       window_time_sum(0), window_time(0), last_rate(-1), efficiency(0) {
   CpvInitialize(Controller*, g_controller);
   CpvAccess(g_controller) = this;
   last_time = CmiWallTimer();
+  if (g_tw_ctl_alpha_init > 0) alpha = g_tw_ctl_alpha_init;
   if (g_tw_ctl == 2 && window == 0) {
     CkAbort("--ctl=2 (hill climb) starts from --optimism-window, which must "
             "be > 0\n");
   }
+}
+
+bool Controller::agg_bound() {
+  return g_tw_ctl_agg_kappa > 0 && g_tw_aggregation && g_tw_agg_policy == 1;
 }
 
 int Controller::bin_of(Time d) {
@@ -375,6 +380,19 @@ Time Controller::quantile_window(const uint64_t* sum) {
   }
   double share = g_tw_ctl_cost ? g_tw_ctl_epsilon / kappa : g_tw_ctl_epsilon;
   q = std::min(Q_MAX, std::max(Q_MIN, share / (r * alpha)));
+  /**
+   * --ctl-agg-kappa: with htram's deadline policy, a remote event whose delay
+   * is inside the window comes due early and is flushed at the next GVT
+   * update or at once, in a smaller message; a wider window costs aggregation
+   * well before it costs rollbacks (full nodes, uniform remote 1.0: from W 250
+   * to 400 htram messages doubled while the rolled-back share went from 0.90%
+   * to 1.18%). So bound those sends too, uncalibrated: r * F(W) <= kappa. The
+   * best fixed W had r * F(W) = 0.14-0.20 at both slack levels (job 3629781).
+   */
+  if (agg_bound() && r > 0 && g_tw_ctl_agg_kappa / r < q) {
+    q = std::max(Q_MIN, g_tw_ctl_agg_kappa / r);
+    agg_rounds++;
+  }
   return clamp_window((Time)std::ceil(inverse_cdf(q)));
 }
 
@@ -505,6 +523,10 @@ void Controller::finalize() {
         g_tw_ctl_cost ? "PE time lost to rollbacks" : "events rolled back",
         g_tw_ctl_calibrate ? "calibrated" : "bound only");
     CkPrintf("Final alpha (calibration)      %.4f\n", alpha);
+    if (agg_bound()) {
+      CkPrintf("Aggregation bound (kappa)      %g, bound in %.1f%% of rounds\n",
+          g_tw_ctl_agg_kappa, rounds ? 100.0 * agg_rounds / rounds : 0.0);
+    }
     if (g_tw_ctl_cost) {
       CkPrintf("Final kappa (rollback cost)    %.2f\n", kappa);
     }

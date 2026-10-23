@@ -93,6 +93,8 @@ class Controller : public CBase_Controller {
                      int hist_bins);
     void finalize();
 
+    /** --ctl-agg-kappa applies: htram with the deadline policy */
+    static bool agg_bound();
     static int bin_of(Time d);
     /** [lo, hi) of a bin */
     static void bin_range(int b, double* lo, double* hi);
@@ -128,6 +130,7 @@ class Controller : public CBase_Controller {
     double kappa;
     double q;                    ///< last quantile the rule asked for
     int rounds;
+    int agg_rounds;              ///< rounds in which --ctl-agg-kappa set W
     double run_executed, run_stragglers, run_late, run_held;  ///< over every round, for the summary
     Time window;
     /** Time-weighted mean W, from the first round on */

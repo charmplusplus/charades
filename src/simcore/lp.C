@@ -383,10 +383,10 @@ int LPChare::execute_me() {
     }
     /** Execute the event on the target LPStruct */
     LPBase* lp = e->owner;
-    // --ctl: time every 16th forward, for what a rolled-back event's forward
-    // work cost (two timer reads per 16 events)
+    // --ctl-cost=1: time every 16th forward, for what a rolled-back event's
+    // forward work cost (two timer reads per 16 events)
     static thread_local unsigned fwd_sample = 0;
-    if (g_tw_ctl && (++fwd_sample & 15) == 0) {
+    if (g_tw_ctl && g_tw_ctl_cost && (++fwd_sample & 15) == 0) {
       double t0 = CmiWallTimer();
       BRACKET_TRACE(lp->forward(e);, USER_EVENT_FWD)
       PE_STATS(fwd_ns) += (uint64_t)((CmiWallTimer() - t0) * 1e9);
@@ -416,7 +416,7 @@ int LPChare::execute_me() {
 
 void LPChare::rollback_me(Time ts) {
   Event* e;
-  double t0 = g_tw_ctl ? CmiWallTimer() : 0;
+  double t0 = g_tw_ctl && g_tw_ctl_cost ? CmiWallTimer() : 0;
   PE_STATS(total_rollback_calls)++;
   PE_STATS(ts_rollback_calls)++;
   /**
@@ -438,11 +438,11 @@ void LPChare::rollback_me(Time ts) {
    */
   scheduler->update_next(&next_token, events.min());
   set_current_event(processed_events.front());
-  if (g_tw_ctl) PE_STATS(rollback_ns) += (uint64_t)((CmiWallTimer() - t0) * 1e9);
+  if (g_tw_ctl && g_tw_ctl_cost) PE_STATS(rollback_ns) += (uint64_t)((CmiWallTimer() - t0) * 1e9);
 }
 
 void LPChare::rollback_me(Event* event) {
-  double t0 = g_tw_ctl ? CmiWallTimer() : 0;
+  double t0 = g_tw_ctl && g_tw_ctl_cost ? CmiWallTimer() : 0;
   PE_STATS(total_rollback_calls)++;
   PE_STATS(event_rollback_calls)++;
 
@@ -475,7 +475,7 @@ void LPChare::rollback_me(Event* event) {
    */
   scheduler->update_next(&next_token, events.min());
   set_current_event(processed_events.front());
-  if (g_tw_ctl) PE_STATS(rollback_ns) += (uint64_t)((CmiWallTimer() - t0) * 1e9);
+  if (g_tw_ctl && g_tw_ctl_cost) PE_STATS(rollback_ns) += (uint64_t)((CmiWallTimer() - t0) * 1e9);
 }
 
 void LPChare::fossil_me(Time gvt) {

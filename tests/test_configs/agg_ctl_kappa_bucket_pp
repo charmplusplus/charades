@@ -1,0 +1,14 @@
+# Optimistic w/Bucketed GVT, htram (PP), deadline flush policy, the window
+# set by the delay-quantile rule with the aggregation bound (kappa) and a low
+# starting alpha
+sync=3
+gvt=4
+buffer-size=655360
+optimism-window=2000
+aggregation=1
+agg-mode=2
+agg-buffer=16
+agg-policy=1
+ctl=1
+ctl-agg-kappa=0.17
+ctl-alpha-init=0.003
