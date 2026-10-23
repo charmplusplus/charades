@@ -53,6 +53,7 @@ void parse_command_line(int argc, char** argv) {
   kernel.register_argument("ctl-alpha-gain",       "Delay quantile rule: share of the way (in log) the calibration moves per fold, at most 1.25x (default 0.25)", g_tw_ctl_alpha_gain);
   kernel.register_argument("ctl-alpha-init",       "Delay quantile rule: starting value of the calibration alpha (default 1)", g_tw_ctl_alpha_init);
   kernel.register_argument("ctl-agg-kappa",        "Delay quantile rule with htram's deadline policy: at most this many remote sends per executed event with a delay inside the window, W = F^-1(min(kappa / r, ...)) (default 0 = off)", g_tw_ctl_agg_kappa);
+  kernel.register_argument("ctl-sparse-waves",     "With --ctl-reduction=1: the controller's counters (and histogram) ride only on the count wave that ends a round, not on every wave - NO=0 (default), YES=1", g_tw_ctl_sparse_waves);
   kernel.register_argument("ctl-interval",         "Controller round: count waves under the bucketed GVT (shared reduction), else GVT updates; at least 1", g_tw_ctl_interval);
   kernel.register_argument("ctl-dry",              "Run the controller but keep the window fixed (measures its cost) - NO=0, YES=1", g_tw_ctl_dry);
   kernel.register_argument("ctl-log",              "Print every controller round - NO=0, YES=1", g_tw_ctl_log);

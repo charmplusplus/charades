@@ -80,6 +80,7 @@ extern unsigned g_tw_ctl_calibrate;   ///< quantile rule: scale the bound by the
 extern unsigned g_tw_ctl_floor;       ///< quantile rule: calibrate only on stragglers the window can cause
 extern double   g_tw_ctl_alpha_gain;  ///< quantile rule: share of the way (in log) alpha moves per fold
 extern double   g_tw_ctl_alpha_init;  ///< quantile rule: alpha's starting value
+extern unsigned g_tw_ctl_sparse_waves; ///< controller data rides only on the count wave that ends a round
 extern double   g_tw_ctl_agg_kappa;   ///< quantile rule with htram's deadline policy: remote sends inside the window per executed event, at most (0: off)
 extern unsigned g_tw_ctl_interval;    ///< GVT updates per controller round
 extern unsigned g_tw_ctl_dry;         ///< run the controller but never change the window

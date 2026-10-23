@@ -203,10 +203,25 @@ void Controller::read_counters(uint64_t* v) {
  */
 void Controller::wave_contribute(std::vector<uint64_t>* counters,
                                  std::vector<uint64_t>* h) {
+  h->clear();
+  bool with_hist;
+  if (g_tw_ctl_sparse_waves) {
+    // Only the waves that end a round carry anything: the counters are
+    // deltas, so a round's sum is the same, and the other waves keep the
+    // GVT's plain two-element tuple (full nodes: a fixed window with the
+    // controller running cost 6%, mostly in PEs waiting on slower waves)
+    unsigned w = waves++, interval = std::max(1u, g_tw_ctl_interval);
+    if ((w + 1) % interval != 0) {
+      counters->clear();
+      return;
+    }
+    unsigned every = std::max(1u, g_tw_ctl_hist_waves / interval);
+    with_hist = ((w + 1) / interval - 1) % every == 0;
+  } else {
+    with_hist = waves++ % g_tw_ctl_hist_waves == 0;
+  }
   counters->assign(COUNTERS, 0);
   read_counters(counters->data());
-  bool with_hist = waves++ % g_tw_ctl_hist_waves == 0;
-  h->clear();
   if (!with_hist) return;
   if (g_tw_ctl_hist_coarse) {
     h->assign(COARSE_BINS, 0);
@@ -237,7 +252,8 @@ void Controller::wave_result(const uint64_t* counters, const uint64_t* h,
     for (int b = 0; b < BINS; b++) wave_sum[b] += h[b];
   }
   for (int i = 0; i < COUNTERS; i++) wave_sum[BINS + i] += counters[i];
-  if (++waves_since < g_tw_ctl_interval) return;
+  // --ctl-sparse-waves: counters arrive only on the wave that ends a round
+  if (!g_tw_ctl_sparse_waves && ++waves_since < g_tw_ctl_interval) return;
   waves_since = 0;
   decide(wave_sum.data());
   std::fill(wave_sum.begin(), wave_sum.end(), 0);

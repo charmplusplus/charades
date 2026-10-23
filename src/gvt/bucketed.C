@@ -230,10 +230,14 @@ void BucketGVT::contribute_counts(int num_buckets) {
   std::vector<uint64_t> ctl_counters, ctl_hist;
   if (ctl_shared()) {
     ctl_wave_contribute(&ctl_counters, &ctl_hist);
-    tuple[elements++] = CkReduction::tupleElement(
-        sizeof(uint64_t) * ctl_counters.size(), ctl_counters.data(),
-        CkReduction::sum_ulong_long);
-    if (!ctl_hist.empty()) {
+    // Empty on the waves that carry nothing (--ctl-sparse-waves); every PE
+    // makes the same choice for the same wave, so the tuples match
+    if (!ctl_counters.empty()) {
+      tuple[elements++] = CkReduction::tupleElement(
+          sizeof(uint64_t) * ctl_counters.size(), ctl_counters.data(),
+          CkReduction::sum_ulong_long);
+    }
+    if (!ctl_counters.empty() && !ctl_hist.empty()) {
       tuple[elements++] = CkReduction::tupleElement(
           sizeof(uint64_t) * ctl_hist.size(), ctl_hist.data(),
           CkReduction::sum_ulong_long);

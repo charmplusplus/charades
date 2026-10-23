@@ -66,6 +66,7 @@ unsigned g_tw_ctl_floor;
 double   g_tw_ctl_alpha_gain;
 double   g_tw_ctl_alpha_init;
 double   g_tw_ctl_agg_kappa;
+unsigned g_tw_ctl_sparse_waves;
 unsigned g_tw_ctl_interval;
 unsigned g_tw_ctl_dry;
 unsigned g_tw_ctl_log;
@@ -145,6 +146,7 @@ void clear_globals() {
   g_tw_ctl_alpha_gain     = 0.25;
   g_tw_ctl_alpha_init     = 1;
   g_tw_ctl_agg_kappa      = 0;
+  g_tw_ctl_sparse_waves   = 0;
   g_tw_ctl_interval       = 8;
   g_tw_ctl_dry            = 0;
   g_tw_ctl_log            = 0;
