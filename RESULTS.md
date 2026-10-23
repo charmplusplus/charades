@@ -103,6 +103,8 @@ Charades' controller ÷ Devastator's adaptive window: 0.68–1.03 at σ ≤ 500 
 | 38 | 2026-10-23 | 3632385 | Controller level, `--agg-scope`, σ 100 profile, results | current |
 | 39 | 2026-10-23 | — | Controller: an aggregation bound, cheaper bookkeeping, a faster start | design |
 | 40 | 2026-10-23 | 3633379 | Controller: an aggregation bound, cheaper bookkeeping, a faster start, results | current |
+| 41 | 2026-10-23 | — | Scaling check at 16 and 32 nodes | design |
+| 42 | 2026-10-23 | — | Three engines at 4 nodes, paper grade | design |
 
 ## Stampede3 runs, in order
 
@@ -2105,6 +2107,57 @@ The revised controller is at least as good as the old one in all 14 workloads. I
   - Warm start and W damping were already dropped.
   - Time spent in the first rounds remains a cost in short runs.
 - **Defaults since these runs** (charades, after 9063017): `--ctl-agg-kappa=0.20`, `--ctl-sparse-waves=1`, `--ctl-hist-waves=32`. The old paths stay covered by the test configs `agg_ctl_floor_bucket_pp` (κ off) and `ctl_quantile_shared` (counters every wave). The finalize report now counts how often κ set W per update, not per round: with the histogram every 32nd wave, only one round in four recomputes W.
+
+### Scaling check at 16 and 32 nodes (design, 2026-10-23; written before any runs)
+
+> **Status: design.** Written before any runs.
+
+**Why.** Nothing above 8 nodes has run since the go/no-go (job 3620576, Debug runtime). The controller (κ 0.20), htram PP 512 and `+lci_ndevices 16` were all tuned at 4 nodes. This check asks whether anything breaks or degrades at 16 and 32 nodes before the paper's scaling runs; it is not a source of paper numbers. Those wait for the 4-node comparison below to settle the settings.
+
+**Setup.** Batch jobs on skx: one of 16 nodes (runs at 4 and 16 nodes, so the job has its own 4-node reference) and one of 32 nodes (runs at 32). Script `$WORK/charades-runs/scale/scale.slurm`; output in `$WORK/charades-runs/scale/`. Two reps, interleaved.
+- Weak-scaled Gaussian PHOLD, lookahead 100, mean delay 1,000, end time 512,000, 15 start events, 128 LPs per PE or rank. Full nodes: 2 processes × 23 PEs per node (Devastator 2 processes × 23 workers; ROSS 46 ranks per node, so all three engines have the same LPs and commit the same events). σ is in LP ids and LPs per node stay constant, so σ 100 and σ 2,000 keep their off-node share as nodes are added; uniform remote 1.0 goes from 75% off-node at 4 nodes to 94% at 16 and 97% at 32.
+- Charades `charades-main` (eef0778, the revised controller as default), native psm2, htram PP 512:
+  - htram, σ 100, σ 2,000, uniform: the controller (ε 0.001) and fixed W 150, 250, 400 (W 250 was best at 4 nodes).
+  - direct sends, σ 2,000: the controller and fixed W 250, 500.
+  - `+lci_ndevices` 8 and 32 against the default 16: htram, σ 2,000, W 250.
+- Devastator (ofi-psm2, `--rng=clcg4`), rebuilt for 32 and 64 processes: σ 100 at W 1,000; σ 2,000 at W 500 and 1,000 (its best at 4 nodes).
+- ROSS optimistic (`--read-buffer=1`, default batch and GVT interval), σ 2,000.
+
+**Measures.** Weak-scaling efficiency: M committed events/s per node at N nodes ÷ the same at 4 nodes (higher is better; 1.0 is perfect). Also the controller ÷ the best fixed W, events per htram message, GVT rounds per second, and Charades' speedup over each engine.
+
+**Predictions:**
+- S1. Every run finishes, apart from excessive-rollback stalls at fixed W 400. No startup or GVT hangs.
+- S2. Charades with htram at σ 100 and σ 2,000: weak-scaling efficiency ≥ 0.85 at 16 and 32 nodes; events per htram message within 20% of 4 nodes, since each node still sends to the same few neighbours.
+- S3. Uniform: efficiency 0.4–0.7. Each process now sends to 32–64 others instead of 8, so each destination buffer fills 4–8× more slowly; events per htram message fall below half of 4 nodes'.
+- S4. The best fixed W stays 250 at σ 100 and σ 2,000. The controller reaches ≥ 0.90 of the best fixed W there, and 0.80–1.0 at uniform, where κ was not tested at this many destinations.
+- S5. Devastator: weak-scaling efficiency ≥ 0.85 at σ 100 and ≥ 0.75 at σ 2,000. Charades' speedup over Devastator at σ 2,000 (each at its best measured W) stays 0.9–1.2, as at 4 nodes (1.03).
+- S6. ROSS: efficiency 0.7–1.0 at σ 2,000. Charades' speedup over ROSS is 3–6.
+- S7. Direct sends: efficiency ≥ 0.8 at σ 2,000; the controller ≥ 0.95 of the best fixed W.
+- S8. No `+lci_ndevices` setting beats 16 by more than 5% at 16 nodes; at 32 nodes, 32 devices may gain a few percent.
+
+### Three engines at 4 nodes, paper grade (design, 2026-10-23; written before any runs)
+
+> **Status: design.** Written before any runs.
+
+**Why.** The cross-engine numbers in "Current numbers" have three known faults: Devastator ran its xorshift RNG (10% faster than CLCG4 at σ 100), ROSS has not been rerun since job 3626388 and was never tuned, and the 1.9 s runs understate adaptive windows, which spend their first rounds finding W. This run replaces them with numbers to quote.
+
+**Setup.** One interactive allocation of 4 skx nodes (idev on skx, 4 h), script `$WORK/charades-runs/cmp4/cmp4.sh`, output `$WORK/charades-runs/cmp4/`. Full nodes, 23,552 LPs (128 per PE or rank), 15 start events. Three reps, reps outermost so a cut-off job still has whole reps.
+- **Run length**: about 1.3 × 10⁹ committed events per run, 10–25 s for Charades. End times: lookahead 100 / mean delay 1,000 at 4,096,000; lookahead 10 / mean delay 200 at 768,000; phase-changing PHOLD (alternating between the two every 32,000) at 2,048,000.
+- **Workloads**: lookahead 100 / mean delay 1,000 at σ 100, 500, 1,000, 2,000, 4,000 and uniform remote 1.0; lookahead 10 / mean delay 200 at σ 500, 2,000 and uniform; phase-changing PHOLD at remote 0.5 and 1.0. Eleven in all.
+- **Charades** (`charades-main`, eef0778; native psm2, PP 512): with htram, the controller and fixed W around the best from job 3629781 (lookahead 100: 200, 250, 300; lookahead 10: 25, 50, 100; phases: 50, 100, 250). With direct sends, as the aggregation ablation, at σ 100, σ 2,000, uniform and lookahead-10 uniform: the controller and fixed W 250 and 500 (lookahead 10: 50, 100).
+- **Devastator** (ofi-psm2, 8 processes × 23 workers, `--rng=clcg4`): its adaptive window (capped at 90 s; a stall bounds the rate) and fixed W 250, 500, 1,000, 2,000 (lookahead 10: 100, 200, 400; phases: 100, 250, 500).
+- **ROSS** (optimistic, `--read-buffer=1`, 46 ranks per node): first a tuning sweep at σ 2,000, end 512,000: `--batch` 4, 16, 64 × `--gvt-interval` 16, 64, 256, plus the best setting at 48 ranks per node with 24,576 LPs, to measure what the 46-rank layout costs ROSS per core. Then the best setting on every workload except phases, which its model doesn't have.
+
+**Measures.** M committed events/s, medians of 3; Charades' speedup over each engine (Charades ÷ the other, each at its best, higher is better for Charades); each adaptive policy ÷ its engine's best fixed W; committed counts equal across the three engines in each workload.
+
+**Predictions:**
+- C1. Charades' speedup over Devastator, both at their best fixed W: 0.65–0.80 at σ 100; 0.75–0.95 at σ 500–1,000; 1.0–1.15 at σ 2,000; 1.2–1.6 at σ 4,000 and uniform; 0.6–1.1 with lookahead 10; 0.7–1.05 on phases. That is the full-node pattern with CLCG4's 2–10% added to Charades' side.
+- C2. Charades' controller ÷ its best fixed W ≥ 0.95 in every workload; ≥ 1.0 on phases.
+- C3. Devastator's adaptive window ÷ its best fixed W: ≤ 0.3 from σ 1,000 up and on phases, 0.6–0.9 at σ 100 and 500. Longer runs do not rescue it, because its failure is a collapsed window, not a slow start.
+- C4. Charades' controller ÷ Devastator's best fixed W ≥ 0.95 in the five workloads where C1 predicts Charades leads.
+- C5. ROSS tuning moves ROSS by ≤ 20% over its defaults; 46 against 48 ranks per node changes its per-core rate by ≤ 5%.
+- C6. Charades' speedup over ROSS (both at their best) is 2.5–4.5 in every workload, highest at uniform.
+- C7. Aggregation (Charades best htram ÷ best direct) 2.2–4.0, as in job 3629781.
 
 ## Baseline verification on the Mac
 
