@@ -1,0 +1,12 @@
+# As base, but worst-case traffic (every terminal sends to the next group)
+# with non-minimal routing through a random intermediate group
+routers-per-group=4
+global-channels=2
+terminals-per-router=2
+traffic=2
+routing=1
+arrive-rate=200
+end-time=20000000
+lookahead=100
+buffer-size=65536
+expected-events=311214

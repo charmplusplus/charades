@@ -1,0 +1,16 @@
+# As base, but worst-case traffic with minimal routing and small channel
+# buffers (16 chunks global, 64 local): the one global channel between each
+# pair of groups backs up, so first-hop chunks are dropped and later-hop
+# chunks wait for credits (the router waiting list)
+routers-per-group=4
+global-channels=2
+terminals-per-router=2
+traffic=2
+routing=0
+arrive-rate=200
+global-vc-size=16
+local-vc-size=64
+end-time=20000000
+lookahead=100
+buffer-size=65536
+expected-events=178850

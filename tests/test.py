@@ -9,7 +9,7 @@ process and across processes.
 Usage: python3 test.py [--tier change|engine|full] [--quick] [--all]
                        [--no-build] [--launcher lcrun|srun] [--nodes N]
                        [--launch PxQ ...] [--timeout SECONDS] [--repeat N]
-                       [test_config ...]
+                       [--model NAME ...] [test_config ...]
 
 Tiers (--tier; the whole matrix is ~3,250 runs and rarely needed):
   change  the named test_configs on the core model configs (CORE_MODEL_CFGS)
@@ -22,6 +22,10 @@ Tiers (--tier; the whole matrix is ~3,250 runs and rarely needed):
           the scheduler, aggregation or the controller.
   full    every test_config on every model config at seven shapes: before
           merging a large branch or starting a paper's runs.
+
+--model NAME (repeatable) runs only the named models (e.g. --model Dragonfly);
+in the engine tier's repeat pass, a named model without REPEAT_MODEL_CFGS
+entries repeats its core model configs.
 
 Races in the optimistic engine and the GVT algorithms show up in a few percent
 of runs or fewer, and repeats find them where breadth does not, so one pass
@@ -50,11 +54,14 @@ KNOWN_BROKEN = {'cd', 'phased'}
 # phases (the controller's phase changes), Imbalanced combo (load imbalance
 # and the 24 B payload slot), Traffic base (sensitive to the order of
 # equal-timestamp events; it found the non-strict comparator). The others
-# differ mostly in size and end time.
+# differ mostly in size and end time. Dragonfly base and congested: three LP
+# types, nine message types, a custom mapper, and (congested) the routers'
+# waiting lists, whose reverse computation leans on commit handlers.
 CORE_MODEL_CFGS = {
   'Simple PHOLD': ['base', 'phases'],
   'Imbalanced PHOLD': ['combo'],
   'Traffic': ['base'],
+  'Dragonfly': ['base', 'congested'],
 }
 # The engine tier's repeat pass looks for races, which need concurrency and
 # depend on timing more than on the model: multi-PE shapes only, on PHOLD
@@ -129,6 +136,9 @@ MODELS = [
   # the order of equal-timestamp events: it found the non-strict comparator
   # in CustomEventComparator (see event.C).
   Model('Traffic', 'traffic', 'traffic'),
+  # A CODES-derived dragonfly network (routers, terminals, MPI processes);
+  # its remote messages fit the 24 B htram payload slot
+  Model('Dragonfly', 'dragonfly', 'dragonfly'),
 ]
 
 
@@ -166,7 +176,20 @@ def main():
                       'test_configs (default 20)')
   parser.add_argument('--timeout', type=float, default=180.0,
                       help='seconds before a run counts as hung')
+  parser.add_argument('--model', action='append', metavar='NAME',
+                      help='run only this model (repeatable): ' +
+                      ', '.join(m.name for m in MODELS))
   opts = parser.parse_args()
+
+  models = MODELS
+  repeat_cfgs = REPEAT_MODEL_CFGS
+  if opts.model:
+    unknown = set(opts.model) - set(m.name for m in MODELS)
+    if unknown:
+      sys.exit('Unknown models: ' + ', '.join(sorted(unknown)))
+    models = [m for m in MODELS if m.name in opts.model]
+    repeat_cfgs = {m.name: REPEAT_MODEL_CFGS.get(m.name) or
+                   CORE_MODEL_CFGS.get(m.name, []) for m in models}
 
   charm = charm_dir()
   launcher = Launcher(opts.launcher, charm, opts.nodes)
@@ -214,7 +237,7 @@ def main():
     launches = [l for l in launches if l.procs == 1]
 
   if not opts.no_build:
-    for m in MODELS:
+    for m in models:
       subprocess.run(['make', '-s', '-C', m.root], check=True)
 
   # Passes of (test_configs, repeats, model configs, shapes): full and change
@@ -227,12 +250,12 @@ def main():
   else:
     passes = [(working, 1, CORE_MODEL_CFGS, launches)]
     if named:
-      passes.append((named, opts.repeat or 20, REPEAT_MODEL_CFGS,
+      passes.append((named, opts.repeat or 20, repeat_cfgs,
                      [l for l in launches if l.pes > 1] or launches))
 
   results = []
   for names, repeat, model_cfgs, shapes in passes:
-    for m in MODELS:
+    for m in models:
       mcfgs = m.cfgs
       if model_cfgs is not None:
         keep = model_cfgs.get(m.name, [])

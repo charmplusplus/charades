@@ -1,0 +1,14 @@
+# 9 groups of 4 routers (2 global channels and 2 terminals per router): 36
+# routers, 72 terminals and 72 MPI processes, one router (with its terminals
+# and processes) per chare. Uniform random traffic, minimal routing; each
+# process sends 3000 / 200 = 15 one-packet messages. Time is in ps.
+routers-per-group=4
+global-channels=2
+terminals-per-router=2
+traffic=1
+routing=0
+arrive-rate=200
+end-time=20000000
+lookahead=100
+buffer-size=65536
+expected-events=226944

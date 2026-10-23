@@ -1,0 +1,8 @@
+module dragonfly_stats {
+  // Sums the model statistics over processes after the simulation ends
+  group DragonflyStatsGroup {
+    entry DragonflyStatsGroup();
+    entry void sums(CkReductionMsg* m);
+    entry void maxima(CkReductionMsg* m);
+  };
+};
