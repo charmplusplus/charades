@@ -29,6 +29,7 @@ Scheduler::Scheduler() {
 
   running = false;
   parked = false;
+  ended = false;
 
   // Initialize rng // TODO: Definitely doesn't belong here
   tw_rand_init(31, 41);
@@ -61,12 +62,26 @@ void Scheduler::start_simulation() {
   thisProxy[CkMyPe()].execute();
 }
 
+/**
+ * Every PE calls this once it has applied the final GVT (after its last
+ * fossil collection), and the LPs finalize only when all have. Before, PE 0
+ * broadcast finalize as soon as it reached the end itself: a PE whose own
+ * final GVT update was still queued then reported its statistics with its
+ * last events executed but not committed. Under the bucketed GVT across
+ * processes, runs whose events all drained before the end time committed too
+ * few events in 8 of 20 runs (traffic, end time 10,000,000) and 2-7 of 20-40
+ * (dragonfly); runs with events left at the end time never showed it.
+ */
 void Scheduler::end_simulation() {
+  if (ended) return;
+  ended = true;
   end_time = CmiWallTimer();
   cumulative_stats->total_time = end_time - start_time;
-  if (CkMyPe() == 0) {
-    lps.finalize();
-  }
+  contribute(CkCallback(CkReductionTarget(Scheduler, all_ended), thisProxy[0]));
+}
+
+void Scheduler::all_ended() {
+  lps.finalize();
 }
 
 void Scheduler::finalize_complete() {

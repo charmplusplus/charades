@@ -47,6 +47,8 @@ class Scheduler : public CBase_Scheduler {
      * (OptimisticScheduler::execute)
      */
     bool parked;
+    /** end_simulation ran on this PE (later GVT results must not end it twice) */
+    bool ended;
 
   public:
     // TODO: Globals may not be needed once event handling is moved to scheduler
@@ -61,7 +63,8 @@ class Scheduler : public CBase_Scheduler {
 
     /** Methods for starting and stopping the entire simulation */
     void start_simulation();  /**< Sets initial state and calls execute() */
-    void end_simulation();    /**< Starts stats reduction */
+    void end_simulation();    /**< This PE is done; finalize once all are */
+    void all_ended();         /**< Every PE has applied the final GVT */
     void finalize_complete();
     void finalize(CkReductionMsg *m); /**< Receives stats reduction and exits */
 
