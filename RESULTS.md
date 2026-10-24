@@ -109,6 +109,7 @@ Charades' controller ÷ Devastator's adaptive window: 0.68–1.03 at σ ≤ 500 
 | 44 | 2026-10-24 | — | Window sweep at 16 and 32 nodes | design |
 | 45 | 2026-10-24 | 3635596 | Window sweep at 16 and 32 nodes, results: 16 nodes | current |
 | 46 | 2026-10-24 | — | GVT round cost at 4 and 16 nodes | design |
+| 47 | 2026-10-24 | 3635612 | GVT round cost at 4 and 16 nodes, results | current |
 
 ## Stampede3 runs, in order
 
@@ -2293,6 +2294,45 @@ Devastator's W 1,000 beat W 500 at σ 2,000 at every node count.
 - G2. In Charades, a wave takes 2–4× the reduction alone at the same node count, and the excess (PEs answering late) accounts for most of the growth in wave time from 4 to 16 nodes.
 - G3. Buckets completed per wave, and waves per GVT advance, are about the same at 4 and 16 nodes.
 - G4. `--gvt-wave-events=0` changes the 16-node rate by less than 10%.
+
+### GVT round cost at 4 and 16 nodes, results (2026-10-24, batch job 3635612 on skx-dev)
+
+> **Status: current.**
+
+**Runs.** `$WORK/charades-runs/gvtprobe/gvtprobe.slurm`; outputs, traces and CSVs copied to `~/charades-data/gvtprobe/`; summary `probe_summary.py`. Every run finished; the two reps agree within 4%.
+
+**A. The reduction alone** (`tools/redbench`, µs per back-to-back wave, median of 2; lower is better):
+
+| nodes (PEs) | 1 (46) | 2 (92) | 4 (184) | 8 (368) | 16 (736) |
+|---|---|---|---|---|---|
+| µs per wave | 71.8 | 98.7 | 109.3 | 139.9 | 161.5 |
+| PE 0's latency, median / p99 (µs) | 70 / 88 | 95 / 123 | 104 / 141–432 | 130 / 484 | 142 / 514 |
+
+**B. Waves in Charades** (`--gvt-trace=1`; medians of 2; each row is one run's medians):
+
+| run | M ev/s | GVT advances | waves per advance | µs per advance (mean) | wave seen by PE 0, median µs | PE 0's delay before contributing, median µs | buckets completed per wave | time in `execute()` % | batches blocked by the window % |
+|---|---|---|---|---|---|---|---|---|---|
+| 4 nodes, σ 100, W 250 | 121.9 | 8,342 | 1.00 | 178 | 72 | 90 | 7.7 | 60 | 94 |
+| 4 nodes, σ 2,000, W 250 | 100.7 | 8,333 | 1.00 | 216 | 73 | 121 | 7.7 | 56 | 95 |
+| 4 nodes, σ 2,000, W 400 | 98.1 | 7,030 | 1.00 | 262 | 160 | 51 | 9.1 | 56 | 95 |
+| 16 nodes, σ 100, W 250 | 333.8 | 8,278 | 1.00 | 262 | 187 | 7 | 7.7 | 57 | 97 |
+| 16 nodes, σ 100, W 400 | 408.9 | 5,781 | 1.00 | 306 | 214 | 11 | 11.1 | 62 | 95 |
+| 16 nodes, σ 2,000, W 250 | 292.9 | 8,306 | 1.00 | 297 | 198 | 9 | 7.7 | 55 | 97 |
+| 16 nodes, σ 2,000, W 400 | 331.6 | 5,756 | 1.00 | 379 | 243 | 17 | 11.1 | 57 | 96 |
+
+**C.** 16 nodes, σ 2,000, W 400: `--gvt-wave-events=0` 326.4 against 331.6 M ev/s with the default 128 (0.98): no effect.
+
+**What it says:**
+- **Every GVT advance is one count wave**, completing about 7.7 buckets at W 250 at both node counts, and 95–97% of scheduler batches end blocked by the window. PEs spend 55–62% of their time in `execute()`; the rest is mostly waiting for GVT.
+- **At 16 nodes, a GVT advance is the reduction's latency.** PE 0 answers each wave within 7–17 µs, then waits 187–243 µs for the result, close to the reduction alone at 16 nodes (162 µs; more under load). At 4 nodes the reduction is partly hidden: PE 0 is still finishing a batch for 90–121 µs before it contributes, and then waits only 72 µs.
+- **The reduction is slow even inside one node**: 72 µs for 46 PEs in 2 processes. A spanning tree over 46 PEs is about 3 levels up and 3 down, so this is roughly 12 µs per hop through Reconverse's scheduler and messaging. It then grows by about 20 µs per doubling of nodes.
+- **So the lever for scale is reduction latency in Reconverse** (or a GVT path that doesn't go through a general group reduction): if a wave took 30–50 µs at 16 nodes, an advance would take roughly 100 µs instead of 260–300, and PEs that now sit blocked by the window 97% of the time would run. That estimate assumes nothing else becomes the limit.
+
+**Predictions:**
+- G1. **Wrong** on the level (72–162 µs, not 30–80); right that it grows by at most 2× from 4 to 16 nodes (1.48×).
+- G2. **Wrong.** At 16 nodes a wave is 1.2–1.5× the reduction alone, and PE 0 answers at once; the growth is the reduction, not PEs answering late. At 4 nodes PE 0's late answer (90–121 µs) is as large as the wave.
+- G3. Right: one wave per advance and 7.7 buckets per wave at W 250 at both node counts.
+- G4. Right: 0.98.
 
 ## Baseline verification on the Mac
 
