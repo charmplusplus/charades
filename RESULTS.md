@@ -110,6 +110,7 @@ Charades' controller ÷ Devastator's adaptive window: 0.68–1.03 at σ ≤ 500 
 | 45 | 2026-10-24 | 3635596 | Window sweep at 16 and 32 nodes, results: 16 nodes | current |
 | 46 | 2026-10-24 | — | GVT round cost at 4 and 16 nodes | design |
 | 47 | 2026-10-24 | 3635612 | GVT round cost at 4 and 16 nodes, results | current |
+| 48 | 2026-10-24 | 3635622 | Where a reduction's time goes, one node | current |
 
 ## Stampede3 runs, in order
 
@@ -2333,6 +2334,44 @@ Devastator's W 1,000 beat W 500 at σ 2,000 at every node count.
 - G2. **Wrong.** At 16 nodes a wave is 1.2–1.5× the reduction alone, and PE 0 answers at once; the growth is the reduction, not PEs answering late. At 4 nodes PE 0's late answer (90–121 µs) is as large as the wave.
 - G3. Right: one wave per advance and 7.7 buckets per wave at W 250 at both node counts.
 - G4. Right: 0.98.
+
+### Where a reduction's time goes, one node (2026-10-24, skx-dev batch job 3635622, plus the Mac)
+
+> **Status: current.** No design section: a short diagnostic follow-up to "GVT round cost", run the same morning. A larger follow-up (job 3635628: reduction modes, PEs per process, 4 and 16 nodes, `perf`) never ran: the job was killed at startup (signal 53, no output) while `/work2` hung on skx-dev compute nodes (an `ssh node hostname` to a fresh allocation also hung).
+
+**Runs.** `tools/redbench` gained a ping-pong mode (`-p PEER`: round trips of a one-int group message between PE 0 and PE PEER) and reduction modes (`-m`: 0 the GVT's tuple, 1 one int, 2 the 16-int array). `$WORK/charades-runs/gvtprobe/hop.slurm`; copied to `~/charades-data/gvtprobe/hop/`. One skx node, psm2, `+lci_ndevices 16`; 2 reps, which agree within 4% except one noted. The first launch of the job (one process, rep 1) stalled at startup for 120 s; its rep 2 ran normally.
+
+**Message hops** (round trip, µs, mean of 100,000; lower is better):
+
+| | round trip |
+|---|---|
+| 1 process × 23 PEs, PE 0 ↔ PE 1 | 2.11 |
+| 2 processes × 23 PEs, PE 0 ↔ PE 1 (same process) | 2.96–3.02 |
+| same, `+backend_poll_thread 23` (one network poller per process) | 2.75–2.86 |
+| same, `+backend_poll_freq 1` | 2.59–2.63 |
+| same, `+lci_ndevices 1` | 3.12–3.23 |
+| 2 processes, PE 0 ↔ PE 23 (other process, same node) | 9.18–9.19 (median 7.63) |
+
+**Reductions shaped like a GVT count wave** (µs per wave; lower is better):
+
+| | µs per wave |
+|---|---|
+| 2 processes × 1 PE | 7.1–7.2 |
+| 1 process × 23 PEs | 26.5–26.9 |
+| 2 processes × 23 PEs | 71.0–71.4 |
+| same, `+backend_poll_thread 23` | 72.3, 79.7 |
+| same, `+backend_poll_freq 1` | 71.0–72.4 |
+
+On the Mac (one process, 8 PEs): the GVT's tuple 7.9 µs per wave, one int 5.1, the 16-int array without a tuple 5.3. On the Mac with 2 processes everything is slow (a same-process round trip 27 µs against 0.6 with one process): every PE's loop spends about half its time in libfabric tcp's `kevent` progress call; that is the Mac's tcp provider, not what Stampede3's psm2 does.
+
+**What it says:**
+- **Message hops are cheap on Stampede3**: about 1.5 µs within a process and 4–5 µs between the two processes of a node; network polling settings change neither.
+- **The reduction's cost is its shape.** Charm++'s group reduction (`CkReductionMgr::init_TopoTree`) is flat within a process: every PE but the first sends its contribution straight to the process's first PE, which receives and combines 22 messages one after another. The result comes back through Reconverse's `CmiForwardMsgToPeers`, also flat: the first PE allocates and sends one copy per local PE (22 `CmiAlloc` + `memcpy` + push; its own comment: "FIXME: now it's just a flat p2p send!! When node size is large, it should also be sent in a tree"). That is about 44 serial message operations on one PE per wave per process, about 1.2 µs each: 26.5 µs for one process of 23 PEs.
+- **Two processes cost far more than one plus a hop** (71 µs against 26.5 + 7). Not yet explained; the profile that would have shown it is in the job that did not run.
+- In Charades the first PE of each process is also executing events, so its 44 operations per wave wait behind its batches.
+- **The GVT's tuple adds about half on top of a plain sum** (Mac, 8 PEs), which Charades can avoid on its own.
+
+**Fixes, in order of reach:** (1) Charades: combine each process's counts in shared memory (atomic adds into a per-process buffer; the last PE in contributes once per process) and publish the result through shared memory, so the cross-process reduction has 2 members per node instead of 46 and no PE handles 44 messages per wave; drop the tuple. (2) Reconverse: a tree for the local fan-out (the FIXME), and a node-aware local fan-in in Charm++'s reduction manager. (1) needs no runtime change.
 
 ## Baseline verification on the Mac
 
