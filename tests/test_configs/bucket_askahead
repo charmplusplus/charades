@@ -1,0 +1,5 @@
+# bucket with --gvt-ask-ahead=-1: every count wave reports counts up to the window
+sync=3
+gvt=4
+buffer-size=655360
+gvt-ask-ahead=-1

@@ -361,9 +361,26 @@ void BucketGVT::wave_done(const int* counts, int num_buckets,
   /** Advance the GVT past the completed buckets */
   if (completed_buckets) advance_gvt(completed_buckets);
 
-  /** If there are still valid buckets then continue to send counts */
+  /**
+   * If there are still valid buckets then continue to send counts. The next
+   * wave asks about the buckets this one left open; with --gvt-ask-ahead, at
+   * least that many past GVT. A bucket can complete only if the wave before
+   * reported its counts, so asking only about those left open lets a bucket
+   * complete about three waves after every PE passed it (in steady state a
+   * wave completes a third of the buckets every PE has passed); asking about
+   * every bucket up to the window lets it complete one wave after. Every PE
+   * computes the same number from the same result and the same window.
+   */
   if (valid_buckets - completed_buckets) {
-    send_counts(valid_buckets - completed_buckets);
+    int next = valid_buckets - completed_buckets;
+    int ahead = g_tw_gvt_ask_ahead;
+    if (ahead < 0) {
+      Time window = PE_VALUE(window);
+      ahead = window ? (int)((window + bucket_size - 1) / bucket_size) + 2 : 0;
+    }
+    next = std::max(next, ahead);
+    next = std::min(next, total_buckets - curr_bucket);
+    send_counts(next);
   } else {
     active = false;
     attempt_gvt();

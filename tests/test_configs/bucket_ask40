@@ -1,0 +1,5 @@
+# bucket with --gvt-ask-ahead=40 (no window: a fixed number of buckets per wave)
+sync=3
+gvt=4
+buffer-size=655360
+gvt-ask-ahead=40

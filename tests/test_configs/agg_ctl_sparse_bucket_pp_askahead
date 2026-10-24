@@ -1,0 +1,14 @@
+# agg_ctl_sparse_bucket_pp with --gvt-ask-ahead=-1: every count wave reports counts up to the window
+sync=3
+gvt=4
+buffer-size=655360
+optimism-window=2000
+aggregation=1
+agg-mode=2
+agg-buffer=16
+agg-policy=1
+ctl=1
+ctl-agg-kappa=0.2
+ctl-sparse-waves=1
+ctl-hist-waves=32
+gvt-ask-ahead=-1

@@ -41,6 +41,7 @@ unsigned g_tw_gvt_trigger;
 unsigned g_tw_gvt_phases;
 unsigned g_tw_gvt_bucket_size;
 unsigned g_tw_gvt_min_buckets;
+int g_tw_gvt_ask_ahead;
 unsigned g_tw_gvt_trace;
 unsigned g_tw_pe_stats;
 unsigned g_tw_gvt_wave_events;
@@ -122,6 +123,7 @@ void clear_globals() {
   g_tw_gvt_phases    = 2;
   g_tw_gvt_bucket_size    = 8;
   g_tw_gvt_min_buckets    = 1;
+  g_tw_gvt_ask_ahead      = 0;
   g_tw_gvt_trace          = 0;
   g_tw_pe_stats           = 0;
   // Paced count waves are 1.0-1.38x faster on 4 nodes and remove the
