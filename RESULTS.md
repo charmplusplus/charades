@@ -112,6 +112,7 @@ Charades' controller ÷ Devastator's adaptive window: 0.68–1.03 at σ ≤ 500 
 | 47 | 2026-10-24 | 3635612 | GVT round cost at 4 and 16 nodes, results | current |
 | 48 | 2026-10-24 | 3635622 | Where a reduction's time goes, one node | current |
 | 49 | 2026-10-24 | — | GVT count waves combined per process, `--gvt-node-waves` | design |
+| 50 | 2026-10-24 | 3635736 | GVT count waves combined per process, results | current |
 
 ## Stampede3 runs, in order
 
@@ -2398,6 +2399,40 @@ On the Mac (one process, 8 PEs): the GVT's tuple 7.9 µs per wave, one int 5.1, 
 - N2. At 16 nodes the best fixed W gains 30–60% (σ 100 and σ 2,000), and weak-scaling efficiency at σ 2,000 rises from 0.76 to at least 0.9. At 4 nodes the gain is 5–15%, since there the wave is partly hidden behind PE 0's batches.
 - N3. Committed counts are identical to the message path in every run.
 - N4. With cheaper rounds, the best W at 16 nodes moves back toward 250–300.
+
+### GVT count waves combined per process, results (2026-10-24, skx-dev batch job 3635736, 16 nodes)
+
+> **Status: current.** Short runs (end 512,000), 2 reps; the two paths ran from the same binary (`$WORK/charades-nw`: eef0778 plus the `gvt-node-waves` change), interleaved.
+
+**Runs.** `$WORK/charades-runs/nodewaves.slurm`; CSVs, traces and `summary.md` in `~/charades-data/nodewaves/`. All 40 measured runs finished (the job's first launch, a warm-up, hit the cap: the usual cold start). **Committed counts are identical between the two paths in every workload.**
+
+**Results** (medians of 2; M committed events/s, higher is better; µs per GVT advance, lower is better):
+
+| run | message path: M ev/s | µs per advance | per-process waves: M ev/s | µs per advance | gain |
+|---|---|---|---|---|---|
+| 4 nodes, σ 100, W 250 | 122.6 | 177 | **162.4** | 131 | 1.32 |
+| 4 nodes, σ 100, W 400 | 104.6 | 235 | 141.6 | 171 | 1.35 |
+| 4 nodes, σ 2,000, W 250 | 105.4 | 205 | **135.8** | 156 | 1.29 |
+| 4 nodes, σ 2,000, W 400 | 99.2 | 254 | 118.3 | 213 | 1.19 |
+| 16 nodes, σ 100, W 250 | 329.8 | 265 | 467.3 | 181 | 1.42 |
+| 16 nodes, σ 100, W 400 | 400.4 | 308 | **469.7** | 224 | 1.17 |
+| 16 nodes, σ 2,000, W 250 | 291.7 | 299 | **373.8** | 227 | 1.28 |
+| 16 nodes, σ 2,000, W 400 | 315.8 | 397 | 365.0 | 311 | 1.16 |
+| 16 nodes, controller, σ 100 (mean W) | 346.6 (292) | 297 | 450.7 (296) | 209 | 1.30 |
+| 16 nodes, controller, σ 2,000 (mean W) | 288.9 (277) | 338 | 366.2 (275) | 252 | 1.27 |
+
+- **Best against best: 1.29–1.32× at 4 nodes and 1.17–1.18× at 16.** At 16 nodes the best W moves back to 250 (σ 2,000) or ties 250 and 400 (σ 100), and the controller reaches 0.96 and 0.98 of the best fixed W, up from 0.86.
+- A GVT advance takes 131–156 µs at 4 nodes (was 177–205) and 181–227 µs at 16 at W 250 (was 265–299). At 16 nodes most of what remains is the reduction across the 32 processes.
+- **Against Devastator** (its rates from earlier jobs with the same end time, 3633769 and 3635596, so indicative only; Charades ÷ Devastator, higher is better for Charades): 4 nodes σ 100 0.96 (was 0.73), σ 2,000 1.29 (was 1.02); 16 nodes σ 100 0.71 (was 0.62), σ 2,000 0.98 (was 0.86).
+- Weak-scaling efficiency from 4 to 16 nodes, each path against its own 4-node rate: σ 100 0.72, σ 2,000 0.69. It looks lower than before only because the 4-node rate rose more.
+
+**Predictions:**
+- N1. **Wrong.** At 16 nodes a wave seen by PE 0 is 116–179 µs (not ≤ 80) and an advance 181–311 µs (not ≤ 130): combining within processes removed about a third, and the cross-process reduction remains.
+- N2. **Wrong both ways.** 16 nodes gain 17–18% best against best (not 30–60%); 4 nodes gain 29–32% (not 5–15%). The per-process combine matters as much at 4 nodes, where PE 0 used to spend its time handling 44 messages per wave.
+- N3. Right: identical committed counts.
+- N4. Right: the best W at 16 nodes is back to 250 (σ 2,000) or 250–400 (σ 100).
+
+**What this means:** `--gvt-node-waves` is the largest single gain since psm2, and it is free of any runtime change. The cross-engine numbers in "Current numbers" (message path) understate Charades by about 1.3× at 4 nodes; the paper-grade comparison should be rerun with it on. What is left at 16 nodes is the reduction across processes (32 members, about 180–230 µs per advance), next to try: a flatter or wider tree across processes, or contributing as soon as a process is complete rather than through an entry method.
 
 ## Baseline verification on the Mac
 
