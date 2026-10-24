@@ -133,7 +133,14 @@ void Scheduler::finalize(CkReductionMsg* msg) {
         g_tw_expected_events, final_stats->events_committed);
     CkAbort("Failed Simulation Expectations!\n");
   } else {
+    // test.py looks for this line. Redirected to a file, stdout is block
+    // buffered, and another process flushing its own buffer at exit could
+    // land between the two writes of a line that straddled a buffer boundary
+    // (dragonfly congested, 2x2: 5 of 40 runs). Flushed on both sides, the
+    // line is one write.
+    fflush(stdout);
     CkPrintf("Simulation Executed Successfully!\n");
+    fflush(stdout);
     final_printed = true;
     exit_when_done();
   }
