@@ -67,24 +67,35 @@ struct FpState {
 
 static thread_local FpState fp_state;
 
-void fp_check() {
+/** Why the fast path was turned off in this run (NULL: it was not) */
+static const char* fp_off_reason;
+
+void fp_resolve() {
   if (!g_tw_local_fast_path) return;
   if (g_tw_synchronization_protocol != OPTIMISTIC || g_tw_gvt_scheme != 4 ||
       g_tw_sched_park) {
-    CkAbort("--local-fast-path=1 needs the optimistic scheduler, the bucketed "
-            "GVT (--gvt=4) and no --sched-park: an event waiting in an inbox "
-            "is in transit, which only the bucketed GVT's counts see, and "
-            "every PE must keep draining its inbox\n");
+    // An event waiting in an inbox is in transit, which only the bucketed
+    // GVT's counts see, and every PE must keep draining its inbox
+    fp_off_reason = "it needs the optimistic scheduler, the bucketed GVT "
+                    "(--gvt=4) and no --sched-park";
+  } else if (g_tw_adaptive_buckets) {
+    fp_off_reason = "it does not support --gvt-adaptive-buckets";
+  } else if (g_tw_ldb_interval > 0 || g_tw_ldb_first > 0) {
+    fp_off_reason = "it does not support load balancing (events go to their "
+                    "chare's home PE)";
   }
-  if (g_tw_adaptive_buckets) {
-    CkAbort("--local-fast-path=1 does not support --gvt-adaptive-buckets\n");
+  if (fp_off_reason) g_tw_local_fast_path = 0;
+}
+
+void fp_check() {
+  if (fp_off_reason) {
+    CkPrintf("Local fast path: off, %s\n", fp_off_reason);
+  } else if (g_tw_local_fast_path) {
+    CkPrintf("Local fast path: events for other chares in %s are handed over "
+             "by pointer (--local-fast-path=%u)\n",
+             g_tw_local_fast_path == 2 ? "this PE" : "this process",
+             g_tw_local_fast_path);
   }
-  if (g_tw_ldb_interval > 0 || g_tw_ldb_first > 0) {
-    CkAbort("--local-fast-path=1 does not support load balancing: events "
-            "go to their chare's home PE\n");
-  }
-  CkPrintf("Local fast path: events for other chares in this process are "
-           "handed over by pointer (--local-fast-path)\n");
 }
 
 /** Push msg onto the inbox of the PE that owns its chare. False: elsewhere */

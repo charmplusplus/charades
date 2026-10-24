@@ -1,0 +1,5 @@
+# Optimistic w/Bucketed GVT; same-process events as messages or through htram (--local-fast-path=0)
+sync=3
+gvt=4
+buffer-size=655360
+local-fast-path=0

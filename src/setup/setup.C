@@ -45,6 +45,9 @@ void tw_init(int argc, char** argv) {
   if (g_tw_ctl == 1 && g_tw_optimism_window == 0) {
     g_tw_optimism_window = g_tw_gvt_scheme == 4 ? g_tw_gvt_bucket_size : 1;
   }
+  // Same-process events by pointer: on by default, off where it cannot work
+  // (jobs 3636369, 3636435: 1.29x at 16 nodes sigma 100, 0.97-1.04 elsewhere)
+  fp_resolve();
 }
 
 /**

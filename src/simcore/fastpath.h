@@ -16,6 +16,8 @@
  * received when drained, so one waiting in an inbox is in transit. As with
  * --agg-inbox, only where nothing waits on quiescence and every PE keeps
  * iterating: the bucketed GVT, the optimistic scheduler, not --sched-park.
+ * On by default (RESULTS.md "Same-process events by pointer"); elsewhere it
+ * turns itself off.
  */
 
 #ifndef FASTPATH_H_
@@ -26,7 +28,13 @@
 class Event;
 class RemoteEvent;
 
-/** Abort unless the run's settings allow --local-fast-path (PE 0, startup) */
+/**
+ * Turn --local-fast-path (on by default) off where it cannot work: other
+ * schedulers and GVTs, --sched-park, event holding, load balancing. Once per
+ * process, after the command line is parsed.
+ */
+void fp_resolve();
+/** Report whether the fast path is on, or why it was turned off (PE 0) */
 void fp_check();
 /**
  * Hand msg to its chare by pointer if that chare is in this process (and
