@@ -115,6 +115,7 @@ Charades' controller ÷ Devastator's adaptive window: 0.68–1.03 at σ ≤ 500 
 | 50 | 2026-10-24 | 3635736 | GVT count waves combined per process, results | current |
 | 51 | 2026-10-24 | — | The cross-process part of a GVT advance: allreduce by recursive doubling | design |
 | 52 | 2026-10-24 | 3635974 (3635873) | The cross-process part of a GVT advance, results | current |
+| 53 | 2026-10-24 | — | What makes a process late to a count wave: batch size and wave holding | design |
 
 ## Stampede3 runs, in order
 
@@ -2489,6 +2490,18 @@ On the Mac (one process, 8 PEs): the GVT's tuple 7.9 µs per wave, one int 5.1, 
 - A3. Right: identical committed counts.
 
 **Decision:** `--gvt-wave-allreduce` stays as an option, off. Next: what makes a process late, tried first with existing settings (`--gvt-wave-events=0`; `--batch` 4 and 8), traced, at 4 and 16 nodes.
+
+### What makes a process late to a count wave: batch size and wave holding (design, 2026-10-24; written before any runs)
+
+> **Status: design.** Written before any runs.
+
+**Why.** Crossing processes takes 152–204 µs of a 16-node advance while the reduction itself takes about 50 ("The cross-process part of a GVT advance, results"): the wave waits for the slowest process to gather its PEs. A PE runs a wave's result and contributes to the next only between scheduler batches (16 events by default), and it holds its contribution until it has run 128 events since its last one unless it ran out of work (`--gvt-wave-events`).
+
+**Runs** (one skx-dev job, 16 nodes, excluding the nodes suspected of the `/work2` hang): σ 100 and σ 2,000, W 250, `--gvt-trace=1`, 4 and 16 nodes, 2 reps; arms: default (batch 16, wave events 128); `--gvt-wave-events=0`; `--batch 8`; `--batch 4`; `--batch 4 --gvt-wave-events=0`.
+
+**Predictions:**
+- K1. If late PEs are what the wave waits for, `--batch 4` cuts the combined → result time at 16 nodes by at least 30% and raises throughput by at least 10%; the extra scheduler passes cost at most 5% at 4 nodes.
+- K2. `--gvt-wave-events=0` alone changes throughput by less than 5%.
 
 ## Baseline verification on the Mac
 
