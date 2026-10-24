@@ -125,6 +125,7 @@ Charades' controller ÷ Devastator's adaptive window: 0.68–1.03 at σ ≤ 500 
 | 60 | 2026-10-24 | 3636197 | Count waves that ask about every bucket up to the window, results | current |
 | 61 | 2026-10-24 | — | Same-process events by pointer (`--local-fast-path`) | design |
 | 62 | 2026-10-24 | 3636369 | Same-process events by pointer, results | current |
+| 63 | 2026-10-24 | — | Where the fast path loses at σ 2,000, and with WPs | design |
 
 ## Stampede3 runs, in order
 
@@ -2685,6 +2686,24 @@ Best ÷ best (each arm set at its best W): 4 nodes σ 100 1.01, σ 2,000 0.97; 1
 - **σ 2,000: no gain, 3% loss at 4 nodes.** Half the remote events still leave the process, and the advance time rises by 5–8 µs. Not yet explained; candidates: contended pushes onto inboxes (22 producers per inbox), messages read from another core's cache instead of copied in bulk, or htram's off-process buffers filling more slowly once same-process items leave them (74 instead of 117 events per message).
 - **F1 partly wrong** (best ÷ best 1.01 at 4 nodes; 1.10–1.14 only off the best W); **F2 wrong** (0.97–1.00); **F3 right** (htram carries only off-process events; efficiency equal or higher); **F4 right**; **F5 wrong**: the gain is larger at 16 nodes, where advances wait on work, not smaller.
 - `--local-fast-path` stays off by default until the σ 2,000 loss is understood.
+
+### Where the fast path loses at σ 2,000, and with WPs (design, 2026-10-24; written before any runs)
+
+> **Status: design.** Written before any runs.
+
+**Questions.** (1) Why the fast path costs 3% at σ 2,000 on 4 nodes, where half the remote events go by pointer. (2) Whether htram WPs 512, which was 1.25× PP 512 at 16 nodes σ 100 before the fast path, still helps now that htram carries only off-process events. (3) Charades ÷ Devastator in the same job, same end time.
+
+**New in the code** (Mac change tier 72/72 on `*_fastpath` and `*_fastpath_pe`):
+- `--local-fast-path=2`: by pointer only to other chares on the sender's own PE (no atomics); events to other PEs of the process go through htram as before.
+- "Inbox Push Retries (fast path)": pushes that failed their compare-and-swap because another PE pushed first.
+
+**Job** (skx-dev, 16 nodes, 2 reps, end 512,000, W 250 / W 400 / controller, σ 100 and 2,000, 4 and 16 nodes): fast path 0, 1, 2 with PP 512, and 1 with WPs 512; Devastator at W 500 and 1,000 (`--rng=clcg4`).
+
+**Predictions:**
+- P1. Mode 2 recovers the σ 2,000 loss (≥ 1.00 of off) and keeps most of the σ 100 gain at 16 nodes (≥ 1.10), i.e. the cross-PE inbox is the cost at σ 2,000.
+- P2. Push retries are below 5% of pushes, so contention is not the cause; the cost is reading messages from another core's cache.
+- P3. WPs 512 with the fast path beats PP 512 with the fast path at 16 nodes σ 100 (≥ 1.05), and loses at σ 2,000 as before.
+- P4. Charades ÷ Devastator at 16 nodes σ 100: 0.85–0.90.
 
 ## Baseline verification on the Mac
 

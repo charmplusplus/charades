@@ -64,7 +64,7 @@ void Statistics::clear() {
   remote_cancels = 0;
   anti_sends = 0;
   anti_cancels = 0;
-  fast_sends = fast_antis = 0;
+  fast_sends = fast_antis = fast_push_retries = 0;
 
   // Communication stats
   send_time = 0.0;
@@ -122,6 +122,7 @@ void Statistics::add(const Statistics* other) {
   anti_sends += other->anti_sends;
   fast_sends += other->fast_sends;
   fast_antis += other->fast_antis;
+  fast_push_retries += other->fast_push_retries;
   add_comm(other);
 
   // GVT stats
@@ -160,6 +161,7 @@ void Statistics::reduce(const Statistics* other) {
   anti_sends += other->anti_sends;
   fast_sends += other->fast_sends;
   fast_antis += other->fast_antis;
+  fast_push_retries += other->fast_push_retries;
   add_comm(other);
 
   // GVT stats
@@ -324,6 +326,7 @@ void Statistics::print() const {
   if (fast_sends || fast_antis) {
     print_int("Process Sends (fast path)", fast_sends);
     print_int("Process Anti Sends (fast path)", fast_antis);
+    print_int("Inbox Push Retries (fast path)", fast_push_retries);
   }
 
   /** \todo Add stats about cancellations */

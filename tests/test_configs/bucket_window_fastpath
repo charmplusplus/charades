@@ -1,5 +1,4 @@
-# Optimistic w/Bucketed GVT and an optimism window: no event executes past, with same-process events by pointer (--local-fast-path)
-# GVT + 2000 (the bucketed GVT itself never throttles execution)
+# Optimistic w/Bucketed GVT and an optimism window (GVT + 2000), with same-process events by pointer (--local-fast-path)
 sync=3
 gvt=4
 buffer-size=655360

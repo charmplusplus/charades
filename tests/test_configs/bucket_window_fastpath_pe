@@ -1,0 +1,6 @@
+# Optimistic w/Bucketed GVT and an optimism window (GVT + 2000), with events for other chares on this PE by pointer (--local-fast-path=2)
+sync=3
+gvt=4
+buffer-size=655360
+optimism-window=2000
+local-fast-path=2

@@ -41,7 +41,7 @@ void parse_command_line(int argc, char** argv) {
   kernel.register_argument("agg-buffer",           "htram buffer size in events (PP: a multiple of 16)", g_tw_agg_buffer);
   kernel.register_argument("agg-urgent",           "Ship an event at once if its ts < GVT + this (0 = never)", g_tw_agg_urgent);
   kernel.register_argument("agg-scope",            "Aggregate events to - ALL REMOTE CHARES=0, OTHER PROCESSES ONLY=1", g_tw_agg_scope);
-  kernel.register_argument("local-fast-path",      "Optimistic, bucketed GVT, not --sched-park: events for other chares in this process are handed over by pointer through per-PE inboxes, not htram or messages - NO=0 (default), YES=1", g_tw_local_fast_path);
+  kernel.register_argument("local-fast-path",      "Optimistic, bucketed GVT, not --sched-park: events for other chares in this process are handed over by pointer through per-PE inboxes, not htram or messages - NO=0 (default), YES=1, THIS PE ONLY=2", g_tw_local_fast_path);
   kernel.register_argument("agg-inbox",            "Optimistic, bucketed GVT, not --sched-park: htram node receives hand events to PEs through inboxes, not messages - NO=0, YES=1 (default)", g_tw_agg_inbox);
   kernel.register_argument("event-index",          "Optimistic: index received events for cancellation by - AVL TREE=0, HASH=1 (default)", g_tw_event_index);
   kernel.register_argument("msg-pool",             "Recycle event messages through a per-PE pool - NO=0, YES=1 (default)", g_tw_msg_pool);

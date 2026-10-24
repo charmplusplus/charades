@@ -95,13 +95,16 @@ static bool fp_push(RemoteEvent* msg, uint64_t dest_chare) {
     st.self_q.push_back(msg);
     return true;
   }
-  if (CkNodeOf(pe) != CkMyNode()) return false;
+  // --local-fast-path=2: this PE only (other PEs through htram or messages)
+  if (g_tw_local_fast_path == 2 || CkNodeOf(pe) != CkMyNode()) return false;
   std::atomic<RemoteEvent*>& head = process_inboxes()[CkRankOf(pe)].head;
   RemoteEvent* h = head.load(std::memory_order_relaxed);
-  do {
+  msg->fp_next = h;
+  while (!head.compare_exchange_weak(h, msg, std::memory_order_release,
+                                     std::memory_order_relaxed)) {
     msg->fp_next = h;
-  } while (!head.compare_exchange_weak(h, msg, std::memory_order_release,
-                                       std::memory_order_relaxed));
+    PE_STATS(fast_push_retries)++;  // another PE pushed (or a spurious failure)
+  }
   return true;
 }
 
