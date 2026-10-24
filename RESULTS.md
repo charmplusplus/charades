@@ -107,6 +107,7 @@ Charades' controller ÷ Devastator's adaptive window: 0.68–1.03 at σ ≤ 500 
 | 42 | 2026-10-23 | — | Three engines at 4 nodes, paper grade | design |
 | 43 | 2026-10-24 | 3633769, 3633770 | Scaling check at 16 and 32 nodes, results | current |
 | 44 | 2026-10-24 | — | Window sweep at 16 and 32 nodes | design |
+| 45 | 2026-10-24 | 3635596 | Window sweep at 16 and 32 nodes, results: 16 nodes | current |
 
 ## Stampede3 runs, in order
 
@@ -2241,6 +2242,39 @@ Devastator's W 1,000 beat W 500 at σ 2,000 at every node count.
 - W3. Uniform: the best W also grows, but gains ≤ 1.2× over W 400, since aggregation, not rounds, limits it.
 - W4. The controller with κ off sits wider than the default and reaches 0.9–1.0 of the best fixed W at σ 100 and σ 2,000; the default stays at 0.8–0.9.
 - W5. Devastator's best W stays 1,000, or moves to 2,000 for a gain of ≤ 10%.
+
+### Window sweep at 16 and 32 nodes, results: 16 nodes (2026-10-24, batch job 3635596 on skx-dev)
+
+> **Status: current** for 16 nodes. The 32-node job (3635597, skx) is still queued; its results will go in their own section.
+
+**Runs.** `$WORK/charades-runs/wsweep/wsweep.slurm`; CSVs and `deva/results.txt` copied to `~/charades-data/wsweep/`; summary `wsweep_summary.py 16`. 2 reps; all runs finished except W 1,200 at σ 100 and σ 2,000 (both reps hit the 60 s cap: excessive rollbacks). Weak-scaling efficiency uses the 4-node rates from job 3633769 (per node, best fixed W).
+
+**16 nodes** (M committed events/s, median of 2; higher is better; in parentheses: % of executed events committed, events per htram message):
+
+| arm | σ 100 | σ 2,000 | uniform |
+|---|---|---|---|
+| W 250 (job 3633769) | 331.9 | 288.3 | 129.7 |
+| **W 400** | **407.6** (99.99%, 144) | **326.0** (99.92%, 79) | 147.3 (99.25%, 14) |
+| W 600 | 259.6 (96.91%, 48) | 299.6 (99.30%, 31) | **158.4** (97.97%, 11) |
+| W 800 | 32.2 (87.33%, 25) | 216.9 (95.77%, 21) | 152.9 (93.66%, 9) |
+| W 1,200 | stalled | stalled | 115.5 (78.94%, 6) |
+| controller, default (÷ best; mean W) | 348.7 (0.86; 291) | 281.7 (0.86; 276) | 128.2 (0.81; 280) |
+| controller, κ off (÷ best; mean W) | 319.4 (0.78; 370) | 286.4 (0.88; 430) | 135.3 (0.85; 374) |
+| Devastator W 1,000 / W 2,000 | 661.2 / 640.5 | 380.1 / 351.0 | – |
+| Charades' speedup over Devastator (best ÷ best) | 0.62 | 0.86 | – |
+| Charades weak-scaling efficiency at its best W | 0.83 | 0.76 | 0.39 |
+
+**What it says:**
+- **A wider window does not recover the lost efficiency.** The best W at 16 nodes is about 400 (σ 100 and σ 2,000) and 600 (uniform), and the peak is sharp: from W 400 to 600 at σ 100, the committed share falls only from 99.99% to 96.91%, yet throughput falls by 36%, and events per htram message drop from 144 to 48. Past the best W, rollbacks and lost aggregation together cost more than the slower GVT rounds.
+- So the efficiency lost from 4 to 16 nodes (0.83 at σ 100, 0.76 at σ 2,000) has to come back from faster GVT rounds or cheaper communication, not from the window.
+- The controller is 0.81–0.86 of the best fixed W with κ and 0.78–0.88 without. Turning κ off lets it go wider (mean W 370–430) but loses at σ 100.
+
+**Predictions (16 nodes):**
+- W1. **Wrong.** The best W is about 400 at σ 100 and σ 2,000, not 600–800; W 800 already costs 33–92%.
+- W3. Right: at uniform the best W grows to 600 and gains 1.08× over W 400.
+- W4. **Wrong.** With κ off the controller reaches 0.78–0.88, not 0.9–1.0; the default stays at 0.81–0.86.
+- W5. Right: Devastator's W 2,000 is 0.92–0.97 of its W 1,000.
+- W2 is about 32 nodes; pending.
 
 ## Baseline verification on the Mac
 
