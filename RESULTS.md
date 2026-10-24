@@ -105,6 +105,7 @@ Charades' controller ÷ Devastator's adaptive window: 0.68–1.03 at σ ≤ 500 
 | 40 | 2026-10-23 | 3633379 | Controller: an aggregation bound, cheaper bookkeeping, a faster start, results | current |
 | 41 | 2026-10-23 | — | Scaling check at 16 and 32 nodes | design |
 | 42 | 2026-10-23 | — | Three engines at 4 nodes, paper grade | design |
+| 43 | 2026-10-24 | 3633769, 3633770 | Scaling check at 16 and 32 nodes, results | current |
 
 ## Stampede3 runs, in order
 
@@ -2158,6 +2159,69 @@ The revised controller is at least as good as the old one in all 14 workloads. I
 - C5. ROSS tuning moves ROSS by ≤ 20% over its defaults; 46 against 48 ranks per node changes its per-core rate by ≤ 5%.
 - C6. Charades' speedup over ROSS (both at their best) is 2.5–4.5 in every workload, highest at uniform.
 - C7. Aggregation (Charades best htram ÷ best direct) 2.2–4.0, as in job 3629781.
+
+### Scaling check at 16 and 32 nodes, results (2026-10-24, batch jobs 3633769 (16 nodes, runs at 4 and 16) and 3633770 (32 nodes))
+
+> **Status: current.** First runs above 8 nodes on the current stack. Short runs (end 512,000, 1.5–8 s), 2 reps; the fixed-W grid (150, 250, 400) turned out too narrow at scale, so Charades' "best fixed W" at 16 and 32 nodes is a lower bound.
+
+**Runs.** `$WORK/charades-runs/scale/scale.slurm`; CSVs, `deva/results.txt`, `ross/results.txt` copied to `~/charades-data/scale/`; summary `scale_summary.py`. Devastator built for 32 and 64 processes inside the jobs (1 and 4 min). Committed counts are identical across the three engines at every node count.
+- Failures: every `+lci_ndevices 32` run aborts at startup (`PSM2 can't open hfi unit: 0 (err=23)`, then LCI's `ofi_device_impl_t` assert): 2 processes × 32 psm2 endpoints exceed the node's hfi1 contexts. An abort, not a hang.
+- Two 4-node runs (rep 1, σ 100, the controller and W 150) hit the 120 s cap. They were the job's first two launches; rep 2 of the same runs took 1.6–2.0 s of execution. Most likely a cold start from `$WORK`, but the rep-1 logs were overwritten by rep 2 (both are labelled `r1` by `ctl_sweep.sh`), so this is not confirmed.
+
+**Charades with htram** (M committed events/s, median of 2; per node; weak-scaling efficiency = per-node rate ÷ the 4-node per-node rate, higher is better):
+
+| workload | nodes | best fixed W (W) | per node | efficiency | controller (÷ best; mean W) | events per htram message, best W |
+|---|---|---|---|---|---|---|
+| σ 100 (1.4% off-node) | 4 | 123.2 (250) | 30.8 | 1.00 | 113.1 (0.92; 296) | 214 |
+| | 16 | ≥ 404.1 (400) | 25.3 | ≥ 0.82 | 345.7 (0.86; 291) | 140 |
+| | 32 | ≥ 644.4 (400) | 20.1 | ≥ 0.65 | 521.2 (0.81; 284) | 139 |
+| σ 2,000 (27% off-node) | 4 | 106.8 (250) | 26.7 | 1.00 | 101.9 (0.95; 284) | 118 |
+| | 16 | ≥ 324.9 (400) | 20.3 | ≥ 0.76 | 287.1 (0.88; 274) | 79 |
+| | 32 | ≥ 494.8 (400) | 15.5 | ≥ 0.58 | 444.5 (0.90; 278) | 74 |
+| uniform (75 / 94 / 97% off-node) | 4 | 102.5 (250) | 25.6 | 1.00 | 93.5 (0.91; 282) | 149 |
+| | 16 | ≥ 144.6 (400) | 9.0 | ≥ 0.35 | 126.2 (0.87; 281) | 14 |
+| | 32 | ≥ 209.8 (400) | 6.6 | ≥ 0.26 | 175.4 (0.84; 278) | 8 |
+
+**Why Charades loses efficiency: GVT round latency, and aggregation at many destinations.**
+- At fixed W 250 every run needs the same number of GVT rounds (about 8,300), so it is paced by how fast rounds complete. Rounds per second at σ 100: 5,681 (4 nodes), 3,796 (16), 2,824 (32); at σ 2,000: 4,932, 3,307, 2,510. Execution time grows in proportion (σ 100: 1.47, 2.18, 2.92 s). Efficiency stays at 99.9–100% even at W 400, so a wider window would help further: the best W at 16 and 32 nodes is above the grid.
+- The controller does not follow. The aggregation bound κ 0.20 holds W at 274–291 at every node count, which was right at 4 nodes and too narrow at 16 and 32.
+- Uniform: events per htram message collapse from 149 to 14 and 8. Each process sends to 32–64 others; buffers flush on the deadline (h = W) long before they fill.
+
+**Direct sends and LCI devices** (σ 2,000):
+
+| nodes | direct best (W) | efficiency | controller ÷ best | htram ÷ direct | 8 devices ÷ 16 (htram W 250) |
+|---|---|---|---|---|---|
+| 4 | 33.7 (500) | 1.00 | 0.97 | 3.17 | 0.99 |
+| 16 | 119.9 (500) | 0.89 | 0.92 | 2.71 | 0.92 |
+| 32 | 218.4 (500) | 0.81 | 0.93 | 2.27 | 0.95 |
+
+**Across engines** (Charades' speedup = Charades best fixed W ÷ the other, higher is better for Charades; Charades' numbers are lower bounds at 16 and 32 nodes):
+
+| workload | nodes | Charades | Devastator, W 1,000 (efficiency) | ROSS (efficiency) | speedup over Devastator | speedup over ROSS |
+|---|---|---|---|---|---|---|
+| σ 100 | 4 | 123.2 | 169.2 (1.00) | – | 0.73 | – |
+| | 16 | ≥ 404.1 | 657.8 (0.97) | – | ≥ 0.61 | – |
+| | 32 | ≥ 644.4 | 1,245.0 (0.92) | – | ≥ 0.52 | – |
+| σ 2,000 | 4 | 106.8 | 105.1 (1.00) | 26.3 (1.00) | 1.02 | 4.06 |
+| | 16 | ≥ 324.9 | 363.7 (0.86) | 95.2 (0.90) | ≥ 0.89 | 3.41 |
+| | 32 | ≥ 494.8 | 724.3 (0.86) | 170.7 (0.81) | ≥ 0.68 | 2.90 |
+
+Devastator's W 1,000 beat W 500 at σ 2,000 at every node count.
+
+**Predictions:**
+- S1. Partly wrong: no hangs, but every 32-device run aborts (psm2 contexts), and two cold-start launches hit the cap.
+- S2. **Wrong.** Efficiency ≥ 0.82 / 0.65 at σ 100 and ≥ 0.76 / 0.58 at σ 2,000 (16 / 32 nodes), not ≥ 0.85; events per message at σ 100 fell by a third (at W 400 against W 250; at equal W they are unchanged).
+- S3. Wrong in degree: uniform efficiency 0.35 / 0.26, below 0.4–0.7; events per message fell more than predicted (149 → 8).
+- S4. **Wrong.** The best fixed W moves from 250 to at least 400; the controller reaches 0.81–0.90.
+- S5. Devastator's efficiency right (0.92–0.97 at σ 100, 0.86 at σ 2,000); Charades' speedup at σ 2,000 wrong (≥ 0.89 / ≥ 0.68, not 0.9–1.2).
+- S6. ROSS efficiency right (0.90 / 0.81); speedup 3.41 / 2.90, at and just below the range.
+- S7. Direct efficiency right (0.89 / 0.81); controller 0.92–0.93, below the predicted ≥ 0.95.
+- S8. Right for 8 devices (0.92–0.99 of 16); 32 devices could not run.
+
+**What this means:**
+- **At scale, Charades is paced by GVT round latency, not by rollbacks.** Two fixes, in order: (1) the controller should widen W when rounds are the limit; κ, which bounds aggregation cost, keeps W near its 4-node value; (2) make GVT rounds faster at 1,000+ PEs (round time roughly doubles from 4 to 32 nodes).
+- **Uniform traffic at many destinations defeats per-destination buffering.** This needs routing through intermediate nodes (as TRAM's virtual topologies do) or a deadline that grows with the number of destinations.
+- **The cross-engine picture at 4 nodes does not hold at 32 yet.** At σ 2,000 Charades goes from parity with Devastator to at least 0.68 of it. The next step is a W sweep beyond 400 at 16 and 32 nodes, to find the true best W before changing the controller.
 
 ## Baseline verification on the Mac
 
