@@ -127,6 +127,7 @@ Charades' controller ÷ Devastator's adaptive window: 0.68–1.03 at σ ≤ 500 
 | 62 | 2026-10-24 | 3636369 | Same-process events by pointer, results | current |
 | 63 | 2026-10-24 | — | Where the fast path loses at σ 2,000, and with WPs | design |
 | 64 | 2026-10-24 | 3636435 | Where the fast path loses at σ 2,000, and with WPs, results | current |
+| 65 | 2026-10-24 | — | Which htram mode and buffer for which workload (fast path on) | design |
 
 ## Stampede3 runs, in order
 
@@ -2741,6 +2742,24 @@ Best ÷ best (each arm set at its best W): 4 nodes σ 100 1.01, σ 2,000 0.97; 1
 - **WPs with the fast path** is the best Charades at 16 nodes σ 100: 1.35× fast path off, 1.05× fast path with PP (**P3 right**), and loses 8–15% at σ 2,000 as before. The htram mode should follow locality.
 - **Against Devastator** (**P4 right**): parity at 4 nodes σ 100 (1.00), ahead at σ 2,000 (1.24 at 4 nodes, 1.02 at 16), behind only at 16 nodes σ 100 (0.87 with PP, 0.91 with WPs; was 0.68).
 - With PP, the fast path's best ÷ best: 1.04 (4 nodes σ 100), 0.97 (4 nodes σ 2,000), 1.29 (16 nodes σ 100), 1.01 (16 nodes σ 2,000).
+
+### Which htram mode and buffer for which workload (fast path on) (design, 2026-10-24; written before any runs)
+
+> **Status: design.** Written before any runs.
+
+**Why.** With the fast path (now the default, 7df59d9), htram carries only events that leave their process. WPs 512 is 1.05× PP 512 at 16 nodes σ 100 but 0.85–0.92 at σ 2,000; before the fast path, PP 128 was 1.17× PP 512 at 16 nodes σ 100. The best setting follows locality and scale, so map it, then choose it automatically.
+
+**Grid** (fast path on, end 512,000 high slack / 128,000 low slack, 2 reps):
+- htram: PP and WPs × buffers 128, 512, 2,048 events.
+- Workloads: lookahead 100 / mean 1,000 at σ 100, 500, 1,000, 2,000, 4,000 and uniform remote 1.0 (arms W 250, W 400, controller); lookahead 10 / mean 200 at σ 500 and 2,000 (arms W 50, W 100, controller).
+- 4 nodes (skx, batch) and 16 nodes (skx-dev, batch), run as two jobs at once. Each starts with a warm-up launch on every node.
+- Devastator in the same jobs, `--rng=clcg4`, W 500 and 1,000 (high slack), W 100, 200, 400 (low slack).
+
+**Predictions:**
+- S1. WPs beats PP (each at its best buffer) at 16 nodes for σ ≤ 500, PP wins for σ ≥ 2,000; at 4 nodes PP is best or tied everywhere.
+- S2. The best buffer shrinks with locality: 128 at σ 100–500 on 16 nodes, 512 or 2,048 for σ ≥ 2,000 and uniform.
+- S3. The best (mode, buffer) beats PP 512 by ≥ 5% in at least 4 of the 16 (workload, nodes) cells and by ≤ 2% elsewhere.
+- S4. A rule on the share of events that leave the process (known from σ, LPs per process and the mapping) picks a setting within 3% of the best in every cell.
 
 ## Baseline verification on the Mac
 
