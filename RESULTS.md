@@ -128,6 +128,7 @@ Charades' controller ÷ Devastator's adaptive window: 0.68–1.03 at σ ≤ 500 
 | 63 | 2026-10-24 | — | Where the fast path loses at σ 2,000, and with WPs | design |
 | 64 | 2026-10-24 | 3636435 | Where the fast path loses at σ 2,000, and with WPs, results | current |
 | 65 | 2026-10-24 | — | Which htram mode and buffer for which workload (fast path on) | design |
+| 66 | 2026-10-24 | 3636522 (16 nodes; 4 nodes pending in 3636523) | Which htram mode and buffer for which workload, results | current, partial |
 
 ## Stampede3 runs, in order
 
@@ -2760,6 +2761,30 @@ Best ÷ best (each arm set at its best W): 4 nodes σ 100 1.01, σ 2,000 0.97; 1
 - S2. The best buffer shrinks with locality: 128 at σ 100–500 on 16 nodes, 512 or 2,048 for σ ≥ 2,000 and uniform.
 - S3. The best (mode, buffer) beats PP 512 by ≥ 5% in at least 4 of the 16 (workload, nodes) cells and by ≤ 2% elsewhere.
 - S4. A rule on the share of events that leave the process (known from σ, LPs per process and the mapping) picks a setting within 3% of the best in every cell.
+
+### Which htram mode and buffer for which workload, results (2026-10-24; 16 nodes: skx-dev batch job 3636522; 4 nodes pending in 3636523)
+
+> **Status: current, partial** (16 nodes only). Short runs, 2 reps (medians), fast path on (default); data `~/charades-data/hsel/` (`hsel_summary.py n16`). All 288 measured runs finished (both warm-up launches hit the cap, as intended). Committed counts identical across all six htram settings in every workload. Both engines ran slower in this allocation than in job 3636435 (Charades PP 512 σ 100: 545 against 577; Devastator: 582 against 661), so engines are compared only within a job.
+
+**16 nodes, each setting at its best arm, ÷ PP 512** (higher is better):
+
+| workload | PP 512 (M ev/s) | PP 128 | PP 2,048 | WPs 128 | WPs 512 | WPs 2,048 | best (arm) | best ÷ PP 512 | Devastator best (M ev/s) | Charades best ÷ Devastator |
+|---|---|---|---|---|---|---|---|---|---|---|
+| lookahead 100, σ 100 | 545.4 | 0.99 | **1.09** | 1.04 | 1.05 | 1.06 | PP 2,048 (W 250) | 1.09 | 581.8 | 1.02 |
+| σ 500 | 499.8 | 0.95 | **1.07** | 0.99 | 1.01 | 1.01 | PP 2,048 (controller) | 1.07 | 506.9 | 1.06 |
+| σ 1,000 | 456.8 | 0.97 | **1.08** | 0.96 | 0.97 | 1.00 | PP 2,048 (controller) | 1.08 | 433.0 | 1.14 |
+| σ 2,000 | 355.8 | 0.93 | 0.70 | 0.89 | 0.93 | 0.93 | PP 512 (W 400) | 1.00 | 366.0 | 0.97 |
+| σ 4,000 | 297.3 | 0.96 | 0.71 | 0.88 | 0.88 | 0.88 | PP 512 (W 400) | 1.00 | 289.5 | 1.03 |
+| uniform remote 1.0 | 161.4 | 0.99 | 0.94 | **1.12** | 1.11 | 1.09 | WPs 128 (W 400) | 1.12 | 192.0 | 0.94 |
+| lookahead 10, σ 500 | 396.8 | 1.01 | **1.08** | 1.02 | 1.06 | 1.07 | PP 2,048 (W 50) | 1.08 | 498.1 | 0.86 |
+| lookahead 10, σ 2,000 | 268.6 | 0.96 | 0.93 | 0.99 | 0.98 | 0.99 | PP 512 (W 100) | 1.00 | 348.7 | 0.77 |
+
+**What it says (16 nodes):**
+- **PP 2,048 wins wherever most events stay in the process** (σ ≤ 1,000, both slack levels: 1.07–1.09×) and **collapses at σ ≥ 2,000** (0.70): efficiency falls to 95–98.6% (W 400: 95.3%), since its larger per-process buffers fill rarely and events wait until they arrive late, while messages carry no more events than with 512 (75 against 74).
+- **WPs wins only with uniform traffic** (1.09–1.12×), where every htram message is small anyway (12–15 events with 31 destination processes).
+- **S1 wrong** (PP, not WPs, is best at σ ≤ 500; WPs wins only uniform); **S2 wrong** (the best buffer grows with locality: 2,048 at σ ≤ 1,000, 512 at σ ≥ 2,000); **S3 right at 16 nodes** (≥ 5% in 5 of 8 workloads, 0% in the other 3).
+- **Against Devastator (same job):** ahead or level at σ 100 to 4,000 (0.97–1.14); behind with uniform traffic (0.94, but every Charades setting was best at W 400, the largest tested; an earlier sweep put uniform's best near 600) and at lookahead 10 (0.86 at σ 500, 0.77 at σ 2,000; there too the best arm was the largest W tested for σ 2,000, W 100, while Devastator's best was W 200).
+- Next for these runs: the W grid must reach 600 (uniform) and 200 (lookahead 10) before those two gaps can be read.
 
 ## Baseline verification on the Mac
 
