@@ -116,6 +116,7 @@ Charades' controller ÷ Devastator's adaptive window: 0.68–1.03 at σ ≤ 500 
 | 51 | 2026-10-24 | — | The cross-process part of a GVT advance: allreduce by recursive doubling | design |
 | 52 | 2026-10-24 | 3635974 (3635873) | The cross-process part of a GVT advance, results | current |
 | 53 | 2026-10-24 | — | What makes a process late to a count wave: batch size and wave holding | design |
+| 54 | 2026-10-24 | 3636110 (3636097) | What makes a process late to a count wave, results | current |
 
 ## Stampede3 runs, in order
 
@@ -2502,6 +2503,32 @@ On the Mac (one process, 8 PEs): the GVT's tuple 7.9 µs per wave, one int 5.1, 
 **Predictions:**
 - K1. If late PEs are what the wave waits for, `--batch 4` cuts the combined → result time at 16 nodes by at least 30% and raises throughput by at least 10%; the extra scheduler passes cost at most 5% at 4 nodes.
 - K2. `--gvt-wave-events=0` alone changes throughput by less than 5%.
+
+### What makes a process late to a count wave, results (2026-10-24, skx-dev batch job 3636110)
+
+> **Status: current.** Short runs (end 512,000), W 250, 2 reps. The first submission (3636097) died at startup like 3635628 and 3635840 (signal 53, no output), on nodes that had run fine an hour before, so the `/work2` hang is not tied to particular nodes; this job wrote its own output to `$SCRATCH` and started at once. Two runs hit the cap (the warm-up launch and one 4-node default run, whose rep 2 stands in).
+
+**Runs.** `$WORK/charades-runs/late2.slurm`; copied to `~/charades-data/late/`. Committed counts are identical across arms.
+
+**Throughput and advances** (M committed events/s, medians of 2, higher is better; µs per GVT advance):
+
+| arm | 4 nodes σ 100 | 4 nodes σ 2,000 | 16 nodes σ 100 | 16 nodes σ 2,000 |
+|---|---|---|---|---|
+| default (batch 16, wave events 128) | 165.5 (128 µs) | 129.7 (164) | 458.3 (185) | 370.2 (229) |
+| `--gvt-wave-events=0` | 164.7 (80) | **137.1** (111) | **466.6** (152) | **381.6** (185) |
+| `--batch 8` | 155.3 (136) | 127.3 (166) | 447.7 (188) | 361.7 (233) |
+| `--batch 4` | 145.8 (145) | 121.7 (174) | 428.6 (196) | 335.6 (251) |
+| `--batch 4 --gvt-wave-events=0` | 129.4 (54) | 114.2 (78) | 409.0 (123) | 357.4 (157) |
+
+**What it says:**
+- **Faster waves do not make the run faster.** Contributing at once (`--gvt-wave-events=0`) cuts the time per advance by 18–38%, but the run then needs 20–60% more advances (16 nodes σ 2,000: 8,543 → 10,213; 4 nodes σ 100: 8,350 → 13,649), each moving GVT less: throughput changes by −0.5% to +6%.
+- **The slowest PE sets the pace.** In every arm PE 0 leads GVT by the whole window (250), while the buckets every PE has passed reach only about 22 past GVT (about 180 of simulated time): one PE lags the rest by about 70, and GVT cannot pass it. Each wave completes about 7.5 buckets in every default arm, at 4 and 16 nodes alike.
+- Smaller batches cost more than they save (more scheduler passes): 0.88–0.98.
+- So from here, cheaper GVT advances buy little at W 250. What makes the slowest PE slow is the open question: more events in its range, events reaching it late, or its core doing other work (htram's node-level receives and `NodeWaves` combining run on whichever PE takes them).
+
+**Predictions:**
+- K1. **Wrong.** `--batch 4` is slower everywhere (0.88–0.94).
+- K2. Right at 16 nodes (+2–3%) and at 4 nodes σ 100 (−0.5%); just outside at 4 nodes σ 2,000 (+6%).
 
 ## Baseline verification on the Mac
 
