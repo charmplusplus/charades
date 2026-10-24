@@ -106,6 +106,7 @@ Charades' controller ÷ Devastator's adaptive window: 0.68–1.03 at σ ≤ 500 
 | 41 | 2026-10-23 | — | Scaling check at 16 and 32 nodes | design |
 | 42 | 2026-10-23 | — | Three engines at 4 nodes, paper grade | design |
 | 43 | 2026-10-24 | 3633769, 3633770 | Scaling check at 16 and 32 nodes, results | current |
+| 44 | 2026-10-24 | — | Window sweep at 16 and 32 nodes | design |
 
 ## Stampede3 runs, in order
 
@@ -2222,6 +2223,24 @@ Devastator's W 1,000 beat W 500 at σ 2,000 at every node count.
 - **At scale, Charades is paced by GVT round latency, not by rollbacks.** Two fixes, in order: (1) the controller should widen W when rounds are the limit; κ, which bounds aggregation cost, keeps W near its 4-node value; (2) make GVT rounds faster at 1,000+ PEs (round time roughly doubles from 4 to 32 nodes).
 - **Uniform traffic at many destinations defeats per-destination buffering.** This needs routing through intermediate nodes (as TRAM's virtual topologies do) or a deadline that grows with the number of destinations.
 - **The cross-engine picture at 4 nodes does not hold at 32 yet.** At σ 2,000 Charades goes from parity with Devastator to at least 0.68 of it. The next step is a W sweep beyond 400 at 16 and 32 nodes, to find the true best W before changing the controller.
+
+### Window sweep at 16 and 32 nodes (design, 2026-10-24; written before any runs)
+
+> **Status: design.** Written before any runs.
+
+**Why.** In the scaling check the best fixed W at 16 and 32 nodes was the widest tested (400), so Charades' rate there is a lower bound. At W 250 every run needs about 8,300 GVT rounds at any node count, and rounds slow from about 175 µs (4 nodes) to 355 µs (32), so a wider W should hide round latency. This sweep finds the best W before the controller is changed.
+
+**Setup.** Same layout and workloads as the scaling check (weak-scaled Gaussian PHOLD, lookahead 100, mean delay 1,000, end 512,000; σ 100, σ 2,000, uniform). `$WORK/charades-runs/wsweep/wsweep.slurm`; 16 nodes on skx-dev, 32 nodes on skx (separate jobs). Two reps, cap 60 s per run.
+- Charades with htram: fixed W 400, 600, 800, 1,200; the controller as default (κ 0.20); the controller with the aggregation bound off (`--ctl-agg-kappa=0`, the waste bound alone).
+- Devastator (`--rng=clcg4`): W 1,000 and 2,000 at σ 100 and σ 2,000, in case its best W also moves.
+- Per-rep log directories (the scaling check's logs were overwritten between reps).
+
+**Predictions:**
+- W1. The best fixed W is 600–800 at 16 nodes and 800–1,200 at 32 for σ 100 and σ 2,000; at the best W at least 99.5% of executed events commit.
+- W2. The best W beats W 400 by 1.1–1.3× at 32 nodes. Charades' weak-scaling efficiency at σ 2,000 rises to 0.7–0.8 at 32 nodes, and its speedup over Devastator there to 0.8–0.95.
+- W3. Uniform: the best W also grows, but gains ≤ 1.2× over W 400, since aggregation, not rounds, limits it.
+- W4. The controller with κ off sits wider than the default and reaches 0.9–1.0 of the best fixed W at σ 100 and σ 2,000; the default stays at 0.8–0.9.
+- W5. Devastator's best W stays 1,000, or moves to 2,000 for a gain of ≤ 10%.
 
 ## Baseline verification on the Mac
 
