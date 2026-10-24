@@ -122,6 +122,7 @@ Charades' controller ÷ Devastator's adaptive window: 0.68–1.03 at σ ≤ 500 
 | 57 | 2026-10-24 | — | Do htram's buffers hold GVT back at scale? | design |
 | 58 | 2026-10-24 | 3636185 | Do htram's buffers hold GVT back at scale?, results | current |
 | 59 | 2026-10-24 | — | Count waves that ask about every bucket up to the window | design |
+| 60 | 2026-10-24 | 3636197 | Count waves that ask about every bucket up to the window, results | current |
 
 ## Stampede3 runs, in order
 
@@ -2603,6 +2604,34 @@ On the Mac (one process, 8 PEs): the GVT's tuple 7.9 µs per wave, one int 5.1, 
 - G2. Throughput rises at least 1.3× at 4 and 16 nodes with htram (PP 512), since runs are paced by GVT advances; less with direct sends, which are slower per event.
 - G3. With faster GVT the best W moves down.
 - G4. Committed counts identical.
+
+### Count waves that ask about every bucket up to the window, results (2026-10-24, skx-dev batch job 3636197)
+
+> **Status: current.** Short runs (end 512,000), 2 reps, all measured runs finished (the warm-up launch hit the cap as usual); data `~/charades-data/askahead/`. Committed counts are identical with and without the option.
+
+| nodes, σ, arm | ask-ahead off: M ev/s (buckets per wave) | `--gvt-ask-ahead=-1` | on ÷ off |
+|---|---|---|---|
+| 4, σ 100, W 250 | 160.0 (7.5) | 156.4 (8.4) | 0.98 |
+| 4, σ 100, W 400 | 138.2 (8.5) | 129.5 (8.7) | 0.94 |
+| 4, σ 100, controller | 152.8 (8.0) | 137.9 (8.3) | 0.90 |
+| 4, σ 2,000, W 250 | 131.8 (7.5) | 133.1 (8.5) | 1.01 |
+| 4, σ 2,000, W 400 | 113.1 (8.9) | 104.4 (9.2) | 0.92 |
+| 4, σ 2,000, controller | 129.0 (7.9) | 121.3 (8.5) | 0.94 |
+| 16, σ 100, W 250 | 456.2 (7.5) | 480.2 (8.7) | 1.05 |
+| 16, σ 100, W 400 | 468.8 (9.4) | 451.0 (9.9) | 0.96 |
+| 16, σ 100, controller | 458.3 (8.3) | 440.2 (9.1) | 0.96 |
+| 16, σ 2,000, W 250 | 375.6 (7.5) | 387.6 (8.9) | 1.03 |
+| 16, σ 2,000, W 400 | 357.5 (10.1) | 358.2 (11.3) | 1.00 |
+| 16, σ 2,000, controller | 368.5 (8.2) | 353.6 (9.5) | 0.96 |
+
+(Buckets per wave here = 64,000 buckets ÷ GVT advances.)
+
+**What it says:**
+- The bookkeeping cap was real (completed rises from exactly valid ÷ 3), but lifting it moves completion only from 7.5 to 8.4–8.9 buckets per wave, and throughput by −10% to +5%. Once every passed bucket can be asked about, most still do not complete in the next wave: their sent and received totals do not match yet, so events sent into them are still in transit. Why they are, at this lag, is not measured.
+- **G1 wrong** (8.4–8.9, not ≥ 12); **G2 wrong** (0.90–1.05, not ≥ 1.3); G3 not tested; **G4 right** (identical counts).
+- `--gvt-ask-ahead` stays as an option, off (default 0).
+
+**Where the GVT work stands.** Combining waves per process (`--gvt-node-waves`) gained 1.17–1.32×. Everything tried after it on the GVT side (allreduce across processes, contributing at once, smaller batches, asking ahead) moves throughput by −12% to +6%. The largest gain seen since is not on the GVT side: htram WPs 512 instead of PP 512 at 16 nodes and σ 100 (1.25×; 0.85× at σ 2,000).
 
 ## Baseline verification on the Mac
 
