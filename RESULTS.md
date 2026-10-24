@@ -108,6 +108,7 @@ Charades' controller ÷ Devastator's adaptive window: 0.68–1.03 at σ ≤ 500 
 | 43 | 2026-10-24 | 3633769, 3633770 | Scaling check at 16 and 32 nodes, results | current |
 | 44 | 2026-10-24 | — | Window sweep at 16 and 32 nodes | design |
 | 45 | 2026-10-24 | 3635596 | Window sweep at 16 and 32 nodes, results: 16 nodes | current |
+| 46 | 2026-10-24 | — | GVT round cost at 4 and 16 nodes | design |
 
 ## Stampede3 runs, in order
 
@@ -2275,6 +2276,23 @@ Devastator's W 1,000 beat W 500 at σ 2,000 at every node count.
 - W4. **Wrong.** With κ off the controller reaches 0.78–0.88, not 0.9–1.0; the default stays at 0.81–0.86.
 - W5. Right: Devastator's W 2,000 is 0.92–0.97 of its W 1,000.
 - W2 is about 32 nodes; pending.
+
+### GVT round cost at 4 and 16 nodes (design, 2026-10-24; written before any runs)
+
+> **Status: design.** Written before any runs.
+
+**Why.** At W 250 every run needs about 8,300 GVT advances at any node count, and they slow from about 175 µs each at 4 nodes to 260 µs at 16 and 355 µs at 32; a wider window does not hide it (window sweep, 16 nodes). An advance is made of count waves: every PE contributes a tuple reduction (sent and received counts per bucket, plus the minimum buckets passed), the result is broadcast, and each PE contributes the next wave when it handles the result. A wave's time is therefore the reduction itself plus how late the slowest PE answers. This splits the two.
+
+**Setup.** One skx-dev job, 16 nodes, 30 min: `$WORK/charades-runs/gvtprobe/gvtprobe.slurm`, output in `$WORK/charades-runs/gvtprobe/`. Full-node layout and psm2 as in every recent run.
+- **A. Reduction alone**: `tools/redbench` (new; charades repo) runs back-to-back waves shaped like the GVT's (8 buckets: a 16-int sum plus an int minimum, result broadcast to the group, next wave on receipt), 20,000 waves after 1,000 warm-up, at 1, 2, 4, 8 and 16 nodes, 2 reps. It reports time per wave and PE 0's contribute-to-result latency (median, p90, p99). On the Mac (2 processes × 2 PEs) it takes 67 µs per wave.
+- **B. Waves in Charades**: `--gvt-trace=1` (PE 0 records each wave's start and end, buckets asked, completed; every PE's time in `execute()`), σ 100 and σ 2,000 at W 250 and W 400, 4 and 16 nodes, 2 reps.
+- **C. One knob**: 16 nodes, σ 2,000, W 400, `--gvt-wave-events` 0 (contribute at once) against the default 128, 2 reps.
+
+**Predictions:**
+- G1. The reduction alone takes 30–80 µs per wave at 1–4 nodes and grows by at most 2× to 16 nodes.
+- G2. In Charades, a wave takes 2–4× the reduction alone at the same node count, and the excess (PEs answering late) accounts for most of the growth in wave time from 4 to 16 nodes.
+- G3. Buckets completed per wave, and waves per GVT advance, are about the same at 4 and 16 nodes.
+- G4. `--gvt-wave-events=0` changes the 16-node rate by less than 10%.
 
 ## Baseline verification on the Mac
 
