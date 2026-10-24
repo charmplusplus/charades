@@ -118,6 +118,8 @@ Charades' controller ÷ Devastator's adaptive window: 0.68–1.03 at σ ≤ 500 
 | 53 | 2026-10-24 | — | What makes a process late to a count wave: batch size and wave holding | design |
 | 54 | 2026-10-24 | 3636110 (3636097) | What makes a process late to a count wave, results | current |
 | 55 | 2026-10-24 | — | Which PE is slow, and why | design |
+| 56 | 2026-10-24 | 3636151 | Which PE is slow, and why, results | current |
+| 57 | 2026-10-24 | — | Do htram's buffers hold GVT back at scale? | design |
 
 ## Stampede3 runs, in order
 
@@ -2542,6 +2544,31 @@ On the Mac (one process, 8 PEs): the GVT's tuple 7.9 µs per wave, one int 5.1, 
 **Predictions:**
 - S1. The PEs least often blocked by the window are the first PE of each process (rank 0), which also runs htram's node-level receives and the `NodeWaves` combine.
 - S2. Executed events per PE vary by at most 5% around the mean: load imbalance is not the cause.
+
+### Which PE is slow, and why, results (2026-10-24, skx-dev batch job 3636151)
+
+> **Status: current.** Short runs (end 512,000), W 250, 2 reps, all 8 finished; `scripts/stampede3/pe_summary.py`; data `~/charades-data/pestats/`.
+
+| run | executed per PE: max ÷ mean, min ÷ mean | window-blocked batches per PE: mean, least | rank 0 vs other ranks (mean blocked) |
+|---|---|---|---|
+| 4 nodes σ 100 | 1.010, 0.990 | 330–451 K, 153–219 K | 275–357 K vs 332–456 K |
+| 4 nodes σ 2,000 | 1.003, 0.997 | 524–525 K, 396–443 K | 481–484 K vs 526 K |
+| 16 nodes σ 100 | 1.013, 0.988 | 937–941 K, 696–738 K | 880–886 K vs 939–943 K |
+| 16 nodes σ 2,000 | 1.004–1.005, 0.996 | 1,170–1,244 K, 1,015–1,061 K | 1,128–1,196 K vs 1,172–1,246 K |
+
+- **S2 right:** events are balanced to ±1.3%.
+- **S1 right in tendency, but it is not the explanation.** Rank 0 (the first PE of each process) is blocked by the window 4–21% less often than other ranks, and most of the ten least-blocked PEs are rank 0; but even the least-blocked PE is blocked hundreds of thousands of times. No PE is busy while the others wait.
+- So the lag of the slowest PE's position behind the window's edge (about 70 of simulated time) is not a slow core. The traces say each wave completes about half the buckets it asks about because their sent and received totals do not yet match: events sent into them have not arrived. One candidate is htram PP's per-node buffer, which goes out only when it fills (512 items) or on a full flush, not when a due event is in it.
+
+### Do htram's buffers hold GVT back at scale? (design, 2026-10-24; written before any runs)
+
+> **Status: design.** Written before any runs.
+
+**Runs** (skx-dev, 16 nodes, output on `$SCRATCH`): σ 100 and σ 2,000, W 250, 4 and 16 nodes, `--gvt-trace=1`, 2 reps; aggregation PP 512 (default), PP 128, PP 64, WPs 512, direct sends.
+
+**Predictions:**
+- H1. Buckets completed per wave rise from about 7.5 with PP 512 to at least 10 with WPs 512 or direct sends.
+- H2. At 16 nodes, smaller PP buffers or WPs beat PP 512 by at least 10% at σ 2,000; at 4 nodes PP 512 stays best.
 
 ## Baseline verification on the Mac
 
