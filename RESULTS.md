@@ -124,6 +124,7 @@ Charades' controller ÷ Devastator's adaptive window: 0.68–1.03 at σ ≤ 500 
 | 59 | 2026-10-24 | — | Count waves that ask about every bucket up to the window | design |
 | 60 | 2026-10-24 | 3636197 | Count waves that ask about every bucket up to the window, results | current |
 | 61 | 2026-10-24 | — | Same-process events by pointer (`--local-fast-path`) | design |
+| 62 | 2026-10-24 | 3636369 | Same-process events by pointer, results | current |
 
 ## Stampede3 runs, in order
 
@@ -2656,6 +2657,34 @@ On the Mac (one process, 8 PEs): the GVT's tuple 7.9 µs per wave, one int 5.1, 
 - F3. Fewer htram messages per committed event (same-process items leave htram), and efficiency equal or higher (same-process events are no longer held by the deadline policy).
 - F4. Committed counts identical.
 - F5. At 16 nodes the gain is smaller than at 4, since runs there are paced by GVT advances rather than per-event cost.
+
+### Same-process events by pointer, results (2026-10-24, skx-dev batch job 3636369)
+
+> **Status: current.** Short runs (end 512,000), 2 reps (medians), htram PP 512 for events to other processes, `--gvt-node-waves` (default); data `~/charades-data/fastpath/` (`fp_summary.py`). All 48 runs finished; committed counts identical with the fast path off and on. Mac: change tier 108/108 on six new `*_fastpath` configs, engine tier 1408/1408 including `--repeat 20` of `bucket_window_fastpath` and `agg_deadline_bucket_pp_fastpath`.
+
+| nodes, σ, arm | off: M ev/s | on: M ev/s | on ÷ off (higher is better) | µs per GVT advance, off / on (lower is better) | events per htram message, off / on | remote sends by pointer |
+|---|---|---|---|---|---|---|
+| 4, σ 100, W 250 | 163.1 | 165.2 | 1.01 | 129 / 128 | 203 / 38 | 97% |
+| 4, σ 100, W 400 | 136.9 | 156.6 | 1.14 | 176 / 156 | 139 / 26 | 97% |
+| 4, σ 100, controller | 150.2 | 165.1 | 1.10 | 151 / 136 | 192 / 35 | 97% |
+| 4, σ 2,000, W 250 | 130.4 | 126.4 | 0.97 | 162 / 168 | 117 / 74 | 50% |
+| 4, σ 2,000, W 400 | 116.7 | 115.1 | 0.99 | 215 / 221 | 71 / 45 | 50% |
+| 4, σ 2,000, controller | 128.2 | 123.1 | 0.96 | 174 / 182 | 107 / 69 | 50% |
+| 16, σ 100, W 250 | 455.3 | 540.2 | 1.19 | 186 / 157 | 193 / 39 | 97% |
+| 16, σ 100, W 400 | 461.6 | 563.7 | 1.22 | 229 / 184 | 107 / 27 | 97% |
+| 16, σ 100, controller | 441.9 | 541.8 | 1.23 | 213 / 173 | 185 / 37 | 97% |
+| 16, σ 2,000, W 250 | 362.9 | 362.5 | 1.00 | 233 / 234 | 116 / 74 | 50% |
+| 16, σ 2,000, W 400 | 361.1 | 357.5 | 0.99 | 313 / 319 | 62 / 44 | 50% |
+| 16, σ 2,000, controller | 352.5 | 347.2 | 0.98 | 261 / 266 | 107 / 69 | 50% |
+
+Best ÷ best (each arm set at its best W): 4 nodes σ 100 1.01, σ 2,000 0.97; 16 nodes σ 100 1.22, σ 2,000 1.00. The 4-node σ 2,000 drop (2–5%) is in both reps; at 16 nodes it is within the rep spread. Efficiency is equal or slightly higher with the fast path (99.84–99.99%). GVT advances per run are unchanged (W sets them).
+
+**What it says:**
+- **The per-event saving shows only where a GVT advance waits on work.** At 4 nodes and W 250 both arms sit at the same advance time (129 µs, the round itself), so the cheaper events buy nothing; at W 400, under the controller, and everywhere at σ 100 on 16 nodes, an advance waits for the slowest process's work, and the fast path cuts it by 10–21%.
+- **σ 100 at 16 nodes: 1.19–1.23×.** Against Devastator's 16-node σ 100 rate from earlier jobs (about 658 M ev/s, longer runs), Charades moves from about 0.71 to about 0.86 with PP 512.
+- **σ 2,000: no gain, 3% loss at 4 nodes.** Half the remote events still leave the process, and the advance time rises by 5–8 µs. Not yet explained; candidates: contended pushes onto inboxes (22 producers per inbox), messages read from another core's cache instead of copied in bulk, or htram's off-process buffers filling more slowly once same-process items leave them (74 instead of 117 events per message).
+- **F1 partly wrong** (best ÷ best 1.01 at 4 nodes; 1.10–1.14 only off the best W); **F2 wrong** (0.97–1.00); **F3 right** (htram carries only off-process events; efficiency equal or higher); **F4 right**; **F5 wrong**: the gain is larger at 16 nodes, where advances wait on work, not smaller.
+- `--local-fast-path` stays off by default until the σ 2,000 loss is understood.
 
 ## Baseline verification on the Mac
 
