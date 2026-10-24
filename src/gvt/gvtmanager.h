@@ -60,6 +60,9 @@ class GVTManager : public CBase_GVTManager {
      * early (blocked by the window or out of events)
      */
     virtual void iteration_end(bool starved) {}
+
+    /** Called at the top of every optimistic execute() (--gvt-node-waves) */
+    virtual void poll() {}
 };
 
 #endif

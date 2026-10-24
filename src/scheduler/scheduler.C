@@ -182,7 +182,15 @@ DistributedScheduler::DistributedScheduler() {
         CProxy_PhaseGVT::ckNew();
         break;
       case 4:
-        CProxy_BucketGVT::ckNew();
+        // --gvt-node-waves: PEs pick results up in execute(), so only the
+        // optimistic scheduler, and not with --sched-park (parked PEs don't run it)
+        if (g_tw_gvt_node_waves && g_tw_synchronization_protocol == OPTIMISTIC &&
+            !g_tw_sched_park) {
+          CkPrintf("Bucketed GVT: count waves combined per process (--gvt-node-waves)\n");
+          CProxy_BucketGVT::ckNew(CProxy_NodeWaves::ckNew());
+        } else {
+          CProxy_BucketGVT::ckNew();
+        }
         break;
 
       default:

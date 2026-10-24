@@ -32,7 +32,19 @@ module gvtmanager {
   /** Bucket-based GVT */
   group BucketGVT : GVTManager {
     entry [notrace] BucketGVT();
+    entry [notrace] BucketGVT(CkGroupID node_waves);
     entry [notrace, reductiontarget] void all_ready(int min);
     entry [notrace] void check_counts(CkReductionMsg* msg);
+  };
+
+  /**
+   * --gvt-node-waves: one per process; combines its PEs' count-wave
+   * contributions in shared memory and contributes them once, and holds the
+   * result the PEs read (see bucketed.h)
+   */
+  nodegroup NodeWaves {
+    entry [notrace] NodeWaves();
+    entry [notrace] void contribute_combined(int n, CmiInt8 v[n]);
+    entry [notrace] void wave_result(CkReductionMsg* msg);
   };
 }

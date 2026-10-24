@@ -49,6 +49,8 @@ void OptimisticScheduler::execute() {
   double t0 = g_tw_gvt_trace ? CmiWallTimer() : 0;
   unsigned num_executed = 0;
   bool blocked = false;
+  // A count wave's result this PE's process now has (--gvt-node-waves)
+  gvt_manager->poll();
   // Events htram's node receives left for this PE (--agg-inbox)
   agg_drain();
   for (; num_executed < g_tw_mblock; num_executed++) {

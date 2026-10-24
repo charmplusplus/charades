@@ -43,6 +43,7 @@ unsigned g_tw_gvt_bucket_size;
 unsigned g_tw_gvt_min_buckets;
 unsigned g_tw_gvt_trace;
 unsigned g_tw_gvt_wave_events;
+unsigned g_tw_gvt_node_waves;
 unsigned g_tw_sched_park;
 Time     g_tw_optimism_window;
 unsigned g_tw_comm_stats;
@@ -123,6 +124,7 @@ void clear_globals() {
   // Paced count waves are 1.0-1.38x faster on 4 nodes and remove the
   // run-to-run flip between two GVT paces (RESULTS.md, "Two speeds")
   g_tw_gvt_wave_events    = 128;
+  g_tw_gvt_node_waves     = 0;
   g_tw_sched_park         = 0;
   g_tw_optimism_window    = 0;
   g_tw_comm_stats         = 0;

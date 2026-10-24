@@ -6,6 +6,7 @@
 #include "mapper.h"
 #include "scheduler.h"
 #include "statistics.h"
+#include "bucketed.h"
 
 void tw_init(int argc, char** argv) {
   clear_globals();

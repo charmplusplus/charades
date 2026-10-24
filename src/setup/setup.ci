@@ -1,5 +1,6 @@
 mainmodule setup {
   initnode registerStatsReduction();
+  initnode registerGvtWaveReduction();
 
   extern module event;
   extern module gvtmanager;

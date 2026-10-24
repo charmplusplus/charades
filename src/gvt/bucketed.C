@@ -16,8 +16,20 @@
 #define SENT_IDX(n) ((n)*2)
 #define RECV_IDX(n) ((n)*2+1)
 
-BucketGVT::BucketGVT() {
+BucketGVT::BucketGVT() { init(); }
+
+BucketGVT::BucketGVT(CkGroupID node_waves) {
+  init();
+  node_waves_on = true;
+  node_waves_gid = node_waves;
+}
+
+void BucketGVT::init() {
   gvt_name = "Bucket GVT";
+  node_waves_on = false;
+  node_waves = nullptr;
+  node_wave_seen = 0;
+  node_wave_pending = false;
   active = false;
   continuous = true;
 
@@ -218,6 +230,32 @@ void BucketGVT::contribute_counts(int num_buckets) {
     wave_passed = num_passed;
   }
 
+  if (node_waves_on) {
+    std::vector<uint64_t> ctl_counters, ctl_hist;
+    if (ctl_shared()) {
+      ctl_wave_contribute(&ctl_counters, &ctl_hist);
+      if (ctl_counters.empty()) ctl_hist.clear();
+    }
+    std::vector<CmiInt8>& v = node_wave_buf;
+    v.clear();
+    v.push_back(num_buckets);
+    v.push_back(num_passed);
+    v.push_back(ctl_counters.size());
+    v.push_back(ctl_hist.size());
+    for (int i = 0; i < 2 * num_buckets; i++) {
+      v.push_back(counts[SENT_IDX(curr_bucket) + i]);
+    }
+    for (uint64_t c : ctl_counters) v.push_back((CmiInt8)c);
+    for (uint64_t h : ctl_hist) v.push_back((CmiInt8)h);
+    if (!node_waves) {
+      node_waves = CProxy_NodeWaves(node_waves_gid).ckLocalBranch();
+      CkAssert(node_waves);
+    }
+    node_wave_pending = true;
+    node_waves->contribute_from(CkMyRank(), v);
+    return;
+  }
+
   CkReduction::tupleElement tuple[4];
   tuple[0] = CkReduction::tupleElement(sizeof(int)*2*num_buckets,
                                        &counts[SENT_IDX(curr_bucket)],
@@ -250,18 +288,24 @@ void BucketGVT::contribute_counts(int num_buckets) {
 }
 
 void BucketGVT::check_counts(CkReductionMsg* msg) {
-  count_reductions++;
-
   int size;
   CkReduction::tupleElement* result;
   msg->toTuple(&result, &size);
   // toTuple copied the data out; the message used to leak on every wave
   delete msg;
 
-  int num_buckets = (result[0].dataSize / sizeof(int)) / 2;
-  int valid_buckets = *((int*)result[1].data);
+  wave_done((const int*)result[0].data,
+      (result[0].dataSize / sizeof(int)) / 2, *((int*)result[1].data),
+      size > 2 ? (const uint64_t*)result[2].data : nullptr,
+      size > 3 ? (const uint64_t*)result[3].data : nullptr,
+      size > 3 ? (int)(result[3].dataSize / sizeof(uint64_t)) : 0);
 
-  int* counts = (int*)result[0].data;
+  delete[] result;
+}
+
+void BucketGVT::wave_done(const int* counts, int num_buckets,
+    int valid_buckets, const uint64_t* ctl, const uint64_t* hist, int nhist) {
+  count_reductions++;
 
   /**
    * A bucket is complete when every PE had passed it at the PREVIOUS wave and
@@ -309,11 +353,7 @@ void BucketGVT::check_counts(CkReductionMsg* msg) {
    * The controller first, so a new window is in force with the GVT that
    * follows; every PE gets the same sums and makes the same decision
    */
-  if (size > 2) {
-    ctl_wave_result((const uint64_t*)result[2].data,
-        size > 3 ? (const uint64_t*)result[3].data : nullptr,
-        size > 3 ? (int)(result[3].dataSize / sizeof(uint64_t)) : 0);
-  }
+  if (ctl) ctl_wave_result(ctl, hist, nhist);
 
   /** Advance the GVT past the completed buckets */
   if (completed_buckets) advance_gvt(completed_buckets);
@@ -326,7 +366,6 @@ void BucketGVT::check_counts(CkReductionMsg* msg) {
     attempt_gvt();
   }
 
-  delete[] result;
 }
 
 void BucketGVT::advance_gvt(int num_buckets) {
@@ -432,4 +471,69 @@ bool BucketGVT::produce(RemoteEvent* e) {
   } else {
     return true;
   }
+}
+
+void BucketGVT::poll() {
+  if (!node_wave_pending || node_waves->generation() <= node_wave_seen) return;
+  node_wave_seen++;
+  node_wave_pending = false;
+  const std::vector<CmiInt8>& r = node_waves->result();
+  int n = r[0], nctl = r[2], nhist = r[3];
+  std::vector<int> sums(r.begin() + 4, r.begin() + 4 + 2 * n);
+  std::vector<uint64_t> ctl(r.begin() + 4 + 2 * n, r.begin() + 4 + 2 * n + nctl);
+  std::vector<uint64_t> hist(r.begin() + 4 + 2 * n + nctl, r.end());
+  wave_done(sums.data(), n, (int)r[1], nctl ? ctl.data() : nullptr,
+      nhist ? hist.data() : nullptr, nhist);
+}
+
+NodeWaves::NodeWaves() : slots(CkMyNodeSize()), arrived(0), gen(0) {}
+
+void NodeWaves::contribute_from(int rank, const std::vector<CmiInt8>& v) {
+  slots[rank].assign(v.begin(), v.end());
+  if (arrived.fetch_add(1, std::memory_order_acq_rel) + 1 < CkMyNodeSize()) {
+    return;
+  }
+  // The last PE in: every slot is written, and none is written again before
+  // this wave's result is out
+  arrived.store(0, std::memory_order_relaxed);
+  combined.assign(slots[0].begin(), slots[0].end());
+  for (int r = 1; r < CkMyNodeSize(); r++) {
+    combine_wave(combined, slots[r].data(), slots[r].size());
+  }
+  thisProxy[CkMyNode()].contribute_combined(combined.size(), combined.data());
+}
+
+void NodeWaves::contribute_combined(int n, CmiInt8* v) {
+  contribute(n * sizeof(CmiInt8), v, gvtWaveReductionType,
+      CkCallback(CkIndex_NodeWaves::wave_result(NULL), thisProxy));
+}
+
+void NodeWaves::wave_result(CkReductionMsg* msg) {
+  const CmiInt8* d = (const CmiInt8*)msg->getData();
+  res.assign(d, d + msg->getSize() / sizeof(CmiInt8));
+  delete msg;
+  gen.fetch_add(1, std::memory_order_release);
+}
+
+void combine_wave(std::vector<CmiInt8>& into, const CmiInt8* from, int n) {
+  CkAssert(n == (int)into.size() && n >= 4 && into[0] == from[0] &&
+      into[2] == from[2] && into[3] == from[3]);
+  into[1] = std::min(into[1], from[1]);
+  for (int i = 4; i < n; i++) into[i] += from[i];
+}
+
+CkReduction::reducerType gvtWaveReductionType;
+void registerGvtWaveReduction() {
+  gvtWaveReductionType = CkReduction::addReducer(gvtWaveReduction);
+}
+
+CkReductionMsg* gvtWaveReduction(int nMsg, CkReductionMsg** msgs) {
+  int n = msgs[0]->getSize() / sizeof(CmiInt8);
+  const CmiInt8* d0 = (const CmiInt8*)msgs[0]->getData();
+  std::vector<CmiInt8> r(d0, d0 + n);
+  for (int i = 1; i < nMsg; i++) {
+    combine_wave(r, (const CmiInt8*)msgs[i]->getData(),
+        msgs[i]->getSize() / sizeof(CmiInt8));
+  }
+  return CkReductionMsg::buildNew(n * sizeof(CmiInt8), r.data());
 }
