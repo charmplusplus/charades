@@ -114,6 +114,7 @@ Charades' controller ÷ Devastator's adaptive window: 0.68–1.03 at σ ≤ 500 
 | 49 | 2026-10-24 | — | GVT count waves combined per process, `--gvt-node-waves` | design |
 | 50 | 2026-10-24 | 3635736 | GVT count waves combined per process, results | current |
 | 51 | 2026-10-24 | — | The cross-process part of a GVT advance: allreduce by recursive doubling | design |
+| 52 | 2026-10-24 | 3635974 (3635873) | The cross-process part of a GVT advance, results | current |
 
 ## Stampede3 runs, in order
 
@@ -2453,6 +2454,41 @@ On the Mac (one process, 8 PEs): the GVT's tuple 7.9 µs per wave, one int 5.1, 
 - A1. `redbench`: recursive doubling takes at most 60% of the nodegroup reduction's time at 8 and 16 nodes.
 - A2. In Charades at 16 nodes, crossing processes is at least half of an advance with the nodegroup reduction; with the allreduce an advance drops from 181–227 µs to 110–150, and throughput rises 15–35%. At 4 nodes the gain is 5–15%.
 - A3. Committed counts are identical.
+
+### The cross-process part of a GVT advance, results (2026-10-24, skx-dev batch job 3635974; benchmark also from the cancelled job 3635873)
+
+> **Status: current.** Short runs (end 512,000), 2 reps, W 250 unless noted. Job 3635840 died at startup on a node with a hanging `/work2` (signal 53, no output); job 3635873 was cancelled when `redbench -m 4` hung, a bug in `redbench` (a partner's first message taken before the process had started the wave), fixed and rerun in 3635974, which excluded the suspect nodes. Charades' allreduce already had the guard `redbench` lacked.
+
+**Runs.** `$WORK/charades-runs/allreduce.slurm`, `allreduce2.slurm`; copied to `~/charades-data/allreduce/`; `scripts/stampede3/advance_split.py` (new) splits each advance from the trace. All Charades runs finished; committed counts are identical between the two paths in every workload.
+
+**The reduction across processes alone** (`redbench`, µs per wave, lower is better; nodes = physical nodes, 2 processes each):
+
+| nodes | 1 | 2 | 4 | 8 | 16 |
+|---|---|---|---|---|---|
+| nodegroup reduction (`-m 3`) | 10.9 | 22.4 | 27.8 | 40.3 | 49.4–49.7 |
+| recursive doubling (`-m 4`) | 5.8–6.0 | 12.6 | 20.4 | 29.5 | 40.7–42.8 |
+
+**A GVT advance, split** (PE 0's view; µs, means over waves, medians of 2; M committed events/s):
+
+| run | M ev/s | µs per advance | PE 0 contributes → its process combined | combined → result | result → PE 0 picks it up | picks up → contributes again |
+|---|---|---|---|---|---|---|
+| 4 nodes, σ 100: nodegroup / allreduce | 160.5 / 160.8 | 133 / 132 | 20 / 20 | 86 / 87 | 4 / 4 | 23 / 21 |
+| 4 nodes, σ 2,000 | 133.1 / 133.5 | 159 / 159 | 40 / 41 | 93 / 90 | 5 / 6 | 20 / 22 |
+| 16 nodes, σ 100 | 465.0 / 445.2 | 182 / 191 | 13 / 13 | 152 / 165 | 4 / 3 | 13 / 10 |
+| 16 nodes, σ 2,000 | 373.3 / 371.4 | 227 / 228 | 23 / 26 | 185 / 183 | 5 / 4 | 14 / 14 |
+| 16 nodes, controller, σ 100 | 435.2 / 423.0 | 216 / 222 | 14 / 11 | 179 / 194 | 5 / 3 | 15 / 11 |
+| 16 nodes, controller, σ 2,000 | 364.4 / 373.1 | 254 / 245 | 24 / 27 | 204 / 193 | 6 / 6 | 17 / 18 |
+
+**What it says:**
+- **Crossing processes is 75–85% of an advance, but the reduction is not what takes the time.** In the runs it takes 152–204 µs at 16 nodes against 41–50 µs for the same reduction alone, and 86–93 µs against about 25 at 4 nodes. The rest is waiting for the slowest process to finish gathering its own PEs; the allreduce cannot shorten that, and it changes throughput by 0.96–1.02.
+- PE 0's own process gathers in 13–41 µs and picks the result up in 3–6 µs, so the slow processes are elsewhere; what holds a process back is not yet measured. Candidates: a PE busy in a 16-event batch when the result arrives, and a PE holding its contribution until it has run 128 events (`--gvt-wave-events`).
+
+**Predictions:**
+- A1. **Wrong.** Recursive doubling is 0.73 (8 nodes) and 0.84 (16) of the nodegroup reduction, not ≤ 0.6.
+- A2. Crossing is more than half of an advance (right), but the allreduce does not shorten it (**wrong**): no throughput gain at 4 or 16 nodes.
+- A3. Right: identical committed counts.
+
+**Decision:** `--gvt-wave-allreduce` stays as an option, off. Next: what makes a process late, tried first with existing settings (`--gvt-wave-events=0`; `--batch` 4 and 8), traced, at 4 and 16 nodes.
 
 ## Baseline verification on the Mac
 

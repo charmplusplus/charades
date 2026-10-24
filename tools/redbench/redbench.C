@@ -118,6 +118,7 @@ class Bench : public CBase_Bench {
 
 class NBench : public CBase_NBench {
   int wave = 0, round = 0, L = 0;
+  bool active = false;  // this process has started wave `wave`
   double t_warm = 0, t_start = 0;
   std::vector<CmiInt8> buf;
   std::vector<double> lat;
@@ -133,6 +134,7 @@ class NBench : public CBase_NBench {
       return;
     }
     round = 0;
+    active = true;
     if (L == 0) { wave_finished(); return; }
     send_round();
   }
@@ -151,6 +153,7 @@ class NBench : public CBase_NBench {
     else wave_finished();
   }
   void wave_finished() {
+    active = false;
     if (CkMyNode() == 0) {
       double now = CkWallTimer();
       if (wave == WARM) t_warm = now;
@@ -175,7 +178,7 @@ class NBench : public CBase_NBench {
   void start() { begin_wave(); }
   void result(CkReductionMsg* m) { delete m; wave_finished(); }
   void rd(int w, int r, int n, CmiInt8* v) {
-    if (w == wave && r == round) { take(v); return; }
+    if (active && w == wave && r == round) { take(v); return; }
     early[{w, r}] = std::vector<CmiInt8>(v, v + n);
   }
 };
