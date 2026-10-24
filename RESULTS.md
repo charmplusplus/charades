@@ -113,6 +113,7 @@ Charades' controller ÷ Devastator's adaptive window: 0.68–1.03 at σ ≤ 500 
 | 48 | 2026-10-24 | 3635622 | Where a reduction's time goes, one node | current |
 | 49 | 2026-10-24 | — | GVT count waves combined per process, `--gvt-node-waves` | design |
 | 50 | 2026-10-24 | 3635736 | GVT count waves combined per process, results | current |
+| 51 | 2026-10-24 | — | The cross-process part of a GVT advance: allreduce by recursive doubling | design |
 
 ## Stampede3 runs, in order
 
@@ -2435,6 +2436,23 @@ On the Mac (one process, 8 PEs): the GVT's tuple 7.9 µs per wave, one int 5.1, 
 **Default since 2026-10-24** (user decision): `--gvt-node-waves=1`. The message path stays reachable with `=0` and is covered by the `*_msgwaves` test configs. Mac gate for the switch: every bucketed config 612/612 (quick shapes), engine tier 940/942 with the 2 non-passes caused by a second `lcrun` I started during the run, both 20/20 when rerun alone.
 
 **What this means:** `--gvt-node-waves` is the largest single gain since psm2, and it is free of any runtime change. The cross-engine numbers in "Current numbers" (message path) understate Charades by about 1.3× at 4 nodes; the paper-grade comparison should be rerun with it on. What is left at 16 nodes is the reduction across processes (32 members, about 180–230 µs per advance), next to try: a flatter or wider tree across processes, or contributing as soon as a process is complete rather than through an entry method.
+
+### The cross-process part of a GVT advance: allreduce by recursive doubling (design, 2026-10-24; written before any runs on Stampede3)
+
+> **Status: design.** Written before the Stampede3 runs; the Mac numbers below are the only measurements so far.
+
+**Why.** With `--gvt-node-waves` a run is still paced by GVT advances (95–97% of scheduler batches end blocked by the window), and an advance takes 131–156 µs at 4 nodes and 181–227 µs at 16. What is left in it: the slowest PE of each process contributing, one local message to the process's `NodeWaves` branch, Charm++'s nodegroup reduction across processes and its broadcast back, and the PEs noticing the result. The nodegroup reduction goes up a tree and back down; an allreduce by recursive doubling (in round r every process swaps its partial sums with process me XOR 2^r; after log2 P rounds every process has the total) has no separate broadcast and half the depth. On the Mac (lcrun, tcp), `tools/redbench` (new modes `-m 3`: nodegroup reduction and broadcast, one contribution per process; `-m 4`: recursive doubling) gives 19.6 against 15.5 µs per wave with 2 processes and 54.0 against 30.9 with 4.
+
+**Design** (`--gvt-wave-allreduce=1`; with `--gvt-node-waves`; needs a power-of-two process count, else the nodegroup reduction is used):
+- The last PE in a process hands the combined array to its `NodeWaves` branch as now; that branch runs the allreduce with `[exclusive]` nodegroup entry methods, buffering a partner's message that arrives a round (or a wave) early, and publishes the total exactly as the reduction result is published now. Integer sums and one minimum are exact, so every process gets the same result.
+- `--gvt-trace=1` also records, for PE 0's process, when its last PE arrived and when the result was published, to split an advance into gathering, crossing processes, and pickup.
+
+**Runs** (one skx-dev job, 16 nodes): `redbench -m 3` and `-m 4` at 1, 2, 4, 8 and 16 nodes; Charades σ 100 and σ 2,000 at W 250, 4 and 16 nodes, `--gvt-wave-allreduce` 0 and 1, traced, 2 reps.
+
+**Predictions:**
+- A1. `redbench`: recursive doubling takes at most 60% of the nodegroup reduction's time at 8 and 16 nodes.
+- A2. In Charades at 16 nodes, crossing processes is at least half of an advance with the nodegroup reduction; with the allreduce an advance drops from 181–227 µs to 110–150, and throughput rises 15–35%. At 4 nodes the gain is 5–15%.
+- A3. Committed counts are identical.
 
 ## Baseline verification on the Mac
 

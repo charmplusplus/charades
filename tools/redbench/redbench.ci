@@ -9,6 +9,12 @@ mainmodule redbench {
     entry Main(CkArgMsg*);
     entry [reductiontarget] void done();
   };
+  nodegroup NBench {
+    entry NBench();
+    entry [exclusive] void start();
+    entry [exclusive] void result(CkReductionMsg* m);
+    entry [exclusive] void rd(int wave, int round, int n, CmiInt8 v[n]);
+  };
   group Bench {
     entry Bench();
     entry void start();

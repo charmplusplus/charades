@@ -8,11 +8,18 @@
 // PE 0 and PE PEER (-r round trips after -w warm-up): one hop each way.
 // -m selects the reduction: 0 the GVT's tuple (default), 1 a single int
 // (sum_int), 2 the 2*K ints as one sum_int array (no tuple).
+// -m 3 and 4 time the reduction across processes only, one contribution of
+// 2*K+4 64-bit ints per process (a nodegroup): 3 Charm++'s nodegroup
+// reduction and broadcast, 4 an allreduce by recursive doubling (each round
+// every process swaps partial sums with one partner; the process count must
+// be a power of two). Time per wave is measured on process 0.
 // Usage: redbench [-k buckets (8)] [-r waves (20000)] [-w warm-up (1000)] [-p peer] [-m mode]
 #include <algorithm>
 #include <cstdlib>
 #include <cstring>
 #include <vector>
+#include <map>
+#include <utility>
 #include "redbench.decl.h"
 
 CProxy_Main mainProxy;
@@ -33,6 +40,11 @@ class Main : public CBase_Main {
     mainProxy = thisProxy;
     CkPrintf("redbench: %d PEs, %d nodes, %d buckets, %d %s (%d warm-up)\n",
              CkNumPes(), CkNumNodes(), K, R, PEER < 0 ? "waves" : "round trips", WARM);
+    if (MODE >= 3) {
+      CProxy_NBench nb = CProxy_NBench::ckNew();
+      nb.start();
+      return;
+    }
     CProxy_Bench b = CProxy_Bench::ckNew();
     b.start();
   }
@@ -100,6 +112,71 @@ class Bench : public CBase_Bench {
                MODE, CkNumPes(), CkNumNodes(), K, 1e6 * per, q(0.5), q(0.9), q(0.99));
     }
     contribute(CkCallback(CkReductionTarget(Main, done), mainProxy));
+  }
+};
+
+
+class NBench : public CBase_NBench {
+  int wave = 0, round = 0, L = 0;
+  double t_warm = 0, t_start = 0;
+  std::vector<CmiInt8> buf;
+  std::vector<double> lat;
+  std::map<std::pair<int, int>, std::vector<CmiInt8>> early;
+
+  void begin_wave() {
+    buf.assign(2 * K + 4, 0);
+    for (int i = 0; i < (int)buf.size(); i++) buf[i] = wave + i + CkMyNode();
+    if (CkMyNode() == 0) t_start = CkWallTimer();
+    if (MODE == 3) {
+      contribute(buf.size() * sizeof(CmiInt8), buf.data(), CkReduction::sum_long_long,
+                 CkCallback(CkIndex_NBench::result(0), thisProxy));
+      return;
+    }
+    round = 0;
+    if (L == 0) { wave_finished(); return; }
+    send_round();
+  }
+  void send_round() {
+    thisProxy[CkMyNode() ^ (1 << round)].rd(wave, round, buf.size(), buf.data());
+    auto it = early.find({wave, round});
+    if (it != early.end()) {
+      std::vector<CmiInt8> v = std::move(it->second);
+      early.erase(it);
+      take(v.data());
+    }
+  }
+  void take(const CmiInt8* v) {
+    for (int i = 0; i < (int)buf.size(); i++) buf[i] += v[i];
+    if (++round < L) send_round();
+    else wave_finished();
+  }
+  void wave_finished() {
+    if (CkMyNode() == 0) {
+      double now = CkWallTimer();
+      if (wave == WARM) t_warm = now;
+      if (wave >= WARM) lat.push_back(now - t_start);
+    }
+    if (++wave < R) { begin_wave(); return; }
+    if (CkMyNode() == 0) {
+      double per = (CkWallTimer() - t_warm) / (R - WARM);
+      std::sort(lat.begin(), lat.end());
+      auto q = [&](double f) { return 1e6 * lat[std::min(lat.size() - 1, (size_t)(f * lat.size()))]; };
+      CkPrintf("REDBENCH mode=%d pes=%d nodes=%d buckets=%d per_wave_us=%.2f lat_median_us=%.2f lat_p90_us=%.2f lat_p99_us=%.2f\n",
+               MODE, CkNumPes(), CkNumNodes(), K, 1e6 * per, q(0.5), q(0.9), q(0.99));
+      CkExit();
+    }
+  }
+
+ public:
+  NBench() {
+    while ((1 << L) < CkNumNodes()) L++;
+    if (MODE == 4 && (1 << L) != CkNumNodes()) CkAbort("redbench -m 4 needs a power-of-two process count");
+  }
+  void start() { begin_wave(); }
+  void result(CkReductionMsg* m) { delete m; wave_finished(); }
+  void rd(int w, int r, int n, CmiInt8* v) {
+    if (w == wave && r == round) { take(v); return; }
+    early[{w, r}] = std::vector<CmiInt8>(v, v + n);
   }
 };
 
