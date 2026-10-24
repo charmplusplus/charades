@@ -2681,7 +2681,7 @@ Best ÷ best (each arm set at its best W): 4 nodes σ 100 1.01, σ 2,000 0.97; 1
 
 **What it says:**
 - **The per-event saving shows only where a GVT advance waits on work.** At 4 nodes and W 250 both arms sit at the same advance time (129 µs, the round itself), so the cheaper events buy nothing; at W 400, under the controller, and everywhere at σ 100 on 16 nodes, an advance waits for the slowest process's work, and the fast path cuts it by 10–21%.
-- **σ 100 at 16 nodes: 1.19–1.23×.** Against Devastator's 16-node σ 100 rate from earlier jobs (about 658 M ev/s, longer runs), Charades moves from about 0.71 to about 0.86 with PP 512.
+- **σ 100 at 16 nodes: 1.19–1.23×.** Against Devastator's rates from earlier jobs with the same end time (3633769, 3635596; indicative only), Charades ÷ Devastator moves at 16 nodes from 0.71 to about 0.88 at σ 100 and stays at about 0.98 at σ 2,000; at 4 nodes about 0.97 (σ 100) and 1.25 (σ 2,000).
 - **σ 2,000: no gain, 3% loss at 4 nodes.** Half the remote events still leave the process, and the advance time rises by 5–8 µs. Not yet explained; candidates: contended pushes onto inboxes (22 producers per inbox), messages read from another core's cache instead of copied in bulk, or htram's off-process buffers filling more slowly once same-process items leave them (74 instead of 117 events per message).
 - **F1 partly wrong** (best ÷ best 1.01 at 4 nodes; 1.10–1.14 only off the best W); **F2 wrong** (0.97–1.00); **F3 right** (htram carries only off-process events; efficiency equal or higher); **F4 right**; **F5 wrong**: the gain is larger at 16 nodes, where advances wait on work, not smaller.
 - `--local-fast-path` stays off by default until the σ 2,000 loss is understood.
