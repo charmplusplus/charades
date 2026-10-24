@@ -1,6 +1,7 @@
 #include "setup.h"
 
 #include "aggregation.h"
+#include "fastpath.h"
 #include "command_line.h"
 #include "factory.h"
 #include "mapper.h"
@@ -177,6 +178,7 @@ void tw_create_simulation(LPFactory* factory, LPMapper* mapper) {
     // has entered the scheduler below, i.e. finished parsing and model setup.
     // With aggregation, htram and the aggregators come first: the scheduler
     // group's creation is their completion callback.
+    fp_check();
     if (g_tw_aggregation) {
       CkStartQD(CkCallback(create_aggregation, NULL));
     } else {

@@ -64,6 +64,7 @@ void Statistics::clear() {
   remote_cancels = 0;
   anti_sends = 0;
   anti_cancels = 0;
+  fast_sends = fast_antis = 0;
 
   // Communication stats
   send_time = 0.0;
@@ -119,6 +120,8 @@ void Statistics::add(const Statistics* other) {
   local_sends += other->local_sends;
   remote_sends += other->remote_sends;
   anti_sends += other->anti_sends;
+  fast_sends += other->fast_sends;
+  fast_antis += other->fast_antis;
   add_comm(other);
 
   // GVT stats
@@ -155,6 +158,8 @@ void Statistics::reduce(const Statistics* other) {
   local_sends += other->local_sends;
   remote_sends += other->remote_sends;
   anti_sends += other->anti_sends;
+  fast_sends += other->fast_sends;
+  fast_antis += other->fast_antis;
   add_comm(other);
 
   // GVT stats
@@ -316,6 +321,10 @@ void Statistics::print() const {
   print_int("Local Sends", local_sends);
   print_int("Remote Sends", remote_sends);
   print_int("Anti Event Sends", anti_sends);
+  if (fast_sends || fast_antis) {
+    print_int("Process Sends (fast path)", fast_sends);
+    print_int("Process Anti Sends (fast path)", fast_antis);
+  }
 
   /** \todo Add stats about cancellations */
   print_section("ROLLBACK STATISTICS");

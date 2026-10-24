@@ -123,6 +123,7 @@ Charades' controller ÷ Devastator's adaptive window: 0.68–1.03 at σ ≤ 500 
 | 58 | 2026-10-24 | 3636185 | Do htram's buffers hold GVT back at scale?, results | current |
 | 59 | 2026-10-24 | — | Count waves that ask about every bucket up to the window | design |
 | 60 | 2026-10-24 | 3636197 | Count waves that ask about every bucket up to the window, results | current |
+| 61 | 2026-10-24 | — | Same-process events by pointer (`--local-fast-path`) | design |
 
 ## Stampede3 runs, in order
 
@@ -2632,6 +2633,29 @@ On the Mac (one process, 8 PEs): the GVT's tuple 7.9 µs per wave, one int 5.1, 
 - `--gvt-ask-ahead` stays as an option, off (default 0).
 
 **Where the GVT work stands.** Combining waves per process (`--gvt-node-waves`) gained 1.17–1.32×. Everything tried after it on the GVT side (allreduce across processes, contributing at once, smaller batches, asking ahead) moves throughput by −12% to +6%. The largest gain seen since is not on the GVT side: htram WPs 512 instead of PP 512 at 16 nodes and σ 100 (1.25×; 0.85× at σ 2,000).
+
+### Same-process events by pointer (`--local-fast-path`) (design, 2026-10-24; written before any code or runs)
+
+> **Status: design.** Written before any code or runs.
+
+**Why.** At σ 100, Charades takes 1.27× Devastator's cycles per committed event, and that ratio is the whole gap there (speedup 0.71–0.77 at 4 nodes; 0.71 with PP 512 at 16). The profile puts 20% of PE time in sends (9%) and htram delivery (11%: inbox drain, `Aggregator::deliver`, `recv_remote_event`), and 97% of events at σ 100 stay in their process (128 LPs per PE, 16 per chare: 8 chares per PE, so most events go to another chare on the same PE or a neighbouring PE). Every one of them is copied into a 64 B htram item, buffered, flushed, copied out into a new message, indexed in the receiver's hash so an anti-message can find it, and removed from the hash at commit. Devastator hands a same-process event to its receiver as a pointer and cancels it by pointer.
+
+**Change.** With `--local-fast-path=1`, an event for a chare on another PE of the same process, or on another chare of the same PE, skips htram and Charm++ messages:
+- **Send.** As now up to `produce()` (GVT bucket counts, `far`, controller delay sample). The sender then pushes the message pointer onto the destination PE's inbox: a lock-free multi-producer list per PE (one compare-and-swap per event), or a plain vector when the destination is the sender's own PE. The sender's event stays in its parent's caused-by list as now, marked sent, and keeps the message pointer as its handle.
+- **Receive.** At the start of every `execute()` (beside `poll()` and `agg_drain()`), the PE takes its whole inbox with one exchange, restores send order, and for each message does what `recv_remote_event` does (`consume()`, straggler statistics, `recv_local_event`) except the hash insert. The receiver's event is stored in the message, so the message pointer finds it.
+- **Cancel.** The sender pushes a small anti-message carrying the target message pointer into the same inbox. One sender's pushes arrive in order, so the event always arrives before its anti-message, and nothing needs indexing. The target is still alive: the receiver frees it only when it commits (its timestamp is below GVT, so its sender can no longer roll back the event that sent it) or when this anti-message arrives.
+- **GVT.** Unchanged: an event is counted sent at `produce()` and received when drained, so one waiting in an inbox is in transit, exactly as with htram's inboxes. As with `--agg-inbox`, only with the bucketed GVT and the optimistic scheduler, not with `--sched-park`, load balancing, or event holding (`--gvt-adaptive-buckets`); elsewhere the option is refused.
+- **Same chare**: unchanged (already by pointer). **Other processes**: unchanged (htram or direct).
+- Statistics: "Process Sends (fast path)" and "Process Anti Sends (fast path)", counted within Remote Sends and Anti Event Sends as before.
+
+**Gate.** Mac change and engine tiers with new `*_fastpath` configs: committed counts equal to the expected counts, `--repeat 20` on two, multi-process and multi-PE (lcrun 2 × 4 PEs).
+
+**Predictions** (4 and 16 nodes, PP 512, best fixed W and the controller, σ 100 and 2,000):
+- F1. σ 100, 4 nodes: 1.10–1.20× (most of the 20% send and delivery time is same-process; Charades ÷ Devastator from 0.77 to about 0.9).
+- F2. σ 2,000: 1.03–1.10× (more events leave the process).
+- F3. Fewer htram messages per committed event (same-process items leave htram), and efficiency equal or higher (same-process events are no longer held by the deadline policy).
+- F4. Committed counts identical.
+- F5. At 16 nodes the gain is smaller than at 4, since runs there are paced by GVT advances rather than per-event cost.
 
 ## Baseline verification on the Mac
 

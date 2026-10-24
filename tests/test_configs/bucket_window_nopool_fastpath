@@ -1,0 +1,7 @@
+# Optimistic w/Bucketed GVT, same-process events by pointer, no message pool
+sync=3
+gvt=4
+buffer-size=655360
+optimism-window=2000
+msg-pool=0
+local-fast-path=1

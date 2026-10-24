@@ -5,6 +5,7 @@
 #include "avl_tree.h"
 #include "event_buffer.h"
 #include "factory.h"
+#include "fastpath.h"
 #include "globals.h"
 #include "lp.h"
 #include "mapper.h"
@@ -137,8 +138,10 @@ void tw_event_free(Event *e, bool commit) {
     while (event) {
       Event* n = event->cause_next;
       // If the owner is not TW_sent, then the event was sent locally and the
-      // pointer is still being used by the receiver on this PE.
-      if(event->state.owner == TW_sent) {
+      // pointer is still being used by the receiver on this PE. A
+      // TW_sent_fast event is the sender's record only; its receiver owns
+      // the message.
+      if(event->state.owner == TW_sent || event->state.owner == TW_sent_fast) {
         tw_event_free(event, false);
       }
       event = n;
@@ -202,12 +205,19 @@ void tw_event_send(Event* e) {
     // (charm_event_release) or delete it with its anti-message.
     bool send_now = scheduler->produce(msg);
     e->offset = msg->offset;
+    bool fast = false;
     if (send_now) {
-      send_remote(msg, dest_chare_id);
+      // A chare in this process gets the message by pointer (--local-fast-path)
+      fast = fp_send(msg, dest_chare_id);
+      if (fast) {
+        e->peer = msg;
+      } else {
+        send_remote(msg, dest_chare_id);
+      }
     }
     e->msg = NULL;
     if (g_tw_synchronization_protocol == OPTIMISTIC) {
-      e->state.owner = TW_sent;
+      e->state.owner = fast ? TW_sent_fast : TW_sent;
     } else {
       tw_event_free(e, false);
     }
@@ -269,6 +279,13 @@ void charm_anti_send(unsigned dest_chare_id, Event* e) {
 void charm_event_cancel(Event * e) {
   // Already in cancel q, return
   if(e->state.cancel_q) {
+    return;
+  }
+
+  // Sent by pointer: an anti-message by pointer, then free the local record
+  if(e->state.owner == TW_sent_fast) {
+    fp_send_anti(e);
+    tw_event_free(e,false);
     return;
   }
 

@@ -200,6 +200,15 @@ class LPChare : public CBase_LPChare {
     ///@}
 
     /**
+     * \name Fast path (--local-fast-path, fastpath.h)
+     * An event, or an anti-message naming one, handed over by pointer from
+     * a chare in this process; called while draining this PE's inboxes.
+     *///@{
+    void recv_fast_event(RemoteEvent* msg);
+    void recv_fast_anti(RemoteEvent* anti);
+    ///@}
+
+    /**
      * \name Migration methods
      * These methods are used to enable migration for things like LB and
      * potentially checkpoint/restart.

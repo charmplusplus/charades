@@ -32,6 +32,9 @@ struct RemoteEvent : public CMessage_RemoteEvent {
       offset = 0;
       send_ns = 0;
       src_pe = -1;
+      fp_next = NULL;
+      fp_target = NULL;
+      fp_event = NULL;
     }
 
     Time ts;
@@ -62,6 +65,13 @@ struct RemoteEvent : public CMessage_RemoteEvent {
     int64_t send_ns;
     int32_t src_pe;
 
+    // --local-fast-path (fastpath.h), never sent over the network: the link
+    // in the receiving PE's inbox; for an anti-message, the event message it
+    // cancels; and the receiver's event for this message once it arrived
+    RemoteEvent* fp_next;
+    RemoteEvent* fp_target;
+    Event* fp_event;
+
     uint8_t type_id;  /**< Used for double-dispatch of event data */
     uint8_t type_size;
     char* data;       /**< Points to memory for user event data */
@@ -89,6 +99,7 @@ enum tw_event_owner {
   TW_chare_q = 1,     /**< In the chare's pending queue */
   TW_rollback_q = 2,  /**< In the chare's rollback queue */
   TW_sent = 3,        /**< Event sent to someone else */
+  TW_sent_fast = 4,   /**< Sent by pointer to a chare in this process (peer) */
 };
 
 struct tw_event_state {
@@ -158,6 +169,9 @@ public:
 
   LPBase* owner;
   RemoteEvent* msg;
+  // TW_sent_fast: the message the receiver now owns, which an anti-message
+  // names (it lives until that anti-message or the event's commit)
+  RemoteEvent* peer;
 
   // Variables for message data types
   uint8_t type_id;
@@ -199,6 +213,7 @@ public:
 
     owner = NULL;
     msg = NULL;
+    peer = NULL;
 
     cv.clear();
     state.owner = state.remote = state.cancel_q = state.avl_tree = 0;

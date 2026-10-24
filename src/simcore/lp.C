@@ -300,6 +300,41 @@ void LPChare::recv_remote_event(RemoteEvent* event) {
   recv_local_event(e);
 }
 
+void LPChare::recv_fast_event(RemoteEvent* event) {
+  scheduler->consume(event);
+  Event* e = event_alloc();
+  e->set_msg(event);
+  e->state.remote = 1;
+  // An anti-message finds the event through its message: nothing is indexed
+  event->fp_event = e;
+  if (g_tw_comm_stats) comm_record_slack(e->ts, get_current_time());
+  // Never held in a buffer, so only a late one counts as held too
+  if (e->ts <= get_current_time() && event->far) {
+    PE_STATS(late_stragglers)++;
+    PE_STATS(held_stragglers)++;
+  }
+  recv_local_event(e);
+}
+
+void LPChare::recv_fast_anti(RemoteEvent* anti) {
+  scheduler->consume(anti);
+  TW_ASSERT(anti->ts >= PE_VALUE(g_last_gvt),
+      "[%d] chare %d: fast anti event ts %llu below GVT %llu (src %llu id %llu)\n",
+      CkMyPe(), thisIndex, (unsigned long long)anti->ts,
+      (unsigned long long)PE_VALUE(g_last_gvt),
+      (unsigned long long)anti->src_lp, (unsigned long long)anti->event_id);
+  // The event arrived first (one sender's pushes stay in order) and is not
+  // freed before this: it is not below GVT, and only this cancels it
+  Event* real = anti->fp_target->fp_event;
+  TW_ASSERT(real != NULL && real->msg == anti->fp_target &&
+      real->event_id == anti->event_id && real->src_lp == anti->src_lp,
+      "[%d] chare %d: fast anti event (src %llu id %llu) does not match its "
+      "event\n", CkMyPe(), thisIndex, (unsigned long long)anti->src_lp,
+      (unsigned long long)anti->event_id);
+  charm_event_cancel(real);
+  remote_event_delete(anti);
+}
+
 void LPChare::recv_local_event(Event* e) {
   /** GVT is a lower bound: an event below it means a GVT was too late */
   TW_ASSERT(!isOptimistic || e->ts >= PE_VALUE(g_last_gvt),

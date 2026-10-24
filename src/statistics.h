@@ -75,6 +75,8 @@ class Statistics {
     uint64_t remote_cancels;
     uint64_t anti_sends;   ///< anti events sent
     uint64_t anti_cancels;
+    uint64_t fast_sends;   ///< remote sends handed over by pointer (--local-fast-path)
+    uint64_t fast_antis;   ///< anti events handed over by pointer (--local-fast-path)
     ///@}
 
     /** \name Communication stats (--comm-stats)

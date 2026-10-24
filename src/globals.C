@@ -56,6 +56,7 @@ unsigned g_tw_agg_buffer;
 Time     g_tw_agg_urgent;
 unsigned g_tw_agg_scope;
 unsigned g_tw_agg_inbox;
+unsigned g_tw_local_fast_path;
 unsigned g_tw_event_index;
 unsigned g_tw_msg_pool;
 unsigned g_tw_agg_gvt_flush;
@@ -140,6 +141,7 @@ void clear_globals() {
   g_tw_agg_urgent         = 0;
   g_tw_agg_scope          = 0;
   g_tw_agg_inbox          = 1;
+  g_tw_local_fast_path    = 0;
   g_tw_event_index        = 1;
   g_tw_msg_pool           = 1;
   g_tw_agg_gvt_flush      = 2;

@@ -1,7 +1,8 @@
 #include "optimistic.h"
 
 #include "aggregation.h"
-#include "avl_tree.h"   // Temporary, should be moved to LP
+#include "avl_tree.h"
+#include "fastpath.h"   // Temporary, should be moved to LP
 #include "globals.h"
 #include "statistics.h"
 #include "trigger.h"
@@ -53,6 +54,8 @@ void OptimisticScheduler::execute() {
   gvt_manager->poll();
   // Events htram's node receives left for this PE (--agg-inbox)
   agg_drain();
+  // Events chares in this process handed over by pointer (--local-fast-path)
+  fp_drain();
   for (; num_executed < g_tw_mblock; num_executed++) {
     // With an optimism window, events past GVT + window wait for GVT to
     // advance. The iteration still completes, so the GVT trigger keeps

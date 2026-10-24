@@ -1,0 +1,5 @@
+# Optimistic w/Bucketed GVT, with same-process events by pointer (--local-fast-path)
+sync=3
+gvt=4
+buffer-size=655360
+local-fast-path=1
