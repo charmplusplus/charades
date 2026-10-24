@@ -1,0 +1,15 @@
+# agg_ctl_sparse_bucket_pp on the message path (--gvt-node-waves=0): every PE contributes to
+# each count wave and gets the result as a message (the default before 2026-10-24)
+sync=3
+gvt=4
+buffer-size=655360
+optimism-window=2000
+aggregation=1
+agg-mode=2
+agg-buffer=16
+agg-policy=1
+ctl=1
+ctl-agg-kappa=0.2
+ctl-sparse-waves=1
+ctl-hist-waves=32
+gvt-node-waves=0

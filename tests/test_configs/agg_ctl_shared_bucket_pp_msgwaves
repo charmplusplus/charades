@@ -1,4 +1,5 @@
-# agg_ctl_shared_bucket_pp with --gvt-node-waves=1: count waves combined per process in shared memory
+# agg_ctl_shared_bucket_pp on the message path (--gvt-node-waves=0): every PE contributes to
+# each count wave and gets the result as a message (the default before 2026-10-24)
 sync=3
 gvt=4
 buffer-size=655360
@@ -13,4 +14,4 @@ ctl-epsilon=0.003
 ctl-reduction=1
 ctl-hist-waves=1
 ctl-hist-coarse=1
-gvt-node-waves=1
+gvt-node-waves=0

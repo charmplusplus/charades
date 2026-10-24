@@ -1,0 +1,6 @@
+# bucket on the message path (--gvt-node-waves=0): every PE contributes to
+# each count wave and gets the result as a message (the default before 2026-10-24)
+sync=3
+gvt=4
+buffer-size=655360
+gvt-node-waves=0
