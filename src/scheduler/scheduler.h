@@ -67,6 +67,10 @@ class Scheduler : public CBase_Scheduler {
     void all_ended();         /**< Every PE has applied the final GVT */
     void finalize_complete();
     void finalize(CkReductionMsg *m); /**< Receives stats reduction and exits */
+    /** --pe-stats, PE 0: writes pe_stats.csv; exits once finalize() has too */
+    void pe_stats(CkReductionMsg *m);
+    bool final_printed, pe_stats_written;
+    void exit_when_done();
 
     /** Method for printing out basic info about the current progress */
     void print_progress(Time ts);

@@ -30,6 +30,7 @@ Scheduler::Scheduler() {
   running = false;
   parked = false;
   ended = false;
+  final_printed = pe_stats_written = false;
 
   // Initialize rng // TODO: Definitely doesn't belong here
   tw_rand_init(31, 41);
@@ -86,8 +87,42 @@ void Scheduler::all_ended() {
 
 void Scheduler::finalize_complete() {
   agg_collect_stats(cumulative_stats);
+  if (g_tw_pe_stats) {
+    const Statistics* s = cumulative_stats;
+    double rec[12] = {(double)CkMyPe(), (double)CkMyNode(), (double)CkMyRank(),
+        (double)s->events_executed, (double)s->events_committed,
+        (double)s->events_rolled_back, (double)s->remote_sends,
+        (double)s->iter_full, (double)s->iter_window, (double)s->iter_empty,
+        s->exec_time, s->total_time};
+    contribute(sizeof(rec), rec, CkReduction::concat,
+        CkCallback(CkIndex_Scheduler::pe_stats(NULL), thisProxy[0]));
+  }
   contribute(sizeof(Statistics), cumulative_stats, statsReductionType,
       CkCallback(CkIndex_Scheduler::finalize(NULL), thisProxy[0]));
+}
+
+void Scheduler::pe_stats(CkReductionMsg* msg) {
+  std::vector<std::vector<double>> recs;
+  const double* d = (const double*)msg->getData();
+  for (int i = 0; i + 12 <= (int)(msg->getSize() / sizeof(double)); i += 12) {
+    recs.emplace_back(d + i, d + i + 12);
+  }
+  delete msg;
+  std::sort(recs.begin(), recs.end());
+  FILE* f = fopen("pe_stats.csv", "w");
+  fprintf(f, "pe,process,rank,executed,committed,rolled_back,remote_sends,"
+             "batches_full,batches_window,batches_empty,exec_s,total_s\n");
+  for (const auto& r : recs) {
+    fprintf(f, "%.0f,%.0f,%.0f,%.0f,%.0f,%.0f,%.0f,%.0f,%.0f,%.0f,%.6f,%.6f\n",
+        r[0], r[1], r[2], r[3], r[4], r[5], r[6], r[7], r[8], r[9], r[10], r[11]);
+  }
+  fclose(f);
+  pe_stats_written = true;
+  exit_when_done();
+}
+
+void Scheduler::exit_when_done() {
+  if (final_printed && (pe_stats_written || !g_tw_pe_stats)) CkExit();
 }
 
 void Scheduler::finalize(CkReductionMsg* msg) {
@@ -99,7 +134,8 @@ void Scheduler::finalize(CkReductionMsg* msg) {
     CkAbort("Failed Simulation Expectations!\n");
   } else {
     CkPrintf("Simulation Executed Successfully!\n");
-    CkExit();
+    final_printed = true;
+    exit_when_done();
   }
 }
 

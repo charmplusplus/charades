@@ -45,6 +45,7 @@ extern unsigned g_tw_gvt_trigger;     ///< unit of the GVT interval (time or eve
 extern unsigned g_tw_gvt_phases;      ///< number of phases in a phased gvt
 extern unsigned g_tw_gvt_bucket_size; ///< size of each bucket in a bucketed gvt
 extern unsigned g_tw_gvt_min_buckets; ///< bucketed gvt: buckets a PE passes before a round
+extern unsigned g_tw_pe_stats;        ///< PE 0 writes one line per PE to pe_stats.csv at the end
 extern unsigned g_tw_gvt_trace;       ///< bucketed gvt: PE 0 logs every count wave; time execute()
 extern unsigned g_tw_gvt_wave_events; ///< bucketed gvt: events a PE runs between count waves (0: none)
 extern unsigned g_tw_gvt_node_waves;  ///< bucketed gvt: combine each process's count-wave contributions in shared memory

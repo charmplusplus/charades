@@ -7,6 +7,7 @@ module scheduler {
     entry [notrace, reductiontarget] void all_ended();
     entry [notrace, reductiontarget] void finalize_complete();
     entry [notrace] void finalize(CkReductionMsg* msg);
+    entry [notrace] void pe_stats(CkReductionMsg* msg);
     entry [notrace] void groups_created();
   };
 
