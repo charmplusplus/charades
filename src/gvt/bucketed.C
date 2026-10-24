@@ -30,6 +30,7 @@ void BucketGVT::init() {
   node_waves = nullptr;
   node_wave_seen = 0;
   node_wave_pending = false;
+  wave_combined_t = wave_result_t = 0;
   active = false;
   continuous = true;
 
@@ -68,12 +69,12 @@ void BucketGVT::init() {
 void BucketGVT::finalize() {
   if (g_tw_gvt_trace && CkMyPe() == 0) {
     std::ofstream t(std::string(g_output_dir) + "gvt_trace.csv");
-    t << "start_s,end_s,asked,passed0,valid,completed,bucket,lead0\n";
+    t << "start_s,end_s,asked,passed0,valid,completed,bucket,lead0,combined_s,result_s\n";
     t << std::fixed << std::setprecision(7);
     for (const WaveRecord& w : trace) {
       t << w.start << "," << w.end << "," << w.asked << "," << w.passed0
         << "," << w.valid << "," << w.completed << "," << w.bucket << ","
-        << w.lead0 << "\n";
+        << w.lead0 << "," << w.combined << "," << w.result << "\n";
     }
   }
   if (CkMyPe() == 0) {
@@ -339,6 +340,8 @@ void BucketGVT::wave_done(const int* counts, int num_buckets,
     WaveRecord w;
     w.start = wave_start;
     w.end = CmiWallTimer();
+    w.combined = wave_combined_t;
+    w.result = wave_result_t;
     w.asked = wave_asked;
     w.passed0 = wave_passed;
     w.valid = valid_buckets;
@@ -478,6 +481,8 @@ void BucketGVT::poll() {
   node_wave_seen++;
   node_wave_pending = false;
   const std::vector<CmiInt8>& r = node_waves->result();
+  wave_combined_t = node_waves->t_combined;
+  wave_result_t = node_waves->t_result;
   int n = r[0], nctl = r[2], nhist = r[3];
   std::vector<int> sums(r.begin() + 4, r.begin() + 4 + 2 * n);
   std::vector<uint64_t> ctl(r.begin() + 4 + 2 * n, r.begin() + 4 + 2 * n + nctl);
@@ -486,7 +491,16 @@ void BucketGVT::poll() {
       nhist ? hist.data() : nullptr, nhist);
 }
 
-NodeWaves::NodeWaves() : slots(CkMyNodeSize()), arrived(0), gen(0) {}
+NodeWaves::NodeWaves()
+    : t_combined(0), t_result(0), slots(CkMyNodeSize()), arrived(0), gen(0),
+      rounds(0), ar_wave(0), ar_round(0), ar_active(false) {
+  while ((1 << rounds) < CkNumNodes()) rounds++;
+  allreduce = g_tw_gvt_wave_allreduce && (1 << rounds) == CkNumNodes();
+  if (g_tw_gvt_wave_allreduce && !allreduce && CkMyNode() == 0) {
+    CkPrintf("Bucketed GVT: %d processes is not a power of two; count waves "
+             "use the nodegroup reduction\n", CkNumNodes());
+  }
+}
 
 void NodeWaves::contribute_from(int rank, const std::vector<CmiInt8>& v) {
   slots[rank].assign(v.begin(), v.end());
@@ -496,6 +510,7 @@ void NodeWaves::contribute_from(int rank, const std::vector<CmiInt8>& v) {
   // The last PE in: every slot is written, and none is written again before
   // this wave's result is out
   arrived.store(0, std::memory_order_relaxed);
+  if (g_tw_gvt_trace) t_combined = CmiWallTimer();
   combined.assign(slots[0].begin(), slots[0].end());
   for (int r = 1; r < CkMyNodeSize(); r++) {
     combine_wave(combined, slots[r].data(), slots[r].size());
@@ -504,15 +519,63 @@ void NodeWaves::contribute_from(int rank, const std::vector<CmiInt8>& v) {
 }
 
 void NodeWaves::contribute_combined(int n, CmiInt8* v) {
-  contribute(n * sizeof(CmiInt8), v, gvtWaveReductionType,
-      CkCallback(CkIndex_NodeWaves::wave_result(NULL), thisProxy));
+  if (!allreduce) {
+    contribute(n * sizeof(CmiInt8), v, gvtWaveReductionType,
+        CkCallback(CkIndex_NodeWaves::wave_result(NULL), thisProxy));
+    return;
+  }
+  ar_buf.assign(v, v + n);
+  ar_round = 0;
+  ar_active = true;
+  if (rounds == 0) {
+    publish(ar_buf.data(), n);
+    return;
+  }
+  send_round();
+}
+
+/** Sends this round's partial sums, then takes the partner's if it is here */
+void NodeWaves::send_round() {
+  thisProxy[CkMyNode() ^ (1 << ar_round)].exchange(ar_wave, ar_round,
+      ar_buf.size(), ar_buf.data());
+  auto it = early.find({ar_wave, ar_round});
+  if (it != early.end()) {
+    std::vector<CmiInt8> v = std::move(it->second);
+    early.erase(it);
+    add_partner(v.data(), v.size());
+  }
+}
+
+void NodeWaves::exchange(int wave, int round, int n, CmiInt8* v) {
+  if (ar_active && wave == ar_wave && round == ar_round) {
+    add_partner(v, n);
+  } else {
+    early[{wave, round}] = std::vector<CmiInt8>(v, v + n);
+  }
+}
+
+void NodeWaves::add_partner(const CmiInt8* v, int n) {
+  combine_wave(ar_buf, v, n);
+  if (++ar_round < rounds) {
+    send_round();
+  } else {
+    publish(ar_buf.data(), ar_buf.size());
+  }
+}
+
+void NodeWaves::publish(const CmiInt8* v, int n) {
+  res.assign(v, v + n);
+  if (g_tw_gvt_trace) t_result = CmiWallTimer();
+  if (allreduce) {
+    ar_active = false;
+    ar_wave++;
+  }
+  gen.fetch_add(1, std::memory_order_release);
 }
 
 void NodeWaves::wave_result(CkReductionMsg* msg) {
-  const CmiInt8* d = (const CmiInt8*)msg->getData();
-  res.assign(d, d + msg->getSize() / sizeof(CmiInt8));
+  publish((const CmiInt8*)msg->getData(), msg->getSize() / sizeof(CmiInt8));
   delete msg;
-  gen.fetch_add(1, std::memory_order_release);
 }
 
 void combine_wave(std::vector<CmiInt8>& into, const CmiInt8* from, int n) {

@@ -1,0 +1,5 @@
+# bucket with --gvt-wave-allreduce=1: processes combine count waves by recursive doubling
+sync=3
+gvt=4
+buffer-size=655360
+gvt-wave-allreduce=1

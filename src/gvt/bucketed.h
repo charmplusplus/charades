@@ -7,6 +7,8 @@
 
 #include <atomic>
 #include <list>
+#include <map>
+#include <utility>
 #include <vector>
 
 struct OffsetStats {
@@ -56,6 +58,15 @@ struct OffsetStats {
  * then contributes to the next wave -- so, as with messages, no PE
  * contributes to wave k+1 before it has read wave k's result, which also
  * keeps the slots and the result buffer from being overwritten early.
+ *
+ * --gvt-wave-allreduce: across processes, an allreduce by recursive doubling
+ * replaces the nodegroup reduction and broadcast: in round r a process sends
+ * its partial sums to process (me XOR 2^r) and adds in what that process
+ * sent; after log2 P rounds every process has the total. Integer sums and
+ * one minimum are exact, so every process gets the same result. A partner's
+ * message that arrives before this process reached that wave and round is
+ * kept until it does. The entry methods are [exclusive], so one PE at a time
+ * runs this state machine.
  */
 class NodeWaves : public CBase_NodeWaves {
   public:
@@ -64,11 +75,23 @@ class NodeWaves : public CBase_NodeWaves {
     void contribute_from(int rank, const std::vector<CmiInt8>& v);
     void contribute_combined(int n, CmiInt8* v);
     void wave_result(CkReductionMsg* msg);
+    void exchange(int wave, int round, int n, CmiInt8* v);
     /** Results published so far; read result() only after this moved */
     uint64_t generation() const { return gen.load(std::memory_order_acquire); }
     const std::vector<CmiInt8>& result() const { return res; }
+    /** --gvt-trace: when the last PE in arrived, and when the result came */
+    double t_combined, t_result;
 
   private:
+    void publish(const CmiInt8* v, int n);
+    void send_round();
+    void add_partner(const CmiInt8* v, int n);
+    bool allreduce;     ///< --gvt-wave-allreduce, and a power-of-two process count
+    int rounds;         ///< log2 of the process count
+    int ar_wave, ar_round;
+    bool ar_active;     ///< this process is in wave ar_wave
+    std::vector<CmiInt8> ar_buf;
+    std::map<std::pair<int, int>, std::vector<CmiInt8>> early;
     std::vector<std::vector<CmiInt8>> slots;
     std::atomic<int> arrived;
     std::vector<CmiInt8> combined;
@@ -178,6 +201,7 @@ class BucketGVT : public CBase_BucketGVT {
     uint64_t node_wave_seen;    ///< results of NodeWaves this PE has run
     bool node_wave_pending;     ///< contributed, result not yet run
     std::vector<CmiInt8> node_wave_buf;
+    double wave_combined_t, wave_result_t;  ///< --gvt-trace, PE 0
     void init();
 
     /**
@@ -188,6 +212,7 @@ class BucketGVT : public CBase_BucketGVT {
      */
     struct WaveRecord {
       double start, end;
+      double combined, result;  ///< --gvt-node-waves: PE 0's process (0 otherwise)
       int asked, passed0, valid, completed, bucket;
       long long lead0;
     };
