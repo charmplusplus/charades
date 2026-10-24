@@ -117,6 +117,7 @@ Charades' controller ÷ Devastator's adaptive window: 0.68–1.03 at σ ≤ 500 
 | 52 | 2026-10-24 | 3635974 (3635873) | The cross-process part of a GVT advance, results | current |
 | 53 | 2026-10-24 | — | What makes a process late to a count wave: batch size and wave holding | design |
 | 54 | 2026-10-24 | 3636110 (3636097) | What makes a process late to a count wave, results | current |
+| 55 | 2026-10-24 | — | Which PE is slow, and why | design |
 
 ## Stampede3 runs, in order
 
@@ -2529,6 +2530,18 @@ On the Mac (one process, 8 PEs): the GVT's tuple 7.9 µs per wave, one int 5.1, 
 **Predictions:**
 - K1. **Wrong.** `--batch 4` is slower everywhere (0.88–0.94).
 - K2. Right at 16 nodes (+2–3%) and at 4 nodes σ 100 (−0.5%); just outside at 4 nodes σ 2,000 (+6%).
+
+### Which PE is slow, and why (design, 2026-10-24; written before any runs)
+
+> **Status: design.** Written before any runs.
+
+**Why.** At W 250 GVT waits for the slowest PE, which trails the window's edge by about 70 of simulated time while the rest sit at it ("What makes a process late", results). New option `--pe-stats=1` (charades 8a8abfa): PE 0 writes each PE's executed, committed and rolled-back events, remote sends, and how its scheduler batches ended (full, blocked by the window, out of events) to `pe_stats.csv`. A PE that is rarely blocked by the window is one the others wait for.
+
+**Runs** (skx-dev, 16 nodes, job output on `$SCRATCH`): σ 100 and σ 2,000, W 250, 4 and 16 nodes, `--pe-stats=1 --gvt-trace=1`, 2 reps.
+
+**Predictions:**
+- S1. The PEs least often blocked by the window are the first PE of each process (rank 0), which also runs htram's node-level receives and the `NodeWaves` combine.
+- S2. Executed events per PE vary by at most 5% around the mean: load imbalance is not the cause.
 
 ## Baseline verification on the Mac
 
