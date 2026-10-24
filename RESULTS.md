@@ -111,6 +111,7 @@ Charades' controller ÷ Devastator's adaptive window: 0.68–1.03 at σ ≤ 500 
 | 46 | 2026-10-24 | — | GVT round cost at 4 and 16 nodes | design |
 | 47 | 2026-10-24 | 3635612 | GVT round cost at 4 and 16 nodes, results | current |
 | 48 | 2026-10-24 | 3635622 | Where a reduction's time goes, one node | current |
+| 49 | 2026-10-24 | — | GVT count waves combined per process, `--gvt-node-waves` | design |
 
 ## Stampede3 runs, in order
 
@@ -2372,6 +2373,31 @@ On the Mac (one process, 8 PEs): the GVT's tuple 7.9 µs per wave, one int 5.1, 
 - **The GVT's tuple adds about half on top of a plain sum** (Mac, 8 PEs), which Charades can avoid on its own.
 
 **Fixes, in order of reach:** (1) Charades: combine each process's counts in shared memory (atomic adds into a per-process buffer; the last PE in contributes once per process) and publish the result through shared memory, so the cross-process reduction has 2 members per node instead of 46 and no PE handles 44 messages per wave; drop the tuple. (2) Reconverse: a tree for the local fan-out (the FIXME), and a node-aware local fan-in in Charm++'s reduction manager. (1) needs no runtime change.
+
+### GVT count waves combined per process, `--gvt-node-waves` (design, 2026-10-24; written before any code or runs)
+
+> **Status: design.** Written before any code or runs.
+
+**Why.** At 16 nodes a GVT advance is one count wave and takes about as long as the reduction under it ("GVT round cost"), and that reduction is slow because of its shape ("Where a reduction's time goes"): each process's first PE receives and combines 22 contributions, then allocates and sends 22 copies of the result, one after another, and the GVT's tuple message adds about half again. Charades can avoid all of it without runtime changes, the way `--agg-inbox` already avoids per-PE htram messages.
+
+**Design** (`--gvt-node-waves=1`; bucketed GVT only; off under `--sched-park`, like `--agg-inbox`, since parked PEs do not poll):
+1. **Contribute into shared memory.** A new nodegroup `NodeWaves` holds, per process, one slot per PE and an arrival counter. A PE's wave contribution (sent and received counts for the buckets asked, buckets passed, and the controller's counters and histogram when it sends them) becomes one flat array of 64-bit integers written to its own slot; it then increments the arrival counter.
+2. **The last PE in combines.** The PE that brings the counter to the process's PE count sums the slots (minimum for buckets passed), resets the counter, and hands the combined array to its process's `NodeWaves` branch (one local message), which contributes it to a nodegroup reduction.
+3. **No tuple.** The cross-process reduction uses one custom reducer over the flat array (sum everywhere except one minimum), registered at startup like the statistics reducer.
+4. **The result comes back once per process** (a nodegroup broadcast). The handler copies it into the process's shared result and bumps a generation counter.
+5. **PEs pick it up where they already look for work**: at the top of `execute()`, next to the htram inbox drain, a PE that is waiting on a wave checks the generation counter and, if it moved, runs the existing `check_counts` logic on the shared result. That logic is unchanged, so every PE still makes the same decision from the same sums.
+- Correctness: a PE contributes to wave k+1 only after it has read wave k's result, as now (Mattern's four-counter rule needs exactly that); the slots and the result buffer are reused safely because no PE can contribute to wave k+1, or a result k+1 exist, before every PE of the process has read result k. Committed counts must equal the message path's.
+- The start reduction (once per run) is unchanged.
+
+**Gate.** Mac: `test.py --tier change` and the bucketed configs with `--gvt-node-waves=1` (with and without htram, with the controller on the count waves), `--repeat 20` on two of them; committed counts equal to the message path.
+
+**Then on Stampede3** (when `/work2` works on compute nodes again): `--gvt-trace=1` runs at 4 and 16 nodes, σ 100 and σ 2,000, W 250 and 400, both paths, 2 reps.
+
+**Predictions:**
+- N1. At 16 nodes a wave (seen by PE 0) drops from 187–243 µs to at most 80 µs, and a GVT advance from 262–379 µs to at most 130.
+- N2. At 16 nodes the best fixed W gains 30–60% (σ 100 and σ 2,000), and weak-scaling efficiency at σ 2,000 rises from 0.76 to at least 0.9. At 4 nodes the gain is 5–15%, since there the wave is partly hidden behind PE 0's batches.
+- N3. Committed counts are identical to the message path in every run.
+- N4. With cheaper rounds, the best W at 16 nodes moves back toward 250–300.
 
 ## Baseline verification on the Mac
 
