@@ -120,6 +120,8 @@ Charades' controller ÷ Devastator's adaptive window: 0.68–1.03 at σ ≤ 500 
 | 55 | 2026-10-24 | — | Which PE is slow, and why | design |
 | 56 | 2026-10-24 | 3636151 | Which PE is slow, and why, results | current |
 | 57 | 2026-10-24 | — | Do htram's buffers hold GVT back at scale? | design |
+| 58 | 2026-10-24 | 3636185 | Do htram's buffers hold GVT back at scale?, results | current |
+| 59 | 2026-10-24 | — | Count waves that ask about every bucket up to the window | design |
 
 ## Stampede3 runs, in order
 
@@ -2569,6 +2571,38 @@ On the Mac (one process, 8 PEs): the GVT's tuple 7.9 µs per wave, one int 5.1, 
 **Predictions:**
 - H1. Buckets completed per wave rise from about 7.5 with PP 512 to at least 10 with WPs 512 or direct sends.
 - H2. At 16 nodes, smaller PP buffers or WPs beat PP 512 by at least 10% at σ 2,000; at 4 nodes PP 512 stays best.
+
+### Do htram's buffers hold GVT back at scale?, results (2026-10-24, skx-dev batch job 3636185)
+
+> **Status: current.** Short runs (end 512,000), W 250, 2 reps; two runs hit the cap (the warm-up launch and one 4-node PP 512 run, whose rep 2 stands in); data `~/charades-data/aggbuf/`. Committed counts are identical across arms.
+
+| nodes, σ | PP 512 (default) | PP 128 | PP 64 | WPs 512 | direct sends |
+|---|---|---|---|---|---|
+| 4, σ 100: M ev/s (µs per advance) | 158.0 (135) | 157.7 (134) | 145.2 (146) | **164.5** (129) | 58.7 (367) |
+| 4, σ 2,000 | **126.1** (170) | 122.0 (174) | 112.0 (189) | 111.0 (191) | 32.2 (662) |
+| 16, σ 100 | 454.5 (186) | 530.0 (159) | 513.6 (164) | **566.3** (149) | 174.6 (492) |
+| 16, σ 2,000 | **371.1** (228) | 329.9 (256) | 311.9 (271) | 316.8 (268) | 103.4 (825) |
+
+**Buckets completed per wave: 7.5 in every arm, direct sends included**, with 22.4–22.9 buckets passed by every PE.
+
+**What it says:**
+- **H1 wrong: htram's buffers are not what holds GVT back.** Direct sends, which buffer nothing, complete exactly as many buckets per wave.
+- **The cause is the bucketed GVT's own bookkeeping.** A wave asks about the buckets the previous result left open (valid − completed), and a bucket can complete only if every PE had passed it at the previous wave and that wave reported its counts; so completed ≤ asked − completed last time. In steady state completed = asked ÷ 2 and asked = valid − completed, so **completed = valid ÷ 3**: 22.5 ÷ 3 = 7.5, as measured in every run since the traces began (W 400: 11.1 of about 33). GVT trails the buckets every PE has passed by about two waves by construction, which is why PEs sit blocked at the window's edge.
+- H2 mixed: at 16 nodes σ 100, WPs 512 is 1.25× PP 512 and PP 128 1.17×; at σ 2,000 PP 512 stays best (PP 128 0.89, WPs 0.85). Not pursued until the GVT change below.
+
+### Count waves that ask about every bucket up to the window (design, 2026-10-24; written before any code or runs)
+
+> **Status: design.** Written before any code or runs.
+
+**Change** (`--gvt-ask-ahead=A`): a wave reports counts for max(valid − completed, A) buckets (capped at the buckets left) instead of valid − completed. With A at least the window in buckets, the previous wave has always reported counts for every bucket all PEs had passed, so a bucket can complete one wave after every PE passed it and its counts match, instead of about three. Mattern's four-counter rule is unchanged: a bucket still completes only when it was passed by every PE at the previous wave and the previous wave's received total equals this wave's sent total. Cost: 2A integers per contribution instead of about 30 (A = 33 at W 250: 66).
+
+**Gate.** Mac change tier on the bucketed configs with `--gvt-ask-ahead` set, `--repeat 20` on two; committed counts equal to the default.
+
+**Predictions:**
+- G1. Buckets completed per wave rise from 7.5 to at least 12 at W 250 (the bound is valid ÷ 2 ≈ 11 if valid stays at 22.5, more if PEs then pass further).
+- G2. Throughput rises at least 1.3× at 4 and 16 nodes with htram (PP 512), since runs are paced by GVT advances; less with direct sends, which are slower per event.
+- G3. With faster GVT the best W moves down.
+- G4. Committed counts identical.
 
 ## Baseline verification on the Mac
 
