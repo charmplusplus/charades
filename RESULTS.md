@@ -126,6 +126,7 @@ Charades' controller ÷ Devastator's adaptive window: 0.68–1.03 at σ ≤ 500 
 | 61 | 2026-10-24 | — | Same-process events by pointer (`--local-fast-path`) | design |
 | 62 | 2026-10-24 | 3636369 | Same-process events by pointer, results | current |
 | 63 | 2026-10-24 | — | Where the fast path loses at σ 2,000, and with WPs | design |
+| 64 | 2026-10-24 | 3636435 | Where the fast path loses at σ 2,000, and with WPs, results | current |
 
 ## Stampede3 runs, in order
 
@@ -2704,6 +2705,42 @@ Best ÷ best (each arm set at its best W): 4 nodes σ 100 1.01, σ 2,000 0.97; 1
 - P2. Push retries are below 5% of pushes, so contention is not the cause; the cost is reading messages from another core's cache.
 - P3. WPs 512 with the fast path beats PP 512 with the fast path at 16 nodes σ 100 (≥ 1.05), and loses at σ 2,000 as before.
 - P4. Charades ÷ Devastator at 16 nodes σ 100: 0.85–0.90.
+
+### Where the fast path loses at σ 2,000, and with WPs, results (2026-10-24, skx-dev batch job 3636435)
+
+> **Status: current.** Short runs (end 512,000), 2 reps (medians); data `~/charades-data/fp2/`. 94 of 96 Charades runs finished. The two that did not (fast path off, 4 nodes, σ 100, rep 1, W 250 and W 400) printed nothing before the 60 s cap: a cold start on nodes the 4-node warm-up had not touched, not the code under test (rep 2 and job 3636369 cover both). Later jobs warm every node. Committed counts identical across all four variants.
+
+**÷ fast path off with PP 512** (higher is better):
+
+| nodes, σ, arm | off: M ev/s | on (PP) | this PE only (PP) | on + WPs 512 | µs per GVT advance: off / on / PE only / WPs | inbox push retries per push (on) |
+|---|---|---|---|---|---|---|
+| 4, σ 100, W 250 | 164.5 | 1.04 | 1.02 | 1.01 | 129 / 124 / 127 / 128 | 1.2% |
+| 4, σ 100, W 400 | 137.7 | 1.15 | 1.12 | 1.19 | 175 / 154 / 157 / 148 | 1.2% |
+| 4, σ 100, controller | 150.3 | 1.08 | 1.02 | 1.11 | 151 / 139 / 148 / 137 | 1.2% |
+| 4, σ 2,000, W 250 | 132.7 | 0.97 | 0.98 | 0.85 | 160 / 164 / 164 / 187 | 2.8% |
+| 4, σ 2,000, W 400 | 116.7 | 0.98 | 1.00 | 0.92 | 215 / 222 / 214 / 245 | 2.7% |
+| 4, σ 2,000, controller | 127.3 | 0.99 | 0.99 | 0.87 | 177 / 178 / 178 / 203 | 2.8% |
+| 16, σ 100, W 250 | 448.3 | 1.23 | 1.05 | 1.33 | 188 / 154 / 179 / 141 | 1.3% |
+| 16, σ 100, W 400 | 448.0 | 1.29 | 1.08 | 1.35 | 236 / 179 / 220 / 170 | 1.2% |
+| 16, σ 100, controller | 447.8 | 1.23 | 1.04 | 1.35 | 210 / 168 / 202 / 152 | 1.2% |
+| 16, σ 2,000, W 250 | 375.2 | 0.97 | 1.01 | 0.89 | 225 / 231 / 224 / 253 | 2.9% |
+| 16, σ 2,000, W 400 | 372.9 | 1.01 | 0.99 | 0.89 | 303 / 297 / 306 / 355 | 2.8% |
+| 16, σ 2,000, controller | 367.5 | 0.97 | 1.00 | 0.87 | 251 / 257 / 251 / 291 | 2.9% |
+
+**Charades ÷ Devastator, same job, same end time** (each at its best tested setting; Devastator W 500 or 1,000 with `--rng=clcg4`; higher is better for Charades):
+
+| nodes, σ | Devastator (M ev/s) | Charades, fast path off, PP | fast path, PP | fast path, WPs |
+|---|---|---|---|---|
+| 4, σ 100 | 171.7 | 0.96 (164.5) | **1.00** (171.5) | 0.97 (166.2) |
+| 4, σ 2,000 | 104.2 | 1.27 (132.7) | 1.24 (129.3) | 1.09 (113.3) |
+| 16, σ 100 | 661.0 | 0.68 (448.3) | 0.87 (577.1) | **0.91** (604.7) |
+| 16, σ 2,000 | 368.8 | 1.02 (375.2) | 1.02 (377.5) | 0.91 (334.2) |
+
+**What it says:**
+- **Contention is not the σ 2,000 cost** (P2 right): 2.8% of pushes retry. Sending by pointer only within the PE recovers σ 2,000 (0.98–1.01) but keeps only 1.04–1.08 of the 1.23–1.29 at 16 nodes σ 100 (**P1 wrong**): most of the σ 100 gain is events to other PEs of the process. The σ 2,000 loss is small (0–3%) and, with both modes near 1.00 at 16 nodes, close to the rep spread.
+- **WPs with the fast path** is the best Charades at 16 nodes σ 100: 1.35× fast path off, 1.05× fast path with PP (**P3 right**), and loses 8–15% at σ 2,000 as before. The htram mode should follow locality.
+- **Against Devastator** (**P4 right**): parity at 4 nodes σ 100 (1.00), ahead at σ 2,000 (1.24 at 4 nodes, 1.02 at 16), behind only at 16 nodes σ 100 (0.87 with PP, 0.91 with WPs; was 0.68).
+- With PP, the fast path's best ÷ best: 1.04 (4 nodes σ 100), 0.97 (4 nodes σ 2,000), 1.29 (16 nodes σ 100), 1.01 (16 nodes σ 2,000).
 
 ## Baseline verification on the Mac
 
