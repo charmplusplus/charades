@@ -143,6 +143,7 @@ Charades' controller ÷ Devastator's adaptive window: 0.68–1.03 at σ ≤ 500 
 | 76 | 2026-10-25 | 3638968 (16 nodes), 3638969 (4 nodes) | `--agg-auto` without the second instance, results: the PP 2,048 gain is not aggregation | current |
 | 77 | 2026-10-25 | — | Weak scaling 1–16 nodes in one allocation; one process per node | design |
 | 78 | 2026-10-25 | 3639098 | Weak scaling 1–16 nodes in one allocation, results: time per GVT advance, not aggregation, limits Charades | current |
+| 79 | 2026-10-25 | — | Where a GVT advance's time goes at scale; PP 2,048's allocation vs its limit; the horizon margin | design |
 
 ## Stampede3 runs, in order
 
@@ -3138,6 +3139,28 @@ Best ÷ best (each arm set at its best W): 4 nodes σ 100 1.01, σ 2,000 0.97; 1
 - **The main finding: at Gaussian σ, Charades' scaling loss is time per GVT advance, not aggregation.** From 4 to 16 nodes at a fixed setting, events per message (σ 2,000: 74, 74, 75), efficiency and the advance count stay the same, while µs per advance grows 167 → 195 → 233 (σ 4,000: 188 → 286). Even at σ 100, where 2–3% of events leave the process, µs per advance rises 112 → 151 from 1 to 16 nodes, which is Charades' whole 0.80 there; Devastator is flat (1.00) on the same workload. Aggregation thinning is the cause only for uniform (114 → 39 → 15 events per message, 177 → 330 → 563 µs per advance).
 - **Why Devastator escapes it.** Its best window grows to W 1,000 at 8–16 nodes (500 at 1–2), so each GVT advance covers 2.5–4× more simulated time than Charades' best (W 250–400). Charades cannot widen W as cheaply (rollbacks cost more, section 68).
 - **Plan change.** GVT advance cost at scale moves ahead of aggregation thinning. Next: break µs per advance into its parts at 4 and 16 nodes (reduction latency vs waiting for the slowest PE vs blocked passes). Then either cut that cost or make wider windows affordable.
+
+### Where a GVT advance's time goes at scale; PP 2,048's allocation vs its limit; the horizon margin (design, 2026-10-25; written before any runs)
+
+> **Status: design.** Charades branch `scale-diag` (off `agg-auto`), htram `pdes` with `initPPLimit`. Job script `$WORK/charades-runs/diag.slurm`; output `$WORK/charades-runs/sdiag/j<job>/`.
+
+**Why.** Section 78: at Gaussian σ, Charades' loss from 4 to 16 nodes is all in µs per GVT advance (σ 2,000: 167 → 233), and section 76: PP 2,048's gain at low σ is not aggregation, while its loss at σ ≥ 2,000 comes from events held past their deadline. Earlier work (memory, jobs 3635974–3636197) found that the cross-process wait is waiting for the slowest process, not the reduction, on PE 0's view only.
+
+**New instrumentation** (off by default):
+- `--gvt-trace=2`: with `--gvt-node-waves` (the default), every process writes `gvt_waves_<process>.csv`, one row per count wave, all on its own clock: when its first and its last PE contributed, the last PE's rank, and when the result was published there. Per process and wave: *work* = last contribution − previous result (how long until its slowest PE was ready), *spread* = last − first, *wait* = result − last contribution. Per wave across processes: the advance time = result − previous result (the same for every process, up to broadcast skew), the *reduction floor* = the smallest wait (the slowest process waits only for the reduction and broadcast), and the *straggler cost* = the largest work − the median work. No clocks are compared across nodes.
+- `--agg-pp-limit=N` (diagnostic): PP's shared buffers are capped at N events while every buffer stays allocated at `--agg-buffer` (htram `initPPLimit`). Mac: test configs `agg_pp_limit`, `bucket_gvt_trace2`.
+
+**Job** (16 nodes, skx-dev; PP 512, W 250, margin 8 unless noted):
+- A. N = 16, 8, 4 nodes; σ 100, σ 2,000, uniform; `--gvt-trace=2 --pe-stats=1`, each against an untraced run; 3 reps.
+- B. 16 nodes, σ 100 and σ 2,000: PP 512, PP 2,048, PP 2,048 capped at 512; 3 reps.
+- C. 16 nodes, σ 100, 2,000, 4,000; PP 512 and PP 2,048; W 250 and 400; margins 8, 32, 64, 128 (the horizon is W + margin); 2 reps.
+
+**Predictions:**
+- A1. The trace costs ≤ 3% (traced ÷ untraced ≥ 0.97).
+- A2. From 4 to 16 nodes the reduction floor grows by ≤ 30 µs (to 40–80 µs at 16 nodes), and the straggler cost grows by more: it is most of the increase in advance time at σ 2,000 and σ 100.
+- A3. The slowest process changes from wave to wave (no process is the last in more than 20% of waves at 16 nodes), and within it the spread (last − first PE) is most of its work, with no fixed last rank.
+- B1. At σ 100, PP 2,048 capped at 512 is within 3% of PP 2,048 (the gain is the allocation, a layout effect); at σ 2,000 it is within 3% of PP 512 (the loss follows the limit).
+- C1. A larger margin cuts events held past their deadline at σ ≥ 2,000, and PP 2,048 at margin 64–128 recovers to ≥ 0.95 of PP 512 at margin 8. PP 512 gains ≤ 5% at σ ≥ 2,000; at σ 100 every margin is within 2%.
 
 ## Baseline verification on the Mac
 
