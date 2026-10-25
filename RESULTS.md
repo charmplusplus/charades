@@ -132,6 +132,7 @@ Charades' controller ÷ Devastator's adaptive window: 0.68–1.03 at σ ≤ 500 
 | 65 | 2026-10-24 | — | Which htram mode and buffer for which workload (fast path on) | design |
 | 66 | 2026-10-25 | 3636522 (16 nodes), 3638303 (4 nodes) | Which htram mode and buffer for which workload, results | current |
 | 67 | 2026-10-25 | — | The 16-node gaps with wider windows (uniform, lookahead 10) | design |
+| 68 | 2026-10-25 | 3638330 | The 16-node gaps with wider windows, results | current |
 
 ## Stampede3 runs, in order
 
@@ -2826,6 +2827,41 @@ Best ÷ best (each arm set at its best W): 4 nodes σ 100 1.01, σ 2,000 0.97; 1
 - G1. Uniform: Charades' best W is 600–800, and Charades ÷ Devastator rises to at least 1.00.
 - G2. Lookahead 10: the best W is 150–200; Charades ÷ Devastator rises to at least 0.95 at σ 500 and 0.90 at σ 2,000.
 - G3. The controller reaches at least 0.90 of the best fixed W in all three workloads; if not, its bound (κ) holds W too low at 16 nodes.
+
+### The 16-node gaps with wider windows, results (2026-10-25, skx-dev batch job 3638330)
+
+> **Status: current.** 16 nodes, short runs, 2 reps (medians), fast path on; data `~/charades-data/gaps16/`. All 92 measured runs finished (the first warm-up launch hit the cap, as intended); committed counts identical across settings.
+
+**Uniform remote 1.0** (lookahead 100 / mean 1,000; M committed events/s, efficiency %):
+
+| W | PP 512 | WPs 512 | Devastator |
+|---|---|---|---|
+| 400 | 158.7 (99.0) | 178.2 (99.2) | — |
+| 500 | — | — | 174.5 (98.0) |
+| 600 | **162.9** (97.0) | **180.0** (97.0) | — |
+| 800 | 146.7 (89.2) | 151.3 (87.9) | — |
+| 1,000 | 120.3 (77.9) | 122.8 (75.7) | **178.3** (92.6) |
+| 2,000 | — | — | 131.0 (72.7) |
+| controller | 139.9 (W 279) | 160.9 (W 287) | — |
+
+**Lookahead 10 / mean 200** (M committed events/s, efficiency %):
+
+| W | σ 500: PP 512 | σ 500: PP 2,048 | σ 500: WPs 512 | σ 500: Devastator | σ 2,000: PP 512 | σ 2,000: WPs 512 | σ 2,000: Devastator |
+|---|---|---|---|---|---|---|---|
+| 50 | 373.7 (99.98) | **413.5** (99.99) | 397.4 (99.99) | — | 254.3 (99.95) | 251.1 (99.96) | — |
+| 100 | 317.0 (98.96) | 289.3 (98.84) | 311.1 (98.92) | 449.8 (99.95) | 250.5 (98.36) | **255.0** (98.56) | 304.0 (99.54) |
+| 150 | 208.9 (94.50) | 209.0 (94.44) | 206.7 (94.38) | — | 150.8 (89.66) | 162.0 (90.75) | — |
+| 200 | 123.6 (85.85) | 125.0 (85.97) | 118.8 (85.18) | **480.0** (99.72) | 91.2 (74.05) | 120.3 (80.40) | **340.2** (96.94) |
+| 300 | 121.1 (77.25) | 123.0 (77.08) | 131.2 (78.50) | — | 28.5 (32.49) | 69.4 (55.33) | — |
+| 400 | — | — | — | 449.8 (97.81) | — | — | 282.3 (85.90) |
+| controller | 365.5 (W 51) | 405.0 (W 52) | 391.0 (W 51) | — | 246.6 (W 50) | 246.7 (W 51) | — |
+
+**Charades best ÷ Devastator best** (higher is better): uniform **1.01** (WPs 512, W 600; was 0.94 with W ≤ 400); lookahead 10 σ 500 **0.86**, σ 2,000 **0.75** (unchanged).
+
+**What it says:**
+- **Uniform: the gap was the window grid** (**G1 right**): best W 600, and WPs 512 beats PP 512 by 1.10×, as the rule says (15 events per PP message). The controller stops at W 279–287 (κ bound), 0.89 of the best fixed W with WPs (**G3 wrong** here).
+- **Lookahead 10: the gap is real** (**G2 wrong**): wider W makes Charades much worse, not better. At the same W, Charades rolls back far more than Devastator: W 200 at σ 500 runs at 85.9% efficiency against Devastator's 99.7%; at σ 2,000, 74% against 97%. The controller is right to sit at W 50 (0.97–0.98 of the best fixed W, **G3 right** at lookahead 10).
+- **Likely cause: the rollback unit.** Devastator rolls back one LP (its PHOLD registers each LP as its own rollback domain); Charades rolls back a whole chare, 16 LPs here, so a straggler undoes every later event of 16 LPs. When stragglers are rare (lookahead 100) this costs little; at lookahead 10 it multiplies the waste and caps W. Test: fewer LPs per chare, which the fast path now makes cheap (events between chares on a PE no longer go through messages or htram).
 
 ## Baseline verification on the Mac
 
