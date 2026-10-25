@@ -4,7 +4,9 @@ module aggregation {
 
   /** Per-PE glue between the event send/receive paths and htram */
   group Aggregator {
-    entry [notrace] Aggregator(CkGroupID tram);
+    entry [notrace] Aggregator(CkGroupID tram, CkGroupID tram_wps);
+    /** --agg-auto: the summed traffic of the first GVT advances, on every PE */
+    entry [reductiontarget] void auto_choose(int n, double v[n]);
   };
 #endif
 };

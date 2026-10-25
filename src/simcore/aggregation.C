@@ -89,10 +89,20 @@ static bool agg_inbox_on() {
 
 class Aggregator : public CBase_Aggregator {
   public:
-    HTram* tram;
+    HTram* tram;  ///< where new events go
+    /**
+     * Every htram instance: the one --agg-mode made, and with --agg-auto a
+     * second in WPs mode. Flushes, inbox drains and statistics cover both, so
+     * events left in one after sends move to the other still go out.
+     */
+    std::vector<HTram*> trams;
     Time urgent;  ///< urgent_window(the current window), read on every send
+    unsigned advances;  ///< GVT advances seen (--agg-auto)
 
-    Aggregator(CkGroupID tram_gid);
+    Aggregator(CkGroupID tram_gid, CkGroupID wps_gid);
+    void auto_choose(int n, double* v);
+    /** --agg-auto: after enough GVT advances, add this PE's traffic to the choice */
+    void auto_count_advance();
 
     /**
      * Home PE of an LP chare. LPs never migrate with aggregation on (load
@@ -135,17 +145,72 @@ class Aggregator : public CBase_Aggregator {
 
 CpvStaticDeclare(Aggregator*, g_aggregator);
 
-Aggregator::Aggregator(CkGroupID tram_gid) {
+Aggregator::Aggregator(CkGroupID tram_gid, CkGroupID wps_gid) : advances(0) {
   CpvInitialize(Aggregator*, g_aggregator);
   CpvAccess(g_aggregator) = this;
   tram = CProxy_HTram(tram_gid).ckLocalBranch();
+  trams.push_back(tram);
+  if (g_tw_agg_auto) trams.push_back(CProxy_HTram(wps_gid).ckLocalBranch());
   // Before the scheduler exists, so before PE_VALUE(window): the start value
   urgent = urgent_window(g_tw_optimism_window);
-  tram->set_func_ptr_retarr(deliver, dest_pe_of, NULL, this);
-  tram->setAggregationMode(g_tw_agg_mode);
-  // Node-level receives (WPs, PP) send nothing to PEs that get no items
-  tram->setSkipEmptyDeliveries(true);
-  if (agg_inbox_on()) tram->setInboxDelivery(true);
+  for (size_t i = 0; i < trams.size(); i++) {
+    HTram* t = trams[i];
+    t->set_func_ptr_retarr(deliver, dest_pe_of, NULL, this);
+    t->setAggregationMode(i == 0 ? g_tw_agg_mode : WPs);
+    // Node-level receives (WPs, PP) send nothing to PEs that get no items
+    t->setSkipEmptyDeliveries(true);
+    if (agg_inbox_on()) t->setInboxDelivery(true);
+  }
+}
+
+/**
+ * --agg-auto (RESULTS.md "Which htram mode and buffer for which workload"):
+ * on 4 and 16 Stampede3 nodes, PP with 2,048-event buffers was 1.03-1.09x PP
+ * 512 wherever at most 27% of events left their process, and 0.70-0.88 from
+ * 50%; WPs won only where PP 512's messages carried about 20 events or fewer
+ * (uniform traffic on 16 nodes: 15), and lost badly where they were large
+ * (uniform on 4 nodes: 114, WPs 0.72). The run starts on PP and its own
+ * buffer; after --agg-auto-advances GVT advances, every PE adds what it sent
+ * to one reduction, and all apply the same choice from the sums.
+ */
+enum { AUTO_OFF_PROCESS, AUTO_SENDS, AUTO_ITEMS, AUTO_MSGS, AUTO_N };
+
+void Aggregator::auto_count_advance() {
+  if (++advances != g_tw_agg_auto_advances) return;
+  Statistics* s = get_statistics();
+  double v[AUTO_N];
+  // Events that left the process (through htram or directly) and all sends
+  v[AUTO_OFF_PROCESS] = (double)(s->agg_items + s->agg_direct);
+  v[AUTO_SENDS] = (double)(s->self_sends + s->local_sends + s->remote_sends);
+  v[AUTO_ITEMS] = (double)s->agg_items;
+  v[AUTO_MSGS] = (double)trams[0]->msgs_sent;
+  contribute(sizeof(v), v, CkReduction::sum_double,
+      CkCallback(CkReductionTarget(Aggregator, auto_choose), thisProxy));
+}
+
+void Aggregator::auto_choose(int n, double* v) {
+  CkAssert(n == AUTO_N);
+  double share = v[AUTO_SENDS] > 0 ? v[AUTO_OFF_PROCESS] / v[AUTO_SENDS] : 0;
+  double per_msg = v[AUTO_MSGS] > 0 ? v[AUTO_ITEMS] / v[AUTO_MSGS] : 0;
+  const char* choice;
+  if (share <= g_tw_agg_auto_share) {
+    // Live: PP never fills the per-PE buffers setBufferSize rebuilds, and its
+    // shared buffers are allocated at htram's largest size. PEs of a process
+    // switch at different times; a PE still on the smaller size only sends
+    // its own 16-item buffers while another fills the shared one further.
+    trams[0]->setBufferSize(g_tw_agg_auto_buffer);
+    choice = "PP with the large buffer";
+  } else if (per_msg < g_tw_agg_auto_msg) {
+    tram = trams[1];  // what PP still holds goes out with its flushes
+    choice = "WPs";
+  } else {
+    choice = "PP as started";
+  }
+  if (CkMyPe() == 0) {
+    CkPrintf("Aggregation auto: after %u GVT advances, %.3f of events leave "
+             "their process and PP messages carry %.1f events: %s\n",
+             g_tw_agg_auto_advances, share, per_msg, choice);
+  }
 }
 
 void Aggregator::deliver(void* self, PdesItem* items, int n) {
@@ -185,6 +250,8 @@ int Aggregator::dest_pe_of(void* self, PdesItem item) {
 /******************************************************************************/
 static CkCallback agg_done;
 static CkGroupID agg_recv_gid, agg_src_gid, agg_tram_gid;
+// --agg-auto: a second htram, in WPs mode, with its own node groups
+static CkGroupID agg_recv2_gid, agg_src2_gid, agg_tram2_gid;
 
 static void aggregators_created(void*, void* msg) {
   if (msg) CkFreeMsg(msg);
@@ -193,7 +260,7 @@ static void aggregators_created(void*, void* msg) {
 
 static void create_aggregators(void*, void* msg) {
   if (msg) CkFreeMsg(msg);
-  CProxy_Aggregator::ckNew(agg_tram_gid);
+  CProxy_Aggregator::ckNew(agg_tram_gid, agg_tram2_gid);
   CkStartQD(CkCallback(aggregators_created, NULL));
 }
 
@@ -203,6 +270,12 @@ static void create_tram(void*, void* msg) {
       g_tw_agg_buffer, /*enable_timed_flushing=*/false, /*flush_timer=*/0.0,
       /*ret_item=*/false, /*request=*/false,
       CkCallback(CkCallback::ignore));
+  if (g_tw_agg_auto) {
+    agg_tram2_gid = CProxy_HTram::ckNew(agg_recv2_gid, agg_src2_gid,
+        g_tw_agg_buffer, /*enable_timed_flushing=*/false, /*flush_timer=*/0.0,
+        /*ret_item=*/false, /*request=*/false,
+        CkCallback(CkCallback::ignore));
+  }
   CkStartQD(CkCallback(create_aggregators, NULL));
 }
 
@@ -242,9 +315,27 @@ void agg_create(CkCallback done) {
             "an event waits for its bucket to become current\n");
   }
   if (agg_inbox_on()) CkPrintf("Aggregation: node receives deliver through per-PE inboxes\n");
+  if (g_tw_agg_auto) {
+    if (g_tw_agg_mode != PP) {
+      CkAbort("--agg-auto=1 starts from PP: use --agg-mode=2\n");
+    }
+    if (g_tw_agg_auto_buffer > BUFSIZE || g_tw_agg_auto_buffer % LOCAL_BUFSIZE) {
+      CkAbort("--agg-auto-buffer must be at most %d and a multiple of %d\n",
+              BUFSIZE, LOCAL_BUFSIZE);
+    }
+    CkPrintf("Aggregation auto: after %u GVT advances, PP %u if at most %.2f of "
+             "events leave their process, else WPs %u if PP messages carry "
+             "fewer than %.0f events, else stay\n", g_tw_agg_auto_advances,
+             g_tw_agg_auto_buffer, g_tw_agg_auto_share, g_tw_agg_buffer,
+             g_tw_agg_auto_msg);
+  }
   agg_done = done;
   agg_recv_gid = CProxy_HTramRecv::ckNew();
   agg_src_gid = CProxy_HTramNodeGrp::ckNew();
+  if (g_tw_agg_auto) {
+    agg_recv2_gid = CProxy_HTramRecv::ckNew();
+    agg_src2_gid = CProxy_HTramNodeGrp::ckNew();
+  }
   CkStartQD(CkCallback(create_tram, NULL));
 }
 
@@ -311,38 +402,49 @@ bool agg_send(RemoteEvent* msg, uint64_t dest_chare) {
 static void flush_due(Aggregator* a) {
   if (a->urgent == 0) return;  // nothing is ever due (blocking GVT, no window)
   // Due: ts < GVT + horizon, i.e. ts <= GVT + horizon - 1
-  a->tram->flushDue((long long)(PE_VALUE(g_last_gvt) + a->urgent - 1));
+  for (HTram* t : a->trams)
+    t->flushDue((long long)(PE_VALUE(g_last_gvt) + a->urgent - 1));
+}
+
+/** Messages sent by every htram instance on this PE */
+static unsigned long long msgs_sent(Aggregator* a) {
+  unsigned long long m = 0;
+  for (HTram* t : a->trams) m += t->msgs_sent;
+  return m;
 }
 
 void agg_flush_idle() {
   if (!g_tw_aggregation) return;
   Aggregator* a = CpvAccess(g_aggregator);
-  unsigned long long m0 = a->tram->msgs_sent;
+  unsigned long long m0 = msgs_sent(a);
   if (g_tw_agg_policy == 1) {
     flush_due(a);
   } else {
-    a->tram->flushIdle();
+    for (HTram* t : a->trams) t->flushIdle();
   }
-  get_statistics()->agg_msgs_idle += a->tram->msgs_sent - m0;
+  get_statistics()->agg_msgs_idle += msgs_sent(a) - m0;
 }
 
 void agg_drain() {
   if (!g_tw_aggregation) return;
-  CpvAccess(g_aggregator)->tram->drainInbox();
+  for (HTram* t : CpvAccess(g_aggregator)->trams) t->drainInbox();
 }
 
 void agg_flush_gvt() {
   if (!g_tw_aggregation) return;
   Aggregator* a = CpvAccess(g_aggregator);
-  unsigned long long m0 = a->tram->msgs_sent;
-  if (g_tw_agg_policy == 1) {
-    flush_due(a);
-  } else if (g_tw_agg_gvt_flush == 1) {
-    a->tram->flushStale();
-  } else if (g_tw_agg_gvt_flush == 2) {
-    a->tram->flushPending();
+  unsigned long long m0 = msgs_sent(a);
+  for (HTram* t : a->trams) {
+    if (g_tw_agg_policy == 1) continue;  // flush_due below covers both
+    if (g_tw_agg_gvt_flush == 1) {
+      t->flushStale();
+    } else if (g_tw_agg_gvt_flush == 2) {
+      t->flushPending();
+    }
   }
-  get_statistics()->agg_msgs_gvt += a->tram->msgs_sent - m0;
+  if (g_tw_agg_policy == 1) flush_due(a);
+  get_statistics()->agg_msgs_gvt += msgs_sent(a) - m0;
+  if (g_tw_agg_auto) a->auto_count_advance();
 }
 
 void agg_set_window(uint64_t window) {
@@ -353,18 +455,20 @@ void agg_set_window(uint64_t window) {
 void agg_flush_all() {
   if (!g_tw_aggregation) return;
   Aggregator* a = CpvAccess(g_aggregator);
-  unsigned long long m0 = a->tram->msgs_sent;
-  a->tram->flushPending();
-  get_statistics()->agg_msgs_round += a->tram->msgs_sent - m0;
+  unsigned long long m0 = msgs_sent(a);
+  for (HTram* t : a->trams) t->flushPending();
+  get_statistics()->agg_msgs_round += msgs_sent(a) - m0;
 }
 
 void agg_collect_stats(Statistics* s) {
   if (!g_tw_aggregation) return;
-  HTram* tram = CpvAccess(g_aggregator)->tram;
-  s->agg_msgs = tram->msgs_sent;
-  s->agg_bytes = tram->bytes_sent;
-  s->agg_idle_flushes = tram->idle_flushes;
-  s->agg_pp_bypasses = tram->local_bypasses;
+  s->agg_msgs = s->agg_bytes = s->agg_idle_flushes = s->agg_pp_bypasses = 0;
+  for (HTram* t : CpvAccess(g_aggregator)->trams) {
+    s->agg_msgs += t->msgs_sent;
+    s->agg_bytes += t->bytes_sent;
+    s->agg_idle_flushes += t->idle_flushes;
+    s->agg_pp_bypasses += t->local_bypasses;
+  }
 }
 
 #include "aggregation.def.h"

@@ -48,6 +48,11 @@ void parse_command_line(int argc, char** argv) {
   kernel.register_argument("agg-gvt-flush",        "On each GVT update flush - NOTHING=0, DESTINATIONS NOT FILLING=1, EVERYTHING=2", g_tw_agg_gvt_flush);
   kernel.register_argument("agg-policy",           "When htram buffers ship - EAGER (idle PEs and GVT updates flush everything)=0, DEADLINE (only events with ts < GVT + agg-horizon)=1", g_tw_agg_policy);
   kernel.register_argument("agg-horizon",          "Deadline policy: events with ts < GVT + this are due (0 = the optimism window)", g_tw_agg_horizon);
+  kernel.register_argument("agg-auto",             "Aggregation: start PP with --agg-buffer, then after --agg-auto-advances GVT advances choose PP with --agg-auto-buffer (few events leave the process), WPs (small PP messages) or stay - NO=0 (default), YES=1", g_tw_agg_auto);
+  kernel.register_argument("agg-auto-advances",    "--agg-auto: GVT advances to measure before choosing (default 128)", g_tw_agg_auto_advances);
+  kernel.register_argument("agg-auto-share",       "--agg-auto: large PP buffers if at most this share of events leaves the process (default 0.3)", g_tw_agg_auto_share);
+  kernel.register_argument("agg-auto-msg",         "--agg-auto: otherwise WPs if PP messages carry fewer events than this (default 25)", g_tw_agg_auto_msg);
+  kernel.register_argument("agg-auto-buffer",      "--agg-auto: the large PP buffer, in events (default 2048)", g_tw_agg_auto_buffer);
   kernel.register_argument("agg-horizon-margin",   "Deadline policy with agg-horizon 0: the horizon is the window plus this", g_tw_agg_horizon_margin);
   kernel.register_argument("optimism-window",      "Optimistic: execute no event later than GVT + this (0 = unbounded); with --ctl, the starting window", g_tw_optimism_window);
   kernel.register_argument("ctl",                  "Set the optimism window online - NO=0, DELAY QUANTILE=1, HILL CLIMB (Devastator)=2", g_tw_ctl);

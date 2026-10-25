@@ -75,6 +75,11 @@ extern unsigned g_tw_agg_gvt_flush;   ///< on each GVT update: 0 none, 1 stale, 
 extern unsigned g_tw_agg_policy;      ///< 0: eager flushes, 1: flush by timestamp deadline
 extern Time     g_tw_agg_horizon;     ///< deadline policy: events with ts < GVT + this are due
 extern Time     g_tw_agg_horizon_margin; ///< deadline policy, horizon following the window: W + this
+extern unsigned g_tw_agg_auto;        ///< choose the htram mode and buffer from the run's own traffic (aggregation.h)
+extern unsigned g_tw_agg_auto_advances; ///< --agg-auto: GVT advances measured before choosing
+extern double   g_tw_agg_auto_share;  ///< --agg-auto: at most this share of events leaving the process -> large PP buffers
+extern double   g_tw_agg_auto_msg;    ///< --agg-auto: fewer events than this per PP message -> WPs
+extern unsigned g_tw_agg_auto_buffer; ///< --agg-auto: the large PP buffer
 ///@}
 
 /** \name Optimism-window controller (controller.h) *////@{

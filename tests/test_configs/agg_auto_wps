@@ -1,0 +1,13 @@
+# Optimistic w/Bucketed GVT, htram PP -> WPs after 4 GVT advances (--agg-auto, forced)
+sync=3
+gvt=4
+buffer-size=655360
+optimism-window=2000
+aggregation=1
+agg-mode=2
+agg-buffer=16
+agg-policy=1
+agg-auto=1
+agg-auto-advances=4
+agg-auto-share=-1
+agg-auto-msg=1000000
