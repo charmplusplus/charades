@@ -131,6 +131,7 @@ Charades' controller ÷ Devastator's adaptive window: 0.68–1.03 at σ ≤ 500 
 | 64 | 2026-10-24 | 3636435 | Where the fast path loses at σ 2,000, and with WPs, results | current |
 | 65 | 2026-10-24 | — | Which htram mode and buffer for which workload (fast path on) | design |
 | 66 | 2026-10-25 | 3636522 (16 nodes), 3638303 (4 nodes) | Which htram mode and buffer for which workload, results | current |
+| 67 | 2026-10-25 | — | The 16-node gaps with wider windows (uniform, lookahead 10) | design |
 
 ## Stampede3 runs, in order
 
@@ -2810,6 +2811,21 @@ Best ÷ best (each arm set at its best W): 4 nodes σ 100 1.01, σ 2,000 0.97; 1
 - **Against Devastator** (same jobs): at 4 nodes Charades is ahead or level in 7 of 8 workloads (1.00–1.76; 0.95 at lookahead 10 σ 500); at 16 nodes in 5 of 8 (0.97–1.14 at lookahead 100, σ 100–4,000; behind with uniform traffic, 0.94, and at lookahead 10, 0.86 and 0.77).
 - **S1 wrong** (WPs is not the low-σ winner at 16 nodes; the mode follows message size, not locality); **S2 wrong** (the best buffer grows with locality); **S3 right** (≥ 5% in 8 of 16 cells, under 5% in the rest); **S4 right in form** (a two-quantity rule is within 2% everywhere), but measured, not yet run as an automatic choice.
 
+
+### The 16-node gaps with wider windows (uniform, lookahead 10) (design, 2026-10-25; written before any runs)
+
+> **Status: design.** Written before any runs.
+
+**Why.** At 16 nodes Charades trails Devastator with uniform traffic (0.94) and at lookahead 10 / mean 200 (0.86 at σ 500, 0.77 at σ 2,000), but in both its best arm was the widest window tested (W 400; W 100 at σ 2,000), while Devastator's best was W 1,000 and W 200. Are these gaps real?
+
+**Job** (skx-dev, 16 nodes, 2 reps, fast path on, short runs, each node warmed first):
+- Uniform remote 1.0 (lookahead 100 / mean 1,000): W 400, 600, 800, 1,000 and the controller; PP 512 and WPs 512. Devastator W 500, 1,000, 2,000.
+- Lookahead 10 / mean 200, σ 500 and 2,000: W 50, 100, 150, 200, 300 and the controller; PP 512, PP 2,048 and WPs 512. Devastator W 100, 200, 400, 800.
+
+**Predictions:**
+- G1. Uniform: Charades' best W is 600–800, and Charades ÷ Devastator rises to at least 1.00.
+- G2. Lookahead 10: the best W is 150–200; Charades ÷ Devastator rises to at least 0.95 at σ 500 and 0.90 at σ 2,000.
+- G3. The controller reaches at least 0.90 of the best fixed W in all three workloads; if not, its bound (κ) holds W too low at 16 nodes.
 
 ## Baseline verification on the Mac
 
