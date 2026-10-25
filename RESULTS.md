@@ -133,6 +133,7 @@ Charades' controller ÷ Devastator's adaptive window: 0.68–1.03 at σ ≤ 500 
 | 66 | 2026-10-25 | 3636522 (16 nodes), 3638303 (4 nodes) | Which htram mode and buffer for which workload, results | current |
 | 67 | 2026-10-25 | — | The 16-node gaps with wider windows (uniform, lookahead 10) | design |
 | 68 | 2026-10-25 | 3638330 | The 16-node gaps with wider windows, results | current |
+| 69 | 2026-10-25 | — | Choosing htram automatically (`--agg-auto`), and LPs per chare at lookahead 10 | design |
 
 ## Stampede3 runs, in order
 
@@ -2862,6 +2863,23 @@ Best ÷ best (each arm set at its best W): 4 nodes σ 100 1.01, σ 2,000 0.97; 1
 - **Uniform: the gap was the window grid** (**G1 right**): best W 600, and WPs 512 beats PP 512 by 1.10×, as the rule says (15 events per PP message). The controller stops at W 279–287 (κ bound), 0.89 of the best fixed W with WPs (**G3 wrong** here).
 - **Lookahead 10: the gap is real** (**G2 wrong**): wider W makes Charades much worse, not better. At the same W, Charades rolls back far more than Devastator: W 200 at σ 500 runs at 85.9% efficiency against Devastator's 99.7%; at σ 2,000, 74% against 97%. The controller is right to sit at W 50 (0.97–0.98 of the best fixed W, **G3 right** at lookahead 10).
 - **Likely cause: the rollback unit.** Devastator rolls back one LP (its PHOLD registers each LP as its own rollback domain); Charades rolls back a whole chare, 16 LPs here, so a straggler undoes every later event of 16 LPs. When stragglers are rare (lookahead 100) this costs little; at lookahead 10 it multiplies the waste and caps W. Test: fewer LPs per chare, which the fast path now makes cheap (events between chares on a PE no longer go through messages or htram).
+
+### Choosing htram automatically (`--agg-auto`), and LPs per chare at lookahead 10 (design, 2026-10-25; written before any runs)
+
+> **Status: design.** Written before any runs.
+
+**`--agg-auto=1`** (branch `agg-auto`, 9fe32b3): the run starts on PP with `--agg-buffer`. After `--agg-auto-advances` GVT advances (default 128), every PE adds to one reduction the events that left its process, all its sends, and PP's items and messages; every PE applies the same choice from the sums: PP with `--agg-auto-buffer` (2,048) if at most `--agg-auto-share` (0.3) of events leave their process; else WPs 512 if PP messages carry fewer than `--agg-auto-msg` (25) events; else stay. PP resizes live (it never fills the per-PE buffers `setBufferSize` rebuilds, and its shared buffers are allocated at htram's largest size); WPs is a second htram instance made at startup, and flushes, inbox drains and statistics cover both, so what PP still holds goes out. Mac: forced configs `agg_auto_bigpp`, `agg_auto_wps`, `agg_auto_stay` (decision after 4 advances) 20 repeats each at 1 × 4 and 2 × 2 PEs, all three choices exercised, 1,200/1,200; engine tier with 10 repeats of `agg_deadline_bucket_pp` and `agg_auto_wps` 1,490/1,490.
+
+**LPs per chare.** Charades rolls back a whole chare per straggler. On the Mac (1 process × 8 PEs, lookahead 10 / mean 200, σ 500), efficiency at W 100 rises from 62.8% (16 LPs per chare) to 82.4% (4) and 95.1% (1), but at W 50, where little rolls back, 1 LP per chare is 0.87× 16 (every scheduler pass visits every chare for cancellations, and fossil collection visits every chare per GVT advance).
+
+**Job** (16 nodes on skx-dev, 4 nodes on skx, 2 reps, short runs, fast path on):
+- All 8 workloads of section 66; PP 512, PP 2,048, WPs 512 and `--agg-auto` (from PP 512), same arms as there plus W 600 at lookahead 100.
+- Lookahead 10, σ 500 and 2,000, PP 512: 4 and 1 LPs per chare at W 50, 100, 200 and the controller.
+
+**Predictions:**
+- A1. `--agg-auto` chooses what the rule says in every cell (PP 2,048 at σ ≤ 1,000 and lookahead 10 σ 500; WPs for uniform at 16 nodes and lookahead 10 σ 2,000 at 4 nodes; PP 512 elsewhere).
+- A2. `--agg-auto` is within 3% of the best fixed setting in every cell, and at least PP 512's rate everywhere.
+- A3. At 16 nodes, lookahead 10, fewer LPs per chare raises efficiency at W 100–200 but the best throughput stays within ±5% of 16 LPs per chare at W 50 (the scheduler's per-chare passes offset the saved rollbacks).
 
 ## Baseline verification on the Mac
 
