@@ -9,6 +9,21 @@
 #include "statistics.h"
 #include "bucketed.h"
 
+/**
+ * Diagnostic (RESULTS.md, "Memory layout"): CHARADES_PAD_KB=N allocates and
+ * touches N KB on every PE at startup, before any group is created, so every
+ * later allocation lands elsewhere while nothing else changes.
+ */
+void layoutPad() {
+  const char* kb = getenv("CHARADES_PAD_KB");
+  if (kb == NULL) return;
+  size_t n = strtoul(kb, NULL, 10) * 1024;
+  if (n == 0) return;
+  char* p = (char*)malloc(n);
+  memset(p, 1, n);
+  if (CkMyPe() == 0) CkPrintf("Layout pad: %zu KB per PE\n", n / 1024);
+}
+
 void tw_init(int argc, char** argv) {
   clear_globals();
   charm_init(argc, argv);
