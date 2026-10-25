@@ -146,6 +146,7 @@ Charades' controller ÷ Devastator's adaptive window: 0.68–1.03 at σ ≤ 500 
 | 79 | 2026-10-25 | — | Where a GVT advance's time goes at scale; PP 2,048's allocation vs its limit; the horizon margin | design |
 | 80 | 2026-10-25 | 3639554 | Where a GVT advance's time goes at scale, results: a slow node sets the pace; PP 2,048's allocation, not its limit, gives 1.12–1.14×; margin 8 stays | current |
 | 81 | 2026-10-25 | — | The allocator behind `--agg-pp-limit`'s gain; the slow node in both engines; where a wider window's cost goes | design |
+| 82 | 2026-10-25 | 3639812 | The allocator, the slow node in both engines, a wider window's cost, results: c455-081 is slow only with the network, and it hurts Devastator more | current |
 
 ## Stampede3 runs, in order
 
@@ -3235,6 +3236,56 @@ Best ÷ best (each arm set at its best W): 4 nodes σ 100 1.01, σ 2,000 0.97; 1
 - M1. One allocator setting brings PP 512 to within 3% of the capped setting, and adds ≤ 2% on top of the capped setting (the same mechanism). If neither does, the cause is heap layout rather than allocation churn.
 - S1. Leaving out the slow node speeds Charades up by 4–10% and Devastator by 0–5%. Every engine pays up to the slow node's own slowdown; Charades pays more because its window leaves the slowest PEs little room.
 - W1. From W 400 to W 600 at σ 100, throughput falls ≥ 10%, and more than half of that is longer advances (µs per advance) rather than more advances or the time to re-execute rolled-back events: rollbacks hold the GVT back.
+
+### The allocator, the slow node in both engines, a wider window's cost, results: c455-081 is slow only with the network, and it hurts Devastator more (2026-10-25; skx-dev batch job 3639812)
+
+> **Status: current.** Design and predictions in section 81. 132 Charades and 24 Devastator runs, all ok; the 15-node Devastator binary built; 12 min. Data `~/charades-data/sdiag/j3639812/`, summary `~/charades-data/sdiag/sdiag2_summary.py`. Allocation: c454-[012-013], c455-[033-034,041-044,081-082,091-094,101-102].
+
+**N. One-node speed** (Charades alone on each node, M committed events/s ÷ the median node, 2 reps): every node is within 0.975–1.009 of the median. c455-081 is 0.993 (σ 100) and 1.001 (σ 2,000). **N1 wrong: c455-081 is not slow on its own.**
+
+**S. 15 nodes without c455-081 ÷ with it** (the "with" set leaves out c455-102 instead; M committed events/s, median of 3; higher means the node costs more):
+
+| engine | workload | W | without | with | without ÷ with |
+|---|---|---|---|---|---|
+| Charades | σ 100 | 250 | 511.4 | 491.5 | 1.040 |
+| Charades | σ 100 | 400 | 531.7 | 499.3 | 1.065 |
+| Charades | σ 2,000 | 250 | 347.0 | 332.5 | 1.044 |
+| Charades | σ 2,000 | 400 | 349.5 | 340.8 | 1.026 |
+| Devastator | σ 100 | 500 | 610.2 | 535.9 | 1.139 |
+| Devastator | σ 100 | 1,000 | 625.9 | 530.3 | 1.180 |
+| Devastator | σ 2,000 | 500 | 312.9 | 299.5 | 1.045 |
+| Devastator | σ 2,000 | 1,000 | 358.7 | 339.7 | 1.056 |
+
+- **S1 wrong in direction.** The node costs Charades 3–7% and Devastator 5–18%. Devastator is hurt more, most at σ 100.
+- **c455-081 is slow only in multi-node runs.** Alone it is normal; in every 16-node run of this job and of job 3639554 its processes are the busiest (µs per event ÷ median 1.06–1.08; process 16 here, process 22 there: c455-081 in both allocations). With nothing to send off-node it is fine, so the likely cause is its network path (its Omni-Path adapter, link or switch port). That would also explain why Devastator, whose one master thread per process does all of its communication, suffers more.
+- **Earlier 16-node jobs with c455-081:** 3636522 (htram selection at 16 nodes, section 66, and its same-job Devastator comparison), 3638330 (16-node gaps, section 68), 3638371, 3638859, 3638968 (`--agg-auto` at 16 nodes), 3639554 (section 80). The one-allocation scaling series (3639098, section 78) did not have it. Numbers from those jobs are lower than a clean allocation would give, by up to ~7% for Charades and up to ~18% for Devastator; same-job ratios between Charades settings are affected less. **From now on 16-node jobs are submitted with `-x c455-081`.**
+
+**M. Allocator settings, 16 nodes, W 250** (M committed events/s, median of 3; ÷ PP 512 with no setting; events per message and efficiency did not change, 39/74 and 99.92–99.98%):
+
+| workload | PP 512 | + fixed mmap threshold 16 MB | + 256 MB top pad | PP 2,048 capped at 512 | capped + fixed mmap threshold |
+|---|---|---|---|---|---|
+| σ 100 | 520.4 | 503.2 (0.97) | 543.8 (1.04) | 574.8 (1.10) | 553.1 (1.06) |
+| σ 2,000 | 350.2 | 341.3 (0.97) | 361.8 (1.03) | 374.7 (1.07) | 385.5 (1.10) |
+
+- **M1 wrong.** No allocator setting matches the capped setting. Making the 1.2 MB shared buffers come from the heap costs 3%; a large heap top pad gives about 40% of the capped gain (1.03–1.04). The capped setting gives 1.07–1.10 again (1.12–1.14 in section 80, in a different allocation). The gain is real and repeatable, partly about how the heap grows, and still not fully explained.
+
+**W. Wider windows, 16 nodes, PP 512** (median of 2; µs from the per-process traces; this allocation includes c455-081, whose process was the busiest in every run):
+
+| workload | W | M ev/s | efficiency % | GVT advances | µs per advance | reduction floor µs | straggler cost µs | rolled back (M events) |
+|---|---|---|---|---|---|---|---|---|
+| σ 100 | 250 | 514.0 | 99.98 | 8,522 | 159 | 47 | 97 | 0.12 |
+| σ 100 | 400 | 529.1 | 99.95 | 7,060 | 187 | 47 | 123 | 0.33 |
+| σ 100 | 600 | 469.1 | 99.77 | 6,370 | 235 | 50 | 163 | 1.65 |
+| σ 2,000 | 250 | 346.4 | 99.93 | 8,522 | 225 | 47 | 148 | 0.53 |
+| σ 2,000 | 400 | 353.1 | 99.88 | 6,374 | 298 | 54 | 202 | 0.92 |
+| σ 2,000 | 600 | 309.8 | 98.99 | 5,298 | 421 | 56 | 312 | 7.40 |
+
+- **W1 right.** From W 400 to 600 at σ 100, throughput falls 11%: advances fall 10% but each takes 26% longer, and the straggler cost accounts for 40 of the 48 µs added per advance. Re-executing the extra 1.3 M rolled-back events takes about 2 ms of PE time per PE, under 0.2% of the run. At σ 2,000 the same: −12%, advances −17%, µs per advance +41%, straggler cost +110 of +123 µs. So a wider window's cost is the straggler cost per advance, not re-execution.
+- Part of that growth is structural: a wider window means more work per advance, and a straggler's lag scales with it (W 250 → 400 at σ 100: work per advance ×1.21, straggler cost ×1.27). From 400 to 600 the straggler cost grows faster than the work per advance (×1.33 against ×1.11), which is the rollbacks' share. This allocation's straggler was the network-slow node, so the split needs repeating on a clean allocation.
+
+**Consequences.**
+- The earlier explanation that Charades pays more for a slow node because of its tight window is wrong for this node: Devastator pays more. The question I answered before this job ("why is the slow node not a problem for Devastator?") had a false premise; we had not measured it.
+- Next on the window: repeat W on a clean allocation (`-x c455-081`). If the straggler cost still dominates and grows faster than work per advance, attack what makes one process lag within an advance (rank 0's process-level work, per-process receive handling), before in-buffer cancellation.
 
 ## Baseline verification on the Mac
 
