@@ -145,6 +145,7 @@ Charades' controller ÷ Devastator's adaptive window: 0.68–1.03 at σ ≤ 500 
 | 78 | 2026-10-25 | 3639098 | Weak scaling 1–16 nodes in one allocation, results: time per GVT advance, not aggregation, limits Charades | current |
 | 79 | 2026-10-25 | — | Where a GVT advance's time goes at scale; PP 2,048's allocation vs its limit; the horizon margin | design |
 | 80 | 2026-10-25 | 3639554 | Where a GVT advance's time goes at scale, results: a slow node sets the pace; PP 2,048's allocation, not its limit, gives 1.12–1.14×; margin 8 stays | current |
+| 81 | 2026-10-25 | — | The allocator behind `--agg-pp-limit`'s gain; the slow node in both engines; where a wider window's cost goes | design |
 
 ## Stampede3 runs, in order
 
@@ -3218,6 +3219,22 @@ Best ÷ best (each arm set at its best W): 4 nodes σ 100 1.01, σ 2,000 0.97; 1
 
 **Consequences.**
 - The 4→16-node loss at Gaussian σ splits into a growing reduction floor (+16–20 µs per advance) and a growing straggler cost (+26–40 µs), and here much of the straggler cost was one node ~6% slower per event. Next: (1) find the allocation mechanism behind B (allocator settings such as `MALLOC_MMAP_THRESHOLD_`/`MALLOC_TOP_PAD_` on PP 512, against the capped setting; and whether htram's 1.2 MB per-send shared-buffer allocation is the cause), then make the winner the default; (2) make Charades tolerate a slow PE or node: a window that lets processes drift further apart (Devastator's W 1,000 does this), or less work on rank 0; (3) check whether c455-081 is slow on its own (a single-node benchmark) before treating "slow node" as a general effect.
+
+### The allocator behind `--agg-pp-limit`'s gain; the slow node in both engines; where a wider window's cost goes (design, 2026-10-25; written before any runs)
+
+> **Status: design.** Same build as section 80 (Charades `scale-diag`, htram 6a5cc0c). Job script `$WORK/charades-runs/diag2.slurm`, submitted with `-w c455-081` so the slow node is in the allocation; output `$WORK/charades-runs/sdiag2/j<job>/`. Devastator's `run_phold.sh` gained `SRUN_EXTRA` (extra srun options, used for `-x <node>`); a 15-node binary (p30w23) is built at the start of the job.
+
+**Parts** (16 nodes, PP 512, W 250 unless noted):
+- N. One-node speed of each of the 16 nodes: Charades on one node at a time (`srun -w`), σ 100 and σ 2,000, 2 reps.
+- M. glibc allocator settings on PP 512, σ 100 and σ 2,000, 3 reps: none; `MALLOC_MMAP_THRESHOLD_=16 MB` (fixed, so htram's ~1.2 MB shared buffers, allocated at every send, come from the heap instead of mmap/munmap); `MALLOC_TOP_PAD_=256 MB` (the heap grows in large steps); both with `MALLOC_TRIM_THRESHOLD_=1 GB`. Against PP 2,048 capped at 512, with and without the mmap setting.
+- S. Both engines on 15 nodes, without c455-081 and with it (another node left out instead), σ 100 and σ 2,000; Charades W 250 and 400, Devastator W 500 and 1,000; 3 reps, alternating.
+- W. Per-process wave traces (`--gvt-trace=2 --pe-stats=1`) at W 250, 400, 600, σ 100 and σ 2,000, 2 reps.
+
+**Predictions:**
+- N1. c455-081 is 4–8% slower than the median node on one node, and no other node is more than 3% slower.
+- M1. One allocator setting brings PP 512 to within 3% of the capped setting, and adds ≤ 2% on top of the capped setting (the same mechanism). If neither does, the cause is heap layout rather than allocation churn.
+- S1. Leaving out the slow node speeds Charades up by 4–10% and Devastator by 0–5%. Every engine pays up to the slow node's own slowdown; Charades pays more because its window leaves the slowest PEs little room.
+- W1. From W 400 to W 600 at σ 100, throughput falls ≥ 10%, and more than half of that is longer advances (µs per advance) rather than more advances or the time to re-execute rolled-back events: rollbacks hold the GVT back.
 
 ## Baseline verification on the Mac
 
