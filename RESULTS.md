@@ -18,6 +18,8 @@ Every number from every run: Stampede3 runs in order (each design, written befor
 
 ## Current numbers
 
+> **Superseded in part (2026-10-25):** these predate `--gvt-node-waves` and the fast path (both now default). Newer short-run comparisons with Devastator in the same job: "Which htram mode and buffer for which workload, results" (4 and 16 nodes, 8 workloads). Charades ÷ Devastator there: 4 nodes 0.95–1.76 (ahead or level in 7 of 8), 16 nodes 0.77–1.14 (5 of 8). The paper-grade (3 reps, long runs) rerun is still to do.
+
 Full nodes (4 Stampede3 skx nodes, 2 processes × 23 PEs per node, 184 PEs, 128 LPs per PE), production runtime, native psm2, htram PP 512 unless noted. M committed events/s are medians of 3. Sources: "Full-node reruns, results" (jobs 3629783, 3629781) and "Controller level, `--agg-scope`, σ 100 profile, results" (job 3632385).
 
 **Charades' speedup over Devastator** (Charades ÷ Devastator, each at its best fixed W; higher is better for Charades). Devastator used its default xorshift RNG except in the last column:
