@@ -1,4 +1,4 @@
-# Optimistic w/Bucketed GVT, htram PP -> WPs after 4 GVT advances (--agg-auto, forced)
+# Optimistic w/Bucketed GVT, htram PP -> WPs after 4 GVT advances (--agg-auto with --agg-auto-wps, forced)
 sync=3
 gvt=4
 buffer-size=655360
@@ -11,3 +11,4 @@ agg-auto=1
 agg-auto-advances=4
 agg-auto-share=-1
 agg-auto-msg=1000000
+agg-auto-wps=1

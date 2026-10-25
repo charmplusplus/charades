@@ -81,6 +81,7 @@ extern unsigned g_tw_agg_auto_advances; ///< --agg-auto: GVT advances measured b
 extern double   g_tw_agg_auto_share;  ///< --agg-auto: at most this share of events leaving the process -> large PP buffers
 extern double   g_tw_agg_auto_msg;    ///< --agg-auto: fewer events than this per PP message -> WPs
 extern unsigned g_tw_agg_auto_buffer; ///< --agg-auto: the large PP buffer
+extern unsigned g_tw_agg_auto_wps;    ///< --agg-auto: may also choose WPs (makes a second htram instance)
 ///@}
 
 /** \name Optimism-window controller (controller.h) *////@{

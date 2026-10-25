@@ -69,6 +69,7 @@ unsigned g_tw_agg_auto_advances;
 double   g_tw_agg_auto_share;
 double   g_tw_agg_auto_msg;
 unsigned g_tw_agg_auto_buffer;
+unsigned g_tw_agg_auto_wps;
 unsigned g_tw_ctl;
 double   g_tw_ctl_epsilon;
 unsigned g_tw_ctl_cost;
@@ -160,6 +161,7 @@ void clear_globals() {
   g_tw_agg_auto_share     = 0.3;
   g_tw_agg_auto_msg       = 25;
   g_tw_agg_auto_buffer    = 2048;
+  g_tw_agg_auto_wps       = 0;
   g_tw_ctl                = 0;
   g_tw_ctl_epsilon        = -1;   // set in tw_init from --ctl-cost
   g_tw_ctl_cost           = 0;

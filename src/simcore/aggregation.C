@@ -91,8 +91,12 @@ class Aggregator : public CBase_Aggregator {
   public:
     HTram* tram;  ///< where new events go
     /**
-     * Every htram instance: the one --agg-mode made, and with --agg-auto a
-     * second in WPs mode, used only if chosen.
+     * Every htram instance: the one --agg-mode made, and with
+     * --agg-auto-wps=1 a second in WPs mode, used only if chosen. Off by
+     * default: merely creating the idle second instance moved PP by
+     * 0.86-0.93x at sigma 100 and 1.12-1.16x at sigma 2,000 on 16 nodes, not
+     * through anything it did per pass, nor heap position, nor false sharing
+     * on the atomics padded in RESULTS.md section 74 (cause unknown).
      */
     std::vector<HTram*> trams;
     /**
@@ -160,7 +164,9 @@ Aggregator::Aggregator(CkGroupID tram_gid, CkGroupID wps_gid) : advances(0) {
   tram = CProxy_HTram(tram_gid).ckLocalBranch();
   trams.push_back(tram);
   drained.push_back(tram);
-  if (g_tw_agg_auto) trams.push_back(CProxy_HTram(wps_gid).ckLocalBranch());
+  if (g_tw_agg_auto && g_tw_agg_auto_wps) {
+    trams.push_back(CProxy_HTram(wps_gid).ckLocalBranch());
+  }
   // Before the scheduler exists, so before PE_VALUE(window): the start value
   urgent = urgent_window(g_tw_optimism_window);
   for (size_t i = 0; i < trams.size(); i++) {
@@ -210,7 +216,7 @@ void Aggregator::auto_choose(int n, double* v) {
     // its own 16-item buffers while another fills the shared one further.
     trams[0]->setBufferSize(g_tw_agg_auto_buffer);
     choice = "PP with the large buffer";
-  } else if (per_msg < g_tw_agg_auto_msg) {
+  } else if (g_tw_agg_auto_wps && per_msg < g_tw_agg_auto_msg) {
     // What PP holds goes out now; later PP flushes are not needed, since
     // this PE never inserts into it again (another PE of this process that
     // copies into a shared buffer later flushes it when it switches)
@@ -285,7 +291,7 @@ static void create_tram(void*, void* msg) {
       g_tw_agg_buffer, /*enable_timed_flushing=*/false, /*flush_timer=*/0.0,
       /*ret_item=*/false, /*request=*/false,
       CkCallback(CkCallback::ignore));
-  if (g_tw_agg_auto) {
+  if (g_tw_agg_auto && g_tw_agg_auto_wps) {
     agg_tram2_gid = CProxy_HTram::ckNew(agg_recv2_gid, agg_src2_gid,
         g_tw_agg_buffer, /*enable_timed_flushing=*/false, /*flush_timer=*/0.0,
         /*ret_item=*/false, /*request=*/false,
@@ -338,16 +344,22 @@ void agg_create(CkCallback done) {
       CkAbort("--agg-auto-buffer must be at most %d and a multiple of %d\n",
               BUFSIZE, LOCAL_BUFSIZE);
     }
-    CkPrintf("Aggregation auto: after %u GVT advances, PP %u if at most %.2f of "
-             "events leave their process, else WPs %u if PP messages carry "
-             "fewer than %.0f events, else stay\n", g_tw_agg_auto_advances,
-             g_tw_agg_auto_buffer, g_tw_agg_auto_share, g_tw_agg_buffer,
-             g_tw_agg_auto_msg);
+    if (g_tw_agg_auto_wps) {
+      CkPrintf("Aggregation auto: after %u GVT advances, PP %u if at most %.2f "
+               "of events leave their process, else WPs %u if PP messages "
+               "carry fewer than %.0f events, else stay\n",
+               g_tw_agg_auto_advances, g_tw_agg_auto_buffer, g_tw_agg_auto_share,
+               g_tw_agg_buffer, g_tw_agg_auto_msg);
+    } else {
+      CkPrintf("Aggregation auto: after %u GVT advances, PP %u if at most %.2f "
+               "of events leave their process, else stay\n",
+               g_tw_agg_auto_advances, g_tw_agg_auto_buffer, g_tw_agg_auto_share);
+    }
   }
   agg_done = done;
   agg_recv_gid = CProxy_HTramRecv::ckNew();
   agg_src_gid = CProxy_HTramNodeGrp::ckNew();
-  if (g_tw_agg_auto) {
+  if (g_tw_agg_auto && g_tw_agg_auto_wps) {
     agg_recv2_gid = CProxy_HTramRecv::ckNew();
     agg_src2_gid = CProxy_HTramNodeGrp::ckNew();
   }
