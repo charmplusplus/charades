@@ -138,6 +138,7 @@ Charades' controller ÷ Devastator's adaptive window: 0.68–1.03 at σ ≤ 500 
 | 71 | 2026-10-25 | 3638610, 3638739 | Why `--agg-auto` differs, results: an idle htram instance changes the pace of blocked passes | current |
 | 72 | 2026-10-25 | — | `--agg-auto` with one active instance, and pausing blocked passes | design |
 | 73 | 2026-10-25 | 3638798 | Pausing blocked passes, results; memory layout as the cause, design | current / design |
+| 74 | 2026-10-25 | 3638859 | Memory layout: heap pads, results; padded shared atomics, design | current / design |
 
 ## Stampede3 runs, in order
 
@@ -2956,6 +2957,29 @@ Best ÷ best (each arm set at its best W): 4 nodes σ 100 1.01, σ 2,000 0.97; 1
 **Predictions:**
 - L1. Rates move with the pad by more than the rep spread: at least 8% between the best and worst pad in some cell.
 - L2. If L1 holds, padding htram's PP atomics to a cache line each makes the rates insensitive to the pad (within 3%), at or above the best padded rate.
+
+### Memory layout: heap pads, results; padded shared atomics, design (2026-10-25; skx-dev batch job 3638859; design written before the padded runs)
+
+> **Status: current (pads), design (padded atomics).** 16 nodes, W 250, 3 reps in shuffled order, all 84 runs finished; data `~/charades-data/layout/`.
+
+**Pads** (`CHARADES_PAD_KB` per PE; M committed events/s, medians; best ÷ worst pad):
+
+| setting | 0 | 1 | 4 | 16 | 64 | 1,024 | 32,768 KB | best ÷ worst |
+|---|---|---|---|---|---|---|---|---|
+| σ 100, PP 512 | 528 | 521 | 519 | 516 | 518 | 528 | 534 | 1.04 |
+| σ 100, PP 2,048 | 579 | 583 | 588 | 577 | 580 | 579 | 583 | 1.02 |
+| σ 2,000, PP 512 | 338 | 343 | 345 | 349 | 349 | 348 | 345 | 1.03 |
+| σ 2,000, PP 2,048 | 248 | 252 | 246 | 247 | 247 | 253 | 247 | 1.03 |
+
+- **L1 wrong as tested**: 2–4%, within the rep spread. But the test was weak: every pad was a whole number of KB, so no object moved relative to its cache line (false sharing cannot change), and pads past glibc's mmap threshold (128 KB) do not move the heap at all. What it shows is that heap position as such does not matter.
+
+**Padded build** (Charades branch `pad` 6d19d3a on top of `agg-auto`, htram branch `pdes-pad` b6d9b18 on top of `pdes`): PP's per-destination shared counters (`get_idx`, `done_count`, `min_key`, `pp_limit`) and htram's per-PE inboxes each on their own cache line; Charades' `NodeWaves::gen` (polled by every PE on every pass, and the object's last field, so sharing a line with whatever was allocated next) and `arrived` on lines of their own. Mac: 360/360 each (10 repeats).
+
+**Job** (16 nodes, skx-dev, σ 100 and 2,000, W 250, 3 reps in shuffled order): unpadded and padded builds × {PP 512, PP 512 + idle second instance (`--agg-auto` never deciding), PP 2,048, PP 2,048 + idle second instance}.
+
+**Predictions:**
+- L2. In the padded build the idle second instance changes nothing (within 3%), and each setting runs at or above the better of its two unpadded variants.
+- L3. If L2 fails, the cause is outside the structures padded (e.g. LCI or Reconverse internals), and `--agg-auto` should make its WPs instance only when chosen.
 
 ## Baseline verification on the Mac
 
