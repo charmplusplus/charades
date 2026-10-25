@@ -140,7 +140,8 @@ Charades' controller ÷ Devastator's adaptive window: 0.68–1.03 at σ ≤ 500 
 | 73 | 2026-10-25 | 3638798 | Pausing blocked passes, results; memory layout as the cause, design | current / design |
 | 74 | 2026-10-25 | 3638859 | Memory layout: heap pads, results; padded shared atomics, design | current / design |
 | 75 | 2026-10-25 | 3638897 | Padded shared atomics, results; `--agg-auto` without the second instance, design | current / design |
-| 76 | 2026-10-25 | — | Weak scaling 1–16 nodes in one allocation; one process per node | design |
+| 76 | 2026-10-25 | 3638968 | `--agg-auto` without the second instance, results at 16 nodes: the PP 2,048 gain is not aggregation | current |
+| 77 | 2026-10-25 | — | Weak scaling 1–16 nodes in one allocation; one process per node | design |
 
 ## Stampede3 runs, in order
 
@@ -3010,6 +3011,32 @@ Best ÷ best (each arm set at its best W): 4 nodes σ 100 1.01, σ 2,000 0.97; 1
 **Predictions:**
 - V1. `--agg-auto` chooses PP 2,048 at σ ≤ 1,000 and lookahead 10 σ 500, and PP 512 elsewhere.
 - V2. It is within 3% of the fixed setting it chose in every cell (no second instance now), so at least PP 512's rate everywhere and 1.03–1.11× it where it switches.
+
+### `--agg-auto` without the second instance, results at 16 nodes: the PP 2,048 gain is not aggregation (2026-10-25; skx-dev batch job 3638968; 4-node job 3638969 still queued)
+
+> **Status: current (16 nodes).** Charades `agg-auto` 198eabd, htram ce2108f. 8 workloads × {PP 512, PP 2,048, `--agg-auto`} × windows, 2 reps; 183 runs ok, the 2 warm-ups hit the cap as intended; the canary passed; committed counts identical in every workload. Data `$WORK/charades-runs/auto5/n16/`, summary `~/charades-data/auto5/auto_summary.py` (its "choice" column is wrong; decisions below are read from each run's own log).
+
+**M committed events/s, each setting at its best window, median of 2** (higher is better):
+
+| workload | share leaving the process (f) | `--agg-auto` chose | PP 512 | PP 2,048 ÷ PP 512 | `--agg-auto` ÷ PP 512 | `--agg-auto` ÷ the setting it chose |
+|---|---|---|---|---|---|---|
+| σ 100 | 0.02–0.03 | PP 2,048 | 527.9 | 1.10 | 1.04 | 0.95 |
+| σ 500 | 0.11–0.13 | PP 2,048 | 492.4 | 1.07 | 1.00 | 0.93 |
+| σ 1,000 | 0.22–0.25 | PP 2,048 | 460.0 | 1.07 | 1.01 | 0.94 |
+| σ 2,000 | 0.41–0.47 | PP 512 | 359.0 | 0.69 | 1.00 | 1.00 |
+| σ 4,000 | 0.56–0.68 | PP 512 | 304.9 | 0.72 | 1.00 | 1.00 |
+| uniform | 0.75–0.92 | PP 512 | 166.3 | 0.96 | 1.00 | 1.00 |
+| lookahead 10, σ 500 | 0.11–0.13 | PP 2,048 | 391.9 | 1.07 | 1.01 | 0.95 |
+| lookahead 10, σ 2,000 | 0.42–0.47 | PP 512 | 267.8 | 0.94 | 1.01 | 1.01 |
+
+- **V1 right.** Every run decided as predicted, after 128 GVT advances (about 2% of the run).
+- **V2 wrong.** Where it switches to PP 2,048 it gets 0.93–0.95 of PP 2,048, almost none of the gain.
+- **Why: PP 2,048's gain at σ ≤ 1,000 does not come from aggregation.** At the same window, PP 512 and PP 2,048 send the same number of messages with the same events per message (σ 100, W 250: 499,353 vs 497,388 messages, 39.3 vs 39.5 events per message; σ 500: 73.7 vs 74.0; σ 1,000: 87.1 vs 87.5), at the same efficiency and the same GVT advance count. Every "buffer full" send at σ 100 is a PE sending its 16-event local buffer while the shared buffer is being sent (17,642 vs 14,988), not a shared buffer filling. Growing the limit live therefore changes nothing, which is what `--agg-auto` shows. What PP 2,048 changes at startup is allocation sizes (each PE's initial buffers are allocated at the buffer size), so this is most likely the startup-layout effect of section 75 (±10% at 16 nodes from groups or allocations), not a better aggregation setting. Not yet tested.
+- **PP 2,048's loss at σ ≥ 2,000 is real and is a deadline-policy gap.** At σ 2,000, W 250: events held past their due time by htram rise from 233,332 to 1,948,172 (8×), urgent sends from 1,955 to 175,108, and efficiency drops from 99.92% to 98.63% (94–95% at W 400–600), with events per message about the same (74 vs 78). With a larger limit, shared buffers that previously went out when full now wait, and `flushDue` does not send them by their deadline. PP 512 has the same gap at a smaller scale (233,332 held events at σ 2,000 against 57,475 at σ 100).
+- **Consequences.**
+  - `--agg-auto` does not become the default. Its rule is right, but the gain it picks is not one a live switch can get.
+  - The selection rule of section 66 (PP 2,048 where ≤ 0.3 of events leave the process) rests on a 1.03–1.11× that is probably layout, not aggregation; treat it as unexplained until the isolation test below.
+  - Next (one short skx-dev job): (1) PP 2,048's allocation with PP 512's limit (start at 2,048, `pp_size` 512), against both, at σ 100 and σ 2,000; (2) find why `flushDue` misses shared buffers whose events are due, and fix it; the fix may also help PP 512 at σ ≥ 2,000.
 
 ### Weak scaling 1–16 nodes in one allocation; one process per node (design, 2026-10-25; written before any runs)
 
