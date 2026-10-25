@@ -1,0 +1,10 @@
+# Optimistic w/Bucketed GVT and a window, htram PP deadline policy, blocked passes pause 2 us (--blocked-pause-ns, diagnostic)
+sync=3
+gvt=4
+buffer-size=655360
+optimism-window=2000
+aggregation=1
+agg-mode=2
+agg-buffer=16
+agg-policy=1
+blocked-pause-ns=2000

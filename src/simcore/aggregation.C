@@ -92,10 +92,19 @@ class Aggregator : public CBase_Aggregator {
     HTram* tram;  ///< where new events go
     /**
      * Every htram instance: the one --agg-mode made, and with --agg-auto a
-     * second in WPs mode. Flushes, inbox drains and statistics cover both, so
-     * events left in one after sends move to the other still go out.
+     * second in WPs mode, used only if chosen.
      */
     std::vector<HTram*> trams;
+    /**
+     * The instances whose inboxes this PE drains: the active one, and after
+     * a switch the one before it (other processes may still send through
+     * it). Only the active one is flushed. Every pass over an idle instance
+     * costs a little, and most passes are window-blocked spins whose length
+     * moves GVT: an idle second instance flushed and drained on every pass
+     * made PP 0.86-0.90x slower at sigma 100 and 1.16x faster at sigma 2,000
+     * on 16 nodes (RESULTS.md, "Why --agg-auto differs").
+     */
+    std::vector<HTram*> drained;
     Time urgent;  ///< urgent_window(the current window), read on every send
     unsigned advances;  ///< GVT advances seen (--agg-auto)
 
@@ -150,6 +159,7 @@ Aggregator::Aggregator(CkGroupID tram_gid, CkGroupID wps_gid) : advances(0) {
   CpvAccess(g_aggregator) = this;
   tram = CProxy_HTram(tram_gid).ckLocalBranch();
   trams.push_back(tram);
+  drained.push_back(tram);
   if (g_tw_agg_auto) trams.push_back(CProxy_HTram(wps_gid).ckLocalBranch());
   // Before the scheduler exists, so before PE_VALUE(window): the start value
   urgent = urgent_window(g_tw_optimism_window);
@@ -201,7 +211,12 @@ void Aggregator::auto_choose(int n, double* v) {
     trams[0]->setBufferSize(g_tw_agg_auto_buffer);
     choice = "PP with the large buffer";
   } else if (per_msg < g_tw_agg_auto_msg) {
-    tram = trams[1];  // what PP still holds goes out with its flushes
+    // What PP holds goes out now; later PP flushes are not needed, since
+    // this PE never inserts into it again (another PE of this process that
+    // copies into a shared buffer later flushes it when it switches)
+    trams[0]->flushPending();
+    tram = trams[1];
+    drained.insert(drained.begin(), trams[1]);
     choice = "WPs";
   } else {
     choice = "PP as started";
@@ -402,8 +417,7 @@ bool agg_send(RemoteEvent* msg, uint64_t dest_chare) {
 static void flush_due(Aggregator* a) {
   if (a->urgent == 0) return;  // nothing is ever due (blocking GVT, no window)
   // Due: ts < GVT + horizon, i.e. ts <= GVT + horizon - 1
-  for (HTram* t : a->trams)
-    t->flushDue((long long)(PE_VALUE(g_last_gvt) + a->urgent - 1));
+  a->tram->flushDue((long long)(PE_VALUE(g_last_gvt) + a->urgent - 1));
 }
 
 /** Messages sent by every htram instance on this PE */
@@ -420,29 +434,27 @@ void agg_flush_idle() {
   if (g_tw_agg_policy == 1) {
     flush_due(a);
   } else {
-    for (HTram* t : a->trams) t->flushIdle();
+    a->tram->flushIdle();
   }
   get_statistics()->agg_msgs_idle += msgs_sent(a) - m0;
 }
 
 void agg_drain() {
   if (!g_tw_aggregation) return;
-  for (HTram* t : CpvAccess(g_aggregator)->trams) t->drainInbox();
+  for (HTram* t : CpvAccess(g_aggregator)->drained) t->drainInbox();
 }
 
 void agg_flush_gvt() {
   if (!g_tw_aggregation) return;
   Aggregator* a = CpvAccess(g_aggregator);
   unsigned long long m0 = msgs_sent(a);
-  for (HTram* t : a->trams) {
-    if (g_tw_agg_policy == 1) continue;  // flush_due below covers both
-    if (g_tw_agg_gvt_flush == 1) {
-      t->flushStale();
-    } else if (g_tw_agg_gvt_flush == 2) {
-      t->flushPending();
-    }
+  if (g_tw_agg_policy == 1) {
+    flush_due(a);
+  } else if (g_tw_agg_gvt_flush == 1) {
+    a->tram->flushStale();
+  } else if (g_tw_agg_gvt_flush == 2) {
+    a->tram->flushPending();
   }
-  if (g_tw_agg_policy == 1) flush_due(a);
   get_statistics()->agg_msgs_gvt += msgs_sent(a) - m0;
   if (g_tw_agg_auto) a->auto_count_advance();
 }

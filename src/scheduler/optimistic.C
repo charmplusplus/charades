@@ -92,6 +92,12 @@ void OptimisticScheduler::execute() {
   // Only under a continuous GVT: a blocking one needs every PE to keep
   // iterating until its trigger fires. Joining a round first (gvt_begin)
   // lets the last PE to reach the window still start one.
+  // --blocked-pause-ns (diagnostic): how much the pace of blocked passes
+  // matters (RESULTS.md, "Why --agg-auto differs")
+  if (blocked && g_tw_blocked_pause_ns) {
+    double until = CmiWallTimer() + 1e-9 * g_tw_blocked_pause_ns;
+    while (CmiWallTimer() < until) {}
+  }
   if (blocked && g_tw_sched_park && gvt_manager->is_continuous()) {
     parked = true;
     gvt_manager->gvt_begin();

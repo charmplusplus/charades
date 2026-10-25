@@ -34,6 +34,7 @@ extern uint32_t g_event_buffer_size;  ///< event buffer size
 /** \name Scheduler Configuration *////@{
 extern unsigned g_tw_synchronization_protocol;    ///< scheduler type
 extern unsigned g_tw_mblock;                      ///< batch size for event execution
+extern unsigned g_tw_blocked_pause_ns;              ///< diagnostic: a window-blocked PE waits this long before its next pass
 extern unsigned g_tw_sched_park;                  ///< window-blocked PEs park instead of spinning
 extern Time g_tw_ts_end;                      ///< end time of simulation
 ///@}
