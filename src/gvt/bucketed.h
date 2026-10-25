@@ -93,10 +93,14 @@ class NodeWaves : public CBase_NodeWaves {
     std::vector<CmiInt8> ar_buf;
     std::map<std::pair<int, int>, std::vector<CmiInt8>> early;
     std::vector<std::vector<CmiInt8>> slots;
-    std::atomic<int> arrived;
+    // On cache lines of their own: every PE polls gen on every pass and
+    // writes arrived once per wave, and what shared their lines depended on
+    // what was allocated next to this object (RESULTS.md, "Memory layout")
+    alignas(64) std::atomic<int> arrived;
     std::vector<CmiInt8> combined;
     std::vector<CmiInt8> res;
-    std::atomic<uint64_t> gen;
+    alignas(64) std::atomic<uint64_t> gen;
+    char gen_pad[64 - sizeof(std::atomic<uint64_t>)];
 };
 
 /** Combines one contribution into another (layout above) */
