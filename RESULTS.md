@@ -128,7 +128,7 @@ Charades' controller ÷ Devastator's adaptive window: 0.68–1.03 at σ ≤ 500 
 | 63 | 2026-10-24 | — | Where the fast path loses at σ 2,000, and with WPs | design |
 | 64 | 2026-10-24 | 3636435 | Where the fast path loses at σ 2,000, and with WPs, results | current |
 | 65 | 2026-10-24 | — | Which htram mode and buffer for which workload (fast path on) | design |
-| 66 | 2026-10-24 | 3636522 (16 nodes; 4 nodes pending in 3636523) | Which htram mode and buffer for which workload, results | current, partial |
+| 66 | 2026-10-25 | 3636522 (16 nodes), 3638303 (4 nodes) | Which htram mode and buffer for which workload, results | current |
 
 ## Stampede3 runs, in order
 
@@ -2762,9 +2762,9 @@ Best ÷ best (each arm set at its best W): 4 nodes σ 100 1.01, σ 2,000 0.97; 1
 - S3. The best (mode, buffer) beats PP 512 by ≥ 5% in at least 4 of the 16 (workload, nodes) cells and by ≤ 2% elsewhere.
 - S4. A rule on the share of events that leave the process (known from σ, LPs per process and the mapping) picks a setting within 3% of the best in every cell.
 
-### Which htram mode and buffer for which workload, results (2026-10-24; 16 nodes: skx-dev batch job 3636522; 4 nodes pending in 3636523)
+### Which htram mode and buffer for which workload, results (2026-10-24/25; 16 nodes: skx-dev batch job 3636522; 4 nodes: skx-dev batch job 3638303)
 
-> **Status: current, partial** (16 nodes only). Short runs, 2 reps (medians), fast path on (default); data `~/charades-data/hsel/` (`hsel_summary.py n16`). All 288 measured runs finished (both warm-up launches hit the cap, as intended). Committed counts identical across all six htram settings in every workload. Both engines ran slower in this allocation than in job 3636435 (Charades PP 512 σ 100: 545 against 577; Devastator: 582 against 661), so engines are compared only within a job.
+> **Status: current.** The 4-node job (resubmitted to skx-dev after waiting on skx; the skx copy 3636758 was cancelled unstarted) also ran W 600 (lookahead 100) and W 200 (lookahead 10); its 384 runs all finished. Short runs, 2 reps (medians), fast path on (default); data `~/charades-data/hsel/` (`hsel_summary.py n16`). All 288 measured runs finished (both warm-up launches hit the cap, as intended). Committed counts identical across all six htram settings in every workload. Both engines ran slower in this allocation than in job 3636435 (Charades PP 512 σ 100: 545 against 577; Devastator: 582 against 661), so engines are compared only within a job.
 
 **16 nodes, each setting at its best arm, ÷ PP 512** (higher is better):
 
@@ -2784,7 +2784,30 @@ Best ÷ best (each arm set at its best W): 4 nodes σ 100 1.01, σ 2,000 0.97; 1
 - **WPs wins only with uniform traffic** (1.09–1.12×), where every htram message is small anyway (12–15 events with 31 destination processes).
 - **S1 wrong** (PP, not WPs, is best at σ ≤ 500; WPs wins only uniform); **S2 wrong** (the best buffer grows with locality: 2,048 at σ ≤ 1,000, 512 at σ ≥ 2,000); **S3 right at 16 nodes** (≥ 5% in 5 of 8 workloads, 0% in the other 3).
 - **Against Devastator (same job):** ahead or level at σ 100 to 4,000 (0.97–1.14); behind with uniform traffic (0.94, but every Charades setting was best at W 400, the largest tested; an earlier sweep put uniform's best near 600) and at lookahead 10 (0.86 at σ 500, 0.77 at σ 2,000; there too the best arm was the largest W tested for σ 2,000, W 100, while Devastator's best was W 200).
-- Next for these runs: the W grid must reach 600 (uniform) and 200 (lookahead 10) before those two gaps can be read.
+- Next for these runs: the W grid must reach 600 (uniform) and 200 (lookahead 10) at 16 nodes before those two gaps can be read (at 4 nodes neither wider W won).
+
+**4 nodes, each setting at its best arm, ÷ PP 512** (higher is better):
+
+| workload | events leaving the process | PP 512 (M ev/s) | PP 128 | PP 2,048 | WPs 128 | WPs 512 | WPs 2,048 | best ÷ PP 512 | Devastator best (M ev/s) | Charades best ÷ Devastator |
+|---|---|---|---|---|---|---|---|---|---|---|
+| lookahead 100, σ 100 | 2.7% | 166.0 | 1.01 | 1.04 | 1.02 | 1.04 | **1.05** | 1.05 | 169.5 | 1.02 |
+| σ 500 | 13.5% | 149.9 | 0.98 | **1.03** | 1.00 | 1.02 | **1.03** | 1.03 | 144.7 | 1.07 |
+| σ 1,000 | 27% | 138.6 | 1.00 | **1.07** | 1.01 | 1.03 | 1.04 | 1.07 | 124.6 | 1.18 |
+| σ 2,000 | 50% | **129.6** | 0.98 | 0.81 | 0.89 | 0.90 | 0.91 | 1.00 | 103.0 | 1.26 |
+| σ 4,000 | 72% | **109.4** | 0.99 | 0.88 | 0.83 | 0.83 | 0.85 | 1.00 | 78.5 | 1.39 |
+| uniform remote 1.0 | 87% | 117.0 | **1.02** | 0.99 | 0.73 | 0.72 | 0.73 | 1.02 | 68.0 | 1.76 |
+| lookahead 10, σ 500 | 13.5% | 129.3 | 1.01 | 1.03 | **1.04** | **1.04** | 1.03 | 1.04 | 142.2 | 0.95 |
+| lookahead 10, σ 2,000 | 50% | 92.0 | 1.00 | 1.02 | 1.00 | **1.05** | 0.99 | 1.05 | 96.6 | 1.00 |
+
+(Events leaving the process: remote sends not handed over by pointer ÷ events executed, from the PP 512 runs; the same at 16 nodes except uniform, 97%.)
+
+**Both scales:**
+- **Large PP buffers where events stay in the process.** PP 2,048 is 1.03–1.09× PP 512 wherever at most 27% of events leave the process, and 0.70–0.88 from 50% up. Its shared per-process buffers hold events until they are due instead of filling; held events then meet the flush-versus-GVT-update race (a receiver may already have run past an event sent the moment it becomes due), which costs little when few events leave the process and a lot when half do (efficiency 95–98.6% at σ 2,000 on 16 nodes).
+- **WPs where messages are small anyway.** WPs wins where PP 512's messages carry about 20 events or fewer (uniform on 16 nodes: 15; lookahead 10, σ 2,000 on 4 nodes: 20) and loses badly where they are large (uniform on 4 nodes: 114 events per message, WPs 0.72).
+- **A rule** on two quantities the run can measure — the share of events leaving the process (f) and PP 512's events per htram message (m): PP 2,048 if f ≤ 0.3; else WPs 512 if m < 25; else PP 512. In all 16 cells it is within 2% of the best tested setting (lowest: 0.98, lookahead 10 σ 2,000 at 16 nodes), against PP 512's 0.89–1.00. The f threshold sits between two measured points (0.27, where PP 2,048 wins, and 0.50, where it loses badly), so it is the least certain part.
+- **Against Devastator** (same jobs): at 4 nodes Charades is ahead or level in 7 of 8 workloads (1.00–1.76; 0.95 at lookahead 10 σ 500); at 16 nodes in 5 of 8 (0.97–1.14 at lookahead 100, σ 100–4,000; behind with uniform traffic, 0.94, and at lookahead 10, 0.86 and 0.77).
+- **S1 wrong** (WPs is not the low-σ winner at 16 nodes; the mode follows message size, not locality); **S2 wrong** (the best buffer grows with locality); **S3 right** (≥ 5% in 8 of 16 cells, under 5% in the rest); **S4 right in form** (a two-quantity rule is within 2% everywhere), but measured, not yet run as an automatic choice.
+
 
 ## Baseline verification on the Mac
 
