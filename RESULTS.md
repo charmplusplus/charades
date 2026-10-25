@@ -144,6 +144,7 @@ Charades' controller ÷ Devastator's adaptive window: 0.68–1.03 at σ ≤ 500 
 | 77 | 2026-10-25 | — | Weak scaling 1–16 nodes in one allocation; one process per node | design |
 | 78 | 2026-10-25 | 3639098 | Weak scaling 1–16 nodes in one allocation, results: time per GVT advance, not aggregation, limits Charades | current |
 | 79 | 2026-10-25 | — | Where a GVT advance's time goes at scale; PP 2,048's allocation vs its limit; the horizon margin | design |
+| 80 | 2026-10-25 | 3639554 | Where a GVT advance's time goes at scale, results: a slow node sets the pace; PP 2,048's allocation, not its limit, gives 1.12–1.14×; margin 8 stays | current |
 
 ## Stampede3 runs, in order
 
@@ -3161,6 +3162,62 @@ Best ÷ best (each arm set at its best W): 4 nodes σ 100 1.01, σ 2,000 0.97; 1
 - A3. The slowest process changes from wave to wave (no process is the last in more than 20% of waves at 16 nodes), and within it the spread (last − first PE) is most of its work, with no fixed last rank.
 - B1. At σ 100, PP 2,048 capped at 512 is within 3% of PP 2,048 (the gain is the allocation, a layout effect); at σ 2,000 it is within 3% of PP 512 (the loss follows the limit).
 - C1. A larger margin cuts events held past their deadline at σ ≥ 2,000, and PP 2,048 at margin 64–128 recovers to ≥ 0.95 of PP 512 at margin 8. PP 512 gains ≤ 5% at σ ≥ 2,000; at σ 100 every margin is within 2%.
+
+### Where a GVT advance's time goes at scale; PP 2,048's allocation vs its limit; the horizon margin, results (2026-10-25; skx-dev batch job 3639554)
+
+> **Status: current.** Design and predictions in section 79. Charades `scale-diag` 00b1944, htram 6a5cc0c. 171 runs, all ok; canary passed (32 trace files); 15 min. Data `~/charades-data/sdiag/j3639554/` (CSVs, `gvt_waves_*.csv`, `pe_stats.csv`), summary `~/charades-data/sdiag/sdiag_summary.py`.
+
+**A. GVT advance breakdown, PP 512, W 250** (µs, mean over waves 10%–95% of the run, median of 3 reps; lower is better):
+
+| workload | nodes | traced ÷ untraced | advance | reduction floor | median process work | slowest process work | straggler cost (slowest − median) | spread inside the slowest process | most often slowest process (share of waves, 3 reps) |
+|---|---|---|---|---|---|---|---|---|---|
+| σ 100 | 4 | 0.98 | 130 | 34 | 29 | 96 | 67 | 86 | 6/6/6 (0.76) |
+| σ 100 | 8 | 1.04 | 137 | 44 | 20 | 91 | 69 | 83 | 0/6/9 (0.45) |
+| σ 100 | 16 | 0.98 | 158 | 50 | 13 | 106 | 93 | 99 | 22/22/22 (0.55) |
+| σ 2,000 | 4 | 0.92 | 181 | 35 | 39 | 145 | 107 | 131 | 6/3/6 (0.76) |
+| σ 2,000 | 8 | 1.06 | 178 | 43 | 42 | 141 | 99 | 130 | 2/6/0 (0.38) |
+| σ 2,000 | 16 | 1.00 | 228 | 52 | 27 | 174 | 147 | 163 | 22/22/22 (0.46) |
+| uniform | 4 | 0.99 | 182 | 30 | 66 | 152 | 86 | 138 | 0/6/6 (0.29) |
+| uniform | 8 | 1.04 | 319 | 44 | 85 | 273 | 192 | 236 | 10/6/14 (0.15) |
+| uniform | 16 | 1.01 | 535 | 50 | 93 | 482 | 389 | 430 | 22/13/22 (0.06) |
+
+(Work = a process's last PE contribution − the previous result there; reduction floor = the smallest wait from last contribution to result, i.e. the slowest process's; spread = last − first PE contribution in that process.)
+
+- **A1 right, with noise.** Traced ÷ untraced is 0.92–1.06 (median 1.00); one cell (4 nodes, σ 2,000) is below 0.97.
+- **A2 right.** From 4 to 16 nodes the reduction floor grows 16–20 µs (to 50–52 µs). The rest of the growth is the straggler cost: σ 2,000 +40 µs of the +47 µs, σ 100 +26 of +28, uniform +303 of +353. The slowest process's time is mostly the spread among its own PEs (its last PE comes 86–163 µs after its first; uniform 430).
+- **A3 wrong: the slowest process is not random; at 16 nodes it is one slow node.** Process 22 was slowest in 46–55% of waves in all three reps at σ 100 and σ 2,000. `pe_stats` shows why: both processes on that node (allocation index 11, **c455-081**) execute the same events as every other process (to 0.1%) but spend 4–8% more time doing it (µs per event ÷ median: process 22 1.07–1.08, process 23 1.02–1.05, every other process ≤ 1.05 and mostly ≤ 1.01), and are rarely window-blocked (0.57 of the median's blocked passes). So a node about 6% slower per event sets the pace of every advance. With a tight window (W 250), the whole job runs at the slowest node's speed; the chance of having such a node grows with the node count, which is part of the 4→16-node loss and would hit any Charades run on that node. At 4 nodes process 6 was slowest in 76% of waves without being slower per event (1.00), so there the cause is something else (not yet explained).
+- **The last PE inside the slowest process is often rank 0** (σ 100: 0.70 at 4 nodes, 0.36 at 16; less at higher σ), the PE that also does process-level work (node-group entry methods, htram node receives).
+
+**B. PP 2,048's allocation with PP 512's limit, 16 nodes, W 250** (M committed events/s, median of 3; in parentheses events per htram message, efficiency %; higher is better):
+
+| workload | PP 512 | PP 2,048 | PP 2,048 capped at 512 | capped ÷ PP 512 | capped ÷ PP 2,048 |
+|---|---|---|---|---|---|
+| σ 100 | 516.5 (39.4, 99.98) | 589.7 (39.5, 99.98) | 586.7 (39.5, 99.98) | 1.14 | 0.99 |
+| σ 2,000 | 339.2 (74.0, 99.93) | 246.6 (77.7, 98.66) | 378.6 (74.6, 99.93) | 1.12 | 1.54 |
+
+- **B1 right, and it is a free 12–14%.** Allocating the buffers at 2,048 gives the gain (1.14 at σ 100, 1.12 at σ 2,000) with PP 512's messages and efficiency; the 2,048 limit gives the loss at σ 2,000. Capped is the best setting at both σ. The mechanism is unknown: in PP each PE's own `msgBuffers` (allocated at the buffer size, 32 destinations × 2,048 × ~72 B ≈ 4.7 MB per PE) are not used to send, so this is a side effect of the allocation (heap layout or the allocator's behaviour for the 1.2 MB shared buffers allocated at every send), like the unexplained ±10% of section 75. It has to be understood before it becomes a default.
+
+**C. Horizon margin, 16 nodes** (M committed events/s, median of 2; ÷ PP 512 at margin 8 and the same W; higher is better):
+
+| workload | W | setting | margin 8 | 32 | 64 | 128 |
+|---|---|---|---|---|---|---|
+| σ 100 | 250 | PP 512 | 527.3 (1.00) | 528.1 (1.00) | 510.9 (0.97) | 455.2 (0.86) |
+| σ 100 | 250 | PP 2,048 | 577.5 (1.10) | 564.3 (1.07) | 485.4 (0.92) | 498.2 (0.94) |
+| σ 100 | 400 | PP 512 | 538.2 (1.00) | 530.1 (0.99) | 512.1 (0.95) | 472.6 (0.88) |
+| σ 100 | 400 | PP 2,048 | 531.0 (0.99) | 558.0 (1.04) | 547.0 (1.02) | 487.2 (0.91) |
+| σ 2,000 | 250 | PP 512 | 343.2 (1.00) | 334.6 (0.97) | 279.9 (0.82) | 224.9 (0.66) |
+| σ 2,000 | 250 | PP 2,048 | 245.5 (0.72) | 388.5 (1.13) | 299.5 (0.87) | 214.1 (0.62) |
+| σ 2,000 | 400 | PP 512 | 346.5 (1.00) | 326.4 (0.94) | 296.9 (0.86) | 256.4 (0.74) |
+| σ 2,000 | 400 | PP 2,048 | 239.8 (0.69) | 257.9 (0.74) | 263.8 (0.76) | 234.0 (0.68) |
+| σ 4,000 | 250 | PP 512 | 295.4 (1.00) | 270.1 (0.91) | 228.0 (0.77) | 192.3 (0.65) |
+| σ 4,000 | 250 | PP 2,048 | 206.9 (0.70) | 220.9 (0.75) | 196.9 (0.67) | 177.7 (0.60) |
+| σ 4,000 | 400 | PP 512 | 293.2 (1.00) | 283.5 (0.97) | 252.6 (0.86) | 204.6 (0.70) |
+| σ 4,000 | 400 | PP 2,048 | 211.2 (0.72) | 225.2 (0.77) | 224.2 (0.76) | 195.3 (0.67) |
+
+- **C1 mostly wrong.** A larger margin does remove the late events (efficiency 98.7 → 99.95–100% at σ 2,000), but it sends events sooner and messages shrink (σ 2,000, W 250: 74 → 61 → 36 → 12 events per message), which costs more than the rollbacks it saves: PP 512 loses 3–35% at σ ≥ 2,000 and up to 14% at σ 100. PP 2,048 recovers only in one cell (σ 2,000, W 250, margin 32: 1.13, which is about the allocation gain of B). **Margin 8 stays the default**; the PP 2,048 lateness is better fixed by the cap (B) than by sending early.
+
+**Consequences.**
+- The 4→16-node loss at Gaussian σ splits into a growing reduction floor (+16–20 µs per advance) and a growing straggler cost (+26–40 µs), and here much of the straggler cost was one node ~6% slower per event. Next: (1) find the allocation mechanism behind B (allocator settings such as `MALLOC_MMAP_THRESHOLD_`/`MALLOC_TOP_PAD_` on PP 512, against the capped setting; and whether htram's 1.2 MB per-send shared-buffer allocation is the cause), then make the winner the default; (2) make Charades tolerate a slow PE or node: a window that lets processes drift further apart (Devastator's W 1,000 does this), or less work on rank 0; (3) check whether c455-081 is slow on its own (a single-node benchmark) before treating "slow node" as a general effect.
 
 ## Baseline verification on the Mac
 
