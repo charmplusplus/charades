@@ -134,6 +134,7 @@ Charades' controller ÷ Devastator's adaptive window: 0.68–1.03 at σ ≤ 500 
 | 67 | 2026-10-25 | — | The 16-node gaps with wider windows (uniform, lookahead 10) | design |
 | 68 | 2026-10-25 | 3638330 | The 16-node gaps with wider windows, results | current |
 | 69 | 2026-10-25 | — | Choosing htram automatically (`--agg-auto`), and LPs per chare at lookahead 10 | design |
+| 70 | 2026-10-25 | — | Why `--agg-auto` differs from the fixed setting it chose | design |
 
 ## Stampede3 runs, in order
 
@@ -2880,6 +2881,18 @@ Best ÷ best (each arm set at its best W): 4 nodes σ 100 1.01, σ 2,000 0.97; 1
 - A1. `--agg-auto` chooses what the rule says in every cell (PP 2,048 at σ ≤ 1,000 and lookahead 10 σ 500; WPs for uniform at 16 nodes and lookahead 10 σ 2,000 at 4 nodes; PP 512 elsewhere).
 - A2. `--agg-auto` is within 3% of the best fixed setting in every cell, and at least PP 512's rate everywhere.
 - A3. At 16 nodes, lookahead 10, fewer LPs per chare raises efficiency at W 100–200 but the best throughput stays within ±5% of 16 LPs per chare at W 50 (the scheduler's per-chare passes offset the saved rollbacks).
+
+### Why `--agg-auto` differs from the fixed setting it chose (design, 2026-10-25; written before any runs)
+
+> **Status: design.** Written before any runs.
+
+**Why.** In job 3638610 (16 nodes; results to be written up with the 4-node job) `--agg-auto` chose as the rule says in every run, but its rate differs from the fixed setting it chose, both ways and consistently across reps with interleaved order: after switching live to PP 2,048 at σ 100, 0.82 of fixed PP 2,048 (505 against 613 M ev/s at W 250); staying on PP 512 at σ 2,000, 1.07 of fixed PP 512 (394 against 368). htram's message counts and GVT advances match the fixed runs; time per GVT advance does not (σ 100: 164 against 135 µs). What `--agg-auto` adds besides the decision is a second, idle htram instance (WPs) that every PE flushes and drains on every pass. On the Mac (2 × 4 PEs, σ 2,000) the second instance changes nothing (2.49–2.56 against 2.54–2.63 M ev/s).
+
+**Job** (16 nodes, skx-dev; σ 100 and 2,000, W 250, 3 reps, variants in shuffled order each rep): A fixed PP 512; B fixed PP 2,048; C `--agg-auto` from PP 512 that never decides (`--agg-auto-advances` 10⁹); D the same from PP 2,048; E `--agg-auto` from PP 512 deciding as usual.
+
+**Predictions:**
+- I1. C = A and D = B within 3%: the second instance is not the cause.
+- I2. E at σ 100 below B by more than 5%: the live switch leaves PP slower than starting at 2,048, through something not yet identified.
 
 ## Baseline verification on the Mac
 
