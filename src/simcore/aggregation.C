@@ -173,6 +173,18 @@ Aggregator::Aggregator(CkGroupID tram_gid, CkGroupID wps_gid) : advances(0) {
     HTram* t = trams[i];
     t->set_func_ptr_retarr(deliver, dest_pe_of, NULL, this);
     t->setAggregationMode(i == 0 ? g_tw_agg_mode : WPs);
+    if (i == 0 && g_tw_agg_pp_limit) {
+      if (g_tw_agg_mode != PP || g_tw_agg_auto ||
+          g_tw_agg_pp_limit > g_tw_agg_buffer || g_tw_agg_pp_limit % LOCAL_BUFSIZE) {
+        CkAbort("--agg-pp-limit needs PP, no --agg-auto, and a multiple of %d "
+                "no larger than --agg-buffer\n", LOCAL_BUFSIZE);
+      }
+      t->initPPLimit(g_tw_agg_pp_limit);
+      if (CkMyPe() == 0) {
+        CkPrintf("Aggregation: PP shared buffers capped at %u events, allocated "
+                 "at %u (--agg-pp-limit)\n", g_tw_agg_pp_limit, g_tw_agg_buffer);
+      }
+    }
     // Node-level receives (WPs, PP) send nothing to PEs that get no items
     t->setSkipEmptyDeliveries(true);
     if (agg_inbox_on()) t->setInboxDelivery(true);

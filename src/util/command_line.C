@@ -30,7 +30,7 @@ void parse_command_line(int argc, char** argv) {
   kernel.register_argument("gvt-node-waves",       "Optimistic, bucketed GVT, not --sched-park: each process combines its PEs' count-wave contributions in shared memory and contributes once; the result comes back once per process - NO=0, YES=1 (default)", g_tw_gvt_node_waves);
   kernel.register_argument("gvt-wave-allreduce",   "With --gvt-node-waves: processes combine each count wave by recursive doubling (log2 P rounds of pairwise exchange) instead of a reduction and broadcast; needs a power-of-two process count - NO=0, YES=1", g_tw_gvt_wave_allreduce);
   kernel.register_argument("pe-stats",             "PE 0 writes each PE's events, rollbacks and batch outcomes to pe_stats.csv at the end - NO=0, YES=1", g_tw_pe_stats);
-  kernel.register_argument("gvt-trace",            "Bucketed GVT: PE 0 writes every count wave to gvt_trace.csv, and execute() is timed - NO=0, YES=1", g_tw_gvt_trace);
+  kernel.register_argument("gvt-trace",            "Bucketed GVT: PE 0 writes every count wave to gvt_trace.csv, and execute() is timed - NO=0, YES=1; 2 also: with --gvt-node-waves, each process writes its waves to gvt_waves_<process>.csv", g_tw_gvt_trace);
   kernel.register_argument("gvt-adaptive-buckets", "Bucketed GVT: hold remote events far ahead of GVT in the sender - NO=0, YES=1", g_tw_adaptive_buckets);
   kernel.register_argument("gvt-reserve-buckets",  "Bucketed GVT: hold events more than this many buckets ahead of GVT (0 = no offset cutoff)", g_tw_reserve_buckets);
   kernel.register_argument("gvt-reserve-threshold","Bucketed GVT: also hold events at offsets whose anti/regular ratio exceeds this", g_tw_reserve_threshold);
@@ -53,6 +53,7 @@ void parse_command_line(int argc, char** argv) {
   kernel.register_argument("agg-auto-advances",    "--agg-auto: GVT advances to measure before choosing (default 128)", g_tw_agg_auto_advances);
   kernel.register_argument("agg-auto-share",       "--agg-auto: large PP buffers if at most this share of events leaves the process (default 0.3)", g_tw_agg_auto_share);
   kernel.register_argument("agg-auto-msg",         "--agg-auto: otherwise WPs if PP messages carry fewer events than this (default 25)", g_tw_agg_auto_msg);
+  kernel.register_argument("agg-pp-limit",         "Diagnostic, PP: cap the shared buffers at this many events while buffers stay allocated at --agg-buffer (0: the same, default)", g_tw_agg_pp_limit);
   kernel.register_argument("agg-auto-wps",         "--agg-auto: may also choose WPs, through a second htram instance made at startup - NO=0 (default), YES=1", g_tw_agg_auto_wps);
   kernel.register_argument("agg-auto-buffer",      "--agg-auto: the large PP buffer, in events (default 2048)", g_tw_agg_auto_buffer);
   kernel.register_argument("agg-horizon-margin",   "Deadline policy with agg-horizon 0: the horizon is the window plus this", g_tw_agg_horizon_margin);

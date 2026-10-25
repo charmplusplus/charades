@@ -8,6 +8,7 @@
 #include "trigger.h"
 #include "util.h"
 
+#include <algorithm>
 #include <float.h>
 #include <fstream>
 #include <iomanip>
@@ -67,6 +68,10 @@ void BucketGVT::init() {
 }
 
 void BucketGVT::finalize() {
+  if (g_tw_gvt_trace >= 2 && node_waves_on && CkMyRank() == 0) {
+    if (!node_waves) node_waves = CProxy_NodeWaves(node_waves_gid).ckLocalBranch();
+    node_waves->write_proc_waves();
+  }
   if (g_tw_gvt_trace && CkMyPe() == 0) {
     std::ofstream t(std::string(g_output_dir) + "gvt_trace.csv");
     t << "start_s,end_s,asked,passed0,valid,completed,bucket,lead0,combined_s,result_s\n";
@@ -509,7 +514,7 @@ void BucketGVT::poll() {
 }
 
 NodeWaves::NodeWaves()
-    : t_combined(0), t_result(0), slots(CkMyNodeSize()), arrived(0), gen(0),
+    : t_combined(0), t_result(0), slots(CkMyNodeSize()), arrived(0), slot_t(CkMyNodeSize()), gen(0),
       rounds(0), ar_wave(0), ar_round(0), ar_active(false) {
   while ((1 << rounds) < CkNumNodes()) rounds++;
   allreduce = g_tw_gvt_wave_allreduce && (1 << rounds) == CkNumNodes();
@@ -521,8 +526,16 @@ NodeWaves::NodeWaves()
 
 void NodeWaves::contribute_from(int rank, const std::vector<CmiInt8>& v) {
   slots[rank].assign(v.begin(), v.end());
+  // Each PE stamps its own slot; its increment releases the stamp, and the
+  // last PE's increment acquires them all
+  if (g_tw_gvt_trace >= 2) slot_t[rank] = CmiWallTimer();
   if (arrived.fetch_add(1, std::memory_order_acq_rel) + 1 < CkMyNodeSize()) {
     return;
+  }
+  if (g_tw_gvt_trace >= 2) {
+    double first = slot_t[0];
+    for (int r = 1; r < CkMyNodeSize(); r++) first = std::min(first, slot_t[r]);
+    proc_waves.push_back({first, slot_t[rank], 0.0, rank});
   }
   // The last PE in: every slot is written, and none is written again before
   // this wave's result is out
@@ -533,6 +546,15 @@ void NodeWaves::contribute_from(int rank, const std::vector<CmiInt8>& v) {
     combine_wave(combined, slots[r].data(), slots[r].size());
   }
   thisProxy[CkMyNode()].contribute_combined(combined.size(), combined.data());
+}
+
+void NodeWaves::write_proc_waves() const {
+  std::ofstream t(std::string(g_output_dir) + "gvt_waves_" +
+                  std::to_string(CkMyNode()) + ".csv");
+  t << "first_s,last_s,result_s,last_rank\n" << std::fixed << std::setprecision(7);
+  for (const ProcWave& w : proc_waves) {
+    t << w.first << "," << w.last << "," << w.result << "," << w.last_rank << "\n";
+  }
 }
 
 void NodeWaves::contribute_combined(int n, CmiInt8* v) {
@@ -583,6 +605,7 @@ void NodeWaves::add_partner(const CmiInt8* v, int n) {
 void NodeWaves::publish(const CmiInt8* v, int n) {
   res.assign(v, v + n);
   if (g_tw_gvt_trace) t_result = CmiWallTimer();
+  if (g_tw_gvt_trace >= 2 && !proc_waves.empty()) proc_waves.back().result = t_result;
   if (allreduce) {
     ar_active = false;
     ar_wave++;

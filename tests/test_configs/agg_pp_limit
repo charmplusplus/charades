@@ -1,0 +1,10 @@
+# Optimistic w/Bucketed GVT and a window, htram (PP) with 64-event buffers capped at 16 (--agg-pp-limit, diagnostic), deadline flush policy
+sync=3
+gvt=4
+buffer-size=655360
+optimism-window=2000
+aggregation=1
+agg-mode=2
+agg-buffer=64
+agg-pp-limit=16
+agg-policy=1

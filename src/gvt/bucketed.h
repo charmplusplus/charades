@@ -81,6 +81,14 @@ class NodeWaves : public CBase_NodeWaves {
     const std::vector<CmiInt8>& result() const { return res; }
     /** --gvt-trace: when the last PE in arrived, and when the result came */
     double t_combined, t_result;
+    /**
+     * --gvt-trace=2: one record per wave for this process, all on its own
+     * clock -- when its first and last PE contributed, the last PE's rank, and
+     * when the result was published here. Written by rank 0 at the end.
+     */
+    struct ProcWave { double first, last, result; int last_rank; };
+    std::vector<ProcWave> proc_waves;
+    void write_proc_waves() const;
 
   private:
     void publish(const CmiInt8* v, int n);
@@ -94,6 +102,7 @@ class NodeWaves : public CBase_NodeWaves {
     std::map<std::pair<int, int>, std::vector<CmiInt8>> early;
     std::vector<std::vector<CmiInt8>> slots;
     std::atomic<int> arrived;
+    std::vector<double> slot_t;  ///< --gvt-trace=2: when each rank contributed
     std::vector<CmiInt8> combined;
     std::vector<CmiInt8> res;
     std::atomic<uint64_t> gen;
