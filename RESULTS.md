@@ -142,6 +142,7 @@ Charades' controller ÷ Devastator's adaptive window: 0.68–1.03 at σ ≤ 500 
 | 75 | 2026-10-25 | 3638897 | Padded shared atomics, results; `--agg-auto` without the second instance, design | current / design |
 | 76 | 2026-10-25 | 3638968 | `--agg-auto` without the second instance, results at 16 nodes: the PP 2,048 gain is not aggregation | current |
 | 77 | 2026-10-25 | — | Weak scaling 1–16 nodes in one allocation; one process per node | design |
+| 78 | 2026-10-25 | 3639098 | Weak scaling 1–16 nodes in one allocation, results: time per GVT advance, not aggregation, limits Charades | current |
 
 ## Stampede3 runs, in order
 
@@ -3060,6 +3061,65 @@ Best ÷ best (each arm set at its best W): 4 nodes σ 100 1.01, σ 2,000 0.97; 1
 - S3. Events per htram message for uniform fall about as 1 ÷ (destination processes): the 16-node value is 0.4–0.6 of the 8-node one.
 - S4. Charades' speedup over Devastator falls with N on σ ≥ 2,000 and uniform: above 1 at 1–4 nodes, below 1 at 16.
 - S5. One process per node doubles events per htram message (1.7–2.3×) at uniform and σ ≥ 2,000. It is 1.10–1.30× two processes per node on uniform, 1.0–1.15× on σ 2,000 and 4,000, and within 5% at lookahead 10 (GVT-bound there). The risk is contention on PP's process-wide buffers with 46 PEs sharing them.
+
+### Weak scaling 1–16 nodes in one allocation, results: time per GVT advance, not aggregation, limits Charades (2026-10-25; skx-dev batch job 3639098)
+
+> **Status: current.** Design and predictions in section 77. 822 Charades and 180 Devastator runs, all ok, none capped; 1:19 elapsed. Data `~/charades-data/scale/j3639098/` (CSVs and Devastator `results.txt`), summary `~/charades-data/scale/scale_summary.py`.
+
+**M committed events/s per node, each engine at its best setting, median of 2** (higher is better; efficiency = per-node rate at 16 nodes ÷ the same at 4 or 1 node, 1.0 perfect):
+
+| workload | engine | 1 node | 2 nodes | 4 nodes | 8 nodes | 16 nodes | 16 ÷ 4 nodes | 16 ÷ 1 node |
+|---|---|---|---|---|---|---|---|---|
+| σ 100 | Charades | 47.7 | 45.1 | 41.4 | 37.9 | 38.3 | 0.93 | 0.80 |
+| σ 100 | Devastator | 41.7 | 42.6 | 42.6 | 42.4 | 41.7 | 0.98 | 1.00 |
+| σ 500 | Charades | 41.4 | 40.4 | 38.7 | 35.7 | 34.9 | 0.90 | 0.84 |
+| σ 500 | Devastator | 38.6 | 38.9 | 35.2 | 35.1 | 32.4 | 0.92 | 0.84 |
+| σ 1,000 | Charades | 40.5 | 38.0 | 36.6 | 34.6 | 32.6 | 0.89 | 0.81 |
+| σ 1,000 | Devastator | 37.6 | 34.4 | 30.2 | 29.6 | 25.9 | 0.86 | 0.69 |
+| σ 2,000 | Charades | 38.9 | 35.7 | 31.9 | 27.7 | 22.7 | 0.71 | 0.58 |
+| σ 2,000 | Devastator | 30.6 | 27.0 | 26.4 | 25.3 | 23.9 | 0.91 | 0.78 |
+| σ 4,000 | Charades | 39.0 | 35.3 | 28.2 | 23.8 | 19.5 | 0.69 | 0.50 |
+| σ 4,000 | Devastator | 29.5 | 21.4 | 20.2 | 20.1 | 18.8 | 0.93 | 0.64 |
+| uniform | Charades | 41.6 | 36.9 | 29.7 | 16.0 | 11.9 | 0.40 | 0.29 |
+| uniform | Devastator | 30.2 | 20.8 | 17.6 | 15.0 | 12.0 | 0.68 | 0.40 |
+| lookahead 10, σ 500 | Charades | 37.3 | 35.5 | 33.5 | 29.0 | 27.2 | 0.81 | 0.73 |
+| lookahead 10, σ 500 | Devastator | 39.0 | 39.2 | 36.7 | 32.6 | 31.9 | 0.87 | 0.82 |
+| lookahead 10, σ 2,000 | Charades | 32.3 | 27.0 | 24.0 | 21.0 | 17.1 | 0.71 | 0.53 |
+| lookahead 10, σ 2,000 | Devastator | 29.6 | 25.5 | 24.8 | 24.2 | 22.6 | 0.91 | 0.77 |
+
+**Charades' speedup (Charades ÷ Devastator, each at its best; higher is better):**
+
+| workload | 1 node | 2 nodes | 4 nodes | 8 nodes | 16 nodes |
+|---|---|---|---|---|---|
+| σ 100 | 1.14 | 1.06 | 0.97 | 0.89 | 0.92 |
+| σ 500 | 1.07 | 1.04 | 1.10 | 1.02 | 1.08 |
+| σ 1,000 | 1.08 | 1.11 | 1.21 | 1.17 | 1.26 |
+| σ 2,000 | 1.27 | 1.32 | 1.21 | 1.10 | 0.95 |
+| σ 4,000 | 1.32 | 1.65 | 1.40 | 1.19 | 1.04 |
+| uniform | 1.38 | 1.77 | 1.69 | 1.07 | 0.99 |
+| lookahead 10, σ 500 | 0.96 | 0.91 | 0.91 | 0.89 | 0.85 |
+| lookahead 10, σ 2,000 | 1.09 | 1.06 | 0.97 | 0.87 | 0.76 |
+
+**Charades at a fixed setting (PP 512; W 250, lookahead 10 W 50): µs per GVT advance, and events per htram message** (lower µs is better; efficiency 99.75–100% and about 8,500 advances in every cell, 11,400 at lookahead 10):
+
+| workload | 1 node | 2 nodes | 4 nodes | 8 nodes | 16 nodes |
+|---|---|---|---|---|---|
+| σ 100 | 112 µs, 47 | 119, 37 | 129, 38 | 139, 39 | 151, 39 |
+| σ 2,000 | 137, 163 | 149, 95 | 167, 74 | 195, 74 | 233, 75 |
+| σ 4,000 | 137, 157 | 151, 146 | 188, 68 | 222, 61 | 286, 61 |
+| uniform | 129, 148 | 145, 126 | 177, 114 | 330, 39 | 563, 15 |
+| lookahead 10, σ 2,000 | 155, 26 | 184, 21 | 216, 20 | 249, 21 | 313, 21 |
+
+**One process per node (46 PEs) ÷ two (2 × 23), 16 nodes, best window** (higher is better): σ 2,000 0.71 (PP 512) and 0.78 (PP 2,048); σ 4,000 0.73 and 0.71; uniform 0.78 and 0.87; lookahead 10 σ 2,000 0.78 and 0.80. Events per message at uniform rose 3.7× (11.6 → 42.5, PP 512), yet the rate fell.
+
+- **S1 right.** In one allocation, 4→16-node efficiency is Charades 0.93, 0.90, 0.89, 0.71, 0.69, 0.40, 0.81, 0.71 and Devastator 0.98, 0.92, 0.86, 0.91, 0.93, 0.68, 0.87, 0.91, all within 0.1 of the cross-allocation numbers (Charades slightly better here).
+- **S2 right.** For σ ≥ 2,000 and uniform, Charades loses at every doubling, and the loss per doubling grows (σ 2,000: 0.92, 0.89, 0.87, 0.82). At σ ≤ 1,000 the 8→16 step costs 0–6%.
+- **S3 roughly right, slightly worse.** Uniform, PP 512, W 250: 16-node events per message ÷ 8-node = 15.1 ÷ 38.6 = 0.39 (predicted 0.4–0.6). From 4 to 8 nodes it falls further than the destination count alone predicts (114 → 39, 0.34, against 7 ÷ 15 = 0.47).
+- **S4 mostly right.** Charades' speedup falls with N at σ ≥ 2,000 and uniform, from 1.27–1.77 at 1–4 nodes to 0.95–1.04 at 16 nodes. Only σ 2,000 goes clearly below 1 (σ 4,000 1.04, uniform 0.99). Charades stays ahead at 16 nodes at σ 500 (1.08) and σ 1,000 (1.26). Lookahead 10 is behind from 2–4 nodes on.
+- **S5 wrong.** One process per node is 0.71–0.87 of two. It does make messages larger (uniform 3.7×), but it is slower. One 46-PE process spans both sockets, so NUMA effects on the shared buffers, the per-process GVT and the inboxes may explain it; it is not a fix on this machine as is.
+- **The main finding: at Gaussian σ, Charades' scaling loss is time per GVT advance, not aggregation.** From 4 to 16 nodes at a fixed setting, events per message (σ 2,000: 74, 74, 75), efficiency and the advance count stay the same, while µs per advance grows 167 → 195 → 233 (σ 4,000: 188 → 286). Even at σ 100, where 2–3% of events leave the process, µs per advance rises 112 → 151 from 1 to 16 nodes, which is Charades' whole 0.80 there; Devastator is flat (1.00) on the same workload. Aggregation thinning is the cause only for uniform (114 → 39 → 15 events per message, 177 → 330 → 563 µs per advance).
+- **Why Devastator escapes it.** Its best window grows to W 1,000 at 8–16 nodes (500 at 1–2), so each GVT advance covers 2.5–4× more simulated time than Charades' best (W 250–400). Charades cannot widen W as cheaply (rollbacks cost more, section 68).
+- **Plan change.** GVT advance cost at scale moves ahead of aggregation thinning. Next: break µs per advance into its parts at 4 and 16 nodes (reduction latency vs waiting for the slowest PE vs blocked passes). Then either cut that cost or make wider windows affordable.
 
 ## Baseline verification on the Mac
 
