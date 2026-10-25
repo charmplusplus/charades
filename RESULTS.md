@@ -137,6 +137,7 @@ Charades' controller ÷ Devastator's adaptive window: 0.68–1.03 at σ ≤ 500 
 | 70 | 2026-10-25 | — | Why `--agg-auto` differs from the fixed setting it chose | design |
 | 71 | 2026-10-25 | 3638610, 3638739 | Why `--agg-auto` differs, results: an idle htram instance changes the pace of blocked passes | current |
 | 72 | 2026-10-25 | — | `--agg-auto` with one active instance, and pausing blocked passes | design |
+| 73 | 2026-10-25 | 3638798 | Pausing blocked passes, results; memory layout as the cause, design | current / design |
 
 ## Stampede3 runs, in order
 
@@ -2930,6 +2931,31 @@ Best ÷ best (each arm set at its best W): 4 nodes σ 100 1.01, σ 2,000 0.97; 1
 - P1. `--agg-auto` is within 3% of the fixed setting it chooses in every cell (σ 100: PP 2,048; σ 2,000: PP 512).
 - P2. At σ 2,000 a pause of 500–2,000 ns gives PP 512 at least 1.10× at 16 nodes; at σ 100 every pause is slower.
 - P3. At 4 nodes the pause matters less (fewer, faster GVT rounds), within ±5% at both σ.
+
+### Pausing blocked passes, results; memory layout as the cause, design (2026-10-25; skx-dev batch job 3638798; design written before the layout runs)
+
+> **Status: current (pause results), design (layout).** 16 nodes, W 250, 3 reps in shuffled order, all 64 runs finished; data `~/charades-data/pause/`.
+
+**Pause results** (M committed events/s, medians; ÷ the same setting without a pause; higher is better):
+
+| setting | σ 100 | σ 2,000 |
+|---|---|---|
+| PP 512 | 550.6 | 365.2 |
+| PP 512, pause 250 / 500 / 1,000 / 2,000 / 4,000 ns | 0.98 / 0.99 / 1.02 / 1.00 / 0.98 | 0.98 / 0.99 / 0.98 / 0.97 / 0.98 |
+| PP 2,048 | 611.0 | 251.6 |
+| PP 2,048, pause 500 / 2,000 ns | 1.00 / 0.99 | 1.01 / 1.00 |
+| `--agg-auto` (one active instance, e4b34c5) | 503.6 (0.82 of PP 2,048, which it chose) | 391.6 (1.07 of PP 512, which it kept) |
+
+- **P2 wrong:** pausing blocked passes changes nothing (±2%). **P1 wrong:** `--agg-auto` still differs from its choice exactly as before, although it no longer flushes or drains the idle instance. So it is not what the idle instance does on each pass but that it exists: making it allocates tens of MB per process (its node buffers are sized for htram's largest buffer) and per PE before the scheduler, the LPs and the event pools are made, so every later allocation lands elsewhere.
+- **Section 71's explanation (the pace of blocked passes) is withdrawn.**
+
+**Hypothesis: throughput depends on memory layout by up to ±15%.** Likely mechanism: false sharing between hot shared atomics, e.g. htram's PP counters (`get_idx`, `done_count`, `min_key`: packed `std::atomic` arrays, one per destination node, 16 to a cache line, written by all 23 PEs of a process). If so, earlier A/B results that changed allocation (new groups, larger structures) carry layout effects of this size.
+
+**Layout job** (16 nodes, skx-dev, σ 100 and 2,000, W 250, 3 reps in shuffled order): PP 512 and PP 2,048 with `CHARADES_PAD_KB` 0, 1, 4, 16, 64, 1,024 and 32,768 (each PE allocates and touches that much at startup, before any group; nothing else changes).
+
+**Predictions:**
+- L1. Rates move with the pad by more than the rep spread: at least 8% between the best and worst pad in some cell.
+- L2. If L1 holds, padding htram's PP atomics to a cache line each makes the rates insensitive to the pad (within 3%), at or above the best padded rate.
 
 ## Baseline verification on the Mac
 
