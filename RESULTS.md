@@ -140,7 +140,7 @@ Charades' controller ÷ Devastator's adaptive window: 0.68–1.03 at σ ≤ 500 
 | 73 | 2026-10-25 | 3638798 | Pausing blocked passes, results; memory layout as the cause, design | current / design |
 | 74 | 2026-10-25 | 3638859 | Memory layout: heap pads, results; padded shared atomics, design | current / design |
 | 75 | 2026-10-25 | 3638897 | Padded shared atomics, results; `--agg-auto` without the second instance, design | current / design |
-| 76 | 2026-10-25 | 3638968 | `--agg-auto` without the second instance, results at 16 nodes: the PP 2,048 gain is not aggregation | current |
+| 76 | 2026-10-25 | 3638968 (16 nodes), 3638969 (4 nodes) | `--agg-auto` without the second instance, results: the PP 2,048 gain is not aggregation | current |
 | 77 | 2026-10-25 | — | Weak scaling 1–16 nodes in one allocation; one process per node | design |
 | 78 | 2026-10-25 | 3639098 | Weak scaling 1–16 nodes in one allocation, results: time per GVT advance, not aggregation, limits Charades | current |
 
@@ -3013,7 +3013,7 @@ Best ÷ best (each arm set at its best W): 4 nodes σ 100 1.01, σ 2,000 0.97; 1
 - V1. `--agg-auto` chooses PP 2,048 at σ ≤ 1,000 and lookahead 10 σ 500, and PP 512 elsewhere.
 - V2. It is within 3% of the fixed setting it chose in every cell (no second instance now), so at least PP 512's rate everywhere and 1.03–1.11× it where it switches.
 
-### `--agg-auto` without the second instance, results at 16 nodes: the PP 2,048 gain is not aggregation (2026-10-25; skx-dev batch job 3638968; 4-node job 3638969 still queued)
+### `--agg-auto` without the second instance, results: the PP 2,048 gain is not aggregation (2026-10-25; skx-dev batch jobs 3638968 (16 nodes) and 3638969 (4 nodes))
 
 > **Status: current (16 nodes).** Charades `agg-auto` 198eabd, htram ce2108f. 8 workloads × {PP 512, PP 2,048, `--agg-auto`} × windows, 2 reps; 183 runs ok, the 2 warm-ups hit the cap as intended; the canary passed; committed counts identical in every workload. Data `$WORK/charades-runs/auto5/n16/`, summary `~/charades-data/auto5/auto_summary.py` (its "choice" column is wrong; decisions below are read from each run's own log).
 
@@ -3034,6 +3034,24 @@ Best ÷ best (each arm set at its best W): 4 nodes σ 100 1.01, σ 2,000 0.97; 1
 - **V2 wrong.** Where it switches to PP 2,048 it gets 0.93–0.95 of PP 2,048, almost none of the gain.
 - **Why: PP 2,048's gain at σ ≤ 1,000 does not come from aggregation.** At the same window, PP 512 and PP 2,048 send the same number of messages with the same events per message (σ 100, W 250: 499,353 vs 497,388 messages, 39.3 vs 39.5 events per message; σ 500: 73.7 vs 74.0; σ 1,000: 87.1 vs 87.5), at the same efficiency and the same GVT advance count. Every "buffer full" send at σ 100 is a PE sending its 16-event local buffer while the shared buffer is being sent (17,642 vs 14,988), not a shared buffer filling. Growing the limit live therefore changes nothing, which is what `--agg-auto` shows. What PP 2,048 changes at startup is allocation sizes (each PE's initial buffers are allocated at the buffer size), so this is most likely the startup-layout effect of section 75 (±10% at 16 nodes from groups or allocations), not a better aggregation setting. Not yet tested.
 - **PP 2,048's loss at σ ≥ 2,000 is real and is a deadline-policy gap.** At σ 2,000, W 250: events held past their due time by htram rise from 233,332 to 1,948,172 (8×), urgent sends from 1,955 to 175,108, and efficiency drops from 99.92% to 98.63% (94–95% at W 400–600), with events per message about the same (74 vs 78). With a larger limit, shared buffers that previously went out when full now wait, and `flushDue` does not send them by their deadline. PP 512 has the same gap at a smaller scale (233,332 held events at σ 2,000 against 57,475 at σ 100).
+**4 nodes (job 3638969; 185 runs ok, canary passed, committed counts identical), same layout as the 16-node table:**
+
+| workload | PP 512 (M ev/s) | PP 2,048 ÷ PP 512 | `--agg-auto` ÷ PP 512 | `--agg-auto` ÷ the setting it chose |
+|---|---|---|---|---|
+| σ 100 | 169.2 | 1.01 | 0.96 | 0.95 |
+| σ 500 | 147.9 | 1.04 | 1.02 | 0.98 |
+| σ 1,000 | 141.5 | 1.02 | 0.99 | 0.97 |
+| σ 2,000 | 127.1 | 0.84 | 0.99 | 0.99 |
+| σ 4,000 | 111.5 | 0.88 | 1.00 | 1.00 |
+| uniform | 117.0 | 0.99 | 1.02 | 1.02 |
+| lookahead 10, σ 500 | 132.4 | 1.00 | 0.97 | 0.97 |
+| lookahead 10, σ 2,000 | 93.0 | 1.03 | 1.01 | 1.01 |
+
+- Decisions are the same as at 16 nodes (PP 2,048 at σ ≤ 1,000 and lookahead 10 σ 500), read from each run's log; the summary script's choice column is wrong here too.
+- At 4 nodes, PP 2,048's gain is only 1.00–1.04 (1.03–1.11 in section 66). At W 250 it sends the same events per message as PP 512 (σ 100: 38.3 vs 38.0; σ 1,000: 87.6 vs 87.7), so the gain is not aggregation here either.
+- The loss at σ ≥ 2,000 is smaller than at 16 nodes but the same kind: 0.84 and 0.88, with efficiency 99.93 → 99.22% (σ 2,000) and 99.78 → 99.21% (σ 4,000), at about the same events per message.
+- `--agg-auto` is 0.95–1.02 of the setting it chose; V2 (within 3%) fails only at σ 100 (0.95) and σ 1,000 (0.97, borderline).
+
 - **Consequences.**
   - `--agg-auto` does not become the default. Its rule is right, but the gain it picks is not one a live switch can get.
   - The selection rule of section 66 (PP 2,048 where ≤ 0.3 of events leave the process) rests on a 1.03–1.11× that is probably layout, not aggregation; treat it as unexplained until the isolation test below.
