@@ -140,6 +140,7 @@ Charades' controller ÷ Devastator's adaptive window: 0.68–1.03 at σ ≤ 500 
 | 73 | 2026-10-25 | 3638798 | Pausing blocked passes, results; memory layout as the cause, design | current / design |
 | 74 | 2026-10-25 | 3638859 | Memory layout: heap pads, results; padded shared atomics, design | current / design |
 | 75 | 2026-10-25 | 3638897 | Padded shared atomics, results; `--agg-auto` without the second instance, design | current / design |
+| 76 | 2026-10-25 | — | Weak scaling 1–16 nodes in one allocation; one process per node | design |
 
 ## Stampede3 runs, in order
 
@@ -3009,6 +3010,29 @@ Best ÷ best (each arm set at its best W): 4 nodes σ 100 1.01, σ 2,000 0.97; 1
 **Predictions:**
 - V1. `--agg-auto` chooses PP 2,048 at σ ≤ 1,000 and lookahead 10 σ 500, and PP 512 elsewhere.
 - V2. It is within 3% of the fixed setting it chose in every cell (no second instance now), so at least PP 512's rate everywhere and 1.03–1.11× it where it switches.
+
+### Weak scaling 1–16 nodes in one allocation; one process per node (design, 2026-10-25; written before any runs)
+
+> **Status: design.** Job script `$WORK/charades-runs/scale.slurm`; output `$WORK/charades-runs/scale/j<job>/`.
+
+**Why.** The 4→16-node efficiencies so far (Charades 0.38–0.86, Devastator 0.71–0.92) compare jobs from different allocations, which differ by up to ±0.1, and have no 1, 2 or 8-node points. One allocation gives the curve's shape and shows where Charades starts losing. The second part tests the cheapest remedy for aggregation thinning: one process per node halves the destination processes and should double events per htram message.
+
+**Setup.** One 16-node allocation, Charades `agg-auto` 198eabd (fast path on; `--agg-auto` off), htram `pdes` ce2108f.
+- N = 16, 8, 4, 2, 1 nodes (in that order, inside each rep), 2 reps; full nodes, 2 × 23 PEs per node, 128 LPs per PE, so the problem grows with N.
+- The 8 workloads of section 66: lookahead 100, mean 1,000, σ 100, 500, 1,000, 2,000, 4,000 and uniform remote 1.0 (end time 512,000); lookahead 10, mean 200, σ 500 and 2,000 (end time 128,000).
+- Charades: PP 512 and PP 2,048 with W 250, 400, 600 and the controller (ε 0.001); lookahead 10: W 50, 100, 200 and the controller. WPs 512 for uniform and lookahead 10 σ 2,000 (where it won in section 66).
+- Devastator: W 500 and 1,000 (lookahead 100); W 100, 200, 400 (lookahead 10); clcg4. The 1, 2 and 8-node binaries are rebuilt at the start of the job from the source the 4 and 16-node ones came from (the old 1-node binary predates the phases change; kept as `.pre-scale`).
+- Then at 16 nodes, 2 reps: one process of 46 PEs per node (`+pemap 2-47`) against two of 23, for σ 2,000, σ 4,000, uniform and lookahead 10 σ 2,000, PP 512 and PP 2,048.
+- Last, `--comm-stats=1` at 16 nodes (σ 2,000 and uniform, PP 512, W 250 and 600): send-call time and send-to-receive latency.
+
+**Measures.** Each engine at its best setting per (workload, N). Weak-scaling efficiency: M committed events/s per node at N ÷ the same at 4 nodes, and ÷ 1 node (higher is better; 1.0 is perfect). The 1-node point has no network traffic and the 2-node point little at σ ≤ 1,000, so ÷ 4 nodes is the main measure. Also events per htram message, GVT advances per second, and Charades' speedup (Charades ÷ Devastator).
+
+**Predictions:**
+- S1. 4→16-node efficiency in one allocation lies within ±0.1 of the cross-allocation numbers: Charades about 0.85 at σ ≤ 1,000, 0.7 at σ 2,000 and 4,000, 0.4 uniform; Devastator 0.85–0.92, uniform 0.7.
+- S2. Charades loses efficiency at every doubling from 4 nodes on where traffic is spread (σ ≥ 2,000, uniform), and the loss per doubling grows; at σ ≤ 1,000 the 8→16 step costs < 10%.
+- S3. Events per htram message for uniform fall about as 1 ÷ (destination processes): the 16-node value is 0.4–0.6 of the 8-node one.
+- S4. Charades' speedup over Devastator falls with N on σ ≥ 2,000 and uniform: above 1 at 1–4 nodes, below 1 at 16.
+- S5. One process per node doubles events per htram message (1.7–2.3×) at uniform and σ ≥ 2,000. It is 1.10–1.30× two processes per node on uniform, 1.0–1.15× on σ 2,000 and 4,000, and within 5% at lookahead 10 (GVT-bound there). The risk is contention on PP's process-wide buffers with 46 PEs sharing them.
 
 ## Baseline verification on the Mac
 
