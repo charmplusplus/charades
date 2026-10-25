@@ -135,6 +135,8 @@ Charades' controller ÷ Devastator's adaptive window: 0.68–1.03 at σ ≤ 500 
 | 68 | 2026-10-25 | 3638330 | The 16-node gaps with wider windows, results | current |
 | 69 | 2026-10-25 | — | Choosing htram automatically (`--agg-auto`), and LPs per chare at lookahead 10 | design |
 | 70 | 2026-10-25 | — | Why `--agg-auto` differs from the fixed setting it chose | design |
+| 71 | 2026-10-25 | 3638610, 3638739 | Why `--agg-auto` differs, results: an idle htram instance changes the pace of blocked passes | current |
+| 72 | 2026-10-25 | — | `--agg-auto` with one active instance, and pausing blocked passes | design |
 
 ## Stampede3 runs, in order
 
@@ -2893,6 +2895,41 @@ Best ÷ best (each arm set at its best W): 4 nodes σ 100 1.01, σ 2,000 0.97; 1
 **Predictions:**
 - I1. C = A and D = B within 3%: the second instance is not the cause.
 - I2. E at σ 100 below B by more than 5%: the live switch leaves PP slower than starting at 2,048, through something not yet identified.
+
+### Why `--agg-auto` differs, results: an idle htram instance changes the pace of blocked passes (2026-10-25, skx-dev batch jobs 3638610 and 3638739)
+
+> **Status: current.** 16 nodes, short runs, fast path on, htram ce2108f (PP limit fix). Job 3638610 (`--agg-auto` against fixed settings, 8 workloads, 2 reps): all 245 runs finished, including the canary of the three cases that crashed or hung in job 3638431 before the fix; committed counts identical. Job 3638739 (isolation, σ 100 and 2,000, W 250, 3 reps in shuffled order): all 34 runs finished. Data `~/charades-data/auto3/`, `~/charades-data/iso/`.
+
+**Earlier failures.** Job 3638371: all 60 `--agg-auto` runs aborted with "Argument parse error" (the code was not in the patch sent to Stampede3; Stampede3 now runs pushed commits). Job 3638431: every run that switched PP live from 512 to 2,048 crashed (2) or hung (11): each PE judged its process's shared PP buffers full by its own buffer size, so while PEs disagreed one sent a buffer another was still copying into. Fixed in htram ce2108f (a shared buffer's limit is fixed when it is installed; PP buffers grow but never shrink live).
+
+**Decisions (job 3638610).** In every run `--agg-auto` chose what the rule says from what it measured over 128 GVT advances: PP 2,048 at σ 100–1,000 and lookahead 10 σ 500 (2–26% of events leaving the process); WPs for uniform and where PP messages carried under 25 events; PP 512 otherwise. **A1 right.**
+
+**But its rate differs from the fixed setting it chose. Isolation (job 3638739; M committed events/s, medians of 3, W 250, higher is better):**
+
+| variant | σ 100 | σ 2,000 |
+|---|---|---|
+| A: fixed PP 512 | 543.5 | 356.5 |
+| C: A + `--agg-auto` that never decides (an idle WPs instance) | 486.6 (0.90 of A) | 415.3 (1.16 of A) |
+| B: fixed PP 2,048 | 629.3 | 253.7 |
+| D: B + an idle WPs instance | 539.3 (0.86 of B) | 256.0 (1.01 of B) |
+| E: `--agg-auto` deciding (σ 100: PP 2,048; σ 2,000: PP 512) | 514.8 | 405.4 |
+
+- **The idle second instance is the cause** (**I1 wrong**). It carries no event; all it adds is a flush and an inbox check on every scheduler pass, most of which are window-blocked spins. That moves the time per GVT advance both ways: at σ 100, 157 → 174 µs (slower passes pick up GVT results later); at σ 2,000 with PP 512, 238 → 203 µs (faster). The live switch itself is not the cause (**I2 wrong**: E is within the spread of D at σ 100).
+- **So blocked PEs spinning flat out slow everyone down when traffic is heavy.** At σ 2,000, half of all events cross the network, and 23 PEs per process spinning (each pass polls the network and flushes) costs the PEs doing that work more than they gain. A deliberate pause when blocked could be worth up to about 1.16× there, and costs at σ 100, so it would have to follow the traffic too.
+- **Fixed in `--agg-auto`** (e4b34c5 on `agg-auto`): only the instance in use is flushed; a switch to WPs flushes PP once; the second instance's inbox is drained only after the switch. Added `--blocked-pause-ns` (diagnostic) to measure the pause directly.
+
+### `--agg-auto` with one active instance, and pausing blocked passes (design, 2026-10-25; written before any runs)
+
+> **Status: design.** Written before any runs.
+
+**Jobs** (fast path on, short runs, each starting with warm-ups on every node):
+- 16 nodes (skx-dev): σ 100 and 2,000 at W 250, 3 reps, variants in shuffled order: fixed PP 512; fixed PP 2,048; `--agg-auto`; PP 512 with `--blocked-pause-ns` 250, 500, 1,000, 2,000, 4,000; PP 2,048 with 500 and 2,000.
+- 4 nodes (skx): all 8 workloads with PP 512, PP 2,048, WPs 512 and `--agg-auto` (section 69's grid), plus σ 100 and 2,000 PP 512 with pauses of 500 and 2,000 ns.
+
+**Predictions:**
+- P1. `--agg-auto` is within 3% of the fixed setting it chooses in every cell (σ 100: PP 2,048; σ 2,000: PP 512).
+- P2. At σ 2,000 a pause of 500–2,000 ns gives PP 512 at least 1.10× at 16 nodes; at σ 100 every pause is slower.
+- P3. At 4 nodes the pause matters less (fewer, faster GVT rounds), within ±5% at both σ.
 
 ## Baseline verification on the Mac
 
