@@ -139,6 +139,7 @@ Charades' controller ÷ Devastator's adaptive window: 0.68–1.03 at σ ≤ 500 
 | 72 | 2026-10-25 | — | `--agg-auto` with one active instance, and pausing blocked passes | design |
 | 73 | 2026-10-25 | 3638798 | Pausing blocked passes, results; memory layout as the cause, design | current / design |
 | 74 | 2026-10-25 | 3638859 | Memory layout: heap pads, results; padded shared atomics, design | current / design |
+| 75 | 2026-10-25 | 3638897 | Padded shared atomics, results; `--agg-auto` without the second instance, design | current / design |
 
 ## Stampede3 runs, in order
 
@@ -2980,6 +2981,34 @@ Best ÷ best (each arm set at its best W): 4 nodes σ 100 1.01, σ 2,000 0.97; 1
 **Predictions:**
 - L2. In the padded build the idle second instance changes nothing (within 3%), and each setting runs at or above the better of its two unpadded variants.
 - L3. If L2 fails, the cause is outside the structures padded (e.g. LCI or Reconverse internals), and `--agg-auto` should make its WPs instance only when chosen.
+
+### Padded shared atomics, results; `--agg-auto` without the second instance, design (2026-10-25; skx-dev batch job 3638897; design written before the next runs)
+
+> **Status: current (padding), design (next).** 16 nodes, W 250, 3 reps in shuffled order; 48 measured runs finished (the two warm-ups hit the cap, as intended); committed counts identical. Data `~/charades-data/layout2/`.
+
+**M committed events/s, medians** (higher is better; "+ idle instance" = `--agg-auto` that never decides):
+
+| setting | unpadded | padded |
+|---|---|---|
+| σ 100, PP 512 | 549.8 | 546.5 |
+| σ 100, PP 512 + idle instance | 473.6 (0.86) | 487.2 (0.89) |
+| σ 100, PP 2,048 | 604.1 | 601.0 |
+| σ 100, PP 2,048 + idle instance | 548.1 (0.91) | 560.8 (0.93) |
+| σ 2,000, PP 512 | 363.0 | 356.3 |
+| σ 2,000, PP 512 + idle instance | 405.7 (1.12) | 400.9 (1.13) |
+| σ 2,000, PP 2,048 | 252.3 | 251.0 |
+| σ 2,000, PP 2,048 + idle instance | 258.7 (1.03) | 257.7 (1.03) |
+
+- **L2 wrong.** Padding changes nothing (padded ÷ unpadded 0.98–1.02), and the idle instance moves PP just as much in the padded build. The cause is not false sharing on these atomics, not per-pass work (section 73), and not heap position (section 74). It remains unexplained; candidates left are inside the runtime (the extra groups' creation, Charm/Reconverse or LCI state, allocation inside CmiAlloc). It matters for reading results: **any change that adds a group or a large allocation can move 16-node throughput by ±10% for reasons unrelated to what it changes**, so such changes need this isolation check before their gains are trusted.
+- The padding branches (Charades `pad`, htram `pdes-pad`) stay unmerged.
+
+**`--agg-auto` without the second instance** (15dd755 on `agg-auto`): it now chooses only between PP 512 and PP 2,048 (live resize, safe since htram ce2108f); WPs needs `--agg-auto-wps=1`. That keeps the larger gain (PP 2,048: 1.03–1.11× PP 512 at σ ≤ 1,000 at both scales) and gives up WPs where it won (uniform at 16 nodes 1.10–1.16×; lookahead 10 σ 2,000 at 4 nodes 1.05×). Mac: forced configs 10 repeats each, 480/480.
+
+**Jobs**: 16 nodes (skx-dev) and 4 nodes (skx): the 8 workloads of section 66 with PP 512, PP 2,048 and `--agg-auto`, 2 reps.
+
+**Predictions:**
+- V1. `--agg-auto` chooses PP 2,048 at σ ≤ 1,000 and lookahead 10 σ 500, and PP 512 elsewhere.
+- V2. It is within 3% of the fixed setting it chose in every cell (no second instance now), so at least PP 512's rate everywhere and 1.03–1.11× it where it switches.
 
 ## Baseline verification on the Mac
 
