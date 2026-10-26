@@ -190,6 +190,7 @@ Charades' controller ÷ Devastator's adaptive window: 0.68–1.03 at σ ≤ 500 
 | 99 | 2026-10-26 | 3642782 | The lock, results: Reconverse's per-PE message pool, fought over by the process-edge ranks because each drains the other's network messages | current |
 | 100 | 2026-10-26 | — | Late rank 0: edge traffic or the rank? Rotated LP blocks, and sending on the destination PE's device | design |
 | 101 | 2026-10-26 | 3643113 | Late rank 0, results: the lateness follows the lower-edge LPs, not the rank or the device; sending on the destination device does not help | current |
+| 102 | 2026-10-26 | — | htram flush order: rotating start and earliest timestamp first | design |
 
 ## Stampede3 runs, in order
 
@@ -3767,6 +3768,26 @@ At σ 2,000: base r0 31 against 23 for the middle (last PE 0.25), rot r0 28 (0.1
 **Why the lower edge.** Every htram flush loop (`flushDue`, `flushPending`, `tflush`, `flushStale`, `flushIdle`) scans destination processes in index order, 0 to N − 1. Process p's buffers toward p − 1 are therefore flushed before those toward p + 1 in every pass (except at the wrap-around). The events for process p's lower-edge LPs come from p − 1, whose buffer toward p (the higher index) goes out after its buffer toward p − 2. So the lower edge of every process gets its cross-process events later in each flush pass than the upper edge does. That would explain why the lower-edge rank is the late one. Not yet tested.
 
 **Next:** flush in an order that does not favour low process indices: by earliest due timestamp, or starting each scan at the PE's own process and wrapping. Then measure whether the lower edge stops being late and whether the slowest-PE delay falls.
+
+### htram flush order: rotating start and earliest timestamp first (design, 2026-10-26; written before any runs)
+
+> **Status: design.** Charades `scale-diag` 64d2db8 (adds `--agg-flush-order`), htram `pdes` 8ed0252 (adds `htram_flush_order`), Reconverse `pads-dest-device` 13ae1ac with `+lci_dest_device` off (the same as `pads-runtime`). `+lci_ndevices 23`, glibc defaults. Job J `$WORK/charades-runs/diag12.slurm` (4 nodes, skx-dev and skx, the copy that starts second cancelled).
+
+**Why.** Section 101: the late PE holds its process's lower-edge LPs, and every htram flush pass visits destination processes by index, so each process's buffer toward p + 1 always goes out after its buffer toward p − 1.
+
+**Change.** `htram_flush_order` sets the order of `flushDue` (every mode) and of `tflush` and `flushPending` (PP):
+- 0: by index (as before).
+- 1: by index, starting one destination later on each pass.
+- 2: earliest buffered timestamp first (the lower of the PE's local minimum key and the node's shared one).
+
+Committed events are unchanged on the Mac (81,667 for all three at 2 × 4 PEs, and for 0 and 2 at 4 × 2 PEs).
+
+**Runs.** σ 100 and σ 2,000 at W 400, PP 512. Arms `fo0`, `fo1`, `fo2`, each traced (`--gvt-trace=3`) with an untraced pair, 3 reps, interleaved.
+
+**Predictions:**
+- J1. With `fo2` at σ 100, the lower edge stops being late: rank 0's mean delay comes within 3 µs of the middle ranks', and no rank is the slowest process's last PE in more than 30% of waves.
+- J2. With `fo2` at σ 100, the slowest-PE delay falls by at least 15% (111 µs with index order in section 101), and throughput is ≥ 1.03× `fo0`. At σ 2,000, `fo2` is ≥ 1.0×.
+- J3. `fo1` removes the lower-edge bias as well (ranks 0 and 22 equally late), but gains less than `fo2`, because it is unbiased rather than urgent-first.
 
 ## Baseline verification on the Mac
 
