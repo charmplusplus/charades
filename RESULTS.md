@@ -157,6 +157,7 @@ Charades' controller ÷ Devastator's adaptive window: 0.68–1.03 at σ ≤ 500 
 | 83 | 2026-10-25 | — | Where a wider window's cost goes, on a clean allocation | design |
 | 84 | 2026-10-25 | 3640064 | Where a wider window's cost goes, on a clean allocation, results: the slowest process is usually late because of its rank 0 | current |
 | 85 | 2026-10-25 | — | What rank 0 does while it is late: wave-aligned timers and a per-thread perf profile | design |
+| 86 | 2026-10-25 | 3640203 | What rank 0 does while it is late, results: nothing extra on average; ranks 0 and 1 are late as a pair | current |
 
 ## Stampede3 runs, in order
 
@@ -3363,6 +3364,19 @@ With 23 PEs per process, chance is 0.04. So in the process that holds an advance
 - T2. Rank 0's contribution delay is above the process median in most waves (not only in a few), and rank 1's is the second highest at σ 2,000 (the shared device).
 - T3. Per snapshot interval, rank 0's extra time over rank 11 is mostly drains and rollbacks at σ 100 (≥ 50%), and mostly outside Charades at σ 2,000 (≥ 50%).
 - P1. In perf, rank 0's thread has a larger share of its samples in LCI and Reconverse progress and queue functions than rank 11's (≥ 1.5×).
+
+### What rank 0 does while it is late, results: nothing extra on average; ranks 0 and 1 are late as a pair (2026-10-25; skx-dev batch job 3640203, 4 nodes)
+
+> **Status: current.** Design and predictions in section 85. 4 nodes (c455-081 excluded), 22 runs, all ok; perf ran on the compute nodes; 4 min. Summary `~/charades-data/sdiag/sdiag4_summary.py` (perf part also `sdiag4_perf.py`; this perf version sorts threads with `--sort pid`, not `tid`).
+
+- **T1 roughly right.** Traced ÷ untraced 0.95–1.00 (median 0.97); 4 of 8 pairs are below 0.97.
+- **T2 right, with a twist: ranks 0 and 1 are late, as a pair.** The slowest process's last PE (share of waves): σ 100, W 250: rank 1 0.68, rank 0 0.14; W 400: rank 0 0.57, rank 1 0.22, rank 22 0.11; σ 2,000: rank 0 0.28–0.32, rank 1 0.11–0.14. Mean contribution delay after the previous result: ranks 0 and 1 22–32 µs, the others 12–25 µs (σ 100, W 250: 22 and 27 against about 16). At 4 nodes the process-edge rank 22 matters much less than at 16.
+- **T3 wrong: rank 0 does no extra work on average.** Per PE, averaged over 10-wave intervals, ranks 0, 1, 11, 21 and 22 spend the same time in every category to within about 1 µs per wave (σ 100, W 250: scheduler loop 108–110, drains 19–20, GVT polls 8.5–9.4, rollbacks ≤ 0.2, node-group GVT handlers ≤ 0.3, htram node receives ≤ 0.5, outside Charades 17–18 µs per wave; σ 2,000 alike), and execute the same events.
+- **P1 wrong.** Over the whole run, rank 0's thread differs from rank 11's only in start-up and shutdown work it does as the process's main thread: psm2 `ips_proto_disconnect` (7–10% of its samples), `printf` of the final statistics, `memset`, `__mpn_divrem`. Its network share (0.14–0.16) is within the spread of other ranks across reps (0.04–0.23). One hint: a kernel address (0xffffffffa2000b80, likely the return from an interrupt; the profile is user-space only, `perf_event_paranoid` 2) takes 1.1–1.3% of rank 0's samples and none of rank 11's.
+
+**What this means.** Ranks 0 and 1 are late in individual waves, not busier overall: short, occasional delays. Their work is the same as every other rank's, so the cause is probably outside the process: interrupts or other OS activity on the cores they run on. With `+pemap 2-46:2,3-47:2`, ranks 0 and 1 of the two processes on a node sit on cores 2, 4 (socket 0) and 3, 5 (socket 1), next to the two free cores 0 and 1.
+
+**Next (one short 4-node job):** (1) record `/proc/interrupts` and the IRQ affinity of the hfi1 (Omni-Path) interrupts on the compute nodes, before and after a run; (2) the same traced runs with a reversed `+pemap` (rank 0 on core 46/47, rank 22 on core 2/3): if the lateness follows the core, it is the OS or interrupts, and the fix is to keep those cores free; if it follows the rank, it is in the software.
 
 ## Baseline verification on the Mac
 
