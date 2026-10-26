@@ -3908,7 +3908,7 @@ If K2 holds, the straggler cost at uniform is GVT waiting for the PE with the mo
 - **Receive work is even over the run but uneven per wave.** Every rank spends about 2 µs per wave in htram receive handlers on average (WPs, 16 nodes: 0.2–10.4 per PE, no rank above 3). In a given wave, the late PE is the one that took about 100 µs of receives. With LCI, a message lands on the device with the sender's index, so which PE handles a receive depends on the sender's rank, which is effectively random at uniform.
 - **K4 right.** 74% (WPs) and 87% (PP) of the growth in the late PE's delay is after pickup. But it is mostly receive work, not event execution.
 - **K5 right, and σ 2,000 does not grow in this job.** The late PE contributes by count in 94% of waves. Its delay is 156 µs at 4 nodes and 143 at 16, with receives at 2 µs. This job's σ 2,000 efficiency is 0.86 (0.81 in section 95), so it has little loss left to explain.
-- **K6 right for uniform, and better than predicted at σ 2,000.** K 32 gives 1.056 (WPs) and 1.042 (PP) at uniform, and 1.035 at σ 2,000 (predicted ±3%). K 0 gives about the same as 32 at uniform. All four reps are within ±1% of their pair. In section 66's era (4 nodes, old layout), K 64 was 0.77, so 32 needs checking at 1 and 4 nodes before it becomes the default.
+- **K6 right for uniform, and better than predicted at σ 2,000.** K 32 gives 1.056 (WPs) and 1.042 (PP) at uniform, and 1.035 at σ 2,000 (predicted ±3%). K 0 gives about the same as 32 at uniform. All four reps are within ±1% of their pair. In section 25 (4 nodes, an older runtime and layout), K 64 was 0.77, so 32 needs checking at 1 and 4 nodes before it becomes the default.
 - **K7 right.** Traced ÷ untraced is 0.984–1.018.
 
 **What this means.**
