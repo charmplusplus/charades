@@ -20,7 +20,22 @@ Every number from every run: Stampede3 runs in order (each design, written befor
 
 > **As of 2026-10-25 (`main` 2369301).** Defaults: same-process fast path and `--gvt-node-waves` on, htram PP 512 with the deadline policy (horizon margin 8), full nodes (2 processes × 23 PEs per node, 128 LPs per PE), native psm2. Short runs (end time 512,000; 128,000 at lookahead 10; 1–4 s each) and 2 reps: the paper-grade rerun (3 reps, long runs) is still to do. Avoid Stampede3 node c455-081 (section 82).
 
-> **Launch change, 2026-10-26:** `+lci_ndevices 23` (one device per PE) replaces 16: 1.08–1.46× at 16 nodes (geometric mean 1.21), 1.03–1.07× at 4 nodes (sections 88, 90). The tables below used 16 devices and are to be rerun with Devastator in the same allocation.
+> **Launch change, 2026-10-26:** `+lci_ndevices 23` (one device per PE) replaces 16: 1.08–1.46× at 16 nodes (geometric mean 1.21), 1.03–1.07× at 4 nodes (sections 88, 90). The 1–16 node table further down used 16 devices.
+
+**Charades and Devastator at 16 nodes, one allocation, 23 devices** (job 3641926, section 92; c455-081 excluded; median of 3, short runs; each engine at its best setting over the same grids as job 3639098, Devastator also at W 2,000; higher is better for Charades):
+
+| workload | Charades (M ev/s) | Devastator (M ev/s) | Charades ÷ Devastator |
+|---|---|---|---|
+| lookahead 100, mean 1,000, σ 100 | 702.3 | 661.9 | 1.06 |
+| σ 500 | 622.7 | 523.5 | 1.19 |
+| σ 1,000 | 579.1 | 446.1 | 1.30 |
+| σ 2,000 | 435.4 | 381.9 | 1.14 |
+| σ 4,000 | 421.8 | 301.1 | 1.40 |
+| uniform remote 1.0 | 280.2 | 197.7 | 1.42 |
+| lookahead 10, mean 200, σ 500 | 560.5 | 512.0 | 1.09 |
+| lookahead 10, σ 2,000 | 414.6 | 360.1 | 1.15 |
+
+Charades leads in all 8 at 16 nodes. Its controller is within 0–3% of its best fixed W except at σ 2,000 and 4,000 (0.87–0.90). Still to do at 1 and 4 nodes with 23 devices. Candidate, not yet default: `GLIBC_TUNABLES=glibc.malloc.trim_threshold=1073741824:glibc.malloc.top_pad=67108864` (1.06–1.08× at 4 nodes, section 92).
 
 **Charades and Devastator, 1–16 nodes, weak scaling, one allocation** (job 3639098, section 78; without c455-081). Each engine at its best setting per cell: Charades over PP 512, PP 2,048 (and WPs 512 for uniform and lookahead 10 σ 2,000) × W 250/400/600 and the controller (lookahead 10: W 50/100/200); Devastator over W 500/1,000 (lookahead 10: 100/200/400), CLCG4.
 
@@ -165,6 +180,7 @@ Charades' controller ÷ Devastator's adaptive window: 0.68–1.03 at σ ≤ 500 
 | 89 | 2026-10-26 | — | Is rank 0 preempted? Per-thread scheduler statistics; and 23 devices at 16 nodes | design |
 | 90 | 2026-10-26 | 3641766, 3641785 | Rank 0 takes page faults, not preemption; 23 devices is 1.21× at 16 nodes | current |
 | 91 | 2026-10-26 | — | Rank 0's page faults: where from, and do malloc settings stop them? Charades (23 devices) against Devastator at 16 nodes | design |
+| 92 | 2026-10-26 | 3641910, 3641926 | Results: malloc settings 1.06–1.08×, but rank 0's faults come from system calls; Charades ahead of Devastator in all 8 workloads at 16 nodes | current |
 
 ## Stampede3 runs, in order
 
@@ -3522,6 +3538,49 @@ Each arm runs with the `/proc` sampler and `--gvt-trace=3`, plus an untraced, un
 **Predictions (D):**
 - D1. Charades ÷ Devastator (each at its best, median of 3, higher is better) ≥ 1.0 in at least 6 of 8 workloads. The two below 1.0 are σ 100 and lookahead 10 σ 500 (provisional 0.96 and 0.92 in section 90).
 - D2. Charades at its best is at least 1.10× its 16-node numbers in job 3639098 at σ ≥ 2,000, uniform and lookahead 10 σ 2,000.
+
+### Results: malloc settings 1.06–1.08×, but rank 0's faults come from system calls; Charades ahead of Devastator in all 8 workloads at 16 nodes (2026-10-26; skx-dev batch jobs 3641910, 4 nodes, and 3641926, 16 nodes)
+
+> **Status: current.** Design and predictions in section 91. Job C 3641910 (c454-094, c454-101 to c454-103): 28 runs, all ok. Job D 3641926 (16 nodes, c455-081 excluded; moved to skx-dev when it came free): 215 of 218 Charades runs ok, all 108 Devastator runs ok. Of the 3 others, one is the first warm-up (the usual stall on fresh nodes) and two are lookahead 10 σ 500 at PP 2,048 in rep 2. One of those Slurm aborted before launch; the other's simulation finished normally in 1.65 s but its step took 206 s in all. Neither is a Charades hang. Summaries `~/charades-data/sdiag/sdiag7_extra.py`, `sdiag6_summary.py`, `cmp16_summary.py`; output and data in `~/charades-data/sdiag/j3641910/` and `~/charades-data/cmp16/j3641926/`.
+
+**Job C: glibc malloc settings, 4 nodes, 23 devices, W 400** (untraced M committed events/s, mean of 2 reps, which agree within 0.7%; ratio = arm ÷ defaults, higher is better):
+
+| arm | σ 100 (M ev/s) | ratio | σ 2,000 (M ev/s) | ratio |
+|---|---|---|---|---|
+| defaults (`m0`) | 167.6 | 1.000 | 125.3 | 1.000 |
+| no trim (`mtrim`) | 181.5 | **1.083** | 132.2 | **1.055** |
+| no trim, mmap threshold 32 MB (`mall`) | 180.0 | 1.074 | 133.1 | 1.062 |
+
+| σ 100, per thread (`/proc`, 2 reps) | rank 0, `m0` | rank 0, `mtrim` / `mall` | ranks 2–21, `m0` | ranks 2–21, `mtrim` / `mall` |
+|---|---|---|---|---|
+| minor page faults per s | 37,000–45,000 | 15,000–16,000 / 10,000 | 220 | 67 / 59 |
+| time in the kernel | 0.25–0.30 | 0.23 / 0.22 | 0 | 0 / 0 |
+| mean contribution delay (µs) | 22 | 19 / 18 | 12 | 9 / 9 |
+| rank 0 is the slowest process's last PE | 53% | 49% / 47% | | |
+
+- **C1 wrong.** `perf record -e page-faults:u` counts only faults taken in user mode. In steady state rank 0 takes about 400–1,600 of those a second, against 37,000–45,000 in `/proc`. So nearly all of rank 0's faults are taken inside the kernel, during system calls (for instance while the kernel pins or copies user memory), not when glibc grows its heap. Over the whole run, the faults perf did see are mostly PSM2 opening and closing its endpoints in the main thread.
+- **C2 wrong.** The malloc settings cut rank 0's faults by 2.5–4× and every other rank's by about 3.5×, but rank 0's kernel time stays at 22–23%.
+- **C3 wrong at σ 100:** rank 0 is still the late PE about half the time. At σ 2,000 `mtrim` made rank 0 ordinary (last PE 4% against 22%; mean delay 22 µs against 21 for the rest), but `mall` did not (20%); with 2 reps that is not settled.
+- **C4 right at σ 100 (1.07–1.08×), and better than predicted at σ 2,000 (1.06×, predicted ±2%).** The gain is broad: every rank faults less and contributes earlier (rest of the ranks 12 → 9 µs at σ 100), not only rank 0.
+- **Not yet default:** 4 nodes only. `mtrim` is the simpler of the two and is as good.
+
+**Job D: Charades (23 devices) against Devastator at 16 nodes, one allocation** (M committed events/s, median of 3, each engine at its best setting; ratio = Charades ÷ Devastator, higher is better for Charades):
+
+| workload | Charades (M ev/s) | Charades setting | Devastator (M ev/s) | Devastator W | **Charades ÷ Devastator** | same ratio in job 3639098 (16 devices) | Charades ÷ its 3639098 best |
+|---|---|---|---|---|---|---|---|
+| lookahead 100, mean 1,000, σ 100 | 702.3 | PP 2,048, W 400 | 661.9 | 1,000 | **1.06** | 0.92 | 1.15 |
+| σ 500 | 622.7 | PP 2,048, controller | 523.5 | 1,000 | **1.19** | 1.08 | 1.12 |
+| σ 1,000 | 579.1 | PP 2,048, controller | 446.1 | 1,000 | **1.30** | 1.26 | 1.11 |
+| σ 2,000 | 435.4 | PP 512, W 400 | 381.9 | 1,000 | **1.14** | 0.95 | 1.20 |
+| σ 4,000 | 421.8 | PP 512, W 400 | 301.1 | 1,000 | **1.40** | 1.04 | 1.35 |
+| uniform remote 1.0 | 280.2 | WPs 512, W 400 | 197.7 | 1,000 | **1.42** | 0.99 | 1.47 |
+| lookahead 10, mean 200, σ 500 | 560.5 | PP 2,048, W 50 | 512.0 | 200 | **1.09** | 0.85 | 1.29 |
+| lookahead 10, σ 2,000 | 414.6 | WPs 512, W 50 | 360.1 | 200 | **1.15** | 0.76 | 1.52 |
+
+- **D1 right, and better than predicted:** Charades leads in all 8 workloads (1.06–1.42×), not 6. Before the device change it led in 3.
+- **D2 right:** 1.20–1.52× its job-3639098 numbers at σ ≥ 2,000, uniform and lookahead 10 σ 2,000, and 1.11–1.29× elsewhere. Some of that is allocation-to-allocation difference; Devastator's numbers moved by −1% to +8% between the two jobs.
+- **Devastator's grid is adequate now:** its best W is 1,000 everywhere at lookahead 100 (W 2,000 is 4–30% slower) and 200 at lookahead 10, both inside the grid.
+- **Charades' controller at 16 nodes:** 1.00 of the best fixed W at σ ≤ 1,000, 0.97–0.98 at uniform and lookahead 10, but **0.87–0.90 at σ 2,000 and 4,000.** That is the open gap at scale.
 
 ## Baseline verification on the Mac
 
