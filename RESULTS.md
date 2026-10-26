@@ -181,6 +181,7 @@ Charades' controller ÷ Devastator's adaptive window: 0.68–1.03 at σ ≤ 500 
 | 90 | 2026-10-26 | 3641766, 3641785 | Rank 0 takes page faults, not preemption; 23 devices is 1.21× at 16 nodes | current |
 | 91 | 2026-10-26 | — | Rank 0's page faults: where from, and do malloc settings stop them? Charades (23 devices) against Devastator at 16 nodes | design |
 | 92 | 2026-10-26 | 3641910, 3641926 | Results: malloc settings 1.06–1.08×, but rank 0's faults come from system calls; Charades ahead of Devastator in all 8 workloads at 16 nodes | current |
+| 93 | 2026-10-26 | — | Rank 0's system calls; and the 1/4/16-node series on 23 devices, with glibc no-trim at 16 nodes | design |
 
 ## Stampede3 runs, in order
 
@@ -3581,6 +3582,28 @@ Each arm runs with the `/proc` sampler and `--gvt-trace=3`, plus an untraced, un
 - **D2 right:** 1.20–1.52× its job-3639098 numbers at σ ≥ 2,000, uniform and lookahead 10 σ 2,000, and 1.11–1.29× elsewhere. Some of that is allocation-to-allocation difference; Devastator's numbers moved by −1% to +8% between the two jobs.
 - **Devastator's grid is adequate now:** its best W is 1,000 everywhere at lookahead 100 (W 2,000 is 4–30% slower) and 200 at lookahead 10, both inside the grid.
 - **Charades' controller at 16 nodes:** 1.00 of the best fixed W at σ ≤ 1,000, 0.97–0.98 at uniform and lookahead 10, but **0.87–0.90 at σ 2,000 and 4,000.** That is the open gap at scale.
+
+### Rank 0's system calls; and the 1/4/16-node series on 23 devices, with glibc no-trim at 16 nodes (design, 2026-10-26; written before any runs)
+
+> **Status: design.** Charades `scale-diag` e2806de (unchanged), htram b25ab15, `+lci_ndevices 23`. Job E `$WORK/charades-runs/diag8.slurm` (4 nodes), job F `scale23.slurm` (16 nodes), both `-x c455-081`; same rule as section 89 for moving between skx and skx-dev.
+
+**Job E, 4 nodes: which system calls rank 0 makes.** Process 0 runs under `strace -f -ff -tt -T` (one file per thread, with each call's duration), with `--gvt-trace=3` so thread ids map to ranks. Runs:
+- σ 100 with the glibc defaults;
+- σ 100 with no-trim (`mtrim`, section 92);
+- σ 2,000 with the defaults.
+
+2 reps, plus an untraced run without strace. strace slows every system call it sees, so these runs are for identifying the calls, not for timing the simulation.
+
+**Predictions (E):**
+- E1. Between 30% and 90% of the run, at σ 100, rank 0 makes at least 50× as many system calls a second as the median rank. Most of its time in them goes to calls into the Omni-Path driver (`ioctl` or `writev` on `/dev/hfi1_*`, which pin memory for large transfers) or to memory calls (`mmap`, `munmap`, `madvise`). The other ranks make few of either.
+- E2. At σ 2,000 rank 0's calls look like the other ranks'.
+
+**Job F, 16 nodes: the scaling table on the new launch.** Weak scaling at 1, 4 and 16 nodes in one allocation, 3 reps. The grids are those of job 3639098: Charades over PP 512 and PP 2,048 × W 250/400/600 and the controller (lookahead 10: W 50/100/200), plus WPs 512 for uniform and lookahead 10 σ 2,000; Devastator over W 500/1,000 (and 2,000 at 16 nodes; lookahead 10: 100/200/400). In each rep, at 16 nodes, no-trim (`mtrim`) runs for both engines: Charades at W 400 (lookahead 10: W 50) and the controller for each aggregation setting, Devastator at W 1,000 (lookahead 10: 200).
+
+**Predictions (F):**
+- F1. With 23 devices, Charades ÷ Devastator at 1 and 4 nodes is at least the job-3639098 ratio in every workload, and Charades leads in at least 6 of 8 at each node count.
+- F2. Charades' 4→16 node weak-scaling efficiency improves at σ ≥ 2,000 and uniform: at least 0.85 at σ 2,000 (0.71 before) and at least 0.60 for uniform (0.40 before).
+- F3. `mtrim` ÷ defaults at 16 nodes is ≥ 1.03 for Charades in at least 6 of 8 workloads, and within ±3% for Devastator.
 
 ## Baseline verification on the Mac
 
