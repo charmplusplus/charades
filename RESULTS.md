@@ -148,6 +148,7 @@ Charades' controller ÷ Devastator's adaptive window: 0.68–1.03 at σ ≤ 500 
 | 81 | 2026-10-25 | — | The allocator behind `--agg-pp-limit`'s gain; the slow node in both engines; where a wider window's cost goes | design |
 | 82 | 2026-10-25 | 3639812 | The allocator, the slow node in both engines, a wider window's cost, results: c455-081 is slow only with the network, and it hurts Devastator more | current |
 | 83 | 2026-10-25 | — | Where a wider window's cost goes, on a clean allocation | design |
+| 84 | 2026-10-25 | 3640064 | Where a wider window's cost goes, on a clean allocation, results: the slowest process is usually late because of its rank 0 | current |
 
 ## Stampede3 runs, in order
 
@@ -3296,6 +3297,46 @@ Best ÷ best (each arm set at its best W): 4 nodes σ 100 1.01, σ 2,000 0.97; 1
 - C1. No process is consistently the busiest: the busiest process's µs per event is ≤ 1.03× the median, and a different process is busiest in different runs.
 - C2. µs per advance is lower than in section 82 at every W (no slow node), and from W 400 to 600 the straggler cost still accounts for more than half of the added µs per advance.
 - C3. From W 400 to 600 the straggler cost grows faster than the work per advance (the ratio of advances), the share that rollbacks add.
+
+### Where a wider window's cost goes, on a clean allocation, results: the slowest process is usually late because of its rank 0 (2026-10-25; skx-dev batch job 3640064)
+
+> **Status: current.** Design and predictions in section 83. 18 traced runs, all ok (the two warm-ups hit the cap, as intended on fresh nodes); 5 min; allocation c454-[021-022,091-092,094,101-102], c455-[002-004,011,071-072,091-093], without c455-081. Data `~/charades-data/sdiag/j3640064/`, summary `~/charades-data/sdiag/sdiag3_summary.py`.
+
+**16 nodes, PP 512** (median of 3; µs from the per-process traces, mean over waves; higher M ev/s is better, lower µs is better):
+
+| workload | W | M ev/s | efficiency % | GVT advances | µs per advance | reduction floor µs | straggler cost µs | rolled back (M events) |
+|---|---|---|---|---|---|---|---|---|
+| σ 100 | 250 | 542.4 | 99.98 | 8,537 | 151 | 51 | 82 | 0.12 |
+| σ 100 | 400 | 558.6 | 99.96 | 7,016 | 178 | 50 | 107 | 0.32 |
+| σ 100 | 600 | 509.7 | 99.78 | 6,195 | 221 | 51 | 146 | 1.58 |
+| σ 2,000 | 250 | 362.3 | 99.93 | 8,550 | 209 | 51 | 122 | 0.51 |
+| σ 2,000 | 400 | 359.7 | 99.87 | 6,366 | 291 | 56 | 189 | 0.93 |
+| σ 2,000 | 600 | 318.5 | 99.07 | 5,168 | 419 | 58 | 304 | 6.77 |
+
+- **C1 right (one exception).** The busiest process's µs per event is 1.006–1.020× the median and it is a different process in each run, except one run (σ 100, W 250, rep 1: process 5 at 1.071).
+- **C2 right.** Without c455-081, every cell is faster than in section 82 (σ 100: 542 vs 514 at W 250; µs per advance 151 vs 159), and the straggler cost is most of what W 600 adds (σ 100: 39 of 43 µs; σ 2,000: 115 of 128).
+- **C3 right.** The straggler cost grows faster than the work per advance at every step: σ 100, W 400 → 600: ×1.36 against ×1.13; σ 2,000: ×1.61 against ×1.23 (and W 250 → 400: ×1.30 vs ×1.22, ×1.55 vs ×1.34). The reduction floor is flat (50–58 µs). Even at W 250 the straggler cost is 54–58% of an advance.
+
+**Who is late inside the slowest process** (from the last PE's rank in each wave, all 3 reps):
+
+| workload | W | rank 0 is the slowest process's last PE | rank 0 is any process's last PE | the slowest process's first PE contributes after (µs) |
+|---|---|---|---|---|
+| σ 100 | 250 | 0.62 | 0.11 | 8 |
+| σ 100 | 400 | 0.80 | 0.14 | 9 |
+| σ 100 | 600 | 0.74 | 0.16 | 13 |
+| σ 2,000 | 250 | 0.31 | 0.07 | 10 |
+| σ 2,000 | 400 | 0.29 | 0.08 | 17 |
+| σ 2,000 | 600 | 0.22 | 0.07 | 25 |
+
+With 23 PEs per process, chance is 0.04. So in the process that holds an advance up, one PE, usually rank 0, comes 100–300 µs after the others.
+
+**Two causes, from `pe_stats`** (σ 100, W 250 / 400, rep 1; rolled-back events per PE, and window-blocked passes ÷ rank 11's):
+- **The process edges.** Rolled-back events per PE: rank 0 1,596 / 1,209, rank 22 1,788 / 2,248, ranks 1 and 21 166–772, inner ranks 0–258. At σ 100 events go to nearby LPs, so almost all of a process's cross-process events come into its first and last PEs. Those events go through htram and arrive late (held until due), so those PEs roll back 35–50× more often than inner PEs. Rank 0 is also less often idle (0.88–0.95 of rank 11's window-blocked passes), so it is behind. (Rank 22 is more often idle, 1.15–1.19.)
+- **Rank 0's process-level work.** At σ 2,000 rollbacks are even across ranks (1,072–1,666), yet rank 0 is still the slowest process's last PE 22–31% of the time, against 4% by chance, and has the highest µs per event of the inner and edge ranks it was compared with (1.449 vs 1.411–1.438, except rank 22). Rank 0 is where process-level work lands (node-group entry methods; which PE handles htram's node-level receives and the count-wave reduction in Reconverse is to be checked).
+
+**Consequences.** The window's cost and much of the 4→16-node loss come from one late PE per advance, and that PE is predictable: rank 0, and at low σ the process-edge PEs. Two fixes follow, each testable in one short job:
+1. **Take process-level work off rank 0.** Each process has one free core (2 × 23 PEs on 48 cores). Put the node-level receive and reduction handling there, like Devastator's master thread, or spread it across PEs. First find which PE runs what (a short trace of node-group entry methods by rank).
+2. **Process edges at low σ:** send the few cross-process events of low-σ workloads early or directly instead of holding them until due (at σ 100 only 2–3% of events leave the process), or lay out LPs so a process's edge traffic is spread over its PEs.
 
 ## Baseline verification on the Mac
 
