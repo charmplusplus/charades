@@ -188,6 +188,7 @@ Charades' controller ÷ Devastator's adaptive window: 0.68–1.03 at σ ≤ 500 
 | 97 | 2026-10-26 | 3642578 | Rank 0's faults, results: an artifact of my /proc sampler; rank 0 is late without it, and takes one shared lock 10× as often | current |
 | 98 | 2026-10-26 | — | Naming the lock rank 0 takes 10× as often | design |
 | 99 | 2026-10-26 | 3642782 | The lock, results: Reconverse's per-PE message pool, fought over by the process-edge ranks because each drains the other's network messages | current |
+| 100 | 2026-10-26 | — | Late rank 0: edge traffic or the rank? Rotated LP blocks, and sending on the destination PE's device | design |
 
 ## Stampede3 runs, in order
 
@@ -3721,6 +3722,25 @@ At σ 2,000 traffic spreads over every device and every pool sees similar conten
 **Fixes to try (Reconverse branch, then 4 and 16 nodes):**
 1. **Send on the destination PE's device.** In `issueAm`, pick the device by the destination PE's rank in its process, not by the sending thread. Node-level messages keep the sender's device. Then each PE drains its own messages, allocates them from its own pool and frees them locally. Cost: the send completes on another PE's device, so the send buffer is freed by that PE into the sender's pool. That is cross-thread again, but on the sending side, which htram aggregation makes rarer.
 2. **Lock-free cross-thread frees in the mempool:** a free from another thread pushes onto an atomic list that the owner drains when it allocates. This helps σ 2,000 too, where every pool is contended.
+
+### Late rank 0: edge traffic or the rank? Rotated LP blocks, and sending on the destination PE's device (design, 2026-10-26; written before any runs)
+
+> **Status: design.** Charades `scale-diag` 3c7c529 (adds `--map-rotate`), htram b25ab15, Reconverse `pads-dest-device` 13ae1ac (adds `+lci_dest_device`; on Stampede3 only, as a patch on `pads-runtime` 78eedbf in `charm-pads-exp`). `+lci_ndevices 23`, glibc defaults. Job I `$WORK/charades-runs/diag11.slurm` (4 nodes, skx-dev and skx, the copy that starts second cancelled).
+
+**Why.** Section 99: ranks 0 and 22 contend about equally on each other's message pools, but only rank 0 is badly late (mean delay 25 µs, against 14–15 for rank 22 and 12 for the middle ranks). Two candidate explanations:
+- The edge traffic drives both, and something about rank 0 (main thread, device 0) makes it pay more.
+- Rank 0 is late for a reason of its own.
+
+**Changes (both off by default; one build serves every arm):**
+- `--map-rotate=k` (Charades, diagnostic): within each process, rank r gets the LPs the block mapping gives rank (r − k) mod 23. With k = 11 the edge LPs sit on ranks 11 and 10, and rank 0 holds interior LPs. Committed events are unchanged (Mac: 81,667 with and without, direct sends and htram PP).
+- `+lci_dest_device` (Reconverse): `CmiSyncSendAndFree` names the destination rank, and the LCI2 backend sends on the device that rank polls, so each PE drains its own messages and allocates and frees them in its own pool. The send then completes on another PE's device, which frees the buffer into the sender's pool. Node-level messages are unchanged.
+
+**Runs.** σ 100 and σ 2,000 at W 400, PP 512. Four arms: `base`, `rot` (k = 11), `dd` (`+lci_dest_device`), and `ddrot`. Each arm traced (`--gvt-trace=3`) with an untraced pair, 2 reps, plus one smoke run of `dd` first.
+
+**Predictions:**
+- I1. With `rot` at σ 100, the late PE moves with the edge LPs: ranks 10 and 11 become the late ranks, and rank 0's mean delay comes within 3 µs of the middle ranks'. If rank 0 instead stays the most frequent last PE (over 40% of waves), the cause is rank 0 itself.
+- I2. With `dd` at σ 100, rank 0's mean delay comes within 5 µs of the middle ranks', and throughput is ≥ 1.03× `base`. At σ 2,000, `dd` is within ±3% of `base`.
+- I3. `ddrot` matches `dd` (no late ranks anywhere), within ±2% in throughput.
 
 ## Baseline verification on the Mac
 
