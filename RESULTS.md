@@ -20,6 +20,8 @@ Every number from every run: Stampede3 runs in order (each design, written befor
 
 > **As of 2026-10-25 (`main` 2369301).** Defaults: same-process fast path and `--gvt-node-waves` on, htram PP 512 with the deadline policy (horizon margin 8), full nodes (2 processes × 23 PEs per node, 128 LPs per PE), native psm2. Short runs (end time 512,000; 128,000 at lookahead 10; 1–4 s each) and 2 reps: the paper-grade rerun (3 reps, long runs) is still to do. Avoid Stampede3 node c455-081 (section 82).
 
+> **Launch change, 2026-10-26:** `+lci_ndevices 23` (one device per PE) replaces 16: 1.08–1.46× at 16 nodes (geometric mean 1.21), 1.03–1.07× at 4 nodes (sections 88, 90). The tables below used 16 devices and are to be rerun with Devastator in the same allocation.
+
 **Charades and Devastator, 1–16 nodes, weak scaling, one allocation** (job 3639098, section 78; without c455-081). Each engine at its best setting per cell: Charades over PP 512, PP 2,048 (and WPs 512 for uniform and lookahead 10 σ 2,000) × W 250/400/600 and the controller (lookahead 10: W 50/100/200); Devastator over W 500/1,000 (lookahead 10: 100/200/400), CLCG4.
 
 | workload | Charades, 4 nodes (M ev/s) | Devastator, 4 nodes | Charades' speedup, 1 / 4 / 16 nodes | Charades, 16 nodes | Devastator, 16 nodes | weak-scaling efficiency 4→16 nodes, Charades / Devastator |
@@ -161,6 +163,7 @@ Charades' controller ÷ Devastator's adaptive window: 0.68–1.03 at σ ≤ 500 
 | 87 | 2026-10-26 | — | Late ranks 0 and 1: the LCI device they poll, or the PSM2 receive thread? | design |
 | 88 | 2026-10-26 | 3641728 | Late ranks, results: rank 0 is late at every device count; rank 1 only because it shares rank 0's device; 23 devices is 1.03–1.07× faster | current |
 | 89 | 2026-10-26 | — | Is rank 0 preempted? Per-thread scheduler statistics; and 23 devices at 16 nodes | design |
+| 90 | 2026-10-26 | 3641766, 3641785 | Rank 0 takes page faults, not preemption; 23 devices is 1.21× at 16 nodes | current |
 
 ## Stampede3 runs, in order
 
@@ -3460,6 +3463,41 @@ The two reps of each arm are within 1.7% of each other, and the 23-device reps d
 **Predictions (B):**
 - B1. 23 devices ÷ 16 devices (M committed events/s, median of 3, higher is better) is ≥ 1.03 in at least 6 of the 8 workloads with the controller, and below 0.98 in none.
 - B2. The gain is larger at 16 nodes than at 4 (more remote traffic per PE, so per-device sharing costs more).
+
+### Rank 0 takes page faults, not preemption; 23 devices is 1.21× at 16 nodes (2026-10-26; skx-dev batch jobs 3641766, 4 nodes, and 3641785, 16 nodes)
+
+> **Status: current.** Design and predictions in section 89. Job A 3641766 (c455-001 to c455-004): 16 runs, all ok (the two warm-up runs stalled, as first launches on fresh nodes do). Job B 3641785 (16 nodes, c455-081 excluded; moved from skx to skx-dev when skx-dev came free): 96 runs, all ok; the first warm-up failed on a `/work2` read error loading `libreconverse.so` (section 81's file-system problem). Summaries `~/charades-data/sdiag/sdiag6_summary.py`, `dev23_summary.py`; output and data in `~/charades-data/sdiag/j3641766/` and `~/charades-data/dev23/j3641785/`.
+
+**Job A: what rank 0's thread does** (per thread, from `/proc`, 20–90% of each run, mean over the 8 processes; 2 reps agree; W 400):
+
+| | σ 100, 16 devices: rank 0 | σ 100: ranks 2–21 | σ 100, 23 devices: rank 0 | σ 2,000, 16 devices: rank 0 | σ 2,000: ranks 2–21 |
+|---|---|---|---|---|---|
+| time in the kernel (share of wall time) | **0.17–0.22** | 0.001 | **0.30–0.32** | 0.011–0.014 | 0.008–0.009 |
+| minor page faults per s | **18,000–26,000** | 180–200 | **47,000–48,000** | 310–360 | 190 |
+| voluntary / involuntary context switches per s | 111 / 106–110 | 2 / 1–3 | 118–122 / 108–109 | 92–109 / 4 | 102–117 / 3–4 |
+| run-queue wait (ms per s) | 4.2–4.8 | 0.06–0.5 | 4.4 | 0.1 | 0.05–0.14 |
+
+- **S1 right in form, wrong in mechanism.** Rank 0 waits on the run queue 4–5 ms per second (0.5%) and is switched out about 110 times a second involuntarily, far more than the other ranks. But the other threads are not what takes its time: the two non-PE threads per process (PSM2's "async" and an unnamed one) are allowed on every core of their socket, ran mostly on the free core, and used at most 0.15% of a core. What sets rank 0 apart is **page faults: 18,000–48,000 a second against about 200 for every other rank, and 17–32% of its time in the kernel, at σ 100 only.** At σ 2,000 rank 0 looks like every other rank.
+- **S2 right.** Rank 1 is like the others in every statistic.
+- **S3 right.** Interrupt and softirq time on rank 0's core is 2.5–10 ms per s, as on the other socket-0 cores (socket medians 2.5–9.9).
+- **What this means.** Only rank 0 is the process's main thread, and in glibc only the main thread allocates from the main arena, which grows and shrinks the heap with `brk`. Freeing memory at the top of that heap past the trim threshold (128 KB by default, raised dynamically) gives the pages back, and the next allocation faults them in again. The other threads' arenas evidently do not churn this way. 20,000–48,000 faults a second is 80–190 MB of fresh pages a second. That is probably also why section 80's allocation effects (PP buffers allocated at 2,048 but capped at 512: 1.07–1.14×; a malloc top pad recovering about 40% of it) were real but unexplained: they change rank 0's heap pattern. Untested so far: which allocations churn, and why at σ 100 and not at σ 2,000. At σ 2,000 rank 0 is still late in 22–31% of waves (section 84), so that lateness has a different, smaller cause.
+
+**Job B: 23 devices against 16 at 16 nodes** (M committed events/s, median of 3; ratio = 23 ÷ 16, higher is better; PP 512; max ÷ min across reps ≤ 1.07 everywhere, ≤ 1.04 in 27 of 32 cells):
+
+| workload | controller: 16 / 23 devices | ratio | fixed W: 16 / 23 devices | ratio |
+|---|---|---|---|---|
+| lookahead 100, mean 1,000, σ 100 (W 400) | 548.5 / 615.6 | 1.12 | 573.3 / 638.0 | 1.11 |
+| σ 500 | 511.4 / 561.2 | 1.10 | 499.3 / 557.5 | 1.12 |
+| σ 1,000 | 468.4 / 504.0 | 1.08 | 460.9 / 510.5 | 1.11 |
+| σ 2,000 | 361.0 / 402.6 | 1.12 | 360.6 / 431.7 | 1.20 |
+| σ 4,000 | 297.5 / 378.2 | 1.27 | 302.5 / 424.4 | 1.40 |
+| uniform remote 1.0 | 142.3 / 207.8 | 1.46 | 161.0 / 231.3 | 1.44 |
+| lookahead 10, mean 200, σ 500 (W 100) | 399.5 / 471.4 | 1.18 | 371.1 / 388.1 | 1.05 |
+| lookahead 10, σ 2,000 | 249.0 / 354.6 | 1.42 | 274.3 / 344.6 | 1.26 |
+
+- **B1 right:** 1.08–1.46 with the controller (geometric mean 1.21), ≥ 1.03 in 8 of 8 and never below; fixed W 1.05–1.44 (1.20).
+- **B2 right:** at 4 nodes it was 1.03–1.07 (section 88). The gain grows with the share of remote traffic (uniform and σ 4,000 the most), so per-device sharing costs more the more messages a PE receives. **23 devices (one per PE) is the new default launch.**
+- **Against Devastator, provisionally** (Devastator from job 3639098, a different allocation; Charades here searched only the two arms above at PP 512, against a wider grid in 3639098, so this understates Charades): Charades ÷ Devastator at 16 nodes would move from 0.92 / 1.08 / 1.26 / 0.95 / 1.04 / 0.99 / 0.85 / 0.76 to about 0.96 / 1.08 / 1.23 / 1.13 / 1.41 / 1.20 / 0.92 / 0.98 (rows in the order above, best of the two arms). That is ahead or level in 6 of 8 workloads instead of 3. It needs a same-allocation run with Devastator before it goes in the current numbers.
 
 ## Baseline verification on the Mac
 
