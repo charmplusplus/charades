@@ -3714,7 +3714,7 @@ Contended allocations made while draining the network (`lci::progress_recv` → 
 At σ 2,000 traffic spreads over every device and every pool sees similar contention: contended receive allocations run from 577 to 2,021 per rank, U-shaped, highest at the edges (ranks 0, 1, 21, 22: 1,602–2,021).
 
 - **H1 half right.** It is not glibc's arena lock. It is not node-level message delivery either: it is Reconverse's message pool, reached from LCI's receive path on one side and from Charm++ message frees on the other.
-- **H2 right in form.** Rank 0 reaches the lock through the network-receive path, which at σ 100 only the edge ranks take. But rank 22 does the same, about as much. Why rank 0, not rank 22, ends up the late PE is still open; rank 22 was the late one at 16 nodes in section 84.
+- **H2 right in form.** Rank 0 reaches the lock through the network-receive path, which at σ 100 only the edge ranks take. But rank 22 does the same, about as much. Why rank 0, not rank 22, ends up the late PE is still open; at 16 nodes (section 84) rank 0 was also the usual late PE, while both edge ranks rolled back 35–50× more than the rest.
 - **H3 right.** At σ 2,000 rank 0's pool is no more contended than other edge ranks' pools (rank 1's is the busiest).
 - **Caveat.** strace records only lock calls that had to wait or wake; under strace the whole run is 2–5× slower; and the time in those calls is small (section 94: 7.5 ms/s for rank 0). The cost to rank 0 is more likely the uncontended lock traffic, cache-line transfers of the pool's lists between ranks 0 and 22, and the receive work for rank 22, than the futex time itself.
 
