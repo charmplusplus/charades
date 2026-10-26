@@ -191,6 +191,7 @@ Charades' controller ÷ Devastator's adaptive window: 0.68–1.03 at σ ≤ 500 
 | 100 | 2026-10-26 | — | Late rank 0: edge traffic or the rank? Rotated LP blocks, and sending on the destination PE's device | design |
 | 101 | 2026-10-26 | 3643113 | Late rank 0, results: the lateness follows the lower-edge LPs, not the rank or the device; sending on the destination device does not help | current |
 | 102 | 2026-10-26 | — | htram flush order: rotating start and earliest timestamp first | design |
+| 103 | 2026-10-26 | 3643408, 3643609 | htram flush order, results: no effect; the lower edge stays late | current |
 
 ## Stampede3 runs, in order
 
@@ -3788,6 +3789,38 @@ Committed events are unchanged on the Mac (81,667 for all three at 2 × 4 PEs, a
 - J1. With `fo2` at σ 100, the lower edge stops being late: rank 0's mean delay comes within 3 µs of the middle ranks', and no rank is the slowest process's last PE in more than 30% of waves.
 - J2. With `fo2` at σ 100, the slowest-PE delay falls by at least 15% (111 µs with index order in section 101), and throughput is ≥ 1.03× `fo0`. At σ 2,000, `fo2` is ≥ 1.0×.
 - J3. `fo1` removes the lower-edge bias as well (ranks 0 and 22 equally late), but gains less than `fo2`, because it is unbiased rather than urgent-first.
+
+### htram flush order, results: no effect; the lower edge stays late (2026-10-26; skx-dev batch job 3643408 and idev job 3643609, 4 nodes)
+
+> **Status: current.** Design and predictions in section 102.
+> - **Batch job 3643408** (c454-044, c454-102, c454-104, c455-073): index order (`fo0`) and rotating start (`fo1`) ran, 25 runs ok. **Every earliest-timestamp run (`fo2`) crashed** within 2 s with SIGSEGV in `HTram::flushOrder`. My bug: the sort's comparator read the node's shared minimum keys, which other PEs update during the sort, so it was not a strict weak order and `std::stable_sort` ran off the end. It did not show on the Mac (2 and 4 processes). Fixed in htram `pdes` 3cb3d1e: read every key once into a vector, then sort by the copy.
+> - **idev job 3643609** (c454-013, c454-021, c455-001, c455-011): the fix checked interactively, then all of job J. 37 runs ok; the first warm-up stalled as usual.
+>
+> Summary `~/charades-data/sdiag/sdiag12_summary.py`, outputs in `~/charades-data/sdiag/j3643609/` (the batch job's `fo0`/`fo1` agree with it).
+
+**Throughput** (untraced, M committed events/s, mean of 3 reps; ratio = arm ÷ index order, higher is better):
+
+| σ | index order (M ev/s) | rotating start | earliest timestamp |
+|---|---|---|---|
+| 100 | 167.5 | 0.972 (reps 167.8, 152.7, 167.8) | 0.987 |
+| 2,000 | 125.1 | 1.001 | 0.997 |
+
+The batch job agrees for `fo1` (0.995 and 0.998).
+
+**Lateness at σ 100** (mean contribution delay after the previous result, µs; middle ranks 12): rank 0 is 25 / 24 / 25 µs with index / rotating / timestamp order. The slowest process's last PE is rank 0 in 70% / 64% / 71% of waves. The slowest-PE delay is 109 / 111 / 111 µs. At σ 2,000: rank 0 32 / 31 / 32 µs against 23, last PE 0.28 in every arm.
+
+- **J1, J2 and J3 wrong.** Neither order changes which rank is late, by how much, or the throughput. The rotating start's one slow rep (152.7) is noise in a single run. The flush order is not why the lower-edge LPs are late; that leaves the order-of-flush explanation in section 101 refuted. The option stays at 0 (index order), and the timestamp order stays available, off by default.
+
+**Where this leaves the late lower edge.** It follows the lower-edge LPs (section 101) and is not caused by:
+- the core, socket or interrupts (section 86);
+- NUMA placement (97);
+- page faults, which were my sampler (97);
+- system calls (94);
+- the LCI device, whether by sharing (88) or by routing (101);
+- message-pool contention (101);
+- htram flush order (this section).
+
+It costs at σ 100 up to −50% of the advance tail (section 86's bound) but **does not limit scaling now: σ 100's 4→16 node efficiency is 0.99 with 23 devices (section 95)**. Where Charades still scales worse than Devastator is σ ≥ 2,000 and uniform (0.81 and 0.52, against 0.91 and 0.69), and its controller gap there at 16 nodes (0.86–0.92); at σ 2,000 the lower-edge effect is smaller (−21 to −23% of the tail).
 
 ## Baseline verification on the Mac
 
