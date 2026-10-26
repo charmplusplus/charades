@@ -156,6 +156,7 @@ Charades' controller ÷ Devastator's adaptive window: 0.68–1.03 at σ ≤ 500 
 | 82 | 2026-10-25 | 3639812 | The allocator, the slow node in both engines, a wider window's cost, results: c455-081 is slow only with the network, and it hurts Devastator more | current |
 | 83 | 2026-10-25 | — | Where a wider window's cost goes, on a clean allocation | design |
 | 84 | 2026-10-25 | 3640064 | Where a wider window's cost goes, on a clean allocation, results: the slowest process is usually late because of its rank 0 | current |
+| 85 | 2026-10-25 | — | What rank 0 does while it is late: wave-aligned timers and a per-thread perf profile | design |
 
 ## Stampede3 runs, in order
 
@@ -3344,6 +3345,24 @@ With 23 PEs per process, chance is 0.04. So in the process that holds an advance
 **Consequences.** The window's cost and much of the 4→16-node loss come from one late PE per advance, and that PE is predictable: rank 0, and at low σ the process-edge PEs. Two fixes follow, each testable in one short job:
 1. **Take process-level work off rank 0.** Each process has one free core (2 × 23 PEs on 48 cores). Put the node-level receive and reduction handling there, like Devastator's master thread, or spread it across PEs. First find which PE runs what (a short trace of node-group entry methods by rank).
 2. **Process edges at low σ:** send the few cross-process events of low-σ workloads early or directly instead of holding them until due (at σ 100 only 2–3% of events leave the process), or lay out LPs so a process's edge traffic is spread over its PEs.
+
+### What rank 0 does while it is late: wave-aligned timers and a per-thread perf profile (design, 2026-10-25; written before any runs)
+
+> **Status: design.** Charades `scale-diag` e2806de, htram b25ab15. Job script `$WORK/charades-runs/diag4.slurm`, 16 nodes with `-x c455-081`.
+
+**Why.** Section 84: the slowest process holds an advance up because one PE, usually rank 0, contributes 100–300 µs after the others; at σ 100 the process-edge PEs roll back 35–50× more, and at σ 2,000 rank 0 is still last 22–31% of the time with even rollbacks. Reconverse does not single rank 0 out by default (every PE polls; the 23 PEs share the 16 devices in pairs, so ranks 0 and 1 share device 0).
+
+**Tools.** Profilers measure where cycles go, not when work happens, and count idle spinning as work (they misled once before; memory "Reconverse idle cycles are free"). Projections does not see Charades' `[notrace]` entry methods and must stay short under Reconverse. So:
+- `--gvt-trace=3` (new): every rank's contribution delay after the previous result, in every wave (`gvt_ranks_<process>.csv`); for ranks 0, 1, 11, 21, 22 of every process, every 10th wave, cumulative time in inbox drains (htram and fast path, including the rollbacks they cause), rollbacks, GVT result polls, node-group GVT handlers, htram node receives (a new htram hook) and the scheduler loop, with the time and events executed (`gvt_pe_<pe>.csv`). What a PE did between two snapshots that is in none of these is outside Charades: Converse scheduling, network progress, other entry methods.
+- perf: `perf record -e cycles:u` on process 0 only (16-node runs), reported per thread and symbol; node-0 thread ids are printed so threads map to ranks.
+
+**Runs.** σ 100 and σ 2,000, PP 512; traced at W 250 and 400 with untraced pairs, 2 reps; perf at W 400, 2 reps.
+
+**Predictions:**
+- T1. `--gvt-trace=3` costs ≤ 3% (traced ÷ untraced ≥ 0.97).
+- T2. Rank 0's contribution delay is above the process median in most waves (not only in a few), and rank 1's is the second highest at σ 2,000 (the shared device).
+- T3. Per snapshot interval, rank 0's extra time over rank 11 is mostly drains and rollbacks at σ 100 (≥ 50%), and mostly outside Charades at σ 2,000 (≥ 50%).
+- P1. In perf, rank 0's thread has a larger share of its samples in LCI and Reconverse progress and queue functions than rank 11's (≥ 1.5×).
 
 ## Baseline verification on the Mac
 
