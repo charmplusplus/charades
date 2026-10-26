@@ -252,6 +252,7 @@ class BucketGVT : public CBase_BucketGVT {
       float pick_us, prev_end_us, contrib_us;
       float exec_us, drain_us, recv_us, rollback_us, node_gvt_us;
       unsigned events;
+      int passed;  ///< buckets past GVT this PE had passed when it contributed
       int reason;  ///< 0 at pickup, idle; 1 later, idle; 2 later, events; 3 at pickup, events
     };
     std::vector<WaveRec> wave_recs;

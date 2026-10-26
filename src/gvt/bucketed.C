@@ -101,12 +101,12 @@ void BucketGVT::finalize() {
     std::ofstream t(std::string(g_output_dir) + "gvt_rec_" +
                     std::to_string(CkMyPe()) + ".csv");
     t << "wave,pick_us,prev_end_us,contrib_us,exec_us,drain_us,recv_us,"
-         "rollback_us,node_gvt_us,events,reason\n" << std::fixed << std::setprecision(1);
+         "rollback_us,node_gvt_us,events,passed,reason\n" << std::fixed << std::setprecision(1);
     for (const WaveRec& w : wave_recs) {
       t << w.wave << "," << w.pick_us << "," << w.prev_end_us << ","
         << w.contrib_us << "," << w.exec_us << "," << w.drain_us << ","
         << w.recv_us << "," << w.rollback_us << "," << w.node_gvt_us << ","
-        << w.events << "," << w.reason << "\n";
+        << w.events << "," << w.passed << "," << w.reason << "\n";
     }
   }
   if (g_tw_gvt_trace >= 2 && node_waves_on && CkMyRank() == 0) {
@@ -304,7 +304,8 @@ void BucketGVT::contribute_counts(int num_buckets, int reason) {
         us(s->exec_time - pick.exec), us(w.drain - pick.drain),
         us(recv - pick.recv), us(w.rollback - pick.rollback),
         us(w.node_gvt - pick.node_gvt),
-        (unsigned)(s->events_executed - pick.executed), reason});
+        (unsigned)(s->events_executed - pick.executed), buckets_passed(),
+        reason});
   }
   pick.valid = false;
   executed_at_wave = get_statistics()->events_executed;
