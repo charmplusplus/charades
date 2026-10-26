@@ -70,6 +70,7 @@ double   g_tw_agg_auto_share;
 double   g_tw_agg_auto_msg;
 unsigned g_tw_agg_auto_buffer;
 unsigned g_tw_agg_pp_limit;
+unsigned g_tw_map_rotate;
 unsigned g_tw_agg_auto_wps;
 unsigned g_tw_ctl;
 double   g_tw_ctl_epsilon;
@@ -164,6 +165,7 @@ void clear_globals() {
   g_tw_agg_auto_buffer    = 2048;
   g_tw_agg_auto_wps       = 0;
   g_tw_agg_pp_limit       = 0;
+  g_tw_map_rotate         = 0;
   g_tw_ctl                = 0;
   g_tw_ctl_epsilon        = -1;   // set in tw_init from --ctl-cost
   g_tw_ctl_cost           = 0;

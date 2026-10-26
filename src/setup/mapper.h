@@ -44,4 +44,33 @@ class BlockMapper : public LPMapper {
   }
 };
 
+/**
+ * Diagnostic (--map-rotate=k): the block mapping, with each process's chares
+ * rotated by k PEs' worth. Chares sit on PEs in contiguous blocks, so the LPs
+ * the block mapping puts on rank r of a process go to rank (r + k) mod n, and
+ * the process-edge LPs (those with neighbours in other processes) move from
+ * ranks 0 and n-1 to ranks k and k-1.
+ */
+class RotatedBlockMapper : public LPMapper {
+  uint64_t per_proc, shift;  // chares per process; k * chares per PE
+ public:
+  RotatedBlockMapper(uint64_t chares_per_proc, uint64_t shift_chares)
+      : per_proc(chares_per_proc), shift(shift_chares % chares_per_proc) {}
+  uint64_t get_chare_id(uint64_t global_id) const {
+    uint64_t c = global_id / g_lps_per_chare;
+    return c / per_proc * per_proc + (c % per_proc + shift) % per_proc;
+  }
+  uint64_t get_local_id(uint64_t global_id) const {
+    return global_id % g_lps_per_chare;
+  }
+  uint64_t get_global_id(uint64_t chare_id, uint64_t local_id) const {
+    uint64_t c = chare_id / per_proc * per_proc +
+                 (chare_id % per_proc + per_proc - shift) % per_proc;
+    return g_lps_per_chare * c + local_id;
+  }
+  uint64_t get_num_lps(uint64_t chare_id) const {
+    return g_lps_per_chare;
+  }
+};
+
 #endif

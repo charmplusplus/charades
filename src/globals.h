@@ -95,6 +95,7 @@ extern double   g_tw_agg_auto_share;  ///< --agg-auto: at most this share of eve
 extern double   g_tw_agg_auto_msg;    ///< --agg-auto: fewer events than this per PP message -> WPs
 extern unsigned g_tw_agg_auto_buffer; ///< --agg-auto: the large PP buffer
 extern unsigned g_tw_agg_pp_limit;    ///< diagnostic: PP shared buffers capped here, allocated at --agg-buffer
+extern unsigned g_tw_map_rotate;      ///< diagnostic: rotate each process's LP blocks by this many PEs
 extern unsigned g_tw_agg_auto_wps;    ///< --agg-auto: may also choose WPs (makes a second htram instance)
 ///@}
 

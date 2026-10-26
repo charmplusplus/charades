@@ -169,6 +169,16 @@ void tw_create_simulation(LPFactory* factory, LPMapper* mapper) {
     }
   }
 
+  if (g_tw_map_rotate && dynamic_cast<BlockMapper*>(g_lp_mapper) != NULL) {
+    if (g_num_chares % CkNumPes() || CkNumPes() % CkNumNodes())
+      CkAbort("--map-rotate needs the same number of chares on every PE and of PEs in every process\n");
+    uint64_t per_pe = g_num_chares / CkNumPes();
+    uint64_t per_proc = per_pe * (CkNumPes() / CkNumNodes());
+    g_lp_mapper = new RotatedBlockMapper(per_proc, (uint64_t)g_tw_map_rotate * per_pe);
+    if (tw_ismaster())
+      CkPrintf("Mapping: each process's LP blocks rotated by %u PEs (diagnostic)\n", g_tw_map_rotate);
+  }
+
   if (tw_ismaster()) {
     validate_mapping();
   }
