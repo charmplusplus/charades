@@ -187,6 +187,7 @@ Charades' controller ÷ Devastator's adaptive window: 0.68–1.03 at σ ≤ 500 
 | 96 | 2026-10-26 | — | Rank 0's faults: perf against /proc in the same run, a lighter sampler, and memory bound to the socket | design |
 | 97 | 2026-10-26 | 3642578 | Rank 0's faults, results: an artifact of my /proc sampler; rank 0 is late without it, and takes one shared lock 10× as often | current |
 | 98 | 2026-10-26 | — | Naming the lock rank 0 takes 10× as often | design |
+| 99 | 2026-10-26 | 3642782 | The lock, results: Reconverse's per-PE message pool, fought over by the process-edge ranks because each drains the other's network messages | current |
 
 ## Stampede3 runs, in order
 
@@ -3688,6 +3689,38 @@ Each arm runs with the `/proc` sampler and `--gvt-trace=3`, plus an untraced, un
 - H1. The hot lock is not glibc's main-arena lock: that lock lives in libc's data segment, and the hot address (0x3e06600 in section 94) was in the `brk` heap. The new runs' hot address will also be in the heap. Its call stacks on rank 0 go through Reconverse or Charm++ code that delivers node-level messages (the node queue, or node-group entry methods such as htram's node receives and the GVT node waves), not through Charades' event code.
 - H2. Rank 0 reaches the lock through a path the other PEs rarely take, for instance as the main thread or as the thread that drains a node-level queue first. The other PEs' calls on the same address come through the same functions, but about 10× less often.
 - H3. At σ 2,000 rank 0's calls on that lock are within 2× of the median PE's.
+
+### The lock, results: Reconverse's per-PE message pool, fought over by the process-edge ranks because each one drains the other's network messages (2026-10-26; skx-dev batch job 3642782, 4 nodes)
+
+> **Status: current.** Design and predictions in section 98. 4 nodes (c454-043, c454-044, c454-103, c454-104), 5 runs, all ok; 5 min. Summary `~/charades-data/sdiag/sdiag10_summary.py` (plus an inline pool-ownership count, below), output `~/charades-data/sdiag/j3642782/summary.txt`.
+
+**The hot lock is Reconverse's per-PE message-memory pool lock** (`mempool_malloc` and `mempool_free_thread` in `mempool.C`, under `CmiAlloc`/`CmiFree` in the LCI2 backend). Each PE has one; a PE's pool lock is the one hot address in its stacks, and rank 0's sits in the main thread's heap because rank 0 is the main thread.
+
+Who contends at σ 100 (calls that reached the kernel in about 7 s under strace, process 0, rep 1):
+
+| pool owner | contended calls on its lock | by rank (top 5) |
+|---|---|---|
+| rank 22 | 2,583 | r22 1,015, r0 733, r1 449, r2 49, r21 30 |
+| rank 0 | 2,357 | r0 840, r22 634, r21 346, r2 41, r3 39 |
+| next busiest (rank 8) | 174 | r8 110, then ≤ 9 each |
+
+Contended allocations made while draining the network (`lci::progress_recv` → `CmiAlloc`): rank 0 601, rank 22 799, every other rank 0–9.
+
+**Mechanism.**
+- At σ 100 nearly all cross-process events go between the edge ranks of neighbouring processes: rank 22 of process p and rank 0 of process p+1 (section 84's process-edge effect).
+- LCI delivers a message on the receiver's device with the **sender's** index (section 87). So messages sent by rank 22 of p land on device 22 of p+1 and are drained by rank 22 of p+1, though they are for its rank 0; messages for rank 22 are drained by rank 0.
+- The draining PE allocates the receive buffer from its own pool. The destination PE frees it after delivery, which takes the owner's pool lock (`CkDeliverMessageFree` → `mempool_free_thread`), while the owner keeps allocating from the same pool. So ranks 0 and 22 (and their neighbours 1 and 21, which get some of the edge traffic) keep contending on each other's pools, and each does network-receive work for the other end of the process.
+
+At σ 2,000 traffic spreads over every device and every pool sees similar contention: contended receive allocations run from 577 to 2,021 per rank, U-shaped, highest at the edges (ranks 0, 1, 21, 22: 1,602–2,021).
+
+- **H1 half right.** It is not glibc's arena lock. It is not node-level message delivery either: it is Reconverse's message pool, reached from LCI's receive path on one side and from Charm++ message frees on the other.
+- **H2 right in form.** Rank 0 reaches the lock through the network-receive path, which at σ 100 only the edge ranks take. But rank 22 does the same, about as much. Why rank 0, not rank 22, ends up the late PE is still open; rank 22 was the late one at 16 nodes in section 84.
+- **H3 right.** At σ 2,000 rank 0's pool is no more contended than other edge ranks' pools (rank 1's is the busiest).
+- **Caveat.** strace records only lock calls that had to wait or wake; under strace the whole run is 2–5× slower; and the time in those calls is small (section 94: 7.5 ms/s for rank 0). The cost to rank 0 is more likely the uncontended lock traffic, cache-line transfers of the pool's lists between ranks 0 and 22, and the receive work for rank 22, than the futex time itself.
+
+**Fixes to try (Reconverse branch, then 4 and 16 nodes):**
+1. **Send on the destination PE's device.** In `issueAm`, pick the device by the destination PE's rank in its process, not by the sending thread. Node-level messages keep the sender's device. Then each PE drains its own messages, allocates them from its own pool and frees them locally. Cost: the send completes on another PE's device, so the send buffer is freed by that PE into the sender's pool. That is cross-thread again, but on the sending side, which htram aggregation makes rarer.
+2. **Lock-free cross-thread frees in the mempool:** a free from another thread pushes onto an atomic list that the owner drains when it allocates. This helps σ 2,000 too, where every pool is contended.
 
 ## Baseline verification on the Mac
 
