@@ -52,6 +52,7 @@
 #     transport),
 #   EXTRA_ARGS="+lci_ndevices 16 +pemap 2-46:2,3-47:2" (appended to every run;
 #     the pemap puts each process's PEs on its own socket),
+#   BIN_WRAP (a command srun runs the binary through, e.g. a perf wrapper),
 #   CPT=24 (cores per task for srun -c), SRUN_ARGS
 #     (extra srun options, e.g. --cpu-bind=none with a +pemap in EXTRA_ARGS).
 # One CSV row per run; a run that hits CAP is cancelled with scancel (never
@@ -115,7 +116,7 @@ run_one() {  # nodes procs pes cfg arm label
   fi
   extra+=(${EXTRA_ARGS:-})
   srun --mpi=pmi2 --kill-on-bad-exit=1 --wait=30 -N $N -n $n -c ${CPT:-$((pe / n))} ${SRUN_ARGS:-} -J cs_$label \
-      $bin +pe $pe $cfg $C/tests/test_configs/$gvtcfg "${extra[@]}" \
+      ${BIN_WRAP:-} $bin +pe $pe $cfg $C/tests/test_configs/$gvtcfg "${extra[@]}" \
       > $f 2>&1 &
   local sp=$! t0=$(date +%s.%N) status=ok
   while kill -0 $sp 2>/dev/null; do

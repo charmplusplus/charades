@@ -9,6 +9,10 @@
 #include "util.h"
 
 #include <algorithm>
+#ifdef __linux__
+#include <sys/syscall.h>
+#include <unistd.h>
+#endif
 #include <float.h>
 #include <fstream>
 #include <iomanip>
@@ -26,6 +30,13 @@ BucketGVT::BucketGVT(CkGroupID node_waves) {
 }
 
 void BucketGVT::init() {
+#ifdef __linux__
+  // --gvt-trace=3: thread ids, to match a perf profile's threads to ranks
+  if (g_tw_gvt_trace >= 3 && CkMyNode() == 0) {
+    CkPrintf("GVT trace: PE %d rank %d tid %ld\n", CkMyPe(), CkMyRank(),
+             (long)syscall(SYS_gettid));
+  }
+#endif
   gvt_name = "Bucket GVT";
   node_waves_on = false;
   node_waves = nullptr;
@@ -67,7 +78,25 @@ void BucketGVT::init() {
   }
 }
 
+thread_local WaveTimers g_wave_timers;
+#ifdef CHARADES_HTRAM
+extern thread_local double htram_recv_s;
+extern thread_local unsigned long long htram_recv_n;
+#endif
+
 void BucketGVT::finalize() {
+  if (g_tw_gvt_trace >= 3 && !pe_snaps.empty()) {
+    std::ofstream t(std::string(g_output_dir) + "gvt_pe_" +
+                    std::to_string(CkMyPe()) + ".csv");
+    t << "pe,rank,wave,t_s,exec_s,drain_s,rollback_s,poll_s,node_gvt_s,recv_s,"
+         "node_gvt_n,recv_n,executed\n" << std::fixed << std::setprecision(7);
+    for (const PeSnap& p : pe_snaps) {
+      t << CkMyPe() << "," << CkMyRank() << "," << p.wave << "," << p.t << ","
+        << p.exec << "," << p.drain << "," << p.rollback << "," << p.poll << ","
+        << p.node_gvt << "," << p.recv << "," << p.node_gvt_n << "," << p.recv_n
+        << "," << p.executed << "\n";
+    }
+  }
   if (g_tw_gvt_trace >= 2 && node_waves_on && CkMyRank() == 0) {
     if (!node_waves) node_waves = CProxy_NodeWaves(node_waves_gid).ckLocalBranch();
     node_waves->write_proc_waves();
@@ -229,6 +258,25 @@ void BucketGVT::iteration_end(bool starved) {
 
 void BucketGVT::contribute_counts(int num_buckets) {
   executed_at_wave = get_statistics()->events_executed;
+  if (g_tw_gvt_trace >= 3) {
+    const int r = CkMyRank(), n = CkMyNodeSize();
+    if (contributions % 10 == 0 &&
+        (r <= 1 || r == n / 2 || r >= n - 2)) {
+      Statistics* s = get_statistics();
+#ifdef CHARADES_HTRAM
+      const double recv = htram_recv_s;
+      const unsigned long long recv_n = htram_recv_n;
+#else
+      const double recv = 0;
+      const unsigned long long recv_n = 0;
+#endif
+      const WaveTimers& w = g_wave_timers;
+      pe_snaps.push_back({contributions, CmiWallTimer(), s->exec_time, w.drain,
+                          w.rollback, w.poll, w.node_gvt, recv, w.node_gvt_n,
+                          recv_n, (unsigned long long)s->events_executed});
+    }
+    contributions++;
+  }
   int num_passed = buckets_passed();
   if (g_tw_gvt_trace && CkMyPe() == 0) {
     wave_start = CmiWallTimer();
@@ -532,6 +580,11 @@ void NodeWaves::contribute_from(int rank, const std::vector<CmiInt8>& v) {
   if (arrived.fetch_add(1, std::memory_order_acq_rel) + 1 < CkMyNodeSize()) {
     return;
   }
+  if (g_tw_gvt_trace >= 3) {
+    const double prev = proc_waves.empty() ? 0 : proc_waves.back().result;
+    for (int r = 0; r < CkMyNodeSize(); r++)
+      rank_delays.push_back(prev ? (float)((slot_t[r] - prev) * 1e6) : 0.f);
+  }
   if (g_tw_gvt_trace >= 2) {
     double first = slot_t[0];
     for (int r = 1; r < CkMyNodeSize(); r++) first = std::min(first, slot_t[r]);
@@ -548,6 +601,20 @@ void NodeWaves::contribute_from(int rank, const std::vector<CmiInt8>& v) {
   thisProxy[CkMyNode()].contribute_combined(combined.size(), combined.data());
 }
 
+namespace {
+/** --gvt-trace=3: a node-group GVT handler's time, on the PE that ran it */
+struct NodeGvtTimer {
+  double t0;
+  NodeGvtTimer() : t0(g_tw_gvt_trace >= 3 ? CmiWallTimer() : 0) {}
+  ~NodeGvtTimer() {
+    if (g_tw_gvt_trace >= 3) {
+      g_wave_timers.node_gvt += CmiWallTimer() - t0;
+      g_wave_timers.node_gvt_n++;
+    }
+  }
+};
+}
+
 void NodeWaves::write_proc_waves() const {
   std::ofstream t(std::string(g_output_dir) + "gvt_waves_" +
                   std::to_string(CkMyNode()) + ".csv");
@@ -555,9 +622,21 @@ void NodeWaves::write_proc_waves() const {
   for (const ProcWave& w : proc_waves) {
     t << w.first << "," << w.last << "," << w.result << "," << w.last_rank << "\n";
   }
+  if (g_tw_gvt_trace >= 3) {
+    std::ofstream r(std::string(g_output_dir) + "gvt_ranks_" +
+                    std::to_string(CkMyNode()) + ".csv");
+    const int n = CkMyNodeSize();
+    for (int i = 0; i < n; i++) r << (i ? "," : "") << "r" << i;
+    r << "\n" << std::fixed << std::setprecision(1);
+    for (size_t k = 0; k + n <= rank_delays.size(); k += n) {
+      for (int i = 0; i < n; i++) r << (i ? "," : "") << rank_delays[k + i];
+      r << "\n";
+    }
+  }
 }
 
 void NodeWaves::contribute_combined(int n, CmiInt8* v) {
+  NodeGvtTimer timer;
   if (!allreduce) {
     contribute(n * sizeof(CmiInt8), v, gvtWaveReductionType,
         CkCallback(CkIndex_NodeWaves::wave_result(NULL), thisProxy));
@@ -586,6 +665,7 @@ void NodeWaves::send_round() {
 }
 
 void NodeWaves::exchange(int wave, int round, int n, CmiInt8* v) {
+  NodeGvtTimer timer;
   if (ar_active && wave == ar_wave && round == ar_round) {
     add_partner(v, n);
   } else {
@@ -614,6 +694,7 @@ void NodeWaves::publish(const CmiInt8* v, int n) {
 }
 
 void NodeWaves::wave_result(CkReductionMsg* msg) {
+  NodeGvtTimer timer;
   publish((const CmiInt8*)msg->getData(), msg->getSize() / sizeof(CmiInt8));
   delete msg;
 }

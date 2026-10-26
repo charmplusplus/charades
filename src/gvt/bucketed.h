@@ -88,6 +88,8 @@ class NodeWaves : public CBase_NodeWaves {
      */
     struct ProcWave { double first, last, result; int last_rank; };
     std::vector<ProcWave> proc_waves;
+    /** --gvt-trace=3: every rank's contribution, µs after the previous result here */
+    std::vector<float> rank_delays;
     void write_proc_waves() const;
 
   private:
@@ -226,6 +228,18 @@ class BucketGVT : public CBase_BucketGVT {
       long long lead0;
     };
     std::vector<WaveRecord> trace;
+    /**
+     * --gvt-trace=3, ranks 0, 1, the middle one and the last two of each
+     * process: every 10th contribution, the time and the cumulative
+     * WaveTimers, scheduler time, htram node receives and events executed
+     */
+    struct PeSnap {
+      int wave;
+      double t, exec, drain, rollback, poll, node_gvt, recv;
+      unsigned long long node_gvt_n, recv_n, executed;
+    };
+    std::vector<PeSnap> pe_snaps;
+    int contributions = 0;
     double wave_start;
     int wave_asked, wave_passed;
 

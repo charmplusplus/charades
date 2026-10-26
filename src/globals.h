@@ -49,6 +49,19 @@ extern unsigned g_tw_gvt_min_buckets; ///< bucketed gvt: buckets a PE passes bef
 extern int g_tw_gvt_ask_ahead;        ///< bucketed gvt: buckets a count wave asks about at least (-1: window + 2)
 extern unsigned g_tw_pe_stats;        ///< PE 0 writes one line per PE to pe_stats.csv at the end
 extern unsigned g_tw_gvt_trace;       ///< bucketed gvt: PE 0 logs every count wave; time execute()
+
+/**
+ * --gvt-trace=3: each PE's cumulative time (s) in parts of its work, read at
+ * its count-wave contributions: inbox drains (htram and fast path, including
+ * the rollbacks they cause), rollbacks, GVT result polls (wave_done and the
+ * next contribution), and this process's node-group GVT handlers it ran
+ */
+struct WaveTimers {
+  double drain = 0, rollback = 0, poll = 0, node_gvt = 0;
+  unsigned long long node_gvt_n = 0;
+};
+extern thread_local WaveTimers g_wave_timers;
+
 extern unsigned g_tw_gvt_wave_events; ///< bucketed gvt: events a PE runs between count waves (0: none)
 extern unsigned g_tw_gvt_node_waves;  ///< bucketed gvt: combine each process's count-wave contributions in shared memory
 extern unsigned g_tw_gvt_wave_allreduce; ///< bucketed gvt, node waves: processes allreduce by recursive doubling

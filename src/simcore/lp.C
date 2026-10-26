@@ -451,7 +451,7 @@ int LPChare::execute_me() {
 
 void LPChare::rollback_me(Time ts) {
   Event* e;
-  double t0 = g_tw_ctl && g_tw_ctl_cost ? CmiWallTimer() : 0;
+  double t0 = (g_tw_ctl && g_tw_ctl_cost) || g_tw_gvt_trace >= 3 ? CmiWallTimer() : 0;
   PE_STATS(total_rollback_calls)++;
   PE_STATS(ts_rollback_calls)++;
   /**
@@ -474,10 +474,11 @@ void LPChare::rollback_me(Time ts) {
   scheduler->update_next(&next_token, events.min());
   set_current_event(processed_events.front());
   if (g_tw_ctl && g_tw_ctl_cost) PE_STATS(rollback_ns) += (uint64_t)((CmiWallTimer() - t0) * 1e9);
+  if (g_tw_gvt_trace >= 3) g_wave_timers.rollback += CmiWallTimer() - t0;
 }
 
 void LPChare::rollback_me(Event* event) {
-  double t0 = g_tw_ctl && g_tw_ctl_cost ? CmiWallTimer() : 0;
+  double t0 = (g_tw_ctl && g_tw_ctl_cost) || g_tw_gvt_trace >= 3 ? CmiWallTimer() : 0;
   PE_STATS(total_rollback_calls)++;
   PE_STATS(event_rollback_calls)++;
 
@@ -511,6 +512,7 @@ void LPChare::rollback_me(Event* event) {
   scheduler->update_next(&next_token, events.min());
   set_current_event(processed_events.front());
   if (g_tw_ctl && g_tw_ctl_cost) PE_STATS(rollback_ns) += (uint64_t)((CmiWallTimer() - t0) * 1e9);
+  if (g_tw_gvt_trace >= 3) g_wave_timers.rollback += CmiWallTimer() - t0;
 }
 
 void LPChare::fossil_me(Time gvt) {

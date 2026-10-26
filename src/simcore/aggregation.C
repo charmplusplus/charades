@@ -167,6 +167,8 @@ Aggregator::Aggregator(CkGroupID tram_gid, CkGroupID wps_gid) : advances(0) {
   if (g_tw_agg_auto && g_tw_agg_auto_wps) {
     trams.push_back(CProxy_HTram(wps_gid).ckLocalBranch());
   }
+  // --gvt-trace=3: time htram's node-level receives (one flag per process)
+  if (g_tw_gvt_trace >= 3 && CkMyRank() == 0) htram_time_receives = true;
   // Before the scheduler exists, so before PE_VALUE(window): the start value
   urgent = urgent_window(g_tw_optimism_window);
   for (size_t i = 0; i < trams.size(); i++) {
