@@ -189,6 +189,7 @@ Charades' controller ÷ Devastator's adaptive window: 0.68–1.03 at σ ≤ 500 
 | 98 | 2026-10-26 | — | Naming the lock rank 0 takes 10× as often | design |
 | 99 | 2026-10-26 | 3642782 | The lock, results: Reconverse's per-PE message pool, fought over by the process-edge ranks because each drains the other's network messages | current |
 | 100 | 2026-10-26 | — | Late rank 0: edge traffic or the rank? Rotated LP blocks, and sending on the destination PE's device | design |
+| 101 | 2026-10-26 | 3643113 | Late rank 0, results: the lateness follows the lower-edge LPs, not the rank or the device; sending on the destination device does not help | current |
 
 ## Stampede3 runs, in order
 
@@ -3741,6 +3742,31 @@ At σ 2,000 traffic spreads over every device and every pool sees similar conten
 - I1. With `rot` at σ 100, the late PE moves with the edge LPs: ranks 10 and 11 become the late ranks, and rank 0's mean delay comes within 3 µs of the middle ranks'. If rank 0 instead stays the most frequent last PE (over 40% of waves), the cause is rank 0 itself.
 - I2. With `dd` at σ 100, rank 0's mean delay comes within 5 µs of the middle ranks', and throughput is ≥ 1.03× `base`. At σ 2,000, `dd` is within ±3% of `base`.
 - I3. `ddrot` matches `dd` (no late ranks anywhere), within ±2% in throughput.
+
+### Late rank 0, results: the lateness follows the lower-edge LPs, not the rank or the device; sending on the destination device does not help (2026-10-26; skx-dev batch job 3643113, 4 nodes)
+
+> **Status: current.** Design and predictions in section 100. 4 nodes (c455-071, c455-072, c455-082, c455-083), 33 runs ok (the two warm-ups stalled, as first launches on fresh nodes do); the `+lci_dest_device` smoke run was ok. Summary `~/charades-data/sdiag/sdiag11_summary.py`, output `~/charades-data/sdiag/j3643113/summary.txt`.
+
+**Lateness at σ 100** (traced; mean contribution delay after the previous result, µs, lower is better; "middle" = median of ranks 3–8 and 13–19; last PE = share of waves in which the rank is the slowest process's last PE):
+
+| arm | r0 | r1 | r10 | r11 | r12 | r21 | r22 | middle | last PE | slowest-PE delay (µs) |
+|---|---|---|---|---|---|---|---|---|---|---|
+| base | **25** | 13 | 12 | 12 | 12 | 13 | 15 | 12 | r0 0.71, r22 0.10 | 111 |
+| rot (edge LPs on r11, r10) | 15 | 13 | **17** | **20** | 15 | 12 | 12 | 12 | r11 0.36, r10 0.21, r0 0.15 | 115 |
+| dd (`+lci_dest_device`) | **26** | 13 | 12 | 12 | 12 | 13 | 15 | 12 | r0 0.75, r22 0.11 | 112 |
+| ddrot | 14 | 12 | **17** | **22** | 14 | 12 | 12 | 12 | r11 0.54, r10 0.23, r0 0.10 | 114 |
+
+At σ 2,000: base r0 31 against 23 for the middle (last PE 0.25), rot r0 28 (0.14), dd r0 37 (0.41), ddrot r0 35 (0.33).
+
+**Throughput** (untraced, M committed events/s, mean of 2 reps; ratio = arm ÷ base, higher is better): σ 100 base 166.9, rot 0.994, dd 0.987, ddrot 0.990; σ 2,000 base 123.6, rot 0.991, dd 0.963, ddrot 0.956.
+
+- **I1 right, mostly.** With the LP blocks rotated, the lateness moves with the edge LPs to ranks 11 and 10 (last PE 0.36 and 0.21), and rank 0 drops from 25 to 15 µs (the middle is 12). It moves to rank 11 more than rank 10, and rank 11 holds the block that rank 0 holds unrotated: **the process's lower-edge LPs, the ones whose neighbours are in process p − 1.** The upper-edge LPs (rank 22 unrotated, rank 10 rotated) are less late. A small part stays with rank 0 (15 against 12 µs). The slowest-PE delay does not change (111 → 115 µs): moving the problem does not shrink it.
+- **I2 wrong.** `+lci_dest_device` leaves rank 0 exactly as late (26 µs, last PE 0.75) and costs 1.3% at σ 100 and 3.7% at σ 2,000. So the cross-draining and pool contention of section 99 are real, but they are not what makes rank 0 late. Caveat: I did not check under strace that the flag rerouted the messages. The throughput change at σ 2,000 shows it changed something. The flag stays off.
+- **I3 wrong** in the same way: `ddrot` behaves like `rot`.
+
+**Why the lower edge.** Every htram flush loop (`flushDue`, `flushPending`, `tflush`, `flushStale`, `flushIdle`) scans destination processes in index order, 0 to N − 1. Process p's buffers toward p − 1 are therefore flushed before those toward p + 1 in every pass (except at the wrap-around). The events for process p's lower-edge LPs come from p − 1, whose buffer toward p (the higher index) goes out after its buffer toward p − 2. So the lower edge of every process gets its cross-process events later in each flush pass than the upper edge does. That would explain why the lower-edge rank is the late one. Not yet tested.
+
+**Next:** flush in an order that does not favour low process indices: by earliest due timestamp, or starting each scan at the PE's own process and wrapping. Then measure whether the lower edge stops being late and whether the slowest-PE delay falls.
 
 ## Baseline verification on the Mac
 
