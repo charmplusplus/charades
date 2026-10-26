@@ -182,6 +182,7 @@ Charades' controller ÷ Devastator's adaptive window: 0.68–1.03 at σ ≤ 500 
 | 91 | 2026-10-26 | — | Rank 0's page faults: where from, and do malloc settings stop them? Charades (23 devices) against Devastator at 16 nodes | design |
 | 92 | 2026-10-26 | 3641910, 3641926 | Results: malloc settings 1.06–1.08×, but rank 0's faults come from system calls; Charades ahead of Devastator in all 8 workloads at 16 nodes | current |
 | 93 | 2026-10-26 | — | Rank 0's system calls; and the 1/4/16-node series on 23 devices, with glibc no-trim at 16 nodes | design |
+| 94 | 2026-10-26 | 3642143 | Rank 0's system calls, results: not the cause | current |
 
 ## Stampede3 runs, in order
 
@@ -3604,6 +3605,15 @@ Each arm runs with the `/proc` sampler and `--gvt-trace=3`, plus an untraced, un
 - F1. With 23 devices, Charades ÷ Devastator at 1 and 4 nodes is at least the job-3639098 ratio in every workload, and Charades leads in at least 6 of 8 at each node count.
 - F2. Charades' 4→16 node weak-scaling efficiency improves at σ ≥ 2,000 and uniform: at least 0.85 at σ 2,000 (0.71 before) and at least 0.60 for uniform (0.40 before).
 - F3. `mtrim` ÷ defaults at 16 nodes is ≥ 1.03 for Charades in at least 6 of 8 workloads, and within ±3% for Devastator.
+
+### Rank 0's system calls, results: not the cause (2026-10-26; skx-dev batch job 3642143, 4 nodes)
+
+> **Status: current.** Design and predictions in section 93 (job E). 4 nodes (c455-081 excluded), 10 runs, all ok; strace output 106 MB in `$WORK/charades-runs/sdiag8/j3642143/`. Summary `~/charades-data/sdiag/sdiag8_summary.py`, output `~/charades-data/sdiag/j3642143/summary.txt`. Job F is still queued.
+
+- **E1 wrong.** Over the whole run rank 0 makes 19–31× as many system calls a second as the median rank at σ 100. But binned in time, nearly all of them are start-up and shutdown, in the main thread: about 6,600 `openat`/`read`/`close` of `/sys/devices/system/cpu/...` files (the CPU topology probe) before the PEs start, and `munmap`/`sched_yield` at exit. **While the simulation runs (about 1.2 s under strace), rank 0 makes about 900 `futex` calls a second and a handful of `brk`, against about 250 `futex` calls for rank 11; no calls into the Omni-Path driver and almost no memory calls.** strace times all of rank 0's calls at under 1% of its time.
+- **E2 right:** at σ 2,000 every PE makes about 2,200 calls a second (mostly `futex`, plus `writev` to the hfi1 device and `process_vm_readv` for same-node transfers), and rank 0 is like the rest once start-up is excluded.
+- **What this leaves.** Rank 0 at σ 100 spends 17–32% of its time in the kernel and takes 18,000–48,000 minor faults a second (`/proc`, sections 90 and 92). Those are not in system calls (strace), and `perf record -e page-faults:u` saw only 400–1,600 user-mode faults a second (section 92). One of the two measurements is misleading, or the faults come from a kernel mechanism neither sees directly. The leading candidate: automatic NUMA balancing is on (`kernel.numa_balancing` = 1, checked on a login node). It periodically unmaps a process's pages to see which node touches them, and charges the scan and the hinting faults to the threads that run into them. Its address-space walk starts at the lowest addresses, where the main thread's `brk` heap sits. Not yet tested; two other open possibilities are that the `/proc` sampler itself causes the faults on the main thread, or that perf undercounts them.
+- The extra `futex` calls (about 3.5× the median rank) are lock waits. A plausible source is glibc's main-arena lock: memory rank 0 allocates is freed by other PEs, which must take that arena's lock.
 
 ## Baseline verification on the Mac
 
