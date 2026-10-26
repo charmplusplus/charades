@@ -186,6 +186,7 @@ Charades' controller ÷ Devastator's adaptive window: 0.68–1.03 at σ ≤ 500 
 | 95 | 2026-10-26 | 3642157 | 1/4/16 nodes on 23 devices, results: Charades leads in 22 of 24 cells; glibc no-trim 1.055× for Charades, 0.25–0.53× for Devastator | current |
 | 96 | 2026-10-26 | — | Rank 0's faults: perf against /proc in the same run, a lighter sampler, and memory bound to the socket | design |
 | 97 | 2026-10-26 | 3642578 | Rank 0's faults, results: an artifact of my /proc sampler; rank 0 is late without it, and takes one shared lock 10× as often | current |
+| 98 | 2026-10-26 | — | Naming the lock rank 0 takes 10× as often | design |
 
 ## Stampede3 runs, in order
 
@@ -3678,6 +3679,15 @@ Each arm runs with the `/proc` sampler and `--gvt-trace=3`, plus an untraced, un
 - **Rank 0 is late with nothing attached** (`plain`): mean contribution delay 25 µs against 12 for the rest, last PE in 71% of waves at σ 100 (12% at σ 2,000).
 
 **What is left, from the strace runs of section 94.** Between 1.45 and 2.55 s of the σ 100 run (the simulation phase under strace), rank 0 makes 620 `futex` calls on one address, 0x3e06600 (455 wakes, 165 waits). Every other PE makes 40–70 calls on that address. The address is in the main thread's `brk` heap, about 30 MB above its start, so the lock was allocated early by the main thread. It is a lock every PE takes, which rank 0 takes, and finds contended, about 10× as often as any other PE: mostly it is holding it while others wait. That would make rank 0 slow exactly when the lock is busy, without more work on average. `strace -k` (call stack for every system call) works on Stampede3 and would name the lock.
+
+### Naming the lock rank 0 takes 10× as often (design, 2026-10-26; written before any runs)
+
+> **Status: design.** Charades `scale-diag` e2806de (unchanged), htram b25ab15, `+lci_ndevices 23`, glibc defaults. Job H `$WORK/charades-runs/diag10.slurm` (4 nodes, skx-dev and skx, the copy that starts second cancelled), wrapper `skwrap.sh`: process 0 runs under `strace -f -ff -k -e trace=futex` (every lock call that enters the kernel, with its call stack, one file per thread). Runs: σ 100 at W 400, 2 reps, and σ 2,000 once, all with `--gvt-trace=3` so thread ids map to ranks.
+
+**Predictions:**
+- H1. The hot lock is not glibc's main-arena lock: that lock lives in libc's data segment, and the hot address (0x3e06600 in section 94) was in the `brk` heap. The new runs' hot address will also be in the heap. Its call stacks on rank 0 go through Reconverse or Charm++ code that delivers node-level messages (the node queue, or node-group entry methods such as htram's node receives and the GVT node waves), not through Charades' event code.
+- H2. Rank 0 reaches the lock through a path the other PEs rarely take, for instance as the main thread or as the thread that drains a node-level queue first. The other PEs' calls on the same address come through the same functions, but about 10× less often.
+- H3. At σ 2,000 rank 0's calls on that lock are within 2× of the median PE's.
 
 ## Baseline verification on the Mac
 
