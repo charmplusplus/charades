@@ -158,6 +158,7 @@ Charades' controller ÷ Devastator's adaptive window: 0.68–1.03 at σ ≤ 500 
 | 84 | 2026-10-25 | 3640064 | Where a wider window's cost goes, on a clean allocation, results: the slowest process is usually late because of its rank 0 | current |
 | 85 | 2026-10-25 | — | What rank 0 does while it is late: wave-aligned timers and a per-thread perf profile | design |
 | 86 | 2026-10-25 | 3640203 | What rank 0 does while it is late, results: nothing extra on average; ranks 0 and 1 are late as a pair | current |
+| 87 | 2026-10-26 | — | Late ranks 0 and 1: the LCI device they poll, or the PSM2 receive thread? | design |
 
 ## Stampede3 runs, in order
 
@@ -3379,6 +3380,35 @@ With 23 PEs per process, chance is 0.04. So in the process that holds an advance
 **Addendum (same day, topology job 3640225 on c454-082, and the traces above split by socket).** An skx node: 2 × Xeon Platinum 8160 (24 cores each, no SMT), 2 NUMA nodes (node 0 = even cores, 94.7 GB; node 1 = odd cores, 96.8 GB; distance 10/21), L3 33 MB per socket. The Omni-Path adapter hfi1_0 is on NUMA node 0. irqbalance runs with OPA's exact hint policy: the adapter's busiest interrupts are its receive contexts kctxt1 and kctxt2 on cores 2 and 4, and send-DMA engines sdma0–15 on cores 6–36 (sdma0/1 on cores 6 and 8 the busiest); socket 1 takes none. Under our `+pemap`, cores 2 and 4 are ranks 0 and 1 of the socket-0 process. **But ranks 0 and 1 are late just as often in the socket-1 processes** (cores 3 and 5, no adapter interrupts): σ 100, W 250: last-PE share rank 1 0.31 (socket 0) vs 0.36 (socket 1); W 400: rank 0 0.35 vs 0.22, rank 1 0.01 vs 0.21; mean delays alike. So the lateness follows the rank, not the core: it is in the software (ranks 0 and 1 share LCI device 0; rank 0 is the main thread), not the adapter's interrupts. The reversed-pemap test is therefore not needed. One socket effect remains: at σ 2,000 the slowest process is on socket 0 (the adapter's socket) in 65% of waves.
 
 **Superseded next step:** (1) record `/proc/interrupts` and the IRQ affinity of the hfi1 (Omni-Path) interrupts on the compute nodes, before and after a run; (2) the same traced runs with a reversed `+pemap` (rank 0 on core 46/47, rank 22 on core 2/3): if the lateness follows the core, it is the OS or interrupts, and the fix is to keep those cores free; if it follows the rank, it is in the software.
+
+**Upper bound on fixing it** (same traces; mean over waves of the slowest PE's contribution delay after the previous result, all processes; lower is better):
+
+| workload | W | all ranks (µs) | without ranks 0, 1 (µs) | without ranks 0, 1, 22 (µs) |
+|---|---|---|---|---|
+| σ 100 | 250 | 99 | 50 (−50%) | 49 (−50%) |
+| σ 100 | 400 | 118 | 48 (−59%) | 37 (−69%) |
+| σ 2,000 | 250 | 136 | 108 (−21%) | 107 (−22%) |
+| σ 2,000 | 400 | 187 | 145 (−23%) | 143 (−23%) |
+
+This is the tail of each advance, not the whole advance (130–220 µs here), and it assumes the other ranks would not take rank 0's place as the slowest PE.
+
+### Late ranks 0 and 1: the LCI device they poll, or the PSM2 receive thread? (design, 2026-10-26; written before any runs)
+
+> **Status: design.** Charades `scale-diag` e2806de (unchanged), htram b25ab15. Job script `$WORK/charades-runs/diag5.slurm`, 4 nodes with `-x c455-081`.
+
+**What the code says** (Reconverse ff33b56 `src/comm_backend/lci2/comm_backend_lci2.cpp`; LCI ca88ce2c `src/network/ofi/backend_ofi.cpp`):
+- Each PE thread is bound to device `rank / ceil(23 / ndevices)`. At 16 devices that is 2 per device, so ranks 0 and 1 share device 0 (and ranks 2 and 3 share device 1, and so on, with rank 22 alone on device 11). Each thread polls only its own device, under a per-device trylock.
+- LCI exchanges endpoint addresses per device, so device *i* of one process talks only to device *i* of another. A message lands on the receiver's device with the **sender's** device index. Node-level messages (htram node messages, the GVT exchange) are no exception: they go out on the sending PE's device. So there is no routing of node-level traffic to device 0, and the hypothesis I gave before reading the code (node-level messages all land on device 0) is wrong.
+- What does single out device 0: it is the first endpoint each process opens (rank 0, the main thread, opens all of them in `init()`). PSM2 starts its receive thread (`PSM2_RCVTHREAD`, on by default; the "async" thread in the section 86 perf profile, with no user-space samples) for the first endpoint. That thread wakes on adapter interrupts and progresses the endpoint under its lock, so it competes with ranks 0 and 1 for device 0. I have not read the PSM2 source to confirm that the thread is first-endpoint-only.
+- A side effect of per-device polling: a message on device *k* is received only when one of device *k*'s 2 threads polls, even if the other 21 PEs are idle.
+
+**Runs.** σ 100 and σ 2,000 at W 400, PP 512. Five arms: `+lci_ndevices` 16 (as now), 23, 8 and 4 (device 0 polled by ranks 0–1, 0, 0–2 and 0–5), and 16 with `PSM2_RCVTHREAD=0`. Each arm traced (`--gvt-trace=3`) with an untraced pair, 2 reps, interleaved; 40 runs.
+
+**Predictions:**
+- D1. The late set is device 0's threads: at 23 devices only rank 0 is late (rank 1 like the rest); at 8, ranks 0–2; at 4, ranks 0–5, each less late than ranks 0 and 1 are at 16.
+- D2. With `PSM2_RCVTHREAD=0`, ranks 0 and 1 are no later than the median rank (share of waves above their process median ≤ 0.55, against 0.54–0.67 now), and the mean slowest-PE delay falls by at least half the upper bound above.
+- D3. Throughput (untraced, M ev/s) with `PSM2_RCVTHREAD=0` is at least 1.05× the 16-device default at σ 100, and at least 1.02× at σ 2,000. Device counts other than 16 are within ±5% of it (as found earlier on verbs).
+- If D1 holds and D2 fails, the cause is on device 0 but is not the receive thread; next is to read PSM2 and LCI for other per-endpoint work. If D1 fails (ranks 0 and 1 stay late at every device count), the cause is tied to the ranks themselves; next is the Charm++ and Reconverse work that rank 0 does as the main thread, and why rank 1 joins it.
 
 ## Baseline verification on the Mac
 
