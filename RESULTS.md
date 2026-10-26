@@ -192,6 +192,7 @@ Charades' controller ÷ Devastator's adaptive window: 0.68–1.03 at σ ≤ 500 
 | 101 | 2026-10-26 | 3643113 | Late rank 0, results: the lateness follows the lower-edge LPs, not the rank or the device; sending on the destination device does not help | current |
 | 102 | 2026-10-26 | — | htram flush order: rotating start and earliest timestamp first | design |
 | 103 | 2026-10-26 | 3643408, 3643609 | htram flush order, results: no effect; the lower edge stays late | current |
+| 104 | 2026-10-26 | — | Why one PE holds up each GVT advance at uniform and σ 2,000: per-PE wave records, and fewer events per wave | design |
 
 ## Stampede3 runs, in order
 
@@ -3821,6 +3822,39 @@ The batch job agrees for `fo1` (0.995 and 0.998).
 - htram flush order (this section).
 
 It costs at σ 100 up to −50% of the advance tail (section 86's bound) but **does not limit scaling now: σ 100's 4→16 node efficiency is 0.99 with 23 devices (section 95)**. Where Charades still scales worse than Devastator is σ ≥ 2,000 and uniform (0.81 and 0.52, against 0.91 and 0.69), and its controller gap there at 16 nodes (0.86–0.92); at σ 2,000 the lower-edge effect is smaller (−21 to −23% of the tail).
+
+### Why one PE holds up each GVT advance at uniform and σ 2,000: per-PE wave records, and fewer events per wave (design, 2026-10-26; written before any runs)
+
+> **Status: design.** Charades `scale-diag` ff3f4fd (adds `--gvt-trace=4`), htram `pdes` 3cb3d1e, Reconverse `pads-dest-device` 13ae1ac with `+lci_dest_device` off (the same as `pads-runtime`). `+lci_ndevices 23`, glibc defaults. Job K `$WORK/charades-runs/diag13.slurm` (16 nodes, skx-dev and skx, `-x c455-081`, the copy that starts second cancelled).
+
+**Why.** Where Charades still scales worse than Devastator is σ ≥ 2,000 and uniform (4→16-node efficiency 0.81 and 0.52, against 0.91 and 0.69; section 95). Section 80 put most of the growth in time per GVT advance into the straggler cost: the slowest process's last PE contributes long after the others (uniform: +303 of +353 µs per advance from 4 to 16 nodes; the slowest process's own PEs 430 µs apart; σ 2,000: +40 of +47). At uniform the slowest process changes from wave to wave (no process slowest in more than 6% of waves), so this is not the lower-edge effect of sections 84–103, which needs locality. Nothing so far says what that last PE is doing.
+
+**What a contribution waits for.** A PE joins a count wave when it picks up the previous wave's result (at the start of its next scheduler pass) and then either has executed `--gvt-wave-events` events (128) since its last contribution or ends a pass with nothing it may execute. At uniform, each PE executes about 140–150 events per wave (16 nodes, WPs 512, W 400: 278 M ev/s over 736 PEs, 6,473 waves in 2.6 s; 4 nodes: about 140), close to 128. So the last PE may simply be the one that still had events inside the window and ran 128 of them, while PEs that ran out of work joined at once.
+
+**New instrumentation** (off by default): `--gvt-trace=4` adds, for every PE and every 4th wave (`gvt_rec_<pe>.csv`; all PEs sample the same waves), times in µs after the previous result was published in its process (on that process's clock):
+- when the PE picked the result up, and when its last scheduler pass before that ended (so a late pickup splits into time still inside a pass and time outside one: other entry methods, network progress);
+- when it contributed, and why: at pickup (idle or already past 128 events), or later (ran out of work, or reached 128 events);
+- between pickup and contribution: scheduler time, inbox drains, htram receive handlers, rollbacks, node-group GVT handlers, events executed;
+- the buckets past GVT it had passed when it contributed (how far it had got in virtual time).
+
+Mac: test config `bucket_gvt_trace4`, 6/6 (and trace 2/3 unchanged, 12/12).
+
+**Runs** (W 400; uniform = remote 1.0, lookahead 100 / mean 1,000; σ 2,000 at the same lookahead and mean; 2 reps, interleaved):
+- Traced (`--gvt-trace=4 --pe-stats=1`) with untraced pairs at 4 and 16 nodes: uniform with WPs 512 (its best at 16 nodes) and PP 512; σ 2,000 with PP 512.
+- `--gvt-wave-events` 0 and 32 against the default 128, untraced, 16 nodes: uniform with WPs 512 and PP 512; σ 2,000 PP 512 with 32 only. (0 was tried at σ 100 and σ 2,000 in sections 47 and 54: advances 18–38% shorter but 20–60% more of them, throughput −2% to +6%; never at uniform.)
+
+Summary per traced run, over the recorded waves at 10–95% of the run: in each wave the slowest process's last PE (the "late PE") against the median PE of the same process; its delay split into pickup (inside a pass / outside) and pickup → contribution (scheduler, drains, receives, rollbacks), its events, its time per event, its reason, the buckets it had passed; which ranks and processes are late.
+
+**Predictions:**
+- K1. At uniform on 16 nodes the late PE is spread out: no rank is the slowest process's last PE in more than 15% of waves, and no process is the slowest in more than 15%.
+- K2. The late PE contributes on the event count (it reached 128) in at least 70% of waves, while the median PE of its process does so in at most 30%. Its pickup delay is at most 25% of its contribution delay. So it is late because it still had events to run, not because it was busy elsewhere.
+- K3. Between pickup and contribution, the late PE's time per executed event is within 20% of the median PE's (it is late because it has more to do, not because each event costs more), and it reaches the same number of buckets passed as the median PE or fewer.
+- K4. From 4 to 16 nodes, at least 70% of the growth in the late PE's delay is after pickup.
+- K5. σ 2,000 at 16 nodes looks the same: the late PE reaches the event count in at least 60% of waves.
+- K6. `--gvt-wave-events=32` is at least 1.03× the default at uniform on 16 nodes in both modes, and within ±3% at σ 2,000; `--gvt-wave-events=0` is 0.95–1.10× at uniform.
+- K7. `--gvt-trace=4` costs at most 5% (traced ÷ untraced ≥ 0.95).
+
+If K2 holds, the straggler cost at uniform is GVT waiting for the PE with the most work in the window, and the remedies are spreading that work (sharing it within a process) or pacing waves differently, not aggregation. If instead the late PE's time is in pickup or in drains and receives (K2 or K3 wrong), it is receive handling, and fewer, larger messages could help after all.
 
 ## Baseline verification on the Mac
 
