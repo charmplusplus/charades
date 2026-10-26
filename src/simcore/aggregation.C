@@ -169,6 +169,12 @@ Aggregator::Aggregator(CkGroupID tram_gid, CkGroupID wps_gid) : advances(0) {
   }
   // --gvt-trace=3: time htram's node-level receives (one flag per process)
   if (g_tw_gvt_trace >= 3 && CkMyRank() == 0) htram_time_receives = true;
+  // One setting per process, the same on every PE; read only by flushes
+  if (g_tw_agg_flush_order > 2) CkAbort("--agg-flush-order must be 0, 1 or 2\n");
+  htram_flush_order = (int)g_tw_agg_flush_order;
+  if (g_tw_agg_flush_order && CkMyPe() == 0)
+    CkPrintf("Aggregation: htram flush passes visit destinations %s\n",
+             g_tw_agg_flush_order == 1 ? "by index, starting one later each pass" : "earliest timestamp first");
   // Before the scheduler exists, so before PE_VALUE(window): the start value
   urgent = urgent_window(g_tw_optimism_window);
   for (size_t i = 0; i < trams.size(); i++) {
