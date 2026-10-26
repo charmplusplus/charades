@@ -160,6 +160,7 @@ Charades' controller ÷ Devastator's adaptive window: 0.68–1.03 at σ ≤ 500 
 | 86 | 2026-10-25 | 3640203 | What rank 0 does while it is late, results: nothing extra on average; ranks 0 and 1 are late as a pair | current |
 | 87 | 2026-10-26 | — | Late ranks 0 and 1: the LCI device they poll, or the PSM2 receive thread? | design |
 | 88 | 2026-10-26 | 3641728 | Late ranks, results: rank 0 is late at every device count; rank 1 only because it shares rank 0's device; 23 devices is 1.03–1.07× faster | current |
+| 89 | 2026-10-26 | — | Is rank 0 preempted? Per-thread scheduler statistics; and 23 devices at 16 nodes | design |
 
 ## Stampede3 runs, in order
 
@@ -3441,6 +3442,24 @@ The two reps of each arm are within 1.7% of each other, and the 23-device reps d
 - **D2 wrong.** Turning the PSM2 receive thread off changes nothing: ranks 0 and 1 are as late, and throughput is 0.996–1.005×.
 - **D3 wrong for the receive thread, but 23 devices is faster:** 1.03× at σ 100 and 1.07× at σ 2,000, with the slowest-PE delay at σ 2,000 down from 188 to 166 µs. Fewer devices are slower: 0.94–0.95× at 8 and 0.84–0.94× at 4. Earlier, on verbs at 2 × 23 PEs, 23 devices was 0.93–0.94× of 8 devices ("Runtime settings on the production build"); on psm2 it is now the best. This is 4 nodes only.
 - **Code reading, for the next step.** Reconverse opens the network devices (`comm_backend::init`, `convcore.cpp:478`) in the main thread before any PE thread exists, and Charm++ pins each PE later (`CmiInitCPUAffinity`, `ck-core/init.C:1691`). Any helper thread that LCI, PSM2 or libfabric starts after rank 0 is pinned inherits rank 0's core and can preempt it. The section 86 perf profile shows two non-PE threads in process 0 ("async" and an unnamed one), and a kernel return address in 1.1–1.3% of rank 0's samples and none of rank 11's. The per-thread scheduler statistics in `/proc/<pid>/task/<tid>/schedstat` record time spent waiting on a run queue, which would show such preemption directly; they need no privileges.
+
+### Is rank 0 preempted? Per-thread scheduler statistics; and 23 devices at 16 nodes (design, 2026-10-26; written before any runs)
+
+> **Status: design.** Charades `scale-diag` e2806de (unchanged), htram b25ab15. Two jobs, both with `-x c455-081`: `$WORK/charades-runs/diag6.slurm` (4 nodes) and `dev23.slurm` (16 nodes). Whichever skx-dev job finishes first, a job still waiting on skx moves to skx-dev.
+
+**Job A, 4 nodes: is rank 0 preempted?** Section 88 points at rank 0 itself, and the code shows Reconverse opens the network devices in the main thread before Charm++ pins the PEs. A wrapper (`schedwrap.sh`, `schedsample.py`) runs each process and, every 0.5 s, reads from `/proc` for each of its threads: name, allowed cores, last core, time running, time waiting on a run queue, time slices, voluntary and involuntary context switches, page faults, user and system time; and each CPU's interrupt and softirq time. The sampler runs on the process's free core (core 0 or 1). Threads map to ranks by their pinned core (`+pemap 2-46:2,3-47:2`). Runs: σ 100 and σ 2,000 at W 400, 16 and 23 devices, `--gvt-trace=3`, each with an unwrapped untraced pair (overhead check), 2 reps.
+
+**Predictions (A):**
+- S1. Rank 0 waits on the run queue at least 3× as long per second as the median PE, and involuntary switches show the same; at least one non-PE thread is allowed on, or last ran on, rank 0's core.
+- S2. Rank 1's wait is at the median at both device counts.
+- S3. Interrupt and softirq time on rank 0's core is no higher than on other PE cores of the same socket (socket 1 gets no adapter interrupts at all).
+- If S1 fails, rank 0 is not preempted: it is running something else. Next would be timing Charm++ and Converse work inside rank 0's scheduler loop.
+
+**Job B, 16 nodes: 23 devices as default?** The 8 workloads of the scaling series (σ 100, 500, 1,000, 2,000, 4,000 and uniform at lookahead 100 / mean 1,000; σ 500 and 2,000 at lookahead 10 / mean 200), PP 512, the controller (ε 0.001) and one fixed W (400, or 100 at lookahead 10), `+lci_ndevices` 16 and 23, 3 reps interleaved; 96 runs.
+
+**Predictions (B):**
+- B1. 23 devices ÷ 16 devices (M committed events/s, median of 3, higher is better) is ≥ 1.03 in at least 6 of the 8 workloads with the controller, and below 0.98 in none.
+- B2. The gain is larger at 16 nodes than at 4 (more remote traffic per PE, so per-device sharing costs more).
 
 ## Baseline verification on the Mac
 
