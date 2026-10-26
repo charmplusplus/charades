@@ -18,25 +18,32 @@ Every number from every run: Stampede3 runs in order (each design, written befor
 
 ## Current numbers
 
-> **Superseded in part (2026-10-25):** these predate `--gvt-node-waves` and the fast path (both now default). Newer short-run comparisons with Devastator in the same job: "Which htram mode and buffer for which workload, results" (4 and 16 nodes, 8 workloads). Charades ÷ Devastator there: 4 nodes 0.95–1.76 (ahead or level in 7 of 8), 16 nodes 0.77–1.14 (5 of 8). The paper-grade (3 reps, long runs) rerun is still to do.
+> **As of 2026-10-25 (`main` 2369301).** Defaults: same-process fast path and `--gvt-node-waves` on, htram PP 512 with the deadline policy (horizon margin 8), full nodes (2 processes × 23 PEs per node, 128 LPs per PE), native psm2. Short runs (end time 512,000; 128,000 at lookahead 10; 1–4 s each) and 2 reps: the paper-grade rerun (3 reps, long runs) is still to do. Avoid Stampede3 node c455-081 (section 82).
 
-Full nodes (4 Stampede3 skx nodes, 2 processes × 23 PEs per node, 184 PEs, 128 LPs per PE), production runtime, native psm2, htram PP 512 unless noted. M committed events/s are medians of 3. Sources: "Full-node reruns, results" (jobs 3629783, 3629781) and "Controller level, `--agg-scope`, σ 100 profile, results" (job 3632385).
+**Charades and Devastator, 1–16 nodes, weak scaling, one allocation** (job 3639098, section 78; without c455-081). Each engine at its best setting per cell: Charades over PP 512, PP 2,048 (and WPs 512 for uniform and lookahead 10 σ 2,000) × W 250/400/600 and the controller (lookahead 10: W 50/100/200); Devastator over W 500/1,000 (lookahead 10: 100/200/400), CLCG4.
 
-**Charades' speedup over Devastator** (Charades ÷ Devastator, each at its best fixed W; higher is better for Charades). Devastator used its default xorshift RNG except in the last column:
+| workload | Charades, 4 nodes (M ev/s) | Devastator, 4 nodes | Charades' speedup, 1 / 4 / 16 nodes | Charades, 16 nodes | Devastator, 16 nodes | weak-scaling efficiency 4→16 nodes, Charades / Devastator |
+|---|---|---|---|---|---|---|
+| lookahead 100, mean 1,000, σ 100 | 165.6 | 170.4 | 1.14 / 0.97 / 0.92 | 612.8 | 667.2 | 0.93 / 0.98 |
+| σ 500 | 154.8 | 140.8 | 1.07 / 1.10 / 1.08 | 558.4 | 518.4 | 0.90 / 0.92 |
+| σ 1,000 | 146.4 | 120.8 | 1.08 / 1.21 / 1.26 | 521.6 | 414.4 | 0.89 / 0.86 |
+| σ 2,000 | 127.6 | 105.6 | 1.27 / 1.21 / 0.95 | 363.2 | 382.4 | 0.71 / 0.91 |
+| σ 4,000 | 112.8 | 80.8 | 1.32 / 1.40 / 1.04 | 312.0 | 300.8 | 0.69 / 0.93 |
+| uniform remote 1.0 | 118.8 | 70.4 | 1.38 / 1.69 / 0.99 | 190.4 | 192.0 | 0.40 / 0.68 |
+| lookahead 10, mean 200, σ 500 | 134.0 | 146.8 | 0.96 / 0.91 / 0.85 | 435.2 | 510.4 | 0.81 / 0.87 |
+| lookahead 10, σ 2,000 | 96.0 | 99.2 | 1.09 / 0.97 / 0.76 | 273.6 | 361.6 | 0.71 / 0.91 |
 
-| workload | Charades (M ev/s) | Devastator (M ev/s) | speedup | speedup, Devastator on CLCG4 (job 3632385) |
-|---|---|---|---|---|
-| σ 100, high slack | 121.9 | 188.9 | 0.65 | 0.71 |
-| σ 500 | 118.1 | 154.2 | 0.77 | |
-| σ 1,000 | 114.5 | 130.3 | 0.88 | |
-| σ 2,000 | 108.5 | 106.7 | 1.02 | 1.03 |
-| σ 4,000 | 98.4 | 79.6 | 1.24 | |
-| uniform remote 1.0 | 100.6 | 69.6 | 1.45 | |
-| σ 500, low slack | 96.0 | 152.7 | 0.63 | |
-| σ 2,000, low slack | 80.7 | 99.9 | 0.81 | |
-| uniform, low slack | 68.7 | 65.2 | 1.05 | |
-| phase-changing PHOLD, remote 0.5 | 75.3 | 101.4 | 0.74 | |
-| phase-changing PHOLD, remote 1.0 | 60.5 | 60.1 | 1.01 | |
+(Rates are per-node medians × nodes; speedup = Charades ÷ Devastator, higher is better for Charades; efficiency = per-node rate at 16 ÷ at 4 nodes, 1.0 is perfect.) Charades leads at every scale at σ 500–1,000, leads at 1–4 nodes and falls to about level at 16 at σ ≥ 2,000 and uniform, and trails at lookahead 10 from 2–4 nodes on.
+
+**Why Charades scales worse at σ ≥ 2,000** (sections 78–84):
+- At Gaussian σ, events per htram message, efficiency and the number of GVT advances do not change from 4 to 16 nodes; the time per advance grows (σ 2,000, W 250: 167 → 233 µs). Aggregation thinning matters only for uniform (114 → 39 → 15 events per message at 4/8/16 nodes).
+- Per advance at 16 nodes, the reduction itself is about 51 µs (34 µs at 4 nodes) and waiting for the slowest process is 54–58% of the advance even at W 250, growing faster than the work per advance as W widens. That is why a wider window does not pay: re-executing rolled-back events costs under 0.2% of the run.
+- The late PE in the slowest process is usually rank 0 (62–80% of waves at σ 100, 22–31% at σ 2,000; chance 4%): the process-edge PEs (ranks 0 and 22) take the htram-held cross-process events and roll back 35–50× more at σ 100, and rank 0 carries process-level work.
+- One process per node (46 PEs) is 0.71–0.87 of two (section 78). Horizon margins above 8 cost more than they save (section 80).
+
+**Not yet default:** htram buffers allocated at 2,048 but capped at 512 (`--agg-buffer=2048 --agg-pp-limit=512`) give 1.07–1.14× PP 512 at 16 nodes, σ 100 and 2,000, in two allocations, with identical messages; the cause is not understood (an allocator top pad recovers about 40% of it; sections 80, 82). `--agg-auto` picks its buffer correctly but does not deliver the gain (section 76).
+
+**Older 4-node figures** (before the fast path and node waves; jobs 3629783, 3629781, 3632385; kept because the controller, aggregation and transport ratios below have not been remeasured on the current stack):
 
 **Adaptive policies ÷ the engine's own best fixed W** (higher is better):
 
