@@ -59,6 +59,7 @@ extern unsigned g_tw_gvt_trace;       ///< bucketed gvt: PE 0 logs every count w
 struct WaveTimers {
   double drain = 0, rollback = 0, poll = 0, node_gvt = 0;
   unsigned long long node_gvt_n = 0;
+  double exec_end = 0;  ///< --gvt-trace=4: when this PE's last execute() ended
 };
 extern thread_local WaveTimers g_wave_timers;
 

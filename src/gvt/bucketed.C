@@ -97,6 +97,18 @@ void BucketGVT::finalize() {
         << "," << p.executed << "\n";
     }
   }
+  if (g_tw_gvt_trace >= 4 && !wave_recs.empty()) {
+    std::ofstream t(std::string(g_output_dir) + "gvt_rec_" +
+                    std::to_string(CkMyPe()) + ".csv");
+    t << "wave,pick_us,prev_end_us,contrib_us,exec_us,drain_us,recv_us,"
+         "rollback_us,node_gvt_us,events,reason\n" << std::fixed << std::setprecision(1);
+    for (const WaveRec& w : wave_recs) {
+      t << w.wave << "," << w.pick_us << "," << w.prev_end_us << ","
+        << w.contrib_us << "," << w.exec_us << "," << w.drain_us << ","
+        << w.recv_us << "," << w.rollback_us << "," << w.node_gvt_us << ","
+        << w.events << "," << w.reason << "\n";
+    }
+  }
   if (g_tw_gvt_trace >= 2 && node_waves_on && CkMyRank() == 0) {
     if (!node_waves) node_waves = CProxy_NodeWaves(node_waves_gid).ckLocalBranch();
     node_waves->write_proc_waves();
@@ -242,7 +254,8 @@ void BucketGVT::send_counts(int num_buckets) {
     pending_wave = num_buckets;
     return;
   }
-  contribute_counts(num_buckets);
+  contribute_counts(num_buckets,
+      (g_tw_gvt_wave_events && !last_starved) ? 3 : 0);
 }
 
 void BucketGVT::iteration_end(bool starved) {
@@ -252,11 +265,48 @@ void BucketGVT::iteration_end(bool starved) {
           g_tw_gvt_wave_events)) {
     int n = pending_wave;
     pending_wave = -1;
-    contribute_counts(n);
+    contribute_counts(n, starved ? 1 : 2);
   }
 }
 
-void BucketGVT::contribute_counts(int num_buckets) {
+void BucketGVT::take_pick_snapshot(double result_t) {
+  Statistics* s = get_statistics();
+  const WaveTimers& w = g_wave_timers;
+#ifdef CHARADES_HTRAM
+  pick.recv = htram_recv_s;
+#else
+  pick.recv = 0;
+#endif
+  pick.valid = true;
+  pick.result = result_t;
+  pick.t = CmiWallTimer();
+  pick.prev_end = w.exec_end;
+  pick.exec = s->exec_time;
+  pick.drain = w.drain;
+  pick.rollback = w.rollback;
+  pick.node_gvt = w.node_gvt;
+  pick.executed = s->events_executed;
+}
+
+void BucketGVT::contribute_counts(int num_buckets, int reason) {
+  if (g_tw_gvt_trace >= 4 && pick.valid && contributions % 4 == 0) {
+    Statistics* s = get_statistics();
+    const WaveTimers& w = g_wave_timers;
+#ifdef CHARADES_HTRAM
+    const double recv = htram_recv_s;
+#else
+    const double recv = 0;
+#endif
+    const double now = CmiWallTimer(), r = pick.result;
+    auto us = [](double d) { return (float)(d * 1e6); };
+    wave_recs.push_back({contributions, us(pick.t - r),
+        pick.prev_end ? us(pick.prev_end - r) : -1e9f, us(now - r),
+        us(s->exec_time - pick.exec), us(w.drain - pick.drain),
+        us(recv - pick.recv), us(w.rollback - pick.rollback),
+        us(w.node_gvt - pick.node_gvt),
+        (unsigned)(s->events_executed - pick.executed), reason});
+  }
+  pick.valid = false;
   executed_at_wave = get_statistics()->events_executed;
   if (g_tw_gvt_trace >= 3) {
     const int r = CkMyRank(), n = CkMyNodeSize();
@@ -553,6 +603,7 @@ void BucketGVT::poll() {
   const std::vector<CmiInt8>& r = node_waves->result();
   wave_combined_t = node_waves->t_combined;
   wave_result_t = node_waves->t_result;
+  if (g_tw_gvt_trace >= 4) take_pick_snapshot(wave_result_t);
   int n = r[0], nctl = r[2], nhist = r[3];
   std::vector<int> sums(r.begin() + 4, r.begin() + 4 + 2 * n);
   std::vector<uint64_t> ctl(r.begin() + 4 + 2 * n, r.begin() + 4 + 2 * n + nctl);

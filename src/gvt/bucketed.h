@@ -203,7 +203,7 @@ class BucketGVT : public CBase_BucketGVT {
     int pending_wave;
     uint64_t executed_at_wave;
     bool last_starved;
-    void contribute_counts(int num_buckets);
+    void contribute_counts(int num_buckets, int reason = 0);
 
     /** --gvt-node-waves state (see NodeWaves) */
     bool node_waves_on;
@@ -240,6 +240,27 @@ class BucketGVT : public CBase_BucketGVT {
     };
     std::vector<PeSnap> pe_snaps;
     int contributions = 0;
+    /**
+     * --gvt-trace=4, every PE, every 4th contribution: when this PE picked up
+     * the previous wave's result and when it contributed (µs after that result
+     * was published in this process, on this process's clock), when its last
+     * execute() before the pickup ended, why it contributed, and what it did
+     * between pickup and contribution
+     */
+    struct WaveRec {
+      int wave;
+      float pick_us, prev_end_us, contrib_us;
+      float exec_us, drain_us, recv_us, rollback_us, node_gvt_us;
+      unsigned events;
+      int reason;  ///< 0 at pickup, idle; 1 later, idle; 2 later, events; 3 at pickup, events
+    };
+    std::vector<WaveRec> wave_recs;
+    struct PickSnap {
+      bool valid = false;
+      double result, t, prev_end, exec, drain, recv, rollback, node_gvt;
+      unsigned long long executed;
+    } pick;
+    void take_pick_snapshot(double result_t);
     double wave_start;
     int wave_asked, wave_passed;
 
