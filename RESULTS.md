@@ -159,6 +159,7 @@ Charades' controller ÷ Devastator's adaptive window: 0.68–1.03 at σ ≤ 500 
 | 85 | 2026-10-25 | — | What rank 0 does while it is late: wave-aligned timers and a per-thread perf profile | design |
 | 86 | 2026-10-25 | 3640203 | What rank 0 does while it is late, results: nothing extra on average; ranks 0 and 1 are late as a pair | current |
 | 87 | 2026-10-26 | — | Late ranks 0 and 1: the LCI device they poll, or the PSM2 receive thread? | design |
+| 88 | 2026-10-26 | 3641728 | Late ranks, results: rank 0 is late at every device count; rank 1 only because it shares rank 0's device; 23 devices is 1.03–1.07× faster | current |
 
 ## Stampede3 runs, in order
 
@@ -3409,6 +3410,37 @@ This is the tail of each advance, not the whole advance (130–220 µs here), an
 - D2. With `PSM2_RCVTHREAD=0`, ranks 0 and 1 are no later than the median rank (share of waves above their process median ≤ 0.55, against 0.54–0.67 now), and the mean slowest-PE delay falls by at least half the upper bound above.
 - D3. Throughput (untraced, M ev/s) with `PSM2_RCVTHREAD=0` is at least 1.05× the 16-device default at σ 100, and at least 1.02× at σ 2,000. Device counts other than 16 are within ±5% of it (as found earlier on verbs).
 - If D1 holds and D2 fails, the cause is on device 0 but is not the receive thread; next is to read PSM2 and LCI for other per-endpoint work. If D1 fails (ranks 0 and 1 stay late at every device count), the cause is tied to the ranks themselves; next is the Charm++ and Reconverse work that rank 0 does as the main thread, and why rank 1 joins it.
+
+### Late ranks, results: rank 0 is late at every device count; rank 1 only because it shares rank 0's device; 23 devices is 1.03–1.07× faster (2026-10-26; skx-dev batch job 3641728, 4 nodes)
+
+> **Status: current.** Design and predictions in section 87. 4 nodes (c454-004, c454-012, c454-044, c455-082), 42 runs, all ok; 6 min. Summary `~/charades-data/sdiag/sdiag5_summary.py`, output and CSVs in `~/charades-data/sdiag/j3641728/`.
+
+**Throughput** (untraced, M committed events/s, mean of 2 reps; ratio = arm ÷ 16 devices, higher is better):
+
+| arm | σ 100 (M ev/s) | ratio | σ 2,000 (M ev/s) | ratio |
+|---|---|---|---|---|
+| 16 devices (default) | 162.4 | 1.000 | 115.5 | 1.000 |
+| 23 devices (one per PE) | 167.4 | **1.030** | 123.8 | **1.072** |
+| 8 devices | 154.5 | 0.951 | 108.3 | 0.938 |
+| 4 devices | 152.0 | 0.936 | 97.2 | 0.842 |
+| 16 devices, `PSM2_RCVTHREAD=0` | 163.3 | 1.005 | 115.0 | 0.996 |
+
+The two reps of each arm are within 1.7% of each other, and the 23-device reps do not overlap the 16-device ones.
+
+**Late ranks** (traced; mean contribution delay after the previous result, µs, lower is better; "rest" = median over ranks not on device 0 and not 22; last-PE share = how often the rank is the slowest process's last PE):
+
+| arm | σ 100: r0 / r1 / r2 / rest | σ 100: r0 last-PE share | σ 2,000: r0 / r1 / r2 / rest | σ 2,000: r0 last-PE share | σ 2,000: slowest-PE delay (µs) |
+|---|---|---|---|---|---|
+| 16 devices (r0–1 on device 0) | 23 / 18 / 12 / 12 | 0.60 | 33 / 28 / 25 / 24 | 0.28 | 188 |
+| 23 devices (r0 alone) | 25 / **13** / 12 / 12 | 0.74 | 29 / **23** / 24 / 24 | 0.18 | 166 |
+| 8 devices (r0–2) | 25 / 15 / 13 / 12 | 0.79 | 34 / 27 / 29 / 26 | 0.29 | 196 |
+| 4 devices (r0–5) | 26 / 16 / 14 / 12 | 0.77 | 37 / 30 / 29 / 29 | 0.24 | 225 |
+| 16, `PSM2_RCVTHREAD=0` | 24 / 18 / 12 / 12 | 0.64 | 35 / 31 / 24 / 24 | 0.36 | 185 |
+
+- **D1 half right.** Rank 1 is late only when it shares a device with rank 0: alone on its device (23 devices) it is as early as the rest. The other ranks that share device 0 at 8 or 4 devices are only slightly late (ranks 2–5: 0–2 µs above the rest). **Rank 0 is late at every device count** (23–26 µs at σ 100 against 12 for the rest) and is the slowest process's last PE in 60–79% of waves at σ 100. So the cause is rank 0 itself; rank 1 is late because it shares rank 0's device. A guess for that link, not tested: rank 0 sometimes stalls while it holds device 0's progress lock, and rank 1's polls fail the trylock until rank 0 releases it.
+- **D2 wrong.** Turning the PSM2 receive thread off changes nothing: ranks 0 and 1 are as late, and throughput is 0.996–1.005×.
+- **D3 wrong for the receive thread, but 23 devices is faster:** 1.03× at σ 100 and 1.07× at σ 2,000, with the slowest-PE delay at σ 2,000 down from 188 to 166 µs. Fewer devices are slower: 0.94–0.95× at 8 and 0.84–0.94× at 4. Earlier, on verbs, 23 devices was 0.96× (section on runtime settings); on psm2 it is now the best. This is 4 nodes only.
+- **Code reading, for the next step.** Reconverse opens the network devices (`comm_backend::init`, `convcore.cpp:478`) in the main thread before any PE thread exists, and Charm++ pins each PE later (`CmiInitCPUAffinity`, `ck-core/init.C:1691`). Any helper thread that LCI, PSM2 or libfabric starts after rank 0 is pinned inherits rank 0's core and can preempt it. The section 86 perf profile shows two non-PE threads in process 0 ("async" and an unnamed one), and a kernel return address in 1.1–1.3% of rank 0's samples and none of rank 11's. The per-thread scheduler statistics in `/proc/<pid>/task/<tid>/schedstat` record time spent waiting on a run queue, which would show such preemption directly; they need no privileges.
 
 ## Baseline verification on the Mac
 
