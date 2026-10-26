@@ -164,6 +164,7 @@ Charades' controller ÷ Devastator's adaptive window: 0.68–1.03 at σ ≤ 500 
 | 88 | 2026-10-26 | 3641728 | Late ranks, results: rank 0 is late at every device count; rank 1 only because it shares rank 0's device; 23 devices is 1.03–1.07× faster | current |
 | 89 | 2026-10-26 | — | Is rank 0 preempted? Per-thread scheduler statistics; and 23 devices at 16 nodes | design |
 | 90 | 2026-10-26 | 3641766, 3641785 | Rank 0 takes page faults, not preemption; 23 devices is 1.21× at 16 nodes | current |
+| 91 | 2026-10-26 | — | Rank 0's page faults: where from, and do malloc settings stop them? Charades (23 devices) against Devastator at 16 nodes | design |
 
 ## Stampede3 runs, in order
 
@@ -3498,6 +3499,29 @@ The two reps of each arm are within 1.7% of each other, and the 23-device reps d
 - **B1 right:** 1.08–1.46 with the controller (geometric mean 1.21), ≥ 1.03 in 8 of 8 and never below; fixed W 1.05–1.44 (1.20).
 - **B2 right:** at 4 nodes it was 1.03–1.07 (section 88). The gain grows with the share of remote traffic (uniform and σ 4,000 the most), so per-device sharing costs more the more messages a PE receives. **23 devices (one per PE) is the new default launch.**
 - **Against Devastator, provisionally** (Devastator from job 3639098, a different allocation; Charades here searched only the two arms above at PP 512, against a wider grid in 3639098, so this understates Charades): Charades ÷ Devastator at 16 nodes would move from 0.92 / 1.08 / 1.26 / 0.95 / 1.04 / 0.99 / 0.85 / 0.76 to about 0.96 / 1.08 / 1.23 / 1.13 / 1.41 / 1.20 / 0.92 / 0.98 (rows in the order above, best of the two arms). That is ahead or level in 6 of 8 workloads instead of 3. It needs a same-allocation run with Devastator before it goes in the current numbers.
+
+### Rank 0's page faults: where from, and do malloc settings stop them? And Charades (23 devices) against Devastator at 16 nodes, same allocation (design, 2026-10-26; written before any runs)
+
+> **Status: design.** Charades `scale-diag` e2806de (unchanged), htram b25ab15, `+lci_ndevices 23`. Job C `$WORK/charades-runs/diag7.slurm` (4 nodes), job D `cmp16.slurm` (16 nodes), both `-x c455-081`; same rule as section 89 for moving between skx and skx-dev.
+
+**Job C, 4 nodes.** σ 100 and σ 2,000 at W 400, PP 512. Three glibc malloc arms through `GLIBC_TUNABLES`:
+- `m0`: the defaults.
+- `mtrim`: no heap trimming (trim threshold 1 GB, top pad 64 MB). Setting these also stops glibc raising the mmap threshold, which stays at 128 KB.
+- `mall`: no trimming, and an mmap threshold of 32 MB, so large blocks come from the heap instead of `mmap`/`munmap` each time.
+
+Each arm runs with the `/proc` sampler and `--gvt-trace=3`, plus an untraced, unwrapped pair for throughput; 2 reps. Then one run per workload at `m0` with `perf record -e page-faults:u` (every 100th fault, DWARF call stacks) on process 0, reported per thread and by calling function.
+
+**Predictions (C):**
+- C1. In perf, rank 0's faults come from glibc's heap growth after a trim (`sysmalloc`/`brk`) or from freshly mmapped blocks, called from Charades or htram allocations. Other ranks fault little.
+- C2. `mall` brings rank 0's faults to within 2× of the other ranks' (about 200 per s) and its kernel time below 2%, at σ 100. `mtrim` does that only if the cause is trimming rather than `mmap` churn.
+- C3. With `mall`, rank 0 stops being the late rank at σ 100: mean contribution delay within 3 µs of the median rank, and the slowest process's last PE in under 30% of waves (60–79% now).
+- C4. Throughput with `mall` is ≥ 1.05× `m0` at σ 100 and within ±2% at σ 2,000. No arm raises the other ranks' faults.
+
+**Job D, 16 nodes.** The current-numbers comparison redone in one allocation with 23 devices: Charades over PP 512 and PP 2,048 × W 250/400/600 and the controller (lookahead 10: W 50/100/200), plus WPs 512 for uniform and lookahead 10 σ 2,000; Devastator (p32w23, CLCG4) over W 500/1,000/2,000 (lookahead 10: 100/200/400; W 2,000 is new, because its best W was at the top of the grid at 16 nodes). 3 reps, interleaved.
+
+**Predictions (D):**
+- D1. Charades ÷ Devastator (each at its best, median of 3, higher is better) ≥ 1.0 in at least 6 of 8 workloads. The two below 1.0 are σ 100 and lookahead 10 σ 500 (provisional 0.96 and 0.92 in section 90).
+- D2. Charades at its best is at least 1.10× its 16-node numbers in job 3639098 at σ ≥ 2,000, uniform and lookahead 10 σ 2,000.
 
 ## Baseline verification on the Mac
 
