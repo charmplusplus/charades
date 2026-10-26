@@ -3348,7 +3348,7 @@ With 23 PEs per process, chance is 0.04. So in the process that holds an advance
 
 ### What rank 0 does while it is late: wave-aligned timers and a per-thread perf profile (design, 2026-10-25; written before any runs)
 
-> **Status: design.** Charades `scale-diag` e2806de, htram b25ab15. Job script `$WORK/charades-runs/diag4.slurm`, 16 nodes with `-x c455-081`.
+> **Status: design.** Charades `scale-diag` e2806de, htram b25ab15. Job script `$WORK/charades-runs/diag4n4.slurm`, **4 nodes** with `-x c455-081` (a 16-node version, job 3640188, was cancelled before it started: the late rank 0 is a per-process effect already seen at 4 nodes in section 80, and 4 nodes cost a quarter of the node-hours; one 16-node run can size the effect later).
 
 **Why.** Section 84: the slowest process holds an advance up because one PE, usually rank 0, contributes 100–300 µs after the others; at σ 100 the process-edge PEs roll back 35–50× more, and at σ 2,000 rank 0 is still last 22–31% of the time with even rollbacks. Reconverse does not single rank 0 out by default (every PE polls; the 23 PEs share the 16 devices in pairs, so ranks 0 and 1 share device 0).
 
