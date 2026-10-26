@@ -184,6 +184,7 @@ Charades' controller ÷ Devastator's adaptive window: 0.68–1.03 at σ ≤ 500 
 | 93 | 2026-10-26 | — | Rank 0's system calls; and the 1/4/16-node series on 23 devices, with glibc no-trim at 16 nodes | design |
 | 94 | 2026-10-26 | 3642143 | Rank 0's system calls, results: not the cause | current |
 | 95 | 2026-10-26 | 3642157 | 1/4/16 nodes on 23 devices, results: Charades leads in 22 of 24 cells; glibc no-trim 1.055× for Charades, 0.25–0.53× for Devastator | current |
+| 96 | 2026-10-26 | — | Rank 0's faults: perf against /proc in the same run, a lighter sampler, and memory bound to the socket | design |
 
 ## Stampede3 runs, in order
 
@@ -3643,6 +3644,27 @@ Each arm runs with the `/proc` sampler and `--gvt-trace=3`, plus an untraced, un
 - **Charades: 1.021–1.099 over 36 cells, geometric mean 1.055, ≥ 1.03 in 33** (F3 right). Best no-trim ÷ best defaults per workload: 1.035–1.086.
 - **Devastator: 0.25–0.53 (geometric mean 0.38). F3 wrong for Devastator, badly.** The setting is harmful to it, not neutral. A likely reason, untested: glibc gives each thread's arena heaps of at most 64 MB, and a 64 MB top pad asks for that much headroom on every extension, so a program whose worker threads allocate a lot keeps creating and dropping heaps. Each engine keeps its own best: Charades with no-trim, Devastator with the defaults. A smaller pad, or the trim threshold alone, may be better for both; not tested.
 - With no-trim, Charades' 16-node lead would be about 5% larger than in the table above (not rerun as one table).
+
+### Rank 0's faults: perf against /proc in the same run, a lighter sampler, and memory bound to the socket (design, 2026-10-26; written before any runs)
+
+> **Status: design.** Charades `scale-diag` e2806de (unchanged), htram b25ab15, `+lci_ndevices 23`, glibc defaults. Job G `$WORK/charades-runs/diag9.slurm` (4 nodes, skx only: one of my jobs per dev queue), wrapper `gwrap.sh`, sampler `schedsample.py` (new light mode: `/proc/<pid>/task/*/stat` only, every 1 s).
+
+**Why.** Section 94 left a conflict: `/proc` says rank 0 takes 18,000–48,000 minor faults a second at σ 100 and spends 17–32% of its time in the kernel, but strace finds almost no system calls, and a sampled `perf record -e page-faults:u` saw 400–1,600 user-mode faults a second. Three explanations: automatic NUMA balancing (on, on the login node), the `/proc` sampler itself, or perf undercounting.
+
+**Runs** (σ 100, W 400, PP 512, `--gvt-trace=3`, 2 reps):
+- `plain`: no wrapper.
+- `fullperf`: the full sampler on every process, and `perf record -e page-faults:u -c 1` (every user-mode fault, no stacks) on process 0.
+- `light`: the light sampler.
+- `numa`: memory bound to the process's own socket (`numactl --membind`) with the light sampler. A bound policy also exempts the memory from NUMA-balancing migration.
+- At σ 2,000: `light` and `numa`.
+- Untraced throughput pairs, plain and `numa`, at both σ.
+- The job also records each node's `numa_balancing` and transparent-huge-page settings.
+
+**Predictions:**
+- G1. In `fullperf`, perf's user-mode fault count for rank 0 between 30% and 90% of the run is at least half of `/proc`'s minor-fault count for the same thread and window. That would mean the faults are ordinary user-mode faults and the earlier sampled profile undercounted.
+- G2. With the light sampler, rank 0 still takes at least 20× the median rank's faults and spends at least 10% of its time in the kernel, so the sampler is not the cause.
+- G3. With `numa`, rank 0's faults fall to within 3× of the median rank's and its kernel time below 2%. Rank 0 is no longer the late rank: the slowest process's last PE in under 30% of waves (about 50% now). Throughput is ≥ 1.05× plain at σ 100 and within ±2% at σ 2,000.
+- G4. `numa_balancing` is 1 on the compute nodes.
 
 ## Baseline verification on the Mac
 
