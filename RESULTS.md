@@ -185,6 +185,7 @@ Charades' controller ÷ Devastator's adaptive window: 0.68–1.03 at σ ≤ 500 
 | 94 | 2026-10-26 | 3642143 | Rank 0's system calls, results: not the cause | current |
 | 95 | 2026-10-26 | 3642157 | 1/4/16 nodes on 23 devices, results: Charades leads in 22 of 24 cells; glibc no-trim 1.055× for Charades, 0.25–0.53× for Devastator | current |
 | 96 | 2026-10-26 | — | Rank 0's faults: perf against /proc in the same run, a lighter sampler, and memory bound to the socket | design |
+| 97 | 2026-10-26 | 3642578 | Rank 0's faults, results: an artifact of my /proc sampler; rank 0 is late without it, and takes one shared lock 10× as often | current |
 
 ## Stampede3 runs, in order
 
@@ -3665,6 +3666,18 @@ Each arm runs with the `/proc` sampler and `--gvt-trace=3`, plus an untraced, un
 - G2. With the light sampler, rank 0 still takes at least 20× the median rank's faults and spends at least 10% of its time in the kernel, so the sampler is not the cause.
 - G3. With `numa`, rank 0's faults fall to within 3× of the median rank's and its kernel time below 2%. Rank 0 is no longer the late rank: the slowest process's last PE in under 30% of waves (about 50% now). Throughput is ≥ 1.05× plain at σ 100 and within ±2% at σ 2,000.
 - G4. `numa_balancing` is 1 on the compute nodes.
+
+### Rank 0's faults, results: an artifact of my /proc sampler; rank 0 is late without it, and takes one shared lock 10× as often (2026-10-26; skx-dev batch job 3642578, 4 nodes)
+
+> **Status: current.** Design and predictions in section 96. 4 nodes (c455-014, c455-021, c455-042, c455-043), 22 runs, all ok; 4 min. Summary `~/charades-data/sdiag/sdiag9_summary.py`, output `~/charades-data/sdiag/j3642578/summary.txt`. **This corrects sections 90 and 92:** rank 0's 18,000–48,000 faults a second and 17–32% kernel time there were caused by the full `/proc` sampler, not by Charades. The throughput results of those sections (23 devices; glibc no-trim) came from runs without the sampler and stand.
+
+- **G1 right.** With every user-mode fault recorded (`-c 1`), perf and `/proc` agree per thread over the whole run (perf ÷ `/proc` 1.00–1.02 for ranks 0, 1, 11 and 22). The faults are ordinary user-mode faults; the earlier sampled profile (section 92, every 100th fault with DWARF stacks) undercounted them.
+- **G2 wrong.** With the light sampler (one `stat` read per thread per second), rank 0 at σ 100 takes about 490 faults a second and spends 0.3% of its time in the kernel, against 3,700 and 5% next to the full sampler in this job, and 18,000–48,000 and 17–32% in sections 90 and 92. The full sampler reads `status` and `schedstat` for every thread every 0.5 s. Something in that, for the main thread, makes it fault. I have not found the mechanism and will not use that sampler again.
+- **G3 wrong.** Binding memory to the socket (`numactl --membind`, which also exempts it from NUMA-balancing migration) leaves rank 0 as late as before. The slowest process's last PE is rank 0 in 74% of waves, against 71% plain; its mean delay is 25 µs against 11–12 for the rest. Throughput 1.020× at σ 100, 1.001× at σ 2,000.
+- **G4 right:** `numa_balancing` = 1 on all four nodes; transparent huge pages `always`, defrag `madvise`.
+- **Rank 0 is late with nothing attached** (`plain`): mean contribution delay 25 µs against 12 for the rest, last PE in 71% of waves at σ 100 (12% at σ 2,000).
+
+**What is left, from the strace runs of section 94.** Between 1.45 and 2.55 s of the σ 100 run (the simulation phase under strace), rank 0 makes 620 `futex` calls on one address, 0x3e06600 (455 wakes, 165 waits). Every other PE makes 40–70 calls on that address. The address is in the main thread's `brk` heap, about 30 MB above its start, so the lock was allocated early by the main thread. It is a lock every PE takes, which rank 0 takes, and finds contended, about 10× as often as any other PE: mostly it is holding it while others wait. That would make rank 0 slow exactly when the lock is busy, without more work on average. `strace -k` (call stack for every system call) works on Stampede3 and would name the lock.
 
 ## Baseline verification on the Mac
 
