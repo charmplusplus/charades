@@ -3647,7 +3647,7 @@ Each arm runs with the `/proc` sampler and `--gvt-trace=3`, plus an untraced, un
 
 ### Rank 0's faults: perf against /proc in the same run, a lighter sampler, and memory bound to the socket (design, 2026-10-26; written before any runs)
 
-> **Status: design.** Charades `scale-diag` e2806de (unchanged), htram b25ab15, `+lci_ndevices 23`, glibc defaults. Job G `$WORK/charades-runs/diag9.slurm` (4 nodes, skx only: one of my jobs per dev queue), wrapper `gwrap.sh`, sampler `schedsample.py` (new light mode: `/proc/<pid>/task/*/stat` only, every 1 s).
+> **Status: design.** Charades `scale-diag` e2806de (unchanged), htram b25ab15, `+lci_ndevices 23`, glibc defaults. Job G `$WORK/charades-runs/diag9.slurm` (4 nodes, skx and skx-dev, the copy that starts second cancelled), wrapper `gwrap.sh`, sampler `schedsample.py` (new light mode: `/proc/<pid>/task/*/stat` only, every 1 s).
 
 **Why.** Section 94 left a conflict: `/proc` says rank 0 takes 18,000–48,000 minor faults a second at σ 100 and spends 17–32% of its time in the kernel, but strace finds almost no system calls, and a sampled `perf record -e page-faults:u` saw 400–1,600 user-mode faults a second. Three explanations: automatic NUMA balancing (on, on the login node), the `/proc` sampler itself, or perf undercounting.
 
