@@ -147,6 +147,7 @@ Charades' controller ÷ Devastator's adaptive window: 0.68–1.03 at σ ≤ 500 
 | 80 | 2026-10-25 | 3639554 | Where a GVT advance's time goes at scale, results: a slow node sets the pace; PP 2,048's allocation, not its limit, gives 1.12–1.14×; margin 8 stays | current |
 | 81 | 2026-10-25 | — | The allocator behind `--agg-pp-limit`'s gain; the slow node in both engines; where a wider window's cost goes | design |
 | 82 | 2026-10-25 | 3639812 | The allocator, the slow node in both engines, a wider window's cost, results: c455-081 is slow only with the network, and it hurts Devastator more | current |
+| 83 | 2026-10-25 | — | Where a wider window's cost goes, on a clean allocation | design |
 
 ## Stampede3 runs, in order
 
@@ -3286,6 +3287,15 @@ Best ÷ best (each arm set at its best W): 4 nodes σ 100 1.01, σ 2,000 0.97; 1
 **Consequences.**
 - The earlier explanation that Charades pays more for a slow node because of its tight window is wrong for this node: Devastator pays more. The question I answered before this job ("why is the slow node not a problem for Devastator?") had a false premise; we had not measured it.
 - Next on the window: repeat W on a clean allocation (`-x c455-081`). If the straggler cost still dominates and grows faster than work per advance, attack what makes one process lag within an advance (rank 0's process-level work, per-process receive handling), before in-buffer cancellation.
+
+### Where a wider window's cost goes, on a clean allocation (design, 2026-10-25; written before any runs)
+
+> **Status: design.** Part W of section 81 repeated with `-x c455-081`, 3 reps: 16 nodes, PP 512, σ 100 and σ 2,000, W 250, 400, 600, `--gvt-trace=2 --pe-stats=1`. Same build (`charades-diag`). Job script `$WORK/charades-runs/diag3.slurm`.
+
+**Predictions:**
+- C1. No process is consistently the busiest: the busiest process's µs per event is ≤ 1.03× the median, and a different process is busiest in different runs.
+- C2. µs per advance is lower than in section 82 at every W (no slow node), and from W 400 to 600 the straggler cost still accounts for more than half of the added µs per advance.
+- C3. From W 400 to 600 the straggler cost grows faster than the work per advance (the ratio of advances), the share that rollbacks add.
 
 ## Baseline verification on the Mac
 
