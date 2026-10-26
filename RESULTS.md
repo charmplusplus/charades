@@ -193,6 +193,7 @@ Charades' controller ÷ Devastator's adaptive window: 0.68–1.03 at σ ≤ 500 
 | 102 | 2026-10-26 | — | htram flush order: rotating start and earliest timestamp first | design |
 | 103 | 2026-10-26 | 3643408, 3643609 | htram flush order, results: no effect; the lower edge stays late | current |
 | 104 | 2026-10-26 | — | Why one PE holds up each GVT advance at uniform and σ 2,000: per-PE wave records, and fewer events per wave | design |
+| 105 | 2026-10-26 | 3643687 | Per-PE wave records, results: at uniform the late PE is slowed by receiving many small messages; `--gvt-wave-events=32` is 1.04–1.06× at 16 nodes | current |
 
 ## Stampede3 runs, in order
 
@@ -3855,6 +3856,70 @@ Summary per traced run, over the recorded waves at 10–95% of the run: in each 
 - K7. `--gvt-trace=4` costs at most 5% (traced ÷ untraced ≥ 0.95).
 
 If K2 holds, the straggler cost at uniform is GVT waiting for the PE with the most work in the window, and the remedies are spreading that work (sharing it within a process) or pacing waves differently, not aggregation. If instead the late PE's time is in pickup or in drains and receives (K2 or K3 wrong), it is receive handling, and fewer, larger messages could help after all.
+
+### Per-PE wave records, results: at uniform the late PE is slowed by receiving many small messages; `--gvt-wave-events=32` is 1.04–1.06× at 16 nodes (2026-10-26; skx-dev batch job 3643687, 16 nodes)
+
+> **Status: current.** Design and predictions in section 104. 16 nodes (c454-021, c454-022, c454-042, c454-072, c455-022 to -024, c455-031 to -034, c455-041, c455-042, c455-094, c455-101, c455-102; 4-node runs on the first four), 35 runs ok (the first warm-up stalled, as first launches on fresh nodes do); 6 min. Summary `~/charades-data/sdiag/sdiag13_summary.py`, output `~/charades-data/sdiag/j3643687/summary.txt`.
+
+**Throughput** (untraced, W 400, M committed events/s, mean of 2 reps; higher is better):
+
+| workload | htram | 4 nodes | 16 nodes | 4→16 efficiency | traced ÷ untraced (4 / 16 nodes) |
+|---|---|---|---|---|---|
+| uniform | WPs 512 | 101.7 | 280.2 | 0.69 | 0.984 / 0.985 |
+| uniform | PP 512 | 122.1 | 224.5 | 0.46 | 0.987 / 1.018 |
+| σ 2,000 | PP 512 | 125.8 | 431.8 | 0.86 | 0.990 / 1.013 |
+
+**`--gvt-wave-events` K ÷ the default 128, 16 nodes** (untraced, both reps in parentheses; higher is better):
+
+| workload | htram | K 0 | K 32 |
+|---|---|---|---|
+| uniform | WPs 512 | 1.057 (296.7, 295.8 vs 279.4, 281.0) | 1.056 (298.0, 294.0) |
+| uniform | PP 512 | 1.037 (233.5, 232.3 vs 224.8, 224.1) | 1.042 (232.0, 235.6) |
+| σ 2,000 | PP 512 | — | 1.035 (444.4, 449.6 vs 429.3, 434.4) |
+
+**The late PE against the median PE of its process** (the slowest process's last PE in each recorded wave, waves 10–95%, both reps, about 2,800–3,100 waves per cell; µs after the previous result in that process, lower is better; "by count" = share of waves in which it contributed because it had run 128 events since its last contribution):
+
+| workload | nodes | PE | delay | pickup (in a pass + outside) | after pickup | of which: scheduler (incl. drains) | drains | htram receives | other, outside the scheduler | events after pickup | µs per event after pickup | by count |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| uniform, WPs | 4 | late | 209 | 8 + 9 | 192 | 133 | 35 | 47 | 12 | 79 | 2.44 | 1.00 |
+| uniform, WPs | 16 | late | 339 | 22 + 28 | 288 | 159 | 53 | 102 | 27 | 61 | 4.74 | 0.97 |
+| uniform, WPs | 16 | median | 78 | 2 + 2 | 75 | 7 | 1 | 2 | 66 | 2 | — | 0.31 |
+| uniform, PP | 4 | late | 165 | 8 + 7 | 150 | 125 | 28 | 6 | 19 | 87 | 1.72 | 0.98 |
+| uniform, PP | 16 | late | 387 | 13 + 32 | 343 | 154 | 46 | 79 | 110 | 59 | 5.78 | 0.94 |
+| σ 2,000, PP | 4 | late | 156 | 12 + 8 | 136 | 117 | 22 | 2 | 17 | 90 | 1.51 | 0.99 |
+| σ 2,000, PP | 16 | late | 143 | 20 + 15 | 107 | 78 | 16 | 2 | 13 | 55 | 1.94 | 0.94 |
+
+(The median PE contributes almost at once in every cell: delay 21–81 µs, 1–2 events after pickup. Its "other" time is mostly waiting for its next pass to end.)
+
+**Cost of an htram receive** (ranks 0, 1, 11, 21, 22 of every process, from the `--gvt-trace=3` snapshots, waves 10–100%; µs per receive-handler call):
+
+| workload | htram | 4 nodes | 16 nodes |
+|---|---|---|---|
+| uniform | WPs 512 | 10.3, 11.1 (30 events per message) | 8.3, 8.2 (12.4) |
+| uniform | PP 512 | 5.7, 5.5 (75) | 7.5, 7.3 (13.8) |
+| σ 2,000 | PP 512 | 3.7, 3.7 (50) | 3.7, 3.7 (50) |
+
+- **K1 half right.** No rank is the late PE in more than 10% of waves at uniform. But one process is the slowest more often than 15% of the time: process 2 at 16 nodes with WPs (0.26), and processes 2 and 3 at 4 nodes (0.35, 0.32). Processes 2 and 3 are the second node in both runs (c454-022). They are not slower per event (`pe_stats`: every process is within 1.04× of the median), so this is not a slow node like c455-081. Not explained.
+- **K2 right, with one detail.** The late PE contributes by count in 94–100% of waves, and its pickup takes 8–15% of its delay. The median PE contributes by count in 29–34% of waves, just over the 30% predicted. The count runs from the PE's last contribution: after pickup the late PE runs only 55–90 events, never 128. So it is late because it is busy after pickup, not because it was busy elsewhere first.
+- **K3 wrong at uniform: the late PE is slower, not more loaded.** From 4 to 16 nodes it runs *fewer* events after pickup (WPs 79 → 61, PP 87 → 59) but takes longer per event (2.44 → 4.74 µs, 1.72 → 5.78). The extra time is receive work:
+  - WPs: the late PE's delay grows by 130 µs. htram receive handlers +55, pickup +33, drains +18, other time outside the scheduler +15, the events themselves +8.
+  - PP: it grows by 222 µs. Other time outside the scheduler +91, htram receives +73, pickup +30, drains +18. The 91 µs is outside Charades' timers: Converse scheduling, LCI progress, and receive-side work that the htram timer does not cover.
+  - (The comparison with the median PE was not meaningful: it runs 1–2 events after pickup.)
+- **Receive work is even over the run but uneven per wave.** Every rank spends about 2 µs per wave in htram receive handlers on average (WPs, 16 nodes: 0.2–10.4 per PE, no rank above 3). In a given wave, the late PE is the one that took about 100 µs of receives. With LCI, a message lands on the device with the sender's index, so which PE handles a receive depends on the sender's rank, which is effectively random at uniform.
+- **K4 right.** 74% (WPs) and 87% (PP) of the growth in the late PE's delay is after pickup. But it is mostly receive work, not event execution.
+- **K5 right, and σ 2,000 does not grow in this job.** The late PE contributes by count in 94% of waves. Its delay is 156 µs at 4 nodes and 143 at 16, with receives at 2 µs. This job's σ 2,000 efficiency is 0.86 (0.81 in section 95), so it has little loss left to explain.
+- **K6 right for uniform, and better than predicted at σ 2,000.** K 32 gives 1.056 (WPs) and 1.042 (PP) at uniform, and 1.035 at σ 2,000 (predicted ±3%). K 0 gives about the same as 32 at uniform. All four reps are within ±1% of their pair. In section 66's era (4 nodes, old layout), K 64 was 0.77, so 32 needs checking at 1 and 4 nodes before it becomes the default.
+- **K7 right.** Traced ÷ untraced is 0.984–1.018.
+
+**What this means.**
+- At uniform, the straggler cost at scale is receive handling of thin messages. Per call, a WPs receive costs about 10.6 µs at 30 events per message and 8.2 µs at 12.4. Fitting a fixed and a per-event cost to these two points gives about 6.5 µs per message plus 0.13 µs per event. So receive cost per event rises from about 0.35 µs to 0.66 µs as messages thin. PP is not consistent with a simple fixed-plus-per-event fit, because it mixes PEs' 16-event local sends with shared-buffer sends.
+- So fewer, larger messages *would* help uniform, against section 80's reading. So would a cheaper per-message receive: what the 6.5 µs consists of is not yet measured. One candidate is pushes onto up to 23 PEs' inboxes per message.
+- Separately, `--gvt-wave-events=32` is worth 3.5–5.6% at 16 nodes on all three workloads.
+
+**Next:**
+1. `--gvt-wave-events` 32 (and 64) against 128 at 1, 4 and 16 nodes across the scaling workloads, before changing the default.
+2. Break down an htram receive at 16 nodes (unpacking, inbox pushes per destination PE, allocation), to find the fixed cost.
+3. Then compare cutting that cost with fewer destinations (one process per node with per-socket buffers, or two-hop routing).
 
 ## Baseline verification on the Mac
 
