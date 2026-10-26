@@ -22,20 +22,20 @@ Every number from every run: Stampede3 runs in order (each design, written befor
 
 > **Launch change, 2026-10-26:** `+lci_ndevices 23` (one device per PE) replaces 16: 1.08–1.46× at 16 nodes (geometric mean 1.21), 1.03–1.07× at 4 nodes (sections 88, 90). The 1–16 node table further down used 16 devices.
 
-**Charades and Devastator at 16 nodes, one allocation, 23 devices** (job 3641926, section 92; c455-081 excluded; median of 3, short runs; each engine at its best setting over the same grids as job 3639098, Devastator also at W 2,000; higher is better for Charades):
+**Charades and Devastator, 1 / 4 / 16 nodes, one allocation, 23 devices** (job 3642157, section 95; c455-081 excluded; median of 3, short runs; each engine at its best setting: Charades over PP 512, PP 2,048 (WPs 512 for uniform and lookahead 10 σ 2,000) × W 250/400/600 and the controller (lookahead 10: W 50/100/200); Devastator over W 500/1,000 (2,000 at 16 nodes; lookahead 10: 100/200/400), CLCG4; glibc defaults for both):
 
-| workload | Charades (M ev/s) | Devastator (M ev/s) | Charades ÷ Devastator |
-|---|---|---|---|
-| lookahead 100, mean 1,000, σ 100 | 702.3 | 661.9 | 1.06 |
-| σ 500 | 622.7 | 523.5 | 1.19 |
-| σ 1,000 | 579.1 | 446.1 | 1.30 |
-| σ 2,000 | 435.4 | 381.9 | 1.14 |
-| σ 4,000 | 421.8 | 301.1 | 1.40 |
-| uniform remote 1.0 | 280.2 | 197.7 | 1.42 |
-| lookahead 10, mean 200, σ 500 | 560.5 | 512.0 | 1.09 |
-| lookahead 10, σ 2,000 | 414.6 | 360.1 | 1.15 |
+| workload | Charades, 16 nodes (M ev/s) | Devastator, 16 nodes (M ev/s) | Charades ÷ Devastator, 1 / 4 / 16 nodes | efficiency 4→16, Charades / Devastator |
+|---|---|---|---|---|
+| lookahead 100, mean 1,000, σ 100 | 704.4 | 663.0 | 1.17 / 1.04 / 1.06 | 0.99 / 0.97 |
+| σ 500 | 619.0 | 519.8 | 1.09 / 1.08 / 1.19 | 0.97 / 0.88 |
+| σ 1,000 | 579.4 | 442.8 | 1.08 / 1.19 / 1.31 | 0.95 / 0.86 |
+| σ 2,000 | 434.1 | 380.3 | 1.29 / 1.28 / 1.14 | 0.81 / 0.91 |
+| σ 4,000 | 421.4 | 297.9 | 1.34 / 1.48 / 1.41 | 0.87 / 0.92 |
+| uniform remote 1.0 | 276.8 | 194.6 | 1.41 / 1.90 / 1.42 | 0.52 / 0.69 |
+| lookahead 10, mean 200, σ 500 | 562.8 | 514.4 | 0.98 / 0.98 / 1.09 | 0.97 / 0.86 |
+| lookahead 10, σ 2,000 | 414.5 | 360.9 | 1.14 / 1.18 / 1.15 | 0.89 / 0.91 |
 
-Charades leads in all 8 at 16 nodes. Its controller is within 0–3% of its best fixed W except at σ 2,000 and 4,000 (0.87–0.90). Still to do at 1 and 4 nodes with 23 devices. Candidate, not yet default: `GLIBC_TUNABLES=glibc.malloc.trim_threshold=1073741824:glibc.malloc.top_pad=67108864` (1.06–1.08× at 4 nodes, section 92).
+Charades leads in 22 of 24 cells (all but lookahead 10, σ 500 at 1 and 4 nodes, 0.98). Its controller is within 5% of its best fixed W everywhere except σ 2,000 and 4,000 at 16 nodes (0.92, 0.86). Candidate, not yet default: glibc no-trim (`GLIBC_TUNABLES=glibc.malloc.trim_threshold=1073741824:glibc.malloc.top_pad=67108864`) is 1.02–1.10× for Charades at 16 nodes (geometric mean 1.055) but 0.25–0.53× for Devastator, so it is a Charades-only launch setting (section 95). Still open: rank 0 late at σ 100 (sections 88–94), and Charades' weaker 4→16 efficiency at σ ≥ 2,000 and uniform.
 
 **Charades and Devastator, 1–16 nodes, weak scaling, one allocation** (job 3639098, section 78; without c455-081). Each engine at its best setting per cell: Charades over PP 512, PP 2,048 (and WPs 512 for uniform and lookahead 10 σ 2,000) × W 250/400/600 and the controller (lookahead 10: W 50/100/200); Devastator over W 500/1,000 (lookahead 10: 100/200/400), CLCG4.
 
@@ -183,6 +183,7 @@ Charades' controller ÷ Devastator's adaptive window: 0.68–1.03 at σ ≤ 500 
 | 92 | 2026-10-26 | 3641910, 3641926 | Results: malloc settings 1.06–1.08×, but rank 0's faults come from system calls; Charades ahead of Devastator in all 8 workloads at 16 nodes | current |
 | 93 | 2026-10-26 | — | Rank 0's system calls; and the 1/4/16-node series on 23 devices, with glibc no-trim at 16 nodes | design |
 | 94 | 2026-10-26 | 3642143 | Rank 0's system calls, results: not the cause | current |
+| 95 | 2026-10-26 | 3642157 | 1/4/16 nodes on 23 devices, results: Charades leads in 22 of 24 cells; glibc no-trim 1.055× for Charades, 0.25–0.53× for Devastator | current |
 
 ## Stampede3 runs, in order
 
@@ -3614,6 +3615,34 @@ Each arm runs with the `/proc` sampler and `--gvt-trace=3`, plus an untraced, un
 - **E2 right:** at σ 2,000 every PE makes about 2,200 calls a second (mostly `futex`, plus `writev` to the hfi1 device and `process_vm_readv` for same-node transfers), and rank 0 is like the rest once start-up is excluded.
 - **What this leaves.** Rank 0 at σ 100 spends 17–32% of its time in the kernel and takes 18,000–48,000 minor faults a second (`/proc`, sections 90 and 92). Those are not in system calls (strace), and `perf record -e page-faults:u` saw only 400–1,600 user-mode faults a second (section 92). One of the two measurements is misleading, or the faults come from a kernel mechanism neither sees directly. The leading candidate: automatic NUMA balancing is on (`kernel.numa_balancing` = 1, checked on a login node). It periodically unmaps a process's pages to see which node touches them, and charges the scan and the hinting faults to the threads that run into them. Its address-space walk starts at the lowest addresses, where the main thread's `brk` heap sits. Not yet tested; two other open possibilities are that the `/proc` sampler itself causes the faults on the main thread, or that perf undercounts them.
 - The extra `futex` calls (about 3.5× the median rank) are lock waits. A plausible source is glibc's main-arena lock: memory rank 0 allocates is freed by other PEs, which must take that arena's lock.
+
+### 1/4/16 nodes on 23 devices, results: Charades leads in 22 of 24 cells; glibc no-trim is 1.055× for Charades and 0.25–0.53× for Devastator (2026-10-26; skx-dev batch job 3642157, 16 nodes)
+
+> **Status: current.** Design and predictions in section 93 (job F). 16 nodes (c455-081 excluded; moved to skx-dev when it came free), 1 h 9 min. 756 Charades runs ok. Two 1-node runs reached the 60 s cap: lookahead 10, σ 2,000, W 200 at PP 512 and PP 2,048 in rep 1. All Devastator runs ok. Summary `~/charades-data/scale23/scale23_summary.py`, output and data in `~/charades-data/scale23/j3642157/`.
+
+**Weak scaling, each engine at its best setting** (M committed events/s, median of 3; Charades ÷ Devastator, higher is better for Charades; efficiency = per-node rate at 16 ÷ at 4 nodes, 1.0 is perfect):
+
+| workload | Charades 1 / 4 / 16 nodes | Devastator 1 / 4 / 16 nodes | **Charades ÷ Devastator 1 / 4 / 16** | same, job 3639098 (16 devices) | efficiency 4→16, Charades / Devastator | same, job 3639098 |
+|---|---|---|---|---|---|---|
+| lookahead 100, mean 1,000, σ 100 | 48.4 / 178.1 / 704.4 | 41.4 / 171.3 / 663.0 | **1.17 / 1.04 / 1.06** | 1.14 / 0.97 / 0.92 | 0.99 / 0.97 | 0.93 / 0.98 |
+| σ 500 | 42.0 / 159.9 / 619.0 | 38.6 / 147.4 / 519.8 | **1.09 / 1.08 / 1.19** | 1.07 / 1.10 / 1.08 | 0.97 / 0.88 | 0.90 / 0.92 |
+| σ 1,000 | 40.7 / 152.2 / 579.4 | 37.6 / 128.0 / 442.8 | **1.08 / 1.19 / 1.31** | 1.08 / 1.21 / 1.26 | 0.95 / 0.86 | 0.89 / 0.86 |
+| σ 2,000 | 39.5 / 134.3 / 434.1 | 30.6 / 104.8 / 380.3 | **1.29 / 1.28 / 1.14** | 1.27 / 1.21 / 0.95 | 0.81 / 0.91 | 0.71 / 0.91 |
+| σ 4,000 | 39.3 / 120.5 / 421.4 | 29.3 / 81.2 / 297.9 | **1.34 / 1.48 / 1.41** | 1.32 / 1.40 / 1.04 | 0.87 / 0.92 | 0.69 / 0.93 |
+| uniform remote 1.0 | 42.4 / 133.8 / 276.8 | 30.1 / 70.6 / 194.6 | **1.41 / 1.90 / 1.42** | 1.38 / 1.69 / 0.99 | 0.52 / 0.69 | 0.40 / 0.68 |
+| lookahead 10, mean 200, σ 500 | 38.2 / 145.8 / 562.8 | 39.0 / 149.4 / 514.4 | **0.98 / 0.98 / 1.09** | 0.96 / 0.91 / 0.85 | 0.97 / 0.86 | 0.81 / 0.87 |
+| lookahead 10, σ 2,000 | 33.6 / 116.3 / 414.5 | 29.6 / 98.6 / 360.9 | **1.14 / 1.18 / 1.15** | 1.09 / 0.97 / 0.76 | 0.89 / 0.91 | 0.71 / 0.91 |
+
+- **F1 mostly right.** At 1 node every ratio is at or above the old one; at 4 nodes 6 of 8 are, and the other two are 0.02 below (σ 500, 1,000). Charades leads in 7 of 8 workloads at 1 and 4 nodes and 8 of 8 at 16; the one exception is lookahead 10, σ 500 (0.98 at 1 and 4 nodes).
+- **F2 wrong on the thresholds, right in direction.** Charades' 4→16 efficiency rose at every workload: σ 2,000 0.71 → 0.81 (predicted ≥ 0.85), σ 4,000 0.69 → 0.87, uniform 0.40 → 0.52 (predicted ≥ 0.60). At σ ≥ 2,000 Devastator still scales better (0.91–0.92); Charades' lead there comes from its higher rate per node.
+- The 16-node numbers agree with job 3641926 to within 1% for both engines.
+- Charades' best setting: PP 512 at W 250 on 1 node; PP 2,048 at σ ≤ 1,000 and lookahead 10 σ 500 from 4 nodes on; WPs 512 for uniform at 16 nodes and lookahead 10 σ 2,000 from 4. Devastator's best W: 500–1,000 (lookahead 10: 100–200), always inside its grid.
+- **Controller ÷ best fixed W:** 0.95–1.03 everywhere except σ 2,000 and 4,000 at 16 nodes (0.92, 0.86).
+
+**glibc no-trim (`trim_threshold` 1 GB, `top_pad` 64 MB) ÷ defaults at 16 nodes**, same arm, median of 3 each (higher is better):
+- **Charades: 1.021–1.099 over 36 cells, geometric mean 1.055, ≥ 1.03 in 33** (F3 right). Best no-trim ÷ best defaults per workload: 1.035–1.086.
+- **Devastator: 0.25–0.53 (geometric mean 0.38). F3 wrong for Devastator, badly.** The setting is harmful to it, not neutral. A likely reason, untested: glibc gives each thread's arena heaps of at most 64 MB, and a 64 MB top pad asks for that much headroom on every extension, so a program whose worker threads allocate a lot keeps creating and dropping heaps. Each engine keeps its own best: Charades with no-trim, Devastator with the defaults. A smaller pad, or the trim threshold alone, may be better for both; not tested.
+- With no-trim, Charades' 16-node lead would be about 5% larger than in the table above (not rerun as one table).
 
 ## Baseline verification on the Mac
 
