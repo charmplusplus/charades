@@ -207,6 +207,7 @@ Charades' controller ÷ Devastator's adaptive window: 0.68–1.03 at σ ≤ 500 
 | 113 | 2026-10-27 | 3647310 | `+mempool_remote_free`, results: freeing a received message 1.45 → 0.30 µs; uniform 1.02–1.06× at 16 nodes; gate rerun needed (harness) | current |
 | 114 | 2026-10-27 | 3647898 | Correctness gate for `+mempool_remote_free`, results: 231/231; the flag joins the Stampede3 launch | current |
 | 115 | 2026-10-27 | — | What paces GVT at σ 2,000: events in transit or the late PE's work; GVT bucket size; horizon margin with wider windows | design |
+| 116 | 2026-10-27 | 3649213 | What paces GVT at σ 2,000, results: neither transit nor a growing straggler; the cross-process reduction (34 → 70 µs) is the whole 4→16-node loss | current |
 
 ## Stampede3 runs, in order
 
@@ -4276,6 +4277,48 @@ Mac: trace configs 54/54.
 - If P1 and P2 hold, GVT is aggregation-paced, and the fix is to send the events GVT will need next before it needs them (candidate (a)). If both are wrong, the straggling is statistical, and the fix is sharing work within a process (candidate (b)).
 - P3. Bucket size 16 and 32 change throughput by less than 5% either way.
 - P4. No margin and window pair in C beats margin 8 at W 400 by more than 3%.
+
+### What paces GVT at σ 2,000, results: neither transit nor a growing straggler; the cross-process reduction (34 → 70 µs) is the whole 4→16-node loss (2026-10-27; skx-dev batch job 3649213, 16 nodes)
+
+> **Status: current.** Design and predictions in section 115. 16 nodes (c454-013, c454-022, c454-032, c454-033, c454-072, c454-073, c454-084, c454-092, c454-093, c454-101, c455-004, c455-011, c455-031 to -033, c455-071; 4-node runs on the first four), 78 runs, all ok; 8 min. Current launch (`+lci_ndevices 23 +pemap 2-46:2,3-47:2 +mempool_remote_free`, ring input buffers). Summary `~/charades-data/sdiag/sdiag19_summary.py`, output and CSVs in `~/charades-data/sdiag/j3649213/`; the advance split below was computed inline from the `gvt_waves_*.csv` files, as in section 80.
+
+**Throughput, σ 2,000, PP 512** (M committed events/s, mean of 2 reps; higher is better): W 400: 125.4 on 4 nodes and 442.5 on 16, a **4→16-node efficiency of 0.88** (0.81 in section 95 under the old launch; Devastator 0.91 there). On 16 nodes, W 250 is 403.8 (0.91× W 400) and W 600 is 392.2 (0.89×). Traced ÷ untraced: 0.95–0.99.
+
+**A GVT advance, split** (µs, waves 10–95%, both reps; lower is better; definitions as in section 80):
+
+| W | nodes | advance | reduction floor | median process work | slowest process work | straggler cost | spread inside the slowest process |
+|---|---|---|---|---|---|---|---|
+| 400 | 4 | 196 | 34 | 55 | 161 | 106 | 145 |
+| 400 | 16 | 226 | **70** | 43 | 154 | **111** | 138 |
+| 250 | 16 | 198 | 60 | 32 | 136 | 104 | 126 |
+| 600 | 16 | 280 | 62 | 42 | 217 | 174 | 194 |
+
+**Waves** (PE 0's trace): in every wave at every setting, all buckets that every PE had passed at the previous wave complete (W 400: 8.7 per wave on 4 nodes, 9.6 on 16). No passed bucket was ever left open with events in transit.
+
+**The late PE against the median PE of its process** (W 400): the late PE contributes 157–159 µs after the result on both 4 and 16 nodes, after running 92 (4 nodes) or 54 (16 nodes) events since picking the result up. The median PE runs about 1 event and contributes after 21–23 µs. The late PE picks the result up later on 16 nodes (41 against 19 µs; it is in the middle of a scheduler pass). Since its previous contribution it has received 1.07× (4 nodes) to 1.24× (16 nodes) the events of the median PE. **None of either PE's arrivals came within one bucket of GVT**: they arrive on average about 160 buckets (1,300 time units) ahead of it. Rank 0 is the most frequent late PE (0.12–0.21 of waves; the lower-edge effect of sections 84–103).
+
+**B. GVT bucket size** (÷ bucket 8, PP 512, mean of 2 reps; higher is better): 16 and 32 are 0.976–1.010 in all 16 cells (σ 2,000 and 4,000, W 400 and the controller, 4 and 16 nodes).
+
+**C. Horizon margin × window** (σ 2,000, 16 nodes; ÷ margin 8 at W 400; higher is better):
+
+| margin | W 400 | W 600 |
+|---|---|---|
+| 4 | 1.007 | 0.898 |
+| 8 | 1.000 (438.6 M ev/s) | 0.896 |
+| 16 | 0.996 | 0.886 |
+
+Efficiency is 99.84–99.93% at W 400 and 99.0–99.1% at W 600. Events per message are 43–51 at W 400 and 25–27 at W 600.
+
+- **P1 wrong.** GVT never waits on events in transit; every passed bucket completes in the next wave.
+- **P2 wrong.** The late PE received only 1.07–1.24× the median PE's events, and none of them close to GVT. So GVT is not aggregation-paced (explanation (a) is out).
+- **Explanation (b) is half right.** The straggler is real (about 110 µs of a 226 µs advance): one PE still has events inside the window while the rest are blocked by it. But **it no longer grows with the node count** (106 → 111 µs, slowest process work 161 → 154). In section 80, under the old launch, it grew by 40 µs.
+- **What grows is the reduction floor: 34 → 70 µs, the whole +30 µs per advance from 4 to 16 nodes.** This is the slowest process's wait from its last PE's contribution to the published result: the combine across 32 processes and the result's way back. Section 53 found an all-reduce no faster than the nodegroup reduction (0.96–1.02×) when the straggler dominated. The straggler's growth is gone now, so the floor is what limits scaling.
+- **P3 right.** Bucket size changes nothing (−2.4% to +1.0%).
+- **P4 right.** The margin changes nothing at W 400 (±0.7%), and a wider window loses 10–11% at any margin.
+
+**Next.** Make the cross-process combine fast. A 32-process reduction of a few hundred bytes should take about 10–15 µs on Omni-Path, not 70.
+1. Measure where the 70 µs goes, per hop: the message in flight, waiting for a PE to run the nodegroup handler (PEs run handlers only between scheduler passes of up to 16 events, about 30 µs), and combining.
+2. Then reduce what dominates. If it is waiting for a PE, run GVT reduction messages promptly: check for them inside the execute loop, or give them to the free core each process already leaves idle. If it is hops, use fewer: the existing recursive doubling (`--gvt-wave-allreduce`, 5 hops), a two-level exchange (2 hops), or one all-to-all exchange of counts (1 hop, 31 small messages per process per wave).
 
 ## Baseline verification on the Mac
 
