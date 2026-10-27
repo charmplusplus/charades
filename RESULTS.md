@@ -4213,13 +4213,13 @@ The pool header grows by one pointer. Only Reconverse's LCI2 backend uses it.
 | PP | off | 3.43 | 1.41 | 0.85 | 0.368 | 249.4 |
 | PP | on | 2.71 | 1.26 | **0.29** | 0.352 | 255.1 |
 
-- **O1 right, just.** Freeing the received message costs 0.29–0.30 µs instead of 0.85–1.46, at the predicted bound of 0.3. A receive now costs 2.7–3.1 µs (8.8 with the mutex input buffer in section 109). Inbox drains also got slightly cheaper per item (0.350 → 0.327 with WPs): their reference drops free cross-thread too.
+- **O1 right, just.** Freeing the received message costs 0.29–0.30 µs instead of 0.85–1.46, at the predicted bound of 0.3. A receive now costs 2.7–3.1 µs (8.8 with the mutex input buffer in section 109). Input-buffer drains also got slightly cheaper per item (0.350 → 0.327 with WPs): their reference drops free cross-thread too.
 - **O2 partly right.**
   - Uniform with WPs on 16 nodes gains 1.046 and 1.063, as predicted. With PP it gains only 1.025 and 1.018, below the predicted 1.03.
   - Elsewhere every cell is at least 0.99 except σ 2,000 with the controller on 16 nodes (0.983), a cell that moves about ±2% between jobs.
   - On 1 node every cell is within ±1%.
 - **O3 not yet tested** (see the status note).
-- **Uniform's 4→16 node efficiency with WPs at W 400:** 350.7 ÷ (4 × 112.2) ≈ 0.78 in this job's receive runs and 0.76 in its throughput runs. That compares with 0.70 with the mutex input buffer (section 109) and Devastator's 0.69 (section 95, another job).
+- **Uniform's 4→16 node efficiency with WPs at W 400:** 350.7 ÷ (4 × 112.2) ≈ 0.78 in this job's receive runs and 0.79 in its throughput runs (355.2 ÷ 448.8). That compares with 0.70 with the mutex input buffer (section 109) and Devastator's 0.69 (section 95, another job).
 
 **Next.** If the gate passes, adopt `+mempool_remote_free` in the Charades launch line on Stampede3. It is a Reconverse runtime flag, so Charades' code does not change. Making it Reconverse's default is a separate decision, because it changes a pool every Reconverse program uses.
 
