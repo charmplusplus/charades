@@ -663,12 +663,24 @@ void BucketGVT::poll() {
 
 NodeWaves::NodeWaves()
     : t_combined(0), t_result(0), slots(CkMyNodeSize()), arrived(0), slot_t(CkMyNodeSize()), gen(0),
-      rounds(0), ar_wave(0), ar_round(0), ar_active(false) {
+      rounds(0), ar_wave(0), ar_round(0), ar_active(false), tree_parent(-1),
+      tree_wave(0), tree_in(0), tree_lock(CmiCreateLock()) {
   while ((1 << rounds) < CkNumNodes()) rounds++;
   allreduce = g_tw_gvt_wave_allreduce && (1 << rounds) == CkNumNodes();
   if (g_tw_gvt_wave_allreduce && !allreduce && CkMyNode() == 0) {
     CkPrintf("Bucketed GVT: %d processes is not a power of two; count waves "
              "use the nodegroup reduction\n", CkNumNodes());
+  }
+  if (g_tw_gvt_wave_tree) {
+    if (g_tw_gvt_wave_allreduce) {
+      CkAbort("--gvt-wave-tree and --gvt-wave-allreduce exclude each other\n");
+    }
+    // A k-ary heap over the processes, rooted at process 0
+    const long k = g_tw_gvt_wave_tree, me = CkMyNode();
+    if (me) tree_parent = (me - 1) / k;
+    for (long c = me * k + 1; c <= me * k + k && c < CkNumNodes(); c++) {
+      tree_kids.push_back((int)c);
+    }
   }
 }
 
@@ -688,7 +700,7 @@ void NodeWaves::contribute_from(int rank, const std::vector<CmiInt8>& v) {
   if (g_tw_gvt_trace >= 2) {
     double first = slot_t[0];
     for (int r = 1; r < CkMyNodeSize(); r++) first = std::min(first, slot_t[r]);
-    proc_waves.push_back({first, slot_t[rank], 0.0, rank});
+    proc_waves.push_back({first, slot_t[rank], 0.0, rank, 0.0});
   }
   // The last PE in: every slot is written, and none is written again before
   // this wave's result is out
@@ -697,6 +709,11 @@ void NodeWaves::contribute_from(int rank, const std::vector<CmiInt8>& v) {
   combined.assign(slots[0].begin(), slots[0].end());
   for (int r = 1; r < CkMyNodeSize(); r++) {
     combine_wave(combined, slots[r].data(), slots[r].size());
+  }
+  if (g_tw_gvt_wave_tree) {
+    // No hop to this process's own handler: the last PE in adds the sums itself
+    tree_add(-1, -1, t_combined, combined.data(), combined.size());
+    return;
   }
   thisProxy[CkMyNode()].contribute_combined(combined.size(), combined.data());
 }
@@ -718,9 +735,19 @@ struct NodeGvtTimer {
 void NodeWaves::write_proc_waves() const {
   std::ofstream t(std::string(g_output_dir) + "gvt_waves_" +
                   std::to_string(CkMyNode()) + ".csv");
-  t << "first_s,last_s,result_s,last_rank\n" << std::fixed << std::setprecision(7);
+  t << "first_s,last_s,result_s,last_rank,handled_s\n" << std::fixed << std::setprecision(7);
   for (const ProcWave& w : proc_waves) {
-    t << w.first << "," << w.last << "," << w.result << "," << w.last_rank << "\n";
+    t << w.first << "," << w.last << "," << w.result << "," << w.last_rank
+      << "," << w.handled << "\n";
+  }
+  if (g_tw_gvt_wave_tree) {
+    std::ofstream h(std::string(g_output_dir) + "gvt_hops_" +
+                    std::to_string(CkMyNode()) + ".csv");
+    h << "wave,kind,peer,rank,sent_s,recv_s\n" << std::fixed << std::setprecision(7);
+    for (const Hop& x : hops) {
+      h << x.wave << "," << x.kind << "," << x.peer << "," << x.rank << ","
+        << x.sent << "," << x.recv << "\n";
+    }
   }
   if (g_tw_gvt_trace >= 3) {
     std::ofstream r(std::string(g_output_dir) + "gvt_ranks_" +
@@ -737,6 +764,9 @@ void NodeWaves::write_proc_waves() const {
 
 void NodeWaves::contribute_combined(int n, CmiInt8* v) {
   NodeGvtTimer timer;
+  if (g_tw_gvt_trace >= 2 && !proc_waves.empty()) {
+    proc_waves.back().handled = CmiWallTimer();
+  }
   if (!allreduce) {
     contribute(n * sizeof(CmiInt8), v, gvtWaveReductionType,
         CkCallback(CkIndex_NodeWaves::wave_result(NULL), thisProxy));
@@ -779,6 +809,84 @@ void NodeWaves::add_partner(const CmiInt8* v, int n) {
     send_round();
   } else {
     publish(ar_buf.data(), ar_buf.size());
+  }
+}
+
+void NodeWaves::tree_up(int wave, int child, double sent_t, int n, CmiInt8* v) {
+  NodeGvtTimer timer;
+  tree_add(child, wave, sent_t, v, n);
+}
+
+/**
+ * One input to this process's partial sums: its own PEs' (child -1) or a
+ * child process's. The last input sends the sums to the parent, or at the
+ * root starts the result down the tree. A child cannot be a wave ahead: it
+ * starts the next wave only after the result reaches it, which is after this
+ * process moved on to that wave.
+ */
+void NodeWaves::tree_add(int child, int wave, double sent_t, const CmiInt8* v, int n) {
+  const double now = g_tw_gvt_trace >= 2 ? CmiWallTimer() : 0;
+  CmiLock(tree_lock);
+  if (child < 0) wave = tree_wave;
+  if (wave != tree_wave) {
+    CkAbort("Bucketed GVT: process %d got wave %d from process %d during wave %d\n",
+        CkMyNode(), wave, child, tree_wave);
+  }
+  if (g_tw_gvt_trace >= 2) {
+    hops.push_back({wave, child < 0 ? 2 : 0, child < 0 ? CkMyRank() : child,
+                    CkMyRank(), sent_t, now});
+    if (child < 0 && !proc_waves.empty()) proc_waves.back().handled = now;
+  }
+  if (tree_in++ == 0) {
+    tree_buf.assign(v, v + n);
+  } else {
+    combine_wave(tree_buf, v, n);
+  }
+  if (tree_in < 1 + (int)tree_kids.size()) {
+    CmiUnlock(tree_lock);
+    return;
+  }
+  if (g_tw_gvt_trace >= 2) {
+    const double t = CmiWallTimer();
+    hops.push_back({wave, 3, tree_parent, CkMyRank(), t, t});
+  }
+  if (tree_parent >= 0) {
+    // The result comes back down before anything touches tree_buf again
+    thisProxy[tree_parent].tree_up(wave, CkMyNode(), CmiWallTimer(),
+        tree_buf.size(), tree_buf.data());
+    CmiUnlock(tree_lock);
+    return;
+  }
+  std::vector<CmiInt8> r = std::move(tree_buf);
+  tree_wave++;
+  tree_in = 0;
+  CmiUnlock(tree_lock);
+  tree_send_down(wave, r.data(), r.size());
+  publish(r.data(), r.size());
+}
+
+void NodeWaves::tree_down(int wave, double sent_t, int n, CmiInt8* v) {
+  NodeGvtTimer timer;
+  const double now = g_tw_gvt_trace >= 2 ? CmiWallTimer() : 0;
+  CmiLock(tree_lock);
+  if (wave != tree_wave || tree_in != 1 + (int)tree_kids.size()) {
+    CkAbort("Bucketed GVT: process %d got the result of wave %d during wave %d "
+        "with %d inputs\n", CkMyNode(), wave, tree_wave, tree_in);
+  }
+  if (g_tw_gvt_trace >= 2) {
+    hops.push_back({wave, 1, tree_parent, CkMyRank(), sent_t, now});
+  }
+  tree_wave++;
+  tree_in = 0;
+  CmiUnlock(tree_lock);
+  tree_send_down(wave, v, n);
+  publish(v, n);
+}
+
+/** The children first, so the result is on its way before this process uses it */
+void NodeWaves::tree_send_down(int wave, const CmiInt8* v, int n) {
+  for (int c : tree_kids) {
+    thisProxy[c].tree_down(wave, CmiWallTimer(), n, const_cast<CmiInt8*>(v));
   }
 }
 

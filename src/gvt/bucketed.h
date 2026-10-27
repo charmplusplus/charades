@@ -77,6 +77,9 @@ class NodeWaves : public CBase_NodeWaves {
     void contribute_combined(int n, CmiInt8* v);
     void wave_result(CkReductionMsg* msg);
     void exchange(int wave, int round, int n, CmiInt8* v);
+    /** --gvt-wave-tree: a child's partial sums, and the result from the parent */
+    void tree_up(int wave, int child, double sent_t, int n, CmiInt8* v);
+    void tree_down(int wave, double sent_t, int n, CmiInt8* v);
     /** Results published so far; read result() only after this moved */
     uint64_t generation() const { return gen.load(std::memory_order_acquire); }
     const std::vector<CmiInt8>& result() const { return res; }
@@ -87,7 +90,7 @@ class NodeWaves : public CBase_NodeWaves {
      * clock -- when its first and last PE contributed, the last PE's rank, and
      * when the result was published here. Written by rank 0 at the end.
      */
-    struct ProcWave { double first, last, result; int last_rank; };
+    struct ProcWave { double first, last, result; int last_rank; double handled; };
     std::vector<ProcWave> proc_waves;
     /** --gvt-trace=3: every rank's contribution, µs after the previous result here */
     std::vector<float> rank_delays;
@@ -97,12 +100,28 @@ class NodeWaves : public CBase_NodeWaves {
     void publish(const CmiInt8* v, int n);
     void send_round();
     void add_partner(const CmiInt8* v, int n);
+    void tree_add(int child, int wave, double sent_t, const CmiInt8* v, int n);
+    void tree_send_down(int wave, const CmiInt8* v, int n);
     bool allreduce;     ///< --gvt-wave-allreduce, and a power-of-two process count
     int rounds;         ///< log2 of the process count
     int ar_wave, ar_round;
     bool ar_active;     ///< this process is in wave ar_wave
     std::vector<CmiInt8> ar_buf;
     std::map<std::pair<int, int>, std::vector<CmiInt8>> early;
+    int tree_parent;              ///< --gvt-wave-tree: -1 at the root
+    std::vector<int> tree_kids;
+    int tree_wave, tree_in;       ///< the wave being combined, and inputs so far
+    std::vector<CmiInt8> tree_buf;
+    CmiNodeLock tree_lock;
+    /**
+     * --gvt-trace=2 with --gvt-wave-tree: one record per input and per send,
+     * on this process's clock except `sent`, which is the sender's clock.
+     * kind 0 = a child's partial sums received (peer = the child), 1 = the
+     * result received from the parent, 2 = this process's own PEs combined
+     * (sent = when the last PE combined), 3 = all inputs in and sent on.
+     */
+    struct Hop { int wave, kind, peer, rank; double sent, recv; };
+    std::vector<Hop> hops;
     std::vector<std::vector<CmiInt8>> slots;
     std::atomic<int> arrived;
     std::vector<double> slot_t;  ///< --gvt-trace=2: when each rank contributed

@@ -1,0 +1,5 @@
+# bucket with --gvt-wave-tree=2: processes combine count waves up a binary tree of processes
+sync=3
+gvt=4
+buffer-size=655360
+gvt-wave-tree=2

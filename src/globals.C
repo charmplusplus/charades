@@ -47,6 +47,7 @@ unsigned g_tw_pe_stats;
 unsigned g_tw_gvt_wave_events;
 unsigned g_tw_gvt_node_waves;
 unsigned g_tw_gvt_wave_allreduce;
+unsigned g_tw_gvt_wave_tree;
 unsigned g_tw_blocked_pause_ns;
 unsigned g_tw_sched_park;
 Time     g_tw_optimism_window;
@@ -143,6 +144,7 @@ void clear_globals() {
   g_tw_gvt_wave_events    = 128;
   g_tw_gvt_node_waves     = 1;
   g_tw_gvt_wave_allreduce = 0;
+  g_tw_gvt_wave_tree = 0;
   g_tw_sched_park         = 0;
   g_tw_blocked_pause_ns   = 0;
   g_tw_optimism_window    = 0;

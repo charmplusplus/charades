@@ -1,0 +1,8 @@
+# agg_bucket_pp with --gvt-wave-tree=64: one gather to process 0 and one scatter
+sync=3
+gvt=4
+buffer-size=655360
+aggregation=1
+agg-mode=2
+agg-buffer=16
+gvt-wave-tree=64

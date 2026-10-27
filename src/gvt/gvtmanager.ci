@@ -47,5 +47,7 @@ module gvtmanager {
     entry [notrace, exclusive] void contribute_combined(int n, CmiInt8 v[n]);
     entry [notrace, exclusive] void wave_result(CkReductionMsg* msg);
     entry [notrace, exclusive] void exchange(int wave, int round, int n, CmiInt8 v[n]);
+    entry [notrace] void tree_up(int wave, int child, double sent_t, int n, CmiInt8 v[n]);
+    entry [notrace] void tree_down(int wave, double sent_t, int n, CmiInt8 v[n]);
   };
 }
