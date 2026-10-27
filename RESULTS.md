@@ -196,6 +196,7 @@ Charades' controller ÷ Devastator's adaptive window: 0.68–1.03 at σ ≤ 500 
 | 105 | 2026-10-26 | 3643687 | Per-PE wave records, results: at uniform the late PE is slowed by receiving many small messages; `--gvt-wave-events=32` is 1.04–1.06× at 16 nodes | current |
 | 106 | 2026-10-26 | — | `--gvt-wave-events` 32 / 64 / 128 at 1, 4 and 16 nodes; what an htram receive costs | design |
 | 107 | 2026-10-26 | 3645244 | Wave events and receive cost, results: 128 stays; a receive's fixed cost is its inbox pushes, which slow from 0.17 to 0.70 µs each as receives get frequent | current |
+| 108 | 2026-10-27 | — | Cheaper inbox pushes: padded mutex inboxes and lock-free rings | design |
 
 ## Stampede3 runs, in order
 
@@ -4029,6 +4030,35 @@ Controller (ε 0.001):
 2. **Fewer pushes per event:** larger messages, from fewer destinations. 2D routing gets this only at the cost of a second hop, which also pays a receive.
 
 (1) is local to htram's receive path and keeps one hop, so it comes first.
+
+### Cheaper inbox pushes: padded mutex inboxes and lock-free rings (design, 2026-10-27; written before any runs)
+
+> **Status: design.** Charades `scale-diag` 5bd80f6 (adds `--agg-inbox-mode`), htram `pdes` 2d9fd13 (adds `htram_inbox_mode`), Reconverse `pads-dest-device` 13ae1ac with `+lci_dest_device` off. `+lci_ndevices 23`, glibc defaults. Job M `$WORK/charades-runs/diag15.slurm` (16 nodes, skx-dev and skx, `-x c455-081`, the copy that starts second cancelled).
+
+**Why.** Section 107: 72–73% of an htram receive at uniform on 16 nodes is handing the sorted message to the other PEs, one push per PE, and a push costs 0.17 µs when receives are rare but 0.70 µs when they are frequent. Each push locks the destination PE's inbox mutex, appends to a vector and stores a count. The 23 inboxes of a process sit next to each other in one array, about 72 bytes each, so neighbouring PEs' inboxes share cache lines.
+
+**Change** (`--agg-inbox-mode`, one build for every arm; mode 0 is the default and unchanged):
+- **1, padded:** the same mutex inbox, on its own cache lines. This separates false sharing from lock contention.
+- **2, rings:** one single-producer ring of 256 slots per (sending rank, receiving rank) pair in a process.
+  - A push writes a slot, stores the ring's tail and sets the receiver's pending flag. There is no lock and no read-modify-write.
+  - The receiving PE clears its flag and scans its 23 rings when the flag is set.
+  - A full ring falls back to the mutex inbox; `recv_parts_<pe>.csv` counts those overflows.
+  - Each PE allocates its own padded inbox or row of rings when inbox delivery starts. Until then senders use the old inbox, so no message is lost at start-up.
+
+Mac: the inbox configs in all three modes, PP and WPs, every model, 108/108. Ring mode repeated 10 times at 2 processes × 4 PEs on PHOLD and dragonfly, 120/120.
+
+**Runs** (3 reps, interleaved over modes):
+- Throughput at 1, 4 and 16 nodes: σ 100, σ 2,000 and uniform with PP 512, plus uniform with WPs 512; W 400 and the controller (ε 0.001). Modes 0, 1 and 2.
+- Receive breakdown (`--gvt-trace=3`) at 16 nodes, W 400: uniform with WPs 512 and PP 512, modes 0, 1 and 2.
+
+**Predictions:**
+- M1. Rings cut a push at uniform on 16 nodes (WPs) from about 0.70 µs to at most 0.25, and a receive from 8.5 µs to at most 5.
+- M2. Rings are at least 1.05× mode 0 at uniform on 16 nodes (both htram modes, fixed W). They are at least 0.98× at σ 100 and σ 2,000 at every node count, and within ±2% on 1 node.
+- M3. Padding alone recovers less than half the rings' gain at uniform on 16 nodes (a push still costs at least 0.45 µs): the cost is mostly lock contention, not false sharing.
+- M4. Fewer than 0.1% of ring pushes overflow to the mutex inbox.
+- M5. Inbox drains cost no more than 0.05 µs per item extra with rings (0.31–0.49 µs per item in section 107), although each non-empty drain scans 23 rings.
+
+If M2 holds, rings become the default after the full Mac matrix.
 
 ## Baseline verification on the Mac
 
