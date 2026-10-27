@@ -198,6 +198,7 @@ Charades' controller ÷ Devastator's adaptive window: 0.68–1.03 at σ ≤ 500 
 | 107 | 2026-10-26 | 3645244 | Wave events and receive cost, results: 128 stays; a receive's fixed cost is its inbox pushes, which slow from 0.17 to 0.70 µs each as receives get frequent | current |
 | 108 | 2026-10-27 | — | Cheaper inbox pushes: padded mutex inboxes and lock-free rings | design |
 | 109 | 2026-10-27 | 3646589 | Inbox modes, results: lock-free rings make uniform 1.08–1.21× faster at 16 nodes (a push 0.73 → 0.17 µs); σ 2,000 with the controller 0.97× | current |
+| 110 | 2026-10-27 | — | Rings against the mutex inbox on all 8 scaling workloads, before making rings the default | design |
 
 ## Stampede3 runs, in order
 
@@ -4110,6 +4111,24 @@ If M2 holds, rings become the default after the full Mac matrix.
 1. Rerun σ 2,000 and σ 100 at 16 nodes, rings against mutex, with the controller and W 400, 5 reps. This settles the 0.97×.
 2. If it does not hold up, make rings the default after the full Mac test matrix.
 3. Then the cross-thread free.
+
+### Rings against the mutex inbox on all 8 scaling workloads, before making rings the default (design, 2026-10-27; written before any runs)
+
+> **Status: design.** Charades `scale-diag` 5bd80f6, htram `pdes` 2d9fd13 (as section 108). Job N `$WORK/charades-runs/diag16.slurm` (16 nodes, skx-dev and skx, `-x c455-081`, the copy that starts second cancelled).
+
+**Why.** Section 109: rings gained 1.08–1.21× at uniform on 16 nodes, but σ 2,000 with the controller was 0.972× in three consistent reps, and σ 100 at W 400 had one slow rep. The full Mac test matrix is skipped (user decision, 2026-10-27). Before rings become the default, they need a wider performance check than three workloads.
+
+**Runs.** The 8 workloads of the scaling series:
+- lookahead 100 / mean 1,000: σ 100, 500, 1,000, 2,000, 4,000 and uniform, at W 400 and with the controller;
+- lookahead 10 / mean 200: σ 500 and 2,000, at W 50 and with the controller;
+- uniform also with WPs 512.
+
+PP 512, `--agg-inbox-mode` 0 against 2, interleaved. 16 nodes with 5 reps, 4 nodes with 3 reps.
+
+**Predictions:**
+- N1. σ 2,000 with the controller at 16 nodes is within ±2% with rings: section 109's 0.972 was this allocation's, not the rings'.
+- N2. Rings are at least 0.98× in every cell at 4 and 16 nodes. The geometric mean is at least 1.02 at 16 nodes and at least 1.00 at 4.
+- **Decision rule:** rings become the default if no cell is below 0.97 with its reps consistent (no single slow rep). The Mac change-tier tests must pass with the new default.
 
 ## Baseline verification on the Mac
 
