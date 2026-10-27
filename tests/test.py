@@ -93,7 +93,10 @@ class Launch:
     self.name = str(pes) if procs == 1 else '%dx%d' % (procs, pes // procs)
 
   def command(self, exe, args, launcher):
-    run = [exe, '+pe', str(self.pes)] + args
+    # CHARADES_RUN_ARGS: extra runtime or engine flags for every run, e.g.
+    # "+mempool_remote_free --agg-inbox-mode=2"
+    run = [exe, '+pe', str(self.pes)] + args + \
+        os.environ.get('CHARADES_RUN_ARGS', '').split()
     if launcher.kind == 'srun':
       # Even single-process runs: inside an allocation LCI reads the inherited
       # SLURM_NTASKS and would wait for peers that never start. One bad task
