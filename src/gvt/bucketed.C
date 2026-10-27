@@ -645,6 +645,12 @@ bool BucketGVT::produce(RemoteEvent* e) {
   }
 }
 
+unsigned BucketGVT::batch_size() const {
+  if (!g_tw_wave_batch || !node_waves) return g_tw_mblock;
+  const bool flying = g_tw_wave_batch_when ? node_wave_pending : node_waves->in_flight();
+  return flying ? g_tw_wave_batch : g_tw_mblock;
+}
+
 void BucketGVT::poll() {
   if (!node_wave_pending || node_waves->generation() <= node_wave_seen) return;
   node_wave_seen++;
@@ -662,7 +668,7 @@ void BucketGVT::poll() {
 }
 
 NodeWaves::NodeWaves()
-    : t_combined(0), t_result(0), slots(CkMyNodeSize()), arrived(0), slot_t(CkMyNodeSize()), gen(0),
+    : t_combined(0), t_result(0), slots(CkMyNodeSize()), arrived(0), slot_t(CkMyNodeSize()), gen(0), flight(false),
       rounds(0), ar_wave(0), ar_round(0), ar_active(false), tree_parent(-1),
       tree_wave(0), tree_in(0), tree_lock(CmiCreateLock()) {
   while ((1 << rounds) < CkNumNodes()) rounds++;
@@ -705,6 +711,7 @@ void NodeWaves::contribute_from(int rank, const std::vector<CmiInt8>& v) {
   // The last PE in: every slot is written, and none is written again before
   // this wave's result is out
   arrived.store(0, std::memory_order_relaxed);
+  flight.store(true, std::memory_order_relaxed);
   if (g_tw_gvt_trace) t_combined = CmiWallTimer();
   combined.assign(slots[0].begin(), slots[0].end());
   for (int r = 1; r < CkMyNodeSize(); r++) {
@@ -898,6 +905,7 @@ void NodeWaves::publish(const CmiInt8* v, int n) {
     ar_active = false;
     ar_wave++;
   }
+  flight.store(false, std::memory_order_relaxed);
   gen.fetch_add(1, std::memory_order_release);
 }
 

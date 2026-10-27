@@ -1,0 +1,9 @@
+# agg_bucket_pp with --wave-batch=2 --wave-batch-when=1: passes of 2 events from when a PE contributes
+sync=3
+gvt=4
+buffer-size=655360
+aggregation=1
+agg-mode=2
+agg-buffer=16
+wave-batch=2
+wave-batch-when=1

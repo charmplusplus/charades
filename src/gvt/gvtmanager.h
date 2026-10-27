@@ -46,6 +46,8 @@ class GVTManager : public CBase_GVTManager {
      * until it contributes, even if an earlier round's result arrives.
      */
     virtual bool holding_execution() const { return false; }
+    /** Events per scheduler pass now (--batch, or --wave-batch during a count wave) */
+    virtual unsigned batch_size() const;
     bool is_continuous() const { return continuous; }
 
     /** Called by the local PEManager after all groups have been initialized */

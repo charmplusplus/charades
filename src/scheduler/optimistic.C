@@ -60,7 +60,10 @@ void OptimisticScheduler::execute() {
   // Events chares in this process handed over by pointer (--local-fast-path)
   fp_drain();
   if (g_tw_gvt_trace >= 3) g_wave_timers.drain += CmiWallTimer() - td;
-  for (; num_executed < g_tw_mblock; num_executed++) {
+  // Shorter passes while a count wave is in flight (--wave-batch): this PE
+  // comes back to the scheduler sooner to run the wave's messages
+  const unsigned batch = gvt_manager->batch_size();
+  for (; num_executed < batch; num_executed++) {
     // With an optimism window, events past GVT + window wait for GVT to
     // advance. The iteration still completes, so the GVT trigger keeps
     // firing and stragglers inside the window are still processed.
@@ -74,7 +77,7 @@ void OptimisticScheduler::execute() {
       break;
     }
   }
-  if (num_executed == g_tw_mblock) {
+  if (num_executed == batch) {
     PE_STATS(iter_full)++;
   } else if (blocked) {
     PE_STATS(iter_window)++;
@@ -83,10 +86,10 @@ void OptimisticScheduler::execute() {
   }
   // Nothing (more) this PE may execute: whatever it has buffered for other
   // PEs is now only delaying them
-  if (num_executed < g_tw_mblock) agg_flush_idle();
+  if (num_executed < batch) agg_flush_idle();
   process_cancel_q();
   if (g_tw_gvt_trace) PE_STATS(exec_time) += CmiWallTimer() - t0;
-  gvt_manager->iteration_end(num_executed < g_tw_mblock);
+  gvt_manager->iteration_end(num_executed < batch);
   if (g_tw_gvt_trace >= 4) g_wave_timers.exec_end = CmiWallTimer();
   // --sched-park: blocked by the window, stop re-enqueuing execute() until
   // something can unblock this PE: a GVT update (gvt_done), an event or a

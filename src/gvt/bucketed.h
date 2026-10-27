@@ -82,6 +82,8 @@ class NodeWaves : public CBase_NodeWaves {
     void tree_down(int wave, double sent_t, int n, CmiInt8* v);
     /** Results published so far; read result() only after this moved */
     uint64_t generation() const { return gen.load(std::memory_order_acquire); }
+    /** This process's combined sums are sent and its result is not yet here */
+    bool in_flight() const { return flight.load(std::memory_order_relaxed); }
     const std::vector<CmiInt8>& result() const { return res; }
     /** --gvt-trace: when the last PE in arrived, and when the result came */
     double t_combined, t_result;
@@ -128,6 +130,7 @@ class NodeWaves : public CBase_NodeWaves {
     std::vector<CmiInt8> combined;
     std::vector<CmiInt8> res;
     std::atomic<uint64_t> gen;
+    std::atomic<bool> flight;
 };
 
 /** Combines one contribution into another (layout above) */
@@ -145,6 +148,7 @@ class BucketGVT : public CBase_BucketGVT {
 
     /** --gvt-node-waves: run a wave's result once the process has it */
     void poll();
+    unsigned batch_size() const override;
 
     void finalize();
 

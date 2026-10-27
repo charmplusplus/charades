@@ -27,6 +27,8 @@ GVTManager::GVTManager() : curr_gvt(0), prev_gvt(0) {
   }
 }
 
+unsigned GVTManager::batch_size() const { return g_tw_mblock; }
+
 void GVTManager::groups_created() {
   DEBUG_PE("%s created!\n", gvt_name.c_str());
   scheduler = (DistributedScheduler*)CkLocalBranch(scheduler_id);
