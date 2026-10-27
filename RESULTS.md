@@ -210,6 +210,7 @@ Charades' controller ÷ Devastator's adaptive window: 0.68–1.03 at σ ≤ 500 
 | 116 | 2026-10-27 | 3649213 | What paces GVT at σ 2,000, results: neither transit nor a growing straggler; the cross-process reduction (34 → 70 µs) is the whole 4→16-node loss | current |
 | 117 | 2026-10-27 | — | Where the cross-process reduction's 70 µs goes: Charades' own process tree with per-hop times; a flat tree; smaller scheduler passes | design |
 | 118 | 2026-10-27 | 3649717 | Where the reduction's time goes, results: a hop's network time is about 4 µs; the rest is waiting for a PE to run the message. Fewer hops do not help | current |
+| 119 | 2026-10-27 | — | Shorter scheduler passes only while a count wave is in flight (`--wave-batch`) | design |
 
 ## Stampede3 runs, in order
 
@@ -4403,6 +4404,33 @@ The floor falls with the pass size, so the hops wait for a pass to end. But smal
 1. **Shorter passes only while a wave is in flight.** A PE whose process has contributed runs passes of 2–4 events until the result arrives. This is a Charades change of about 20 lines. Batch 4 everywhere cut the floor by 28 µs; this would pay the smaller passes' cost only during the wave, but only if the PEs that must run the hops are the ones taking shorter passes.
 2. **Find which wait it is:** the device poll or the queue. Time stamp in Reconverse when the receiving PE takes the message off its device, against when the handler starts.
 3. **Run GVT messages on the free core.** One core per process is unused (2 × 23 PEs on 2 × 24 cores). A Reconverse thread there could poll the devices and run messages marked immediate at once. This is the most complete fix, but the largest change.
+
+### Shorter scheduler passes only while a count wave is in flight (`--wave-batch`) (design, 2026-10-27; written before any runs)
+
+> **Status: design.** Charades `scale-diag` (this commit: `--wave-batch`, `--wave-batch-when`), htram `pdes` 699c3a9, Reconverse 22871c6; the current launch. Job R `$WORK/charades-runs/diag21.slurm` (16 nodes, skx-dev and skx, `-x c455-081`, the copy that starts second cancelled).
+
+**Why.** Section 118: each hop of the cross-process reduction takes about 4 µs on the network but waits for a PE to come back to the scheduler. On the critical path, the wait is about 16 µs per up hop and 7 µs per down hop. `--batch=4` on every pass cut the 16-node floor from 72 to 44 µs but cost 11% overall.
+
+**New option `--wave-batch=k`** (with `--gvt-node-waves`; 0, off, is the default): the scheduler pass is k events instead of `--batch` (16) while a count wave is in flight.
+- `--wave-batch-when=0` (default): from when this process's combined sums are sent until its result is published. Every PE of the process has contributed by then, so every PE that could run a hop for it takes short passes. The process also takes short passes while it combines its children's sums, and when the result reaches it, its PEs pick the result up sooner.
+- `--wave-batch-when=1`: from when this PE contributes until it runs the result. This also covers the PEs that contribute early and wait for the late PE of their own process.
+- A short pass that runs all k events counts as full, so the idle flush and GVT trigger behave as with a full pass of 16.
+
+Mac: 30/30 on the new configs and their bases (1×4, 2×2, 4×2), and 258/258 on a 20-repeat pass. The job first runs them through `test.py` on 2 nodes with the psm2 transport and stops if any fails.
+
+**Runs** (2 reps, interleaved; Charm++ reduction unless stated):
+- **A. σ 2,000, W 400, PP 512, 4 and 16 nodes, untraced:** batch 16 (the baseline); `--wave-batch` 2, 4 and 8 (when 0); `--wave-batch=4 --wave-batch-when=1`.
+- **A'. Traced (`--gvt-trace=2`), 16 nodes:** the baseline, `--wave-batch=4` (both triggers), and `--gvt-wave-tree=4` with and without `--wave-batch=4` (for the per-hop times).
+- **B. Other workloads, 16 nodes:** σ 100 and σ 4,000 (PP 512) and uniform (WPs 512), W 400 and the controller, the baseline against `--wave-batch=4`.
+
+**Predictions:**
+- P1. `--wave-batch=4` cuts the 16-node floor from about 72 µs to 50 µs or less.
+- P2. Its throughput at 16 nodes (σ 2,000) is at least 1.04× the baseline, and at 4 nodes at least 1.00×. A wave is in flight for about a third of each advance, so a third of batch 4's 11% cost, about 4%, against a floor about 22 µs (10% of an advance) shorter.
+- P3. `--wave-batch-when=1` is no better than when 0. Early PEs take short passes for most of the wave, which costs more and does not shorten the hops.
+- P4. In the fan-out-4 tree, the critical-path up-hop wait falls from about 16 µs to 8 µs or less, and the down-hop wait from about 7 µs to 4 µs or less.
+- P5. In B, no cell is below 0.98×.
+
+If P1 and P2 hold, `--wave-batch` becomes the default at the best k and goes into the paper-grade rerun. If the floor falls but throughput does not rise, the short passes cost too much, and the next step is the free core (section 118, candidate 3).
 
 ## Baseline verification on the Mac
 
