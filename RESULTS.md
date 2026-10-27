@@ -206,6 +206,7 @@ Charades' controller ÷ Devastator's adaptive window: 0.68–1.03 at σ ≤ 500 
 | 112 | 2026-10-27 | — | Freeing another PE's message without its pool lock (`+mempool_remote_free`) | design |
 | 113 | 2026-10-27 | 3647310 | `+mempool_remote_free`, results: freeing a received message 1.45 → 0.30 µs; uniform 1.02–1.06× at 16 nodes; gate rerun needed (harness) | current |
 | 114 | 2026-10-27 | 3647898 | Correctness gate for `+mempool_remote_free`, results: 231/231; the flag joins the Stampede3 launch | current |
+| 115 | 2026-10-27 | — | What paces GVT at σ 2,000: events in transit or the late PE's work; GVT bucket size; horizon margin with wider windows | design |
 
 ## Stampede3 runs, in order
 
@@ -4243,6 +4244,38 @@ The pool header grows by one pointer. Only Reconverse's LCI2 backend uses it.
 - **G1 right.**
 
 **Decision.** `+mempool_remote_free` joins the Stampede3 launch line. It is the new default `EXTRA_ARGS` in `scripts/stampede3/ctl_sweep.sh` (`+lci_ndevices 23 +pemap 2-46:2,3-47:2 +mempool_remote_free`; the old default still said 16 devices). It needs a Reconverse with the `pads-remote-free` patch, which only `charm-pads-exp` on Stampede3 has. Whether to make it Reconverse's own default, and where to publish the `pads-*` runtime patches, is open.
+
+### What paces GVT at σ 2,000: events in transit or the late PE's work; GVT bucket size; horizon margin with wider windows (design, 2026-10-27; written before any runs)
+
+> **Status: design.** Charades `scale-diag` cedf3d7 (new trace fields), htram `pdes` 699c3a9, Reconverse 22871c6; the current launch (`+lci_ndevices 23 +pemap 2-46:2,3-47:2 +mempool_remote_free`, ring input buffers). Job P `$WORK/charades-runs/diag19.slurm` (16 nodes, skx-dev and skx, `-x c455-081`, the copy that starts second cancelled).
+
+**Why.** σ ≥ 2,000 is where Charades still scales worse than Devastator: 4→16-node efficiency 0.81 at σ 2,000 against 0.91 (section 95). Matching 0.91 at the same 4-node rate needs about 12% more throughput on 16 nodes, roughly 25 µs off a 16-node GVT advance or 12% more simulated time per advance. What is known:
+- The loss is time per advance (section 78).
+- Most of an advance is the late PE (section 80). After pickup it runs about 55 events at 1.9 µs each (section 105).
+- Faster reductions, earlier contributions, smaller batches, asking ahead and flush order moved throughput by −12% to +6% (sections 47–60, 103).
+- Section 60: buckets that every PE had passed often did not complete in the next wave because events sent into them were still in transit.
+
+Two explanations fit:
+- **(a) Aggregation-paced.** htram holds an event until GVT nears its timestamp (the deadline policy, horizon W + margin 8). So each GVT step waits for: senders learn of the update → flush what is now due → the events arrive → the next wave counts them. The late PE is late because a burst of such events reached it late.
+- **(b) Statistical.** The late PE simply has the most work inside the window. The maximum over 736 PEs grows with the PE count.
+
+**New trace fields** (off unless traced):
+- PE 0's `gvt_trace.csv`, per wave: how many buckets every PE had passed at the previous wave, and the events sent into the ones of them that did not complete but not yet received (the first such bucket, and all of them).
+- `--gvt-trace=4`'s `gvt_rec_<pe>.csv`, per PE per recorded wave: events received since its previous contribution, how many were within one bucket of GVT, and their mean and least distance from GVT in buckets.
+
+Mac: trace configs 54/54.
+
+**Runs** (PP 512, 2 reps, interleaved):
+- **A. Traced** (`--gvt-trace=4 --pe-stats=1`) with untraced pairs: σ 2,000 at W 400 on 4 and 16 nodes; at W 250 and 600 on 16 nodes.
+- **B. GVT bucket size** 8 (default), 16 and 32: σ 2,000 and σ 4,000, W 400 and the controller, 4 and 16 nodes. Never varied before.
+- **C. Horizon margin** 4, 8 and 16 with W 400 and 600: σ 2,000, 16 nodes. Section 80 varied the margin alone (8, 32, 64, 128), at W 250.
+
+**Predictions:**
+- P1. At 16 nodes, in at least half of the waves some bucket that every PE had passed at the previous wave stays open with events in transit. At 4 nodes, in fewer waves.
+- P2. Since its previous contribution, the late PE has received at least 1.5× the events of the median PE of its process, and a larger share of them within one bucket of GVT.
+- If P1 and P2 hold, GVT is aggregation-paced, and the fix is to send the events GVT will need next before it needs them (candidate (a)). If both are wrong, the straggling is statistical, and the fix is sharing work within a process (candidate (b)).
+- P3. Bucket size 16 and 32 change throughput by less than 5% either way.
+- P4. No margin and window pair in C beats margin 8 at W 400 by more than 3%.
 
 ## Baseline verification on the Mac
 
