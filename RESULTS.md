@@ -15,6 +15,7 @@ Every number from every run: Stampede3 runs in order (each design, written befor
 - Stacks, in order: Debug runtime on verbs (through job 3626388) → production runtime (3626643) → fast paths, TLS and tuning on verbs (to 3627274) → native psm2 (3628343 on) → full nodes as the default (3629783 on). Before 3629783, most runs used 2 × 8 PEs per node.
 - Devastator used its xorshift RNG in every run before job 3632385; it is about 10% faster than CLCG4 at σ 100.
 - Write new designs and results at the end of "Stampede3 runs, in order", with a status line.
+- **Renamed 2026-10-27: "inbox" is now "input buffer"** (charades 80521a6, htram 699c3a9), in this file and in the code. Jobs before then ran with the old spellings: `--agg-inbox` and `--agg-inbox-mode` (now `--agg-input-buffer`, `--agg-input-buffer-mode`), test configs `agg_inbox*` and `agg_noinbox_*` (now `agg_inputbuf*`, `agg_noinputbuf_*`), htram's `HTramInbox`, `drainInbox` and `htram_inbox_mode`, and the fast path's `FpInbox`.
 
 ## Current numbers
 
@@ -195,10 +196,10 @@ Charades' controller ÷ Devastator's adaptive window: 0.68–1.03 at σ ≤ 500 
 | 104 | 2026-10-26 | — | Why one PE holds up each GVT advance at uniform and σ 2,000: per-PE wave records, and fewer events per wave | design |
 | 105 | 2026-10-26 | 3643687 | Per-PE wave records, results: at uniform the late PE is slowed by receiving many small messages; `--gvt-wave-events=32` is 1.04–1.06× at 16 nodes | current |
 | 106 | 2026-10-26 | — | `--gvt-wave-events` 32 / 64 / 128 at 1, 4 and 16 nodes; what an htram receive costs | design |
-| 107 | 2026-10-26 | 3645244 | Wave events and receive cost, results: 128 stays; a receive's fixed cost is its inbox pushes, which slow from 0.17 to 0.70 µs each as receives get frequent | current |
-| 108 | 2026-10-27 | — | Cheaper inbox pushes: padded mutex inboxes and lock-free rings | design |
-| 109 | 2026-10-27 | 3646589 | Inbox modes, results: lock-free rings make uniform 1.08–1.21× faster at 16 nodes (a push 0.73 → 0.17 µs); σ 2,000 with the controller 0.97× | current |
-| 110 | 2026-10-27 | — | Rings against the mutex inbox on all 8 scaling workloads, before making rings the default | design |
+| 107 | 2026-10-26 | 3645244 | Wave events and receive cost, results: 128 stays; a receive's fixed cost is its input buffer pushes, which slow from 0.17 to 0.70 µs each as receives get frequent | current |
+| 108 | 2026-10-27 | — | Cheaper input buffer pushes: padded mutex input buffers and lock-free rings | design |
+| 109 | 2026-10-27 | 3646589 | Input buffer modes, results: lock-free rings make uniform 1.08–1.21× faster at 16 nodes (a push 0.73 → 0.17 µs); σ 2,000 with the controller 0.97× | current |
+| 110 | 2026-10-27 | — | Rings against the mutex input buffer on all 8 scaling workloads, before making rings the default | design |
 | 111 | 2026-10-27 | 3647086 | Rings on all 8 workloads, results: no cell below 0.98, uniform 1.08–1.21×; rings are the default | current |
 | 112 | 2026-10-27 | — | Freeing another PE's message without its pool lock (`+mempool_remote_free`) | design |
 
@@ -1343,12 +1344,12 @@ Even all of this together is unlikely to close 2.2×; items 1–3 are Charades/h
 
 > **Status: historical.** Production runtime, verbs. The three fast paths are the default.
 
-Three changes from the profile's ranked list (charades 4bb324b, htram 50acab7 on `pdes`), each behind a switch. **All three are the default since the same day** (user decision; the inbox turns itself off under `--sched-park`, other GVTs and the conservative scheduler); test configs `bucket_avl` and `agg_noinbox_bucket_pp` keep the old paths covered. Not yet re-run with the new defaults:
-- `--agg-inbox=1` (htram `setInboxDelivery` / `drainInbox`): a PP/WPs node receive puts each PE's share of a node message in that PE's inbox (a mutex-protected vector in the `HTramRecv` node group) instead of sending it a `receivePerPE` message; the optimistic scheduler drains it at the start of every iteration, and the receiving PE's own share is delivered in place. Only with the bucketed GVT (which counts each event when its chare receives it, so an event in an inbox is in transit) and the optimistic scheduler; refused with `--sched-park`. QD-based GVTs would not see inbox items.
+Three changes from the profile's ranked list (charades 4bb324b, htram 50acab7 on `pdes`), each behind a switch. **All three are the default since the same day** (user decision; the input buffer turns itself off under `--sched-park`, other GVTs and the conservative scheduler); test configs `bucket_avl` and `agg_noinputbuf_bucket_pp` keep the old paths covered. Not yet re-run with the new defaults:
+- `--agg-input-buffer=1` (htram `setInputBufferDelivery` / `drainInputBuffer`): a PP/WPs node receive puts each PE's share of a node message in that PE's input buffer (a mutex-protected vector in the `HTramRecv` node group) instead of sending it a `receivePerPE` message; the optimistic scheduler drains it at the start of every iteration, and the receiving PE's own share is delivered in place. Only with the bucketed GVT (which counts each event when its chare receives it, so an event in an input buffer is in transit) and the optimistic scheduler; refused with `--sched-park`. QD-based GVTs would not see input buffer items.
 - `--event-index=1`: received events indexed for cancellation by an open-addressing hash per chare (`collections/event_hash.h`; linear probing, tombstones, key (ts, event_id, src_lp)) instead of the AVL tree. Same insert-or-annihilate contract.
 - `--msg-pool=1`: event messages (`RemoteEvent`) recycled through a per-PE pool (`remote_event_new` / `remote_event_delete` in event.C) on the hot paths: model sends, htram delivery, fossil frees, `agg_send`. Capacity is read from the envelope; reused messages are marked unused so they can be sent again.
 
-Tests (Mac): change tier on the new configs 60/60; inbox configs repeated 10× on 2×2, 1×4, 2×4: 360/360; existing aggregation configs 84/84; engine tier 484/484. Committed counts identical in every Stampede3 run below.
+Tests (Mac): change tier on the new configs 60/60; input buffer configs repeated 10× on 2×2, 1×4, 2×4: 360/360; existing aggregation configs 84/84; engine tier 484/484. Committed counts identical in every Stampede3 run below.
 
 **Throughput** (production runtime, 2 × 23 PEs per node pinned, `+lci_ndevices 4`, Gaussian σ 2,000; M committed events/s, median of 3; higher is better):
 
@@ -1357,7 +1358,7 @@ Tests (Mac): change tier on the new configs 60/60; inbox configs repeated 10× o
 | base (all off) | 43.7 | 1.00 | 20.7 | 14.2 |
 | hash index only | 48.7 | 1.11 | | |
 | message pool only | 48.9 | 1.12 | | |
-| inbox only | 45.2 | 1.03 | | |
+| input buffer only | 45.2 | 1.03 | | |
 | all three | **56.0** | **1.28** | **27.3** (1.32×) | **17.6** (1.24×) |
 
 With all three on full nodes (2 runs each; ÷ W 250 at 56.9): W 175 0.93, W 350 0.85; controller ε 0.003 51.7 (0.91, mean W 309), ε 0.001 39.7 (0.70, pinned at W 110 near the floor). So ε 0.003 stays the default.
@@ -1520,7 +1521,7 @@ Same picture as on verbs (0.87–0.95 of the best fixed W; no single W is safe e
 
 - At σ 4,000 and remote 1.0 the floor (0.25–0.34%) sits just under ε 0.003. The controller shrinks W to about 110 (mean W 110–120 in 5 of 6 runs; the best fixed W is 250). Below W 250 the rollbacks don't fall, so it never meets its target: 0.68–0.74 of the best fixed W, at 99.6% efficiency.
 - **What causes it** (`floor.sh` and `floor_margin.sh`, σ 4,000, 2 runs each; share rolled back, %):
-  - Not the fast paths: `--agg-inbox=0` 0.21–0.24, `--event-index=0` 0.20–0.27, `--msg-pool=0` 0.21–0.26, against 0.24–0.28.
+  - Not the fast paths: `--agg-input-buffer=0` 0.21–0.24, `--event-index=0` 0.20–0.27, `--msg-pool=0` 0.21–0.26, against 0.24–0.28.
   - htram residence time: PP 64 gives 0.010–0.026 (rate at W 250: 47.5–47.9 against 48.9–49.4). verbs, which delivers more slowly, gives 0.63–0.66 at W 50 and 2.98 at W 250.
   - **The deadline margin removes it:** at W 250, margin 8 gives 0.25 (48.9–49.1 M ev/s), 64 gives 0.001–0.002 (41.2–41.3), 250 and 1,000 give 0.000 (25.3–25.5 and 12.9–13.0).
 - **Mechanism.** The window is GVT + W. The deadline policy flushes every destination holding a now-due event at each GVT update and when a PE idles (`flush_due` → `HTram::flushDue`, htram f07aceb). So buffered events *are* re-checked as GVT advances. (A first reading of this result said they were not; that was wrong.) The race is the one the `urgent_window` comment describes: a sender flushes when it learns of a GVT update, and a receiver that learns of the same update first may already run up to the new GVT + W. Every event that update made due is then still in a buffer, or in flight. The margin has to cover how far GVT moves per update. It moves about **61** time units per update on this stack in every configuration (end time ÷ GVT updates; it was 15 in the 2026-10-21 sweep), against a margin of 8. Margin 64 is the first value above the step, and the floor goes from 0.25% to 0.001%. Buffer size and transport change how long a flushed event takes to arrive, not the step, hence PP 64 lower and verbs higher.
@@ -1908,7 +1909,7 @@ Where Charades loses to Devastator (σ ≤ 1,000), most traffic stays in the pro
 - A2. On the finer grid the best fixed W is 200–300, and W 250 stays within 5% of it.
 - A3. ε 0.0005 brings the mean W to 250–300 and the controller to 0.92–0.97 of the best fixed W. ε 0.0003 overshoots at σ 100, falling below W 200.
 - B1. At σ 100, `--agg-scope=1` reaches ≤ 0.6 of scope 0. Same-process Charm++ messages are the expensive part, since htram over direct is 2.27× at σ 100, where 1.3% of events leave the node. At σ 2,000 scope 1 reaches 0.7–0.9, and at low-slack σ 500 ≤ 0.6.
-- C1. At σ 100, same-process delivery takes ≥ 25% of Charades' PE time: htram insert, inbox drain and its mutex, the node queue and per-PE messages. LCI and libfabric progress take < 10%. Cycles per committed event: Charades 1.4–1.7× Devastator.
+- C1. At σ 100, same-process delivery takes ≥ 25% of Charades' PE time: htram insert, input buffer drain and its mutex, the node queue and per-PE messages. LCI and libfabric progress take < 10%. Cycles per committed event: Charades 1.4–1.7× Devastator.
 
 ### Controller level, `--agg-scope`, σ 100 profile, results (2026-10-23, idev job 3632385, 4 skx nodes)
 
@@ -1983,7 +1984,7 @@ A build mistake, fixed before any run used it: the new tree's copied `config.mk`
 - Charades' PE time (inclusive):
   - event execution 38%, of which the model's forward handler is 15%, including `log` and `sin` from the CLCG4 Gaussian and exponential draws;
   - network progress polled by every PE 13%;
-  - htram delivery (inbox drain, `Aggregator::deliver`, `recv_remote_event`) 11%;
+  - htram delivery (input buffer drain, `Aggregator::deliver`, `recv_remote_event`) 11%;
   - sends 9%;
   - GVT count waves 7.5%, including fossil collection 4%.
 - Devastator: `drain` 21%, malloc/free about 17%, thread-channel reaping 9%, event execution 7.6%.
@@ -2467,14 +2468,14 @@ On the Mac (one process, 8 PEs): the GVT's tuple 7.9 µs per wave, one int 5.1, 
 
 > **Status: design.** Written before any code or runs.
 
-**Why.** At 16 nodes a GVT advance is one count wave and takes about as long as the reduction under it ("GVT round cost"), and that reduction is slow because of its shape ("Where a reduction's time goes"): each process's first PE receives and combines 22 contributions, then allocates and sends 22 copies of the result, one after another, and the GVT's tuple message adds about half again. Charades can avoid all of it without runtime changes, the way `--agg-inbox` already avoids per-PE htram messages.
+**Why.** At 16 nodes a GVT advance is one count wave and takes about as long as the reduction under it ("GVT round cost"), and that reduction is slow because of its shape ("Where a reduction's time goes"): each process's first PE receives and combines 22 contributions, then allocates and sends 22 copies of the result, one after another, and the GVT's tuple message adds about half again. Charades can avoid all of it without runtime changes, the way `--agg-input-buffer` already avoids per-PE htram messages.
 
-**Design** (`--gvt-node-waves=1`; bucketed GVT only; off under `--sched-park`, like `--agg-inbox`, since parked PEs do not poll):
+**Design** (`--gvt-node-waves=1`; bucketed GVT only; off under `--sched-park`, like `--agg-input-buffer`, since parked PEs do not poll):
 1. **Contribute into shared memory.** A new nodegroup `NodeWaves` holds, per process, one slot per PE and an arrival counter. A PE's wave contribution (sent and received counts for the buckets asked, buckets passed, and the controller's counters and histogram when it sends them) becomes one flat array of 64-bit integers written to its own slot; it then increments the arrival counter.
 2. **The last PE in combines.** The PE that brings the counter to the process's PE count sums the slots (minimum for buckets passed), resets the counter, and hands the combined array to its process's `NodeWaves` branch (one local message), which contributes it to a nodegroup reduction.
 3. **No tuple.** The cross-process reduction uses one custom reducer over the flat array (sum everywhere except one minimum), registered at startup like the statistics reducer.
 4. **The result comes back once per process** (a nodegroup broadcast). The handler copies it into the process's shared result and bumps a generation counter.
-5. **PEs pick it up where they already look for work**: at the top of `execute()`, next to the htram inbox drain, a PE that is waiting on a wave checks the generation counter and, if it moved, runs the existing `check_counts` logic on the shared result. That logic is unchanged, so every PE still makes the same decision from the same sums.
+5. **PEs pick it up where they already look for work**: at the top of `execute()`, next to the htram input buffer drain, a PE that is waiting on a wave checks the generation counter and, if it moved, runs the existing `check_counts` logic on the shared result. That logic is unchanged, so every PE still makes the same decision from the same sums.
 - Correctness: a PE contributes to wave k+1 only after it has read wave k's result, as now (Mattern's four-counter rule needs exactly that); the slots and the result buffer are reused safely because no PE can contribute to wave k+1, or a result k+1 exist, before every PE of the process has read result k. Committed counts must equal the message path's.
 - The start reduction (once per run) is unchanged.
 
@@ -2715,13 +2716,13 @@ On the Mac (one process, 8 PEs): the GVT's tuple 7.9 µs per wave, one int 5.1, 
 
 > **Status: design.** Written before any code or runs.
 
-**Why.** At σ 100, Charades takes 1.27× Devastator's cycles per committed event, and that ratio is the whole gap there (speedup 0.71–0.77 at 4 nodes; 0.71 with PP 512 at 16). The profile puts 20% of PE time in sends (9%) and htram delivery (11%: inbox drain, `Aggregator::deliver`, `recv_remote_event`), and 97% of events at σ 100 stay in their process (128 LPs per PE, 16 per chare: 8 chares per PE, so most events go to another chare on the same PE or a neighbouring PE). Every one of them is copied into a 64 B htram item, buffered, flushed, copied out into a new message, indexed in the receiver's hash so an anti-message can find it, and removed from the hash at commit. Devastator hands a same-process event to its receiver as a pointer and cancels it by pointer.
+**Why.** At σ 100, Charades takes 1.27× Devastator's cycles per committed event, and that ratio is the whole gap there (speedup 0.71–0.77 at 4 nodes; 0.71 with PP 512 at 16). The profile puts 20% of PE time in sends (9%) and htram delivery (11%: input buffer drain, `Aggregator::deliver`, `recv_remote_event`), and 97% of events at σ 100 stay in their process (128 LPs per PE, 16 per chare: 8 chares per PE, so most events go to another chare on the same PE or a neighbouring PE). Every one of them is copied into a 64 B htram item, buffered, flushed, copied out into a new message, indexed in the receiver's hash so an anti-message can find it, and removed from the hash at commit. Devastator hands a same-process event to its receiver as a pointer and cancels it by pointer.
 
 **Change.** With `--local-fast-path=1`, an event for a chare on another PE of the same process, or on another chare of the same PE, skips htram and Charm++ messages:
-- **Send.** As now up to `produce()` (GVT bucket counts, `far`, controller delay sample). The sender then pushes the message pointer onto the destination PE's inbox: a lock-free multi-producer list per PE (one compare-and-swap per event), or a plain vector when the destination is the sender's own PE. The sender's event stays in its parent's caused-by list as now, marked sent, and keeps the message pointer as its handle.
-- **Receive.** At the start of every `execute()` (beside `poll()` and `agg_drain()`), the PE takes its whole inbox with one exchange, restores send order, and for each message does what `recv_remote_event` does (`consume()`, straggler statistics, `recv_local_event`) except the hash insert. The receiver's event is stored in the message, so the message pointer finds it.
-- **Cancel.** The sender pushes a small anti-message carrying the target message pointer into the same inbox. One sender's pushes arrive in order, so the event always arrives before its anti-message, and nothing needs indexing. The target is still alive: the receiver frees it only when it commits (its timestamp is below GVT, so its sender can no longer roll back the event that sent it) or when this anti-message arrives.
-- **GVT.** Unchanged: an event is counted sent at `produce()` and received when drained, so one waiting in an inbox is in transit, exactly as with htram's inboxes. As with `--agg-inbox`, only with the bucketed GVT and the optimistic scheduler, not with `--sched-park`, load balancing, or event holding (`--gvt-adaptive-buckets`); elsewhere the option is refused.
+- **Send.** As now up to `produce()` (GVT bucket counts, `far`, controller delay sample). The sender then pushes the message pointer onto the destination PE's input buffer: a lock-free multi-producer list per PE (one compare-and-swap per event), or a plain vector when the destination is the sender's own PE. The sender's event stays in its parent's caused-by list as now, marked sent, and keeps the message pointer as its handle.
+- **Receive.** At the start of every `execute()` (beside `poll()` and `agg_drain()`), the PE takes its whole input buffer with one exchange, restores send order, and for each message does what `recv_remote_event` does (`consume()`, straggler statistics, `recv_local_event`) except the hash insert. The receiver's event is stored in the message, so the message pointer finds it.
+- **Cancel.** The sender pushes a small anti-message carrying the target message pointer into the same input buffer. One sender's pushes arrive in order, so the event always arrives before its anti-message, and nothing needs indexing. The target is still alive: the receiver frees it only when it commits (its timestamp is below GVT, so its sender can no longer roll back the event that sent it) or when this anti-message arrives.
+- **GVT.** Unchanged: an event is counted sent at `produce()` and received when drained, so one waiting in an input buffer is in transit, exactly as with htram's input buffers. As with `--agg-input-buffer`, only with the bucketed GVT and the optimistic scheduler, not with `--sched-park`, load balancing, or event holding (`--gvt-adaptive-buckets`); elsewhere the option is refused.
 - **Same chare**: unchanged (already by pointer). **Other processes**: unchanged (htram or direct).
 - Statistics: "Process Sends (fast path)" and "Process Anti Sends (fast path)", counted within Remote Sends and Anti Event Sends as before.
 
@@ -2758,7 +2759,7 @@ Best ÷ best (each arm set at its best W): 4 nodes σ 100 1.01, σ 2,000 0.97; 1
 **What it says:**
 - **The per-event saving shows only where a GVT advance waits on work.** At 4 nodes and W 250 both arms sit at the same advance time (129 µs, the round itself), so the cheaper events buy nothing; at W 400, under the controller, and everywhere at σ 100 on 16 nodes, an advance waits for the slowest process's work, and the fast path cuts it by 10–21%.
 - **σ 100 at 16 nodes: 1.19–1.23×.** Against Devastator's rates from earlier jobs with the same end time (3633769, 3635596; indicative only), Charades ÷ Devastator moves at 16 nodes from 0.71 to about 0.88 at σ 100 and stays at about 0.98 at σ 2,000; at 4 nodes about 0.97 (σ 100) and 1.25 (σ 2,000).
-- **σ 2,000: no gain, 3% loss at 4 nodes.** Half the remote events still leave the process, and the advance time rises by 5–8 µs. Not yet explained; candidates: contended pushes onto inboxes (22 producers per inbox), messages read from another core's cache instead of copied in bulk, or htram's off-process buffers filling more slowly once same-process items leave them (74 instead of 117 events per message).
+- **σ 2,000: no gain, 3% loss at 4 nodes.** Half the remote events still leave the process, and the advance time rises by 5–8 µs. Not yet explained; candidates: contended pushes onto input buffers (22 producers per input buffer), messages read from another core's cache instead of copied in bulk, or htram's off-process buffers filling more slowly once same-process items leave them (74 instead of 117 events per message).
 - **F1 partly wrong** (best ÷ best 1.01 at 4 nodes; 1.10–1.14 only off the best W); **F2 wrong** (0.97–1.00); **F3 right** (htram carries only off-process events; efficiency equal or higher); **F4 right**; **F5 wrong**: the gain is larger at 16 nodes, where advances wait on work, not smaller.
 - `--local-fast-path` stays off by default until the σ 2,000 loss is understood.
 
@@ -2770,12 +2771,12 @@ Best ÷ best (each arm set at its best W): 4 nodes σ 100 1.01, σ 2,000 0.97; 1
 
 **New in the code** (Mac change tier 72/72 on `*_fastpath` and `*_fastpath_pe`):
 - `--local-fast-path=2`: by pointer only to other chares on the sender's own PE (no atomics); events to other PEs of the process go through htram as before.
-- "Inbox Push Retries (fast path)": pushes that failed their compare-and-swap because another PE pushed first.
+- "Input Buffer Push Retries (fast path)": pushes that failed their compare-and-swap because another PE pushed first.
 
 **Job** (skx-dev, 16 nodes, 2 reps, end 512,000, W 250 / W 400 / controller, σ 100 and 2,000, 4 and 16 nodes): fast path 0, 1, 2 with PP 512, and 1 with WPs 512; Devastator at W 500 and 1,000 (`--rng=clcg4`).
 
 **Predictions:**
-- P1. Mode 2 recovers the σ 2,000 loss (≥ 1.00 of off) and keeps most of the σ 100 gain at 16 nodes (≥ 1.10), i.e. the cross-PE inbox is the cost at σ 2,000.
+- P1. Mode 2 recovers the σ 2,000 loss (≥ 1.00 of off) and keeps most of the σ 100 gain at 16 nodes (≥ 1.10), i.e. the cross-PE input buffer is the cost at σ 2,000.
 - P2. Push retries are below 5% of pushes, so contention is not the cause; the cost is reading messages from another core's cache.
 - P3. WPs 512 with the fast path beats PP 512 with the fast path at 16 nodes σ 100 (≥ 1.05), and loses at σ 2,000 as before.
 - P4. Charades ÷ Devastator at 16 nodes σ 100: 0.85–0.90.
@@ -2786,7 +2787,7 @@ Best ÷ best (each arm set at its best W): 4 nodes σ 100 1.01, σ 2,000 0.97; 1
 
 **÷ fast path off with PP 512** (higher is better):
 
-| nodes, σ, arm | off: M ev/s | on (PP) | this PE only (PP) | on + WPs 512 | µs per GVT advance: off / on / PE only / WPs | inbox push retries per push (on) |
+| nodes, σ, arm | off: M ev/s | on (PP) | this PE only (PP) | on + WPs 512 | µs per GVT advance: off / on / PE only / WPs | input buffer push retries per push (on) |
 |---|---|---|---|---|---|---|
 | 4, σ 100, W 250 | 164.5 | 1.04 | 1.02 | 1.01 | 129 / 124 / 127 / 128 | 1.2% |
 | 4, σ 100, W 400 | 137.7 | 1.15 | 1.12 | 1.19 | 175 / 154 / 157 / 148 | 1.2% |
@@ -2935,7 +2936,7 @@ Best ÷ best (each arm set at its best W): 4 nodes σ 100 1.01, σ 2,000 0.97; 1
 
 > **Status: design.** Written before any runs.
 
-**`--agg-auto=1`** (branch `agg-auto`, 9fe32b3): the run starts on PP with `--agg-buffer`. After `--agg-auto-advances` GVT advances (default 128), every PE adds to one reduction the events that left its process, all its sends, and PP's items and messages; every PE applies the same choice from the sums: PP with `--agg-auto-buffer` (2,048) if at most `--agg-auto-share` (0.3) of events leave their process; else WPs 512 if PP messages carry fewer than `--agg-auto-msg` (25) events; else stay. PP resizes live (it never fills the per-PE buffers `setBufferSize` rebuilds, and its shared buffers are allocated at htram's largest size); WPs is a second htram instance made at startup, and flushes, inbox drains and statistics cover both, so what PP still holds goes out. Mac: forced configs `agg_auto_bigpp`, `agg_auto_wps`, `agg_auto_stay` (decision after 4 advances) 20 repeats each at 1 × 4 and 2 × 2 PEs, all three choices exercised, 1,200/1,200; engine tier with 10 repeats of `agg_deadline_bucket_pp` and `agg_auto_wps` 1,490/1,490.
+**`--agg-auto=1`** (branch `agg-auto`, 9fe32b3): the run starts on PP with `--agg-buffer`. After `--agg-auto-advances` GVT advances (default 128), every PE adds to one reduction the events that left its process, all its sends, and PP's items and messages; every PE applies the same choice from the sums: PP with `--agg-auto-buffer` (2,048) if at most `--agg-auto-share` (0.3) of events leave their process; else WPs 512 if PP messages carry fewer than `--agg-auto-msg` (25) events; else stay. PP resizes live (it never fills the per-PE buffers `setBufferSize` rebuilds, and its shared buffers are allocated at htram's largest size); WPs is a second htram instance made at startup, and flushes, input buffer drains and statistics cover both, so what PP still holds goes out. Mac: forced configs `agg_auto_bigpp`, `agg_auto_wps`, `agg_auto_stay` (decision after 4 advances) 20 repeats each at 1 × 4 and 2 × 2 PEs, all three choices exercised, 1,200/1,200; engine tier with 10 repeats of `agg_deadline_bucket_pp` and `agg_auto_wps` 1,490/1,490.
 
 **LPs per chare.** Charades rolls back a whole chare per straggler. On the Mac (1 process × 8 PEs, lookahead 10 / mean 200, σ 500), efficiency at W 100 rises from 62.8% (16 LPs per chare) to 82.4% (4) and 95.1% (1), but at W 50, where little rolls back, 1 LP per chare is 0.87× 16 (every scheduler pass visits every chare for cancellations, and fossil collection visits every chare per GVT advance).
 
@@ -2978,9 +2979,9 @@ Best ÷ best (each arm set at its best W): 4 nodes σ 100 1.01, σ 2,000 0.97; 1
 | D: B + an idle WPs instance | 539.3 (0.86 of B) | 256.0 (1.01 of B) |
 | E: `--agg-auto` deciding (σ 100: PP 2,048; σ 2,000: PP 512) | 514.8 | 405.4 |
 
-- **The idle second instance is the cause** (**I1 wrong**). It carries no event; all it adds is a flush and an inbox check on every scheduler pass, most of which are window-blocked spins. That moves the time per GVT advance both ways: at σ 100, 157 → 174 µs (slower passes pick up GVT results later); at σ 2,000 with PP 512, 238 → 203 µs (faster). The live switch itself is not the cause (**I2 wrong**: E is within the spread of D at σ 100).
+- **The idle second instance is the cause** (**I1 wrong**). It carries no event; all it adds is a flush and an input buffer check on every scheduler pass, most of which are window-blocked spins. That moves the time per GVT advance both ways: at σ 100, 157 → 174 µs (slower passes pick up GVT results later); at σ 2,000 with PP 512, 238 → 203 µs (faster). The live switch itself is not the cause (**I2 wrong**: E is within the spread of D at σ 100).
 - **So blocked PEs spinning flat out slow everyone down when traffic is heavy.** At σ 2,000, half of all events cross the network, and 23 PEs per process spinning (each pass polls the network and flushes) costs the PEs doing that work more than they gain. A deliberate pause when blocked could be worth up to about 1.16× there, and costs at σ 100, so it would have to follow the traffic too.
-- **Fixed in `--agg-auto`** (e4b34c5 on `agg-auto`): only the instance in use is flushed; a switch to WPs flushes PP once; the second instance's inbox is drained only after the switch. Added `--blocked-pause-ns` (diagnostic) to measure the pause directly.
+- **Fixed in `--agg-auto`** (e4b34c5 on `agg-auto`): only the instance in use is flushed; a switch to WPs flushes PP once; the second instance's input buffer is drained only after the switch. Added `--blocked-pause-ns` (diagnostic) to measure the pause directly.
 
 ### `--agg-auto` with one active instance, and pausing blocked passes (design, 2026-10-25; written before any runs)
 
@@ -3035,7 +3036,7 @@ Best ÷ best (each arm set at its best W): 4 nodes σ 100 1.01, σ 2,000 0.97; 1
 
 - **L1 wrong as tested**: 2–4%, within the rep spread. But the test was weak: every pad was a whole number of KB, so no object moved relative to its cache line (false sharing cannot change), and pads past glibc's mmap threshold (128 KB) do not move the heap at all. What it shows is that heap position as such does not matter.
 
-**Padded build** (Charades branch `pad` 6d19d3a on top of `agg-auto`, htram branch `pdes-pad` b6d9b18 on top of `pdes`): PP's per-destination shared counters (`get_idx`, `done_count`, `min_key`, `pp_limit`) and htram's per-PE inboxes each on their own cache line; Charades' `NodeWaves::gen` (polled by every PE on every pass, and the object's last field, so sharing a line with whatever was allocated next) and `arrived` on lines of their own. Mac: 360/360 each (10 repeats).
+**Padded build** (Charades branch `pad` 6d19d3a on top of `agg-auto`, htram branch `pdes-pad` b6d9b18 on top of `pdes`): PP's per-destination shared counters (`get_idx`, `done_count`, `min_key`, `pp_limit`) and htram's per-PE input buffers each on their own cache line; Charades' `NodeWaves::gen` (polled by every PE on every pass, and the object's last field, so sharing a line with whatever was allocated next) and `arrived` on lines of their own. Mac: 360/360 each (10 repeats).
 
 **Job** (16 nodes, skx-dev, σ 100 and 2,000, W 250, 3 reps in shuffled order): unpadded and padded builds × {PP 512, PP 512 + idle second instance (`--agg-auto` never deciding), PP 2,048, PP 2,048 + idle second instance}.
 
@@ -3192,7 +3193,7 @@ Best ÷ best (each arm set at its best W): 4 nodes σ 100 1.01, σ 2,000 0.97; 1
 - **S2 right.** For σ ≥ 2,000 and uniform, Charades loses at every doubling, and the loss per doubling grows (σ 2,000: 0.92, 0.89, 0.87, 0.82). At σ ≤ 1,000 the 8→16 step costs 0–6%.
 - **S3 roughly right, slightly worse.** Uniform, PP 512, W 250: 16-node events per message ÷ 8-node = 15.1 ÷ 38.6 = 0.39 (predicted 0.4–0.6). From 4 to 8 nodes it falls further than the destination count alone predicts (114 → 39, 0.34, against 7 ÷ 15 = 0.47).
 - **S4 mostly right.** Charades' speedup falls with N at σ ≥ 2,000 and uniform, from 1.27–1.77 at 1–4 nodes to 0.95–1.04 at 16 nodes. Only σ 2,000 goes clearly below 1 (σ 4,000 1.04, uniform 0.99). Charades stays ahead at 16 nodes at σ 500 (1.08) and σ 1,000 (1.26). Lookahead 10 is behind from 2–4 nodes on.
-- **S5 wrong.** One process per node is 0.71–0.87 of two. It does make messages larger (uniform 3.7×), but it is slower. One 46-PE process spans both sockets, so NUMA effects on the shared buffers, the per-process GVT and the inboxes may explain it; it is not a fix on this machine as is.
+- **S5 wrong.** One process per node is 0.71–0.87 of two. It does make messages larger (uniform 3.7×), but it is slower. One 46-PE process spans both sockets, so NUMA effects on the shared buffers, the per-process GVT and the input buffers may explain it; it is not a fix on this machine as is.
 - **The main finding: at Gaussian σ, Charades' scaling loss is time per GVT advance, not aggregation.** From 4 to 16 nodes at a fixed setting, events per message (σ 2,000: 74, 74, 75), efficiency and the advance count stay the same, while µs per advance grows 167 → 195 → 233 (σ 4,000: 188 → 286). Even at σ 100, where 2–3% of events leave the process, µs per advance rises 112 → 151 from 1 to 16 nodes, which is Charades' whole 0.80 there; Devastator is flat (1.00) on the same workload. Aggregation thinning is the cause only for uniform (114 → 39 → 15 events per message, 177 → 330 → 563 µs per advance).
 - **Why Devastator escapes it.** Its best window grows to W 1,000 at 8–16 nodes (500 at 1–2), so each GVT advance covers 2.5–4× more simulated time than Charades' best (W 250–400). Charades cannot widen W as cheaply (rollbacks cost more, section 68).
 - **Plan change.** GVT advance cost at scale moves ahead of aggregation thinning. Next: break µs per advance into its parts at 4 and 16 nodes (reduction latency vs waiting for the slowest PE vs blocked passes). Then either cut that cost or make wider windows affordable.
@@ -3397,7 +3398,7 @@ With 23 PEs per process, chance is 0.04. So in the process that holds an advance
 **Why.** Section 84: the slowest process holds an advance up because one PE, usually rank 0, contributes 100–300 µs after the others; at σ 100 the process-edge PEs roll back 35–50× more, and at σ 2,000 rank 0 is still last 22–31% of the time with even rollbacks. Reconverse does not single rank 0 out by default (every PE polls; the 23 PEs share the 16 devices in pairs, so ranks 0 and 1 share device 0).
 
 **Tools.** Profilers measure where cycles go, not when work happens, and count idle spinning as work (they misled once before; memory "Reconverse idle cycles are free"). Projections does not see Charades' `[notrace]` entry methods and must stay short under Reconverse. So:
-- `--gvt-trace=3` (new): every rank's contribution delay after the previous result, in every wave (`gvt_ranks_<process>.csv`); for ranks 0, 1, 11, 21, 22 of every process, every 10th wave, cumulative time in inbox drains (htram and fast path, including the rollbacks they cause), rollbacks, GVT result polls, node-group GVT handlers, htram node receives (a new htram hook) and the scheduler loop, with the time and events executed (`gvt_pe_<pe>.csv`). What a PE did between two snapshots that is in none of these is outside Charades: Converse scheduling, network progress, other entry methods.
+- `--gvt-trace=3` (new): every rank's contribution delay after the previous result, in every wave (`gvt_ranks_<process>.csv`); for ranks 0, 1, 11, 21, 22 of every process, every 10th wave, cumulative time in input buffer drains (htram and fast path, including the rollbacks they cause), rollbacks, GVT result polls, node-group GVT handlers, htram node receives (a new htram hook) and the scheduler loop, with the time and events executed (`gvt_pe_<pe>.csv`). What a PE did between two snapshots that is in none of these is outside Charades: Converse scheduling, network progress, other entry methods.
 - perf: `perf record -e cycles:u` on process 0 only (16-node runs), reported per thread and symbol; node-0 thread ids are printed so threads map to ranks.
 
 **Runs.** σ 100 and σ 2,000, PP 512; traced at W 250 and 400 with untraced pairs, 2 reps; perf at W 400, 2 reps.
@@ -3842,7 +3843,7 @@ It costs at σ 100 up to −50% of the advance tail (section 86's bound) but **d
 **New instrumentation** (off by default): `--gvt-trace=4` adds, for every PE and every 4th wave (`gvt_rec_<pe>.csv`; all PEs sample the same waves), times in µs after the previous result was published in its process (on that process's clock):
 - when the PE picked the result up, and when its last scheduler pass before that ended (so a late pickup splits into time still inside a pass and time outside one: other entry methods, network progress);
 - when it contributed, and why: at pickup (idle or already past 128 events), or later (ran out of work, or reached 128 events);
-- between pickup and contribution: scheduler time, inbox drains, htram receive handlers, rollbacks, node-group GVT handlers, events executed;
+- between pickup and contribution: scheduler time, input buffer drains, htram receive handlers, rollbacks, node-group GVT handlers, events executed;
 - the buckets past GVT it had passed when it contributed (how far it had got in virtual time).
 
 Mac: test config `bucket_gvt_trace4`, 6/6 (and trace 2/3 unchanged, 12/12).
@@ -3920,12 +3921,12 @@ If K2 holds, the straggler cost at uniform is GVT waiting for the PE with the mo
 
 **What this means.**
 - At uniform, the straggler cost at scale is receive handling of thin messages. Per call, a WPs receive costs about 10.6 µs at 30 events per message and 8.2 µs at 12.4. Fitting a fixed and a per-event cost to these two points gives about 6.5 µs per message plus 0.13 µs per event. So receive cost per event rises from about 0.35 µs to 0.66 µs as messages thin. PP is not consistent with a simple fixed-plus-per-event fit, because it mixes PEs' 16-event local sends with shared-buffer sends.
-- So fewer, larger messages *would* help uniform, against section 80's reading. So would a cheaper per-message receive: what the 6.5 µs consists of is not yet measured. One candidate is pushes onto up to 23 PEs' inboxes per message.
+- So fewer, larger messages *would* help uniform, against section 80's reading. So would a cheaper per-message receive: what the 6.5 µs consists of is not yet measured. One candidate is pushes onto up to 23 PEs' input buffers per message.
 - Separately, `--gvt-wave-events=32` is worth 3.5–5.6% at 16 nodes on all three workloads.
 
 **Next:**
 1. `--gvt-wave-events` 32 (and 64) against 128 at 1, 4 and 16 nodes across the scaling workloads, before changing the default.
-2. Break down an htram receive at 16 nodes (unpacking, inbox pushes per destination PE, allocation), to find the fixed cost.
+2. Break down an htram receive at 16 nodes (unpacking, input buffer pushes per destination PE, allocation), to find the fixed cost.
 3. Then compare cutting that cost with fewer destinations (one process per node with per-socket buffers, or two-hop routing).
 
 ### `--gvt-wave-events` 32 / 64 / 128 at 1, 4 and 16 nodes; what an htram receive costs (design, 2026-10-26; written before any runs)
@@ -3945,11 +3946,11 @@ If K2 holds, the straggler cost at uniform is GVT waiting for the PE with the mo
 - allocating the sorted message;
 - finding each item's rank and copying it;
 - freeing the received message;
-- handing the sorted message to the other PEs (one inbox push, under that inbox's lock, per PE that gets items);
+- handing the sorted message to the other PEs (one input buffer push, under that input buffer's lock, per PE that gets items);
 - dropping the receiver's own reference;
 - delivering its own items (Charades' callback).
 
-It also writes the items received, the pushes made, and its inbox drain time. The timers add 7 clock reads per receive.
+It also writes the items received, the pushes made, and its input buffer drain time. The timers add 7 clock reads per receive.
 
 **Predictions:**
 - L1. At 16 nodes, K 32 is at least 1.02× K 128 in at least 6 of the 9 fixed-W cells and in at least 6 of the 9 controller cells. K 64 lies between them.
@@ -3962,7 +3963,7 @@ It also writes the items received, the pushes made, and its inbox drain time. Th
 - R4. Pushes per receive match the number of distinct PEs among the message's items: about 9.8 at 12.4 events per message (23 × (1 − (22/23)^12.4)) and about 17 at 30.
 - R5. Time per receive matches section 105 (WPs, 16 nodes: 8.2 µs) within 15%.
 
-### Wave events and receive cost, results: 128 stays; a receive's fixed cost is its inbox pushes, which slow from 0.17 to 0.70 µs each as receives get frequent (2026-10-26; skx-dev batch job 3645244, 16 nodes)
+### Wave events and receive cost, results: 128 stays; a receive's fixed cost is its input buffer pushes, which slow from 0.17 to 0.70 µs each as receives get frequent (2026-10-26; skx-dev batch job 3645244, 16 nodes)
 
 > **Status: current.** Design and predictions in section 106. 16 nodes (c455-024, c455-031 to -034, c455-041 to -044, c455-082 to -084, c455-091, c455-101 to -103; 4- and 1-node runs on the first nodes), 338 runs, all ok; 23 min. Summary `~/charades-data/sdiag/sdiag14_summary.py`, output and CSVs in `~/charades-data/sdiag/j3645244/`.
 
@@ -4016,7 +4017,7 @@ Controller (ε 0.001):
 | σ 2,000, PP | 4 | 49.9 | 4.0 | 0.33 | 1.21 | 0.51 | **1.38** | 0.05 | 0.45 | 8.4 | **0.17** | 9,900 |
 | σ 2,000, PP | 16 | 50.0 | 3.9 | 0.32 | 1.16 | 0.48 | **1.44** | 0.05 | 0.43 | 8.4 | **0.17** | 9,800 |
 
-(The parts add up to within 0.06 µs of the measured total. Inbox drains on the receiving PEs cost a further 0.31–0.49 µs per item.)
+(The parts add up to within 0.06 µs of the measured total. Input buffer drains on the receiving PEs cost a further 0.31–0.49 µs per item.)
 
 - **R1 right.** Handing the message to other PEs is 73% of a receive at uniform on 16 nodes with WPs (6.2 of 8.5 µs), 72% with PP.
 - **R2 right.** Allocating, freeing the received message and dropping the reference together take 19% (1.6 µs). Freeing the received message grows from 0.70 to 1.13 µs at 16 nodes: this is the cross-thread free into another PE's message pool (section 99).
@@ -4026,30 +4027,30 @@ Controller (ε 0.001):
 - **The cost of a push depends on how often receives happen, not on the message.**
   - At about 10,000 receives per PE over the run (σ 2,000, either node count; uniform PP at 4 nodes), a push takes 0.17–0.21 µs.
   - At 29,000 it takes 0.52 µs; at 69,000–78,000, 0.62–0.70 µs.
-  - Each push takes the destination inbox's mutex, appends to its vector and stores its pending count. At uniform on 16 nodes, all 23 PEs of a process push into the same 23 inboxes while each owner drains its own. So the extra cost is contention and cache-line transfers on the inboxes, which grow with the receive rate.
+  - Each push takes the destination input buffer's mutex, appends to its vector and stores its pending count. At uniform on 16 nodes, all 23 PEs of a process push into the same 23 input buffers while each owner drains its own. So the extra cost is contention and cache-line transfers on the input buffers, which grow with the receive rate.
   - Hand-offs take about 77,500 × 6.2 µs ≈ 0.48 s per PE in a run with 2.6 s of execution (WPs, uniform, 16 nodes), about 18% of each PE's time. And they land unevenly per wave, on whichever PE is the late one (section 105).
 
 **What this means for the thinning question.** The fixed per-message cost of section 105 is almost entirely the per-PE hand-off. Its size is set by contention, not by the work itself. Two ways to cut it:
-1. **Make a push cheap.** Use a lock-free inbox: one single-producer queue per (receiving PE, destination PE) pair, which the owner polls, or a multi-producer list with one atomic exchange per push. Then a push is a cache-line write, not a contended mutex. If pushes return to about 0.2 µs, a uniform receive at 16 nodes drops from 8.5 to about 4 µs. That would save roughly 0.3–0.35 s of the 2.6 s per PE, with more in the late PE's waves.
+1. **Make a push cheap.** Use a lock-free input buffer: one single-producer queue per (receiving PE, destination PE) pair, which the owner polls, or a multi-producer list with one atomic exchange per push. Then a push is a cache-line write, not a contended mutex. If pushes return to about 0.2 µs, a uniform receive at 16 nodes drops from 8.5 to about 4 µs. That would save roughly 0.3–0.35 s of the 2.6 s per PE, with more in the late PE's waves.
 2. **Fewer pushes per event:** larger messages, from fewer destinations. 2D routing gets this only at the cost of a second hop, which also pays a receive.
 
 (1) is local to htram's receive path and keeps one hop, so it comes first.
 
-### Cheaper inbox pushes: padded mutex inboxes and lock-free rings (design, 2026-10-27; written before any runs)
+### Cheaper input buffer pushes: padded mutex input buffers and lock-free rings (design, 2026-10-27; written before any runs)
 
-> **Status: design.** Charades `scale-diag` 5bd80f6 (adds `--agg-inbox-mode`), htram `pdes` 2d9fd13 (adds `htram_inbox_mode`), Reconverse `pads-dest-device` 13ae1ac with `+lci_dest_device` off. `+lci_ndevices 23`, glibc defaults. Job M `$WORK/charades-runs/diag15.slurm` (16 nodes, skx-dev and skx, `-x c455-081`, the copy that starts second cancelled).
+> **Status: design.** Charades `scale-diag` 5bd80f6 (adds `--agg-input-buffer-mode`), htram `pdes` 2d9fd13 (adds `htram_input_buffer_mode`), Reconverse `pads-dest-device` 13ae1ac with `+lci_dest_device` off. `+lci_ndevices 23`, glibc defaults. Job M `$WORK/charades-runs/diag15.slurm` (16 nodes, skx-dev and skx, `-x c455-081`, the copy that starts second cancelled).
 
-**Why.** Section 107: 72–73% of an htram receive at uniform on 16 nodes is handing the sorted message to the other PEs, one push per PE, and a push costs 0.17 µs when receives are rare but 0.70 µs when they are frequent. Each push locks the destination PE's inbox mutex, appends to a vector and stores a count. The 23 inboxes of a process sit next to each other in one array, about 72 bytes each, so neighbouring PEs' inboxes share cache lines.
+**Why.** Section 107: 72–73% of an htram receive at uniform on 16 nodes is handing the sorted message to the other PEs, one push per PE, and a push costs 0.17 µs when receives are rare but 0.70 µs when they are frequent. Each push locks the destination PE's input buffer mutex, appends to a vector and stores a count. The 23 input buffers of a process sit next to each other in one array, about 72 bytes each, so neighbouring PEs' input buffers share cache lines.
 
-**Change** (`--agg-inbox-mode`, one build for every arm; mode 0 is the default and unchanged):
-- **1, padded:** the same mutex inbox, on its own cache lines. This separates false sharing from lock contention.
+**Change** (`--agg-input-buffer-mode`, one build for every arm; mode 0 is the default and unchanged):
+- **1, padded:** the same mutex input buffer, on its own cache lines. This separates false sharing from lock contention.
 - **2, rings:** one single-producer ring of 256 slots per (sending rank, receiving rank) pair in a process.
   - A push writes a slot, stores the ring's tail and sets the receiver's pending flag. There is no lock and no read-modify-write.
   - The receiving PE clears its flag and scans its 23 rings when the flag is set.
-  - A full ring falls back to the mutex inbox; `recv_parts_<pe>.csv` counts those overflows.
-  - Each PE allocates its own padded inbox or row of rings when inbox delivery starts. Until then senders use the old inbox, so no message is lost at start-up.
+  - A full ring falls back to the mutex input_buffers; `recv_parts_<pe>.csv` counts those overflows.
+  - Each PE allocates its own padded input buffer or row of rings when input-buffer delivery starts. Until then senders use the old input buffer, so no message is lost at start-up.
 
-Mac: the inbox configs in all three modes, PP and WPs, every model, 108/108. Ring mode repeated 10 times at 2 processes × 4 PEs on PHOLD and dragonfly, 120/120.
+Mac: the input buffer configs in all three modes, PP and WPs, every model, 108/108. Ring mode repeated 10 times at 2 processes × 4 PEs on PHOLD and dragonfly, 120/120.
 
 **Runs** (3 reps, interleaved over modes):
 - Throughput at 1, 4 and 16 nodes: σ 100, σ 2,000 and uniform with PP 512, plus uniform with WPs 512; W 400 and the controller (ε 0.001). Modes 0, 1 and 2.
@@ -4059,16 +4060,16 @@ Mac: the inbox configs in all three modes, PP and WPs, every model, 108/108. Rin
 - M1. Rings cut a push at uniform on 16 nodes (WPs) from about 0.70 µs to at most 0.25, and a receive from 8.5 µs to at most 5.
 - M2. Rings are at least 1.05× mode 0 at uniform on 16 nodes (both htram modes, fixed W). They are at least 0.98× at σ 100 and σ 2,000 at every node count, and within ±2% on 1 node.
 - M3. Padding alone recovers less than half the rings' gain at uniform on 16 nodes (a push still costs at least 0.45 µs): the cost is mostly lock contention, not false sharing.
-- M4. Fewer than 0.1% of ring pushes overflow to the mutex inbox.
-- M5. Inbox drains cost no more than 0.05 µs per item extra with rings (0.31–0.49 µs per item in section 107), although each non-empty drain scans 23 rings.
+- M4. Fewer than 0.1% of ring pushes overflow to the mutex input buffer.
+- M5. Input buffer drains cost no more than 0.05 µs per item extra with rings (0.31–0.49 µs per item in section 107), although each non-empty drain scans 23 rings.
 
 If M2 holds, rings become the default after the full Mac matrix.
 
-### Inbox modes, results: lock-free rings make uniform 1.08–1.21× faster at 16 nodes (a push 0.73 → 0.17 µs); σ 2,000 with the controller 0.97× (2026-10-27; skx-dev batch job 3646589, 16 nodes)
+### Input buffer modes, results: lock-free rings make uniform 1.08–1.21× faster at 16 nodes (a push 0.73 → 0.17 µs); σ 2,000 with the controller 0.97× (2026-10-27; skx-dev batch job 3646589, 16 nodes)
 
 > **Status: current.** Design and predictions in section 108. 16 nodes (c454-044, c454-071 to -074, c455-001 to -004, c455-011 to -013, c455-032 to -034, c455-041; 4- and 1-node runs on the first nodes), 230 runs, all ok; 17 min. The receive breakdown ran 2 reps per mode, not 3. Summary `~/charades-data/sdiag/sdiag15_summary.py`, output and CSVs in `~/charades-data/sdiag/j3646589/`.
 
-**Throughput by inbox mode** (PP 512 unless marked WPs; M committed events/s with the mutex inbox, mean of 3 reps; ratio = mode ÷ mutex inbox, higher is better):
+**Throughput by input buffer mode** (PP 512 unless marked WPs; M committed events/s with the mutex input buffer, mean of 3 reps; ratio = mode ÷ mutex input buffer, higher is better):
 
 | workload | arm | 1 node: mutex | padded | rings | 4 nodes: mutex | padded | rings | 16 nodes: mutex | padded | rings |
 |---|---|---|---|---|---|---|---|---|---|---|
@@ -4087,7 +4088,7 @@ If M2 holds, rings become the default after the full Mac matrix.
 
 **Receives at uniform, 16 nodes, W 400** (all PEs, whole run, mean of 2 reps; µs, lower is better; throughput higher is better):
 
-| htram | inbox | µs per receive | hand-off | free received message | µs per push | pushes per receive | ring overflows | drain µs per item | M committed ev/s |
+| htram | input buffer | µs per receive | hand-off | free received message | µs per push | pushes per receive | ring overflows | drain µs per item | M committed ev/s |
 |---|---|---|---|---|---|---|---|---|---|
 | WPs | mutex | 8.83 | 6.56 | 1.09 | 0.738 | 8.9 | — | 0.347 | 277.3 |
 | WPs | padded | 5.80 | 3.29 | 1.32 | 0.373 | 8.8 | — | 0.338 | 315.6 |
@@ -4105,16 +4106,16 @@ If M2 holds, rings become the default after the full Mac matrix.
     - σ 2,000 with the controller (0.972) is consistent across reps. At W 400 the same workload is 1.005, and its receives are rare (about 10,000 per PE, section 107), so the push cost cannot explain it. Not yet explained.
 - **M3 wrong: false sharing was the larger part.** Padding alone halves a push (0.74 → 0.37 µs) and gets 70% of the rings' gain at uniform with WPs (1.149 against 1.212). The rings remove most of the rest.
 - **M4 right.** No ring overflowed.
-- **M5 right.** Inbox drains cost 0.34–0.36 µs per item in every mode.
+- **M5 right.** Input buffer drains cost 0.34–0.36 µs per item in every mode.
 - **What remains of a receive.** Freeing the received message, 0.8–1.4 µs, is now about a third of a receive. That is the cross-thread free into another PE's message pool (section 99), and it grows with throughput (WPs: 1.09 → 1.43 µs).
-- **Scaling.** Uniform with WPs at W 400 now reaches 340 M events/s on 16 nodes, against 114 on 4. That is a 4→16-node efficiency of 0.74, up from 0.70 with the mutex inbox in this job (cross-job figures, section 95: Charades 0.52, Devastator 0.69).
+- **Scaling.** Uniform with WPs at W 400 now reaches 340 M events/s on 16 nodes, against 114 on 4. That is a 4→16-node efficiency of 0.74, up from 0.70 with the mutex input buffer in this job (cross-job figures, section 95: Charades 0.52, Devastator 0.69).
 
 **Next:**
 1. Rerun σ 2,000 and σ 100 at 16 nodes, rings against mutex, with the controller and W 400, 5 reps. This settles the 0.97×.
 2. If it does not hold up, make rings the default after the full Mac test matrix.
 3. Then the cross-thread free.
 
-### Rings against the mutex inbox on all 8 scaling workloads, before making rings the default (design, 2026-10-27; written before any runs)
+### Rings against the mutex input buffer on all 8 scaling workloads, before making rings the default (design, 2026-10-27; written before any runs)
 
 > **Status: design.** Charades `scale-diag` 5bd80f6, htram `pdes` 2d9fd13 (as section 108). Job N `$WORK/charades-runs/diag16.slurm` (16 nodes, skx-dev and skx, `-x c455-081`, the copy that starts second cancelled).
 
@@ -4125,7 +4126,7 @@ If M2 holds, rings become the default after the full Mac matrix.
 - lookahead 10 / mean 200: σ 500 and 2,000, at W 50 and with the controller;
 - uniform also with WPs 512.
 
-PP 512, `--agg-inbox-mode` 0 against 2, interleaved. 16 nodes with 5 reps, 4 nodes with 3 reps.
+PP 512, `--agg-input-buffer-mode` 0 against 2, interleaved. 16 nodes with 5 reps, 4 nodes with 3 reps.
 
 **Predictions:**
 - N1. σ 2,000 with the controller at 16 nodes is within ±2% with rings: section 109's 0.972 was this allocation's, not the rings'.
@@ -4136,7 +4137,7 @@ PP 512, `--agg-inbox-mode` 0 against 2, interleaved. 16 nodes with 5 reps, 4 nod
 
 > **Status: current.** Design and predictions in section 110. 16 nodes (c454-074, c454-081 to -084, c454-091, c455-021 to -024, c455-031 to -034, c455-041, c455-042; 4-node runs on the first four), 290 runs, all ok; 22 min. Summary `~/charades-data/sdiag/sdiag16_summary.py`, output and CSVs in `~/charades-data/sdiag/j3647086/`.
 
-**Rings ÷ mutex inbox** (PP 512 unless marked WPs; M committed events/s with the mutex inbox, mean of 5 reps at 16 nodes and 3 at 4 nodes; ratio higher is better):
+**Rings ÷ mutex input buffer** (PP 512 unless marked WPs; M committed events/s with the mutex input buffer, mean of 5 reps at 16 nodes and 3 at 4 nodes; ratio higher is better):
 
 | workload | 16 nodes, W: mutex | rings ÷ mutex | 16 nodes, controller: mutex | rings ÷ mutex | 4 nodes, W: mutex | rings ÷ mutex | 4 nodes, controller: mutex | rings ÷ mutex |
 |---|---|---|---|---|---|---|---|---|
@@ -4155,13 +4156,13 @@ PP 512, `--agg-inbox-mode` 0 against 2, interleaved. 16 nodes with 5 reps, 4 nod
 
 - **N1 right.** σ 2,000 with the controller at 16 nodes is 0.994 (section 109: 0.972). That was the allocation.
 - **N2 right.** The lowest cell is 0.982 (uniform PP, 4 nodes, W; consistent reps), so every cell is at least 0.98. The geometric mean is 1.028–1.034 at 16 nodes and 1.017–1.021 at 4.
-- **Decision: rings are the default** (`--agg-inbox-mode=2`, Charades `scale-diag`; section 110's rule met). The test configs that named rings explicitly now name the mutex inbox (`agg_inbox0_bucket_pp`, `agg_inbox0_bucket_wps`), so it stays tested. Mac: every `agg_*` config on the change tier, without the full matrix (user decision).
+- **Decision: rings are the default** (`--agg-input-buffer-mode=2`, Charades `scale-diag`; section 110's rule met). The test configs that named rings explicitly now name the mutex input buffer (`agg_inputbuf0_bucket_pp`, `agg_inputbuf0_bucket_wps`), so it stays tested. Mac: every `agg_*` config on the change tier, without the full matrix (user decision).
 
 ### Freeing another PE's message without its pool lock (`+mempool_remote_free`) (design, 2026-10-27; written before any runs)
 
 > **Status: design.** Reconverse `pads-remote-free` (on `pads-dest-device`; on Stampede3 commit 22871c6 in `charm-pads-exp/contrib/reconverse`, applied as a patch, not pushed), Charades `scale-diag` with rings as the default, htram `pdes` 2d9fd13. Job O `$WORK/charades-runs/diag17.slurm` (16 nodes, skx-dev and skx, `-x c455-081`, the copy that starts second cancelled).
 
-**Why.** Section 109: with ring inboxes, freeing the received message is about a third of an htram receive (0.8–1.4 µs; WPs at uniform on 16 nodes: 1.09 → 1.43 µs as throughput rose). LCI allocates a receive buffer from the pool of the PE that drained the network. The PE that runs the htram receive frees it, and that PE is usually another PE. Every free takes the owning pool's lock and merges neighbouring free slots under it (section 99), so the lock and the pool's metadata move between cores.
+**Why.** Section 109: with ring input buffers, freeing the received message is about a third of an htram receive (0.8–1.4 µs; WPs at uniform on 16 nodes: 1.09 → 1.43 µs as throughput rose). LCI allocates a receive buffer from the pool of the PE that drained the network. The PE that runs the htram receive frees it, and that PE is usually another PE. Every free takes the owning pool's lock and merges neighbouring free slots under it (section 99), so the lock and the pool's metadata move between cores.
 
 **Change** (Reconverse, `+mempool_remote_free`, off by default):
 - A PE freeing a block of another PE's pool pushes it onto that pool's lock-free stack with one compare-and-swap. The stack is linked through the block's first word, which is free once the message is freed.
@@ -4171,7 +4172,7 @@ PP 512, `--agg-inbox-mode` 0 against 2, interleaved. 16 nodes with 5 reps, 4 nod
 The pool header grows by one pointer. Only Reconverse's LCI2 backend uses it.
 
 **Runs** (rings on everywhere):
-- **Correctness gate first, on 2 nodes:** `test.py --tier change --launcher srun` with `CHARADES_RUN_ARGS="+mempool_remote_free --agg-inbox-mode=2"` (Charades `test.py` now takes extra flags from it). Configs: sequential, blocking, bucket, bucket_window, conservative, agg_blocking_pp, agg_inbox_bucket_pp, agg_inbox_bucket_wps, agg_deadline_bucket_pp, agg_ctl_sparse_bucket_pp. Core model configs.
+- **Correctness gate first, on 2 nodes:** `test.py --tier change --launcher srun` with `CHARADES_RUN_ARGS="+mempool_remote_free --agg-input-buffer-mode=2"` (Charades `test.py` now takes extra flags from it). Configs: sequential, blocking, bucket, bucket_window, conservative, agg_blocking_pp, agg_inputbuf_bucket_pp, agg_inputbuf_bucket_wps, agg_deadline_bucket_pp, agg_ctl_sparse_bucket_pp. Core model configs.
 - **Throughput with and without the flag, 3 reps:** 1, 4 and 16 nodes; σ 100, σ 2,000 and uniform with PP 512, plus uniform with WPs 512; W 400 and the controller.
 - **Receive breakdown (`--gvt-trace=3`), 2 reps:** 16 nodes, uniform with WPs 512 and PP 512, W 400.
 
