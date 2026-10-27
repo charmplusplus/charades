@@ -53,7 +53,7 @@ void parse_command_line(int argc, char** argv) {
   kernel.register_argument("agg-auto-advances",    "--agg-auto: GVT advances to measure before choosing (default 128)", g_tw_agg_auto_advances);
   kernel.register_argument("agg-auto-share",       "--agg-auto: large PP buffers if at most this share of events leaves the process (default 0.3)", g_tw_agg_auto_share);
   kernel.register_argument("agg-auto-msg",         "--agg-auto: otherwise WPs if PP messages carry fewer events than this (default 25)", g_tw_agg_auto_msg);
-  kernel.register_argument("agg-inbox-mode",       "With --agg-inbox: how htram hands a PE its share of a node receive - MUTEX INBOX=0 (default), PADDED MUTEX INBOX=1, LOCK-FREE RINGS=2", g_tw_agg_inbox_mode);
+  kernel.register_argument("agg-inbox-mode",       "With --agg-inbox: how htram hands a PE its share of a node receive - MUTEX INBOX=0, PADDED MUTEX INBOX=1, LOCK-FREE RINGS=2 (default)", g_tw_agg_inbox_mode);
   kernel.register_argument("agg-flush-order",      "Order in which an htram flush pass visits destination processes - BY INDEX=0 (default), ROTATING START=1, EARLIEST TIMESTAMP=2", g_tw_agg_flush_order);
   kernel.register_argument("map-rotate",           "Diagnostic: within each process, give rank r the LPs the block mapping gives rank (r - k) mod PEs-per-process, so the process-edge LPs sit on ranks k-1 and k (0: off, default)", g_tw_map_rotate);
   kernel.register_argument("agg-pp-limit",         "Diagnostic, PP: cap the shared buffers at this many events while buffers stay allocated at --agg-buffer (0: the same, default)", g_tw_agg_pp_limit);
