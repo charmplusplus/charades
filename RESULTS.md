@@ -195,6 +195,7 @@ Charades' controller ÷ Devastator's adaptive window: 0.68–1.03 at σ ≤ 500 
 | 104 | 2026-10-26 | — | Why one PE holds up each GVT advance at uniform and σ 2,000: per-PE wave records, and fewer events per wave | design |
 | 105 | 2026-10-26 | 3643687 | Per-PE wave records, results: at uniform the late PE is slowed by receiving many small messages; `--gvt-wave-events=32` is 1.04–1.06× at 16 nodes | current |
 | 106 | 2026-10-26 | — | `--gvt-wave-events` 32 / 64 / 128 at 1, 4 and 16 nodes; what an htram receive costs | design |
+| 107 | 2026-10-26 | 3645244 | Wave events and receive cost, results: 128 stays; a receive's fixed cost is its inbox pushes, which slow from 0.17 to 0.70 µs each as receives get frequent | current |
 
 ## Stampede3 runs, in order
 
@@ -3955,6 +3956,79 @@ It also writes the items received, the pushes made, and its inbox drain time. Th
 - R3. Delivering the PE's own items takes at most 20%.
 - R4. Pushes per receive match the number of distinct PEs among the message's items: about 9.8 at 12.4 events per message (23 × (1 − (22/23)^12.4)) and about 17 at 30.
 - R5. Time per receive matches section 105 (WPs, 16 nodes: 8.2 µs) within 15%.
+
+### Wave events and receive cost, results: 128 stays; a receive's fixed cost is its inbox pushes, which slow from 0.17 to 0.70 µs each as receives get frequent (2026-10-26; skx-dev batch job 3645244, 16 nodes)
+
+> **Status: current.** Design and predictions in section 106. 16 nodes (c455-024, c455-031 to -034, c455-041 to -044, c455-082 to -084, c455-091, c455-101 to -103; 4- and 1-node runs on the first nodes), 338 runs, all ok; 23 min. Summary `~/charades-data/sdiag/sdiag14_summary.py`, output and CSVs in `~/charades-data/sdiag/j3645244/`.
+
+**A. `--gvt-wave-events` K ÷ 128** (PP 512 unless marked WPs; M committed events/s at K 128, mean of 2 reps; ratios higher is better):
+
+Fixed W (400; lookahead 10: 50):
+
+| workload | 1 node: K 128 | 32 | 64 | 4 nodes: K 128 | 32 | 64 | 16 nodes: K 128 | 32 | 64 |
+|---|---|---|---|---|---|---|---|---|---|
+| σ 100 | 44.4 | 0.889 | 0.899 | 167.3 | 0.976 | 0.959 | 633.1 | 0.925 | 1.011 |
+| σ 500 | 38.4 | 0.846 | 0.858 | 146.8 | 0.924 | 0.912 | 552.3 | 1.014 | 1.026 |
+| σ 1,000 | 35.4 | 0.880 | 0.903 | 142.9 | 0.912 | 0.919 | 512.7 | 1.017 | 0.959 |
+| σ 2,000 | 33.8 | 0.858 | 0.887 | 125.1 | 0.944 | 0.959 | 442.6 | 1.007 | 1.014 |
+| σ 4,000 | 33.8 | 0.845 | 0.872 | 115.4 | 0.953 | 0.947 | 424.8 | 1.016 | 1.004 |
+| uniform | 35.7 | 0.845 | 0.879 | 119.9 | 0.957 | 0.971 | 211.4 | 1.132 | 1.111 |
+| uniform, WPs | 36.1 | 0.858 | 0.899 | 101.8 | 1.009 | 1.031 | 288.1 | 1.007 | 1.020 |
+| lookahead 10, σ 500 | 38.0 | 0.891 | 0.940 | 144.3 | 1.027 | 1.014 | 482.7 | 1.033 | 1.040 |
+| lookahead 10, σ 2,000 | 33.4 | 0.948 | 0.986 | 108.5 | 1.077 | 1.076 | 369.0 | 1.024 | 1.014 |
+| **geometric mean** | | **0.873** | **0.902** | | **0.974** | **0.975** | | **1.018** | **1.021** |
+
+Controller (ε 0.001):
+
+| workload | 1 node: K 128 | 32 | 64 | 4 nodes: K 128 | 32 | 64 | 16 nodes: K 128 | 32 | 64 |
+|---|---|---|---|---|---|---|---|---|---|
+| σ 100 | 46.9 | 1.012 | 0.981 | 171.8 | 1.015 | 1.009 | 614.8 | 0.993 | 0.993 |
+| σ 500 | 41.6 | 1.002 | 1.001 | 154.5 | 1.019 | 1.007 | 564.1 | 0.982 | 0.989 |
+| σ 1,000 | 40.3 | 1.017 | 1.009 | 145.8 | 1.021 | 1.018 | 512.5 | 0.991 | 0.974 |
+| σ 2,000 | 39.1 | 1.012 | 0.999 | 132.9 | 1.005 | 1.009 | 406.9 | 0.983 | 1.005 |
+| σ 4,000 | 38.5 | 1.018 | 1.010 | 119.6 | 1.014 | 1.011 | 382.6 | 0.990 | 1.008 |
+| uniform | 41.7 | 1.017 | 1.009 | 130.2 | 0.968 | 0.978 | 208.1 | 1.004 | 1.007 |
+| uniform, WPs | 41.0 | 1.023 | 1.005 | 104.3 | 1.081 | 1.068 | 275.1 | 1.042 | 1.053 |
+| lookahead 10, σ 500 | 37.8 | 0.997 | 1.002 | 141.5 | 1.020 | 1.010 | 460.9 | 1.034 | 1.043 |
+| lookahead 10, σ 2,000 | 33.5 | 1.026 | 1.031 | 109.8 | 1.021 | 1.028 | 356.9 | 1.011 | 1.016 |
+| **geometric mean** | | **1.014** | **1.005** | | **1.018** | **1.015** | | **1.003** | **1.009** |
+
+- **L1 wrong.** At 16 nodes, K 32 is ≥ 1.02 in 3 of 9 fixed-W cells and 2 of 9 controller cells, not 6. The geometric mean is 1.018 at fixed W and 1.003 with the controller.
+  - The cells section 105 measured gain less here: uniform WPs at W 400 is 1.007 against 1.056, and σ 2,000 is 1.007 against 1.035. Section 105's pairs agreed within 1%, so that gain depended on the allocation.
+  - K 64 is not between 32 and 128 in several cells (σ 100: 0.925 / 1.011; σ 1,000: 1.017 / 0.959).
+- **L2 wrong, badly at fixed W.** On 1 node every fixed-W cell loses with K 32 (0.845–0.948, geometric mean 0.873). At 4 nodes the geometric mean is 0.974 (minimum 0.912). With the controller K 32 is neutral to slightly better (1.014 on 1 node, 1.018 on 4). The controller adjusts the window, which presumably absorbs the shorter waves. Fixed W cannot.
+- **L3 wrong.** Lookahead 10 gains as much or more than lookahead 100 at 4–16 nodes (1.02–1.08).
+- **Decision: K 128 stays the default.** K 32 fails the rule on 1 node (0.873 at fixed W) and at 4 nodes (0.974). Its gains at 16 nodes are small (1.003–1.018) and partly allocation-dependent.
+
+**B. What an htram receive costs** (all PEs over the whole run; µs per receive, mean of 2 reps; lower is better):
+
+| workload, htram | nodes | items per receive | µs per receive | allocate | find rank and copy | free received message | **hand off to other PEs** | drop own reference | own items | pushes per receive | **µs per push** | receives per PE (run) |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| uniform, WPs | 4 | 29.9 | 10.3 | 0.42 | 0.89 | 0.70 | **7.90** | 0.05 | 0.34 | 15.1 | **0.52** | 29,000 |
+| uniform, WPs | 16 | 12.4 | 8.5 | 0.45 | 0.46 | 1.13 | **6.16** | 0.05 | 0.18 | 8.9 | **0.70** | 77,500 |
+| uniform, PP | 4 | 76.2 | 5.8 | 0.37 | 1.77 | 0.60 | **2.20** | 0.05 | 0.77 | 10.5 | **0.21** | 11,500 |
+| uniform, PP | 16 | 13.8 | 7.3 | 0.43 | 0.47 | 0.84 | **5.28** | 0.05 | 0.19 | 8.5 | **0.62** | 69,300 |
+| σ 2,000, PP | 4 | 49.9 | 4.0 | 0.33 | 1.21 | 0.51 | **1.38** | 0.05 | 0.45 | 8.4 | **0.17** | 9,900 |
+| σ 2,000, PP | 16 | 50.0 | 3.9 | 0.32 | 1.16 | 0.48 | **1.44** | 0.05 | 0.43 | 8.4 | **0.17** | 9,800 |
+
+(The parts add up to within 0.06 µs of the measured total. Inbox drains on the receiving PEs cost a further 0.31–0.49 µs per item.)
+
+- **R1 right.** Handing the message to other PEs is 73% of a receive at uniform on 16 nodes with WPs (6.2 of 8.5 µs), 72% with PP.
+- **R2 right.** Allocating, freeing the received message and dropping the reference together take 19% (1.6 µs). Freeing the received message grows from 0.70 to 1.13 µs at 16 nodes: this is the cross-thread free into another PE's message pool (section 99).
+- **R3 right.** The PE's own items take 2%.
+- **R4 roughly right, a little low.** Pushes per receive are 8.9 at 12.4 items (predicted 9.8, or about 9.3 without the PE's own share) and 15.1 at 29.9 (predicted 17).
+- **R5 right.** 8.5 µs per receive against 8.2 in section 105.
+- **The cost of a push depends on how often receives happen, not on the message.**
+  - At about 10,000 receives per PE over the run (σ 2,000, either node count; uniform PP at 4 nodes), a push takes 0.17–0.21 µs.
+  - At 29,000 it takes 0.52 µs; at 69,000–78,000, 0.62–0.70 µs.
+  - Each push takes the destination inbox's mutex, appends to its vector and stores its pending count. At uniform on 16 nodes, all 23 PEs of a process push into the same 23 inboxes while each owner drains its own. So the extra cost is contention and cache-line transfers on the inboxes, which grow with the receive rate.
+  - Hand-offs take about 77,500 × 6.2 µs ≈ 0.48 s per PE in a run with 2.6 s of execution (WPs, uniform, 16 nodes), about 18% of each PE's time. And they land unevenly per wave, on whichever PE is the late one (section 105).
+
+**What this means for the thinning question.** The fixed per-message cost of section 105 is almost entirely the per-PE hand-off. Its size is set by contention, not by the work itself. Two ways to cut it:
+1. **Make a push cheap.** Use a lock-free inbox: one single-producer queue per (receiving PE, destination PE) pair, which the owner polls, or a multi-producer list with one atomic exchange per push. Then a push is a cache-line write, not a contended mutex. If pushes return to about 0.2 µs, a uniform receive at 16 nodes drops from 8.5 to about 4 µs. That would save roughly 0.3–0.35 s of the 2.6 s per PE, with more in the late PE's waves.
+2. **Fewer pushes per event:** larger messages, from fewer destinations. 2D routing gets this only at the cost of a second hop, which also pays a receive.
+
+(1) is local to htram's receive path and keeps one hop, so it comes first.
 
 ## Baseline verification on the Mac
 
