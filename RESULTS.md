@@ -194,6 +194,7 @@ Charades' controller ÷ Devastator's adaptive window: 0.68–1.03 at σ ≤ 500 
 | 103 | 2026-10-26 | 3643408, 3643609 | htram flush order, results: no effect; the lower edge stays late | current |
 | 104 | 2026-10-26 | — | Why one PE holds up each GVT advance at uniform and σ 2,000: per-PE wave records, and fewer events per wave | design |
 | 105 | 2026-10-26 | 3643687 | Per-PE wave records, results: at uniform the late PE is slowed by receiving many small messages; `--gvt-wave-events=32` is 1.04–1.06× at 16 nodes | current |
+| 106 | 2026-10-26 | — | `--gvt-wave-events` 32 / 64 / 128 at 1, 4 and 16 nodes; what an htram receive costs | design |
 
 ## Stampede3 runs, in order
 
@@ -3920,6 +3921,40 @@ If K2 holds, the straggler cost at uniform is GVT waiting for the PE with the mo
 1. `--gvt-wave-events` 32 (and 64) against 128 at 1, 4 and 16 nodes across the scaling workloads, before changing the default.
 2. Break down an htram receive at 16 nodes (unpacking, inbox pushes per destination PE, allocation), to find the fixed cost.
 3. Then compare cutting that cost with fewer destinations (one process per node with per-socket buffers, or two-hop routing).
+
+### `--gvt-wave-events` 32 / 64 / 128 at 1, 4 and 16 nodes; what an htram receive costs (design, 2026-10-26; written before any runs)
+
+> **Status: design.** Charades `scale-diag` 859fe1a (adds `recv_parts_<pe>.csv` under `--gvt-trace=3`), htram `pdes` 04457e0 (splits node-level receives into parts), Reconverse `pads-dest-device` 13ae1ac with `+lci_dest_device` off. `+lci_ndevices 23`, glibc defaults. Job L `$WORK/charades-runs/diag14.slurm` (16 nodes, skx-dev and skx, `-x c455-081`, the copy that starts second cancelled).
+
+**Why.** Section 105: `--gvt-wave-events=32` was 1.035–1.056× the default 128 at 16 nodes on uniform and σ 2,000, but 64 was 0.77 at 4 nodes in section 25 (older runtime and layout), so the default should change only if smaller counts do not lose at 1 and 4 nodes or on other workloads. And at uniform the late PE is slowed by htram receives that cost about 6.5 µs per message plus 0.13 µs per event (a two-point fit), but what that fixed cost is made of is unknown.
+
+**A. `--gvt-wave-events` K = 32, 64, 128.** The 8 workloads of the scaling series at 1, 4 and 16 nodes, PP 512:
+- lookahead 100 / mean 1,000 (σ 100, 500, 1,000, 2,000, 4,000 and uniform): W 400 and the controller (ε 0.001);
+- lookahead 10 / mean 200 (σ 500 and 2,000): W 50 and the controller;
+- uniform also with WPs 512 (its best at 16 nodes), W 400 and the controller.
+
+2 reps, interleaved over K; 324 runs.
+
+**B. The cost of an htram receive.** `--gvt-trace=3` at 4 and 16 nodes, W 400: uniform with WPs 512 and PP 512, σ 2,000 with PP 512; 2 reps. Each PE writes its receives over the run, split into:
+- allocating the sorted message;
+- finding each item's rank and copying it;
+- freeing the received message;
+- handing the sorted message to the other PEs (one inbox push, under that inbox's lock, per PE that gets items);
+- dropping the receiver's own reference;
+- delivering its own items (Charades' callback).
+
+It also writes the items received, the pushes made, and its inbox drain time. The timers add 7 clock reads per receive.
+
+**Predictions:**
+- L1. At 16 nodes, K 32 is at least 1.02× K 128 in at least 6 of the 9 fixed-W cells and in at least 6 of the 9 controller cells. K 64 lies between them.
+- L2. At 1 and 4 nodes, K 32 is within ±3% of K 128 in most cells, and no cell is below 0.95.
+- L3. At lookahead 10 (11,400 advances at 16 nodes, against about 8,500), K 32 gains less than at lookahead 100 and stays within ±3%.
+- **Decision rule:** K 32 becomes the default if its geometric mean over all cells is at least 1.02 at 16 nodes and at least 0.99 at 1 and at 4 nodes, with no cell below 0.95.
+- R1. At uniform on 16 nodes with WPs, handing the message to other PEs is the largest part of a receive, at least 40% of its time.
+- R2. Allocating, freeing the received message and dropping the reference together take at most 25%.
+- R3. Delivering the PE's own items takes at most 20%.
+- R4. Pushes per receive match the number of distinct PEs among the message's items: about 9.8 at 12.4 events per message (23 × (1 − (22/23)^12.4)) and about 17 at 30.
+- R5. Time per receive matches section 105 (WPs, 16 nodes: 8.2 µs) within 15%.
 
 ## Baseline verification on the Mac
 
