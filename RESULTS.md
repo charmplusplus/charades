@@ -4312,7 +4312,7 @@ Efficiency is 99.84–99.93% at W 400 and 99.0–99.1% at W 600. Events per mess
 - **P1 wrong.** GVT never waits on events in transit; every passed bucket completes in the next wave.
 - **P2 wrong.** The late PE received only 1.07–1.24× the median PE's events, and none of them close to GVT. So GVT is not aggregation-paced (explanation (a) is out).
 - **Explanation (b) is half right.** The straggler is real (about 110 µs of a 226 µs advance): one PE still has events inside the window while the rest are blocked by it. But **it no longer grows with the node count** (106 → 111 µs, slowest process work 161 → 154). In section 80, under the old launch, it grew by 40 µs.
-- **What grows is the reduction floor: 34 → 70 µs, the whole +30 µs per advance from 4 to 16 nodes.** This is the slowest process's wait from its last PE's contribution to the published result: the combine across 32 processes and the result's way back. Section 53 found an all-reduce no faster than the nodegroup reduction (0.96–1.02×) when the straggler dominated. The straggler's growth is gone now, so the floor is what limits scaling.
+- **What grows is the reduction floor: 34 → 70 µs, the whole +30 µs per advance from 4 to 16 nodes.** This is the slowest process's wait from its last PE's contribution to the published result: the combine across 32 processes and the result's way back. Section 52 found an all-reduce no faster than the nodegroup reduction (0.96–1.02×) when the straggler dominated. The straggler's growth is gone now, so the floor is what limits scaling.
 - **P3 right.** Bucket size changes nothing (−2.4% to +1.0%).
 - **P4 right.** The margin changes nothing at W 400 (±0.7%), and a wider window loses 10–11% at any margin.
 
