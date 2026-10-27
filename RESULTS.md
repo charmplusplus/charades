@@ -209,6 +209,7 @@ Charades' controller ÷ Devastator's adaptive window: 0.68–1.03 at σ ≤ 500 
 | 115 | 2026-10-27 | — | What paces GVT at σ 2,000: events in transit or the late PE's work; GVT bucket size; horizon margin with wider windows | design |
 | 116 | 2026-10-27 | 3649213 | What paces GVT at σ 2,000, results: neither transit nor a growing straggler; the cross-process reduction (34 → 70 µs) is the whole 4→16-node loss | current |
 | 117 | 2026-10-27 | — | Where the cross-process reduction's 70 µs goes: Charades' own process tree with per-hop times; a flat tree; smaller scheduler passes | design |
+| 118 | 2026-10-27 | 3649717 | Where the reduction's time goes, results: a hop's network time is about 4 µs; the rest is waiting for a PE to run the message. Fewer hops do not help | current |
 
 ## Stampede3 runs, in order
 
@@ -4351,6 +4352,57 @@ Mac: 54/54 on the tree configs (2, 3, 4 processes × 2 PEs; fan-out 2 and 64; bu
 - P6. Recursive doubling stays within ±4% of the Charm++ reduction (section 52).
 
 If P2 and P4 hold, the fix is the flat tree (or a 2-level one) plus prompt handling of GVT messages; if hops are fast and the flat tree does not help, the floor is in the network or the send path, and the next step is timing Reconverse's send and receive of these messages.
+
+### Where the reduction's time goes, results: a hop's network time is about 4 µs; the rest is waiting for a PE to run the message. Fewer hops do not help (2026-10-27; skx-dev batch job 3649717, 16 nodes)
+
+> **Status: current.** Design and predictions in section 117. 16 nodes (c454-004, c454-023, c454-034, c454-041 to -043, c454-074, c454-081, c454-102, c454-104, c455-012, c455-014, c455-073, c455-074, c455-091, c455-092; 4-node runs on the first four), 62 runs, all ok; gate 54/54 on 2 nodes (psm2); 8 min. Summaries `~/charades-data/sdiag/j3649717/sdiag20_summary.py` and `sdiag20_crit.py`, with their output (`summary.txt`, `crit.txt`) and the CSVs. The traces stay in `$WORK/charades-runs/sdiag20/j3649717`.
+
+**Throughput and a GVT advance, σ 2,000, W 400, PP 512** (mean of 2 reps; advance and floor in µs, waves 10–95%, from the traced runs; floor as in section 116):
+
+| reduction | M ev/s, 4 nodes | M ev/s, 16 nodes | ÷ Charm++ reduction, 16 nodes (higher is better) | efficiency 4→16 | advance, 4 / 16 nodes (lower is better) | floor, 4 / 16 nodes (lower is better) |
+|---|---|---|---|---|---|---|
+| Charm++ reduction (default) | 126.3 | 443.6 | 1.000 | 0.88 | 194 / 223 | 32.8 / 71.8 |
+| `--gvt-wave-tree=4` | 125.9 | 441.4 | 0.995 | 0.88 | 195 / 227 | 31.8 / 77.6 |
+| `--gvt-wave-tree=64` (flat) | 123.8 | 379.4 | **0.855** | 0.77 | 198 / 253 | 26.5 / 54.8 |
+| `--gvt-wave-allreduce=1` | 125.9 | 436.6 | 0.984 | 0.87 | 192 / 219 | 15.1 / 36.7 |
+
+Traced ÷ untraced: 0.985–0.995. Recursive doubling's floor is not comparable with the others: the slowest process finds its partners' sums already waiting, so its own wait is short, but the other processes wait for its sums to spread through all 5 rounds. Its advance is the fair measure, and that is no better.
+
+**Per hop, tree with fan-out 4** (µs, offset-corrected; lower is better):
+
+| nodes | up: fastest / median / p90 | down: fastest / median / p90 | on the path the slowest process waits on, beyond the pair's fastest (mean): up / down |
+|---|---|---|---|
+| 4 | 3.9 / 14.0 / 29.0 | 3.9 / 7.5 / 20.1 | 13.0 / 6.8 |
+| 16 | 4.0 / 12.7–15.4 / 25.8–30.3 | 4.0 / 7.8–8.3 / 20.6–21.6 | 16.5 / 7.1 |
+
+- The ranges at 16 nodes are over the 3 tree levels; the level makes no difference.
+- The first hop on the Charm++ path (last PE → its process's handler) takes 3.8–4.1 µs (median); with the tree it is 1.7 µs, a lock.
+- Every PE of a process runs hops about equally often (each rank 0.04–0.05 of them).
+- At 76–81% of tree nodes, the last input to arrive is the process's own PEs. The child's sums come last on the path from the slowest process to the root.
+
+**What the hops add up to** (16 nodes, fan-out 4, 3 levels): 6 hops at about 4 µs is 24 µs of network time. The rest of the 72–78 µs floor is the critical path's up hops waiting about 16 µs each and its down hops about 7 µs each, plus the 2–4 µs first hop. Up hops wait longer because they arrive while the parent's PEs are still executing their passes. Down hops arrive when most PEs are blocked on the window and back in the scheduler often.
+
+**Flat tree:** the root's 31 sends of the result take 45 µs from first to last (1.5 µs each, serially), and 31 children's sums arriving at one process wait longer (up median 18 µs). So the 2-hop tree loses 15% at 16 nodes.
+
+**B. Smaller scheduler passes** (Charm++ reduction; ÷ batch 16; higher is better):
+- **Batch 4:** 0.894 (4 nodes), 0.893 (16 nodes); 16-node floor **71.8 → 44.0 µs**, advance 223 → 241 µs.
+- **Batch 8:** 0.932 (4 nodes), 0.960 (16 nodes); 16-node floor 51.3 µs, advance 222 µs.
+
+The floor falls with the pass size, so the hops wait for a pass to end. But smaller passes on every PE cost more than they save.
+
+**C. Flat tree ÷ Charm++ reduction, 16 nodes** (higher is better): σ 4,000 0.847 (W 400) and 0.910 (controller); uniform 0.998 and 0.956.
+
+- **P1 half right.** The first hop is 3.8–4.1 µs, a little over 3. But it is a small part of the floor; the floor is in the cross-process hops.
+- **P2 right.** Fastest hop about 4 µs, median up hop 13–15 µs (3.5×), median down hop 7.5–8 µs (2×).
+- **P3 right.** The fan-out-4 tree's floor is 8% above the Charm++ reduction's (77.6 against 71.8 µs), at 0.995× the throughput. Its hops stand for the Charm++ ones.
+- **P4 wrong.** The flat tree is 0.855× at 16 nodes and 0.98× at 4; C goes down to 0.847×. Serial sends and fan-in at the root cost more than the hops saved.
+- **P5 right on the floor (−28 µs at batch 4), wrong on the throughput.** Batch 4 is 0.89× and batch 8 0.96×.
+- **P6 right.** Recursive doubling: 0.984× (16 nodes), 0.996× (4 nodes).
+
+**Next.** At 4 µs a hop, the 16-node floor would be about 26 µs instead of 72 µs, which is 20% of a 223 µs advance. Reconverse has no immediate messages and no communication thread: a message waits until the PE that polls its network device, and then some PE of the process, comes back to the scheduler. Candidates:
+1. **Shorter passes only while a wave is in flight.** A PE whose process has contributed runs passes of 2–4 events until the result arrives. This is a Charades change of about 20 lines. Batch 4 everywhere cut the floor by 28 µs; this would pay the smaller passes' cost only during the wave, but only if the PEs that must run the hops are the ones taking shorter passes.
+2. **Find which wait it is:** the device poll or the queue. Time stamp in Reconverse when the receiving PE takes the message off its device, against when the handler starts.
+3. **Run GVT messages on the free core.** One core per process is unused (2 × 23 PEs on 2 × 24 cores). A Reconverse thread there could poll the devices and run messages marked immediate at once. This is the most complete fix, but the largest change.
 
 ## Baseline verification on the Mac
 
