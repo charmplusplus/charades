@@ -19,6 +19,8 @@ Every number from every run: Stampede3 runs in order (each design, written befor
 
 ## Current numbers
 
+> **Launch changes since these numbers (2026-10-26/27):** `+lci_ndevices 23` (section 95), ring input buffers as Charades' default (section 111; uniform 1.08–1.21× at 16 nodes) and `+mempool_remote_free` (sections 113–114; Reconverse `pads-remote-free`, Stampede3 only). The tables below predate the last two; the paper-grade rerun will use all three.
+>
 > **As of 2026-10-25 (`main` 2369301).** Defaults: same-process fast path and `--gvt-node-waves` on, htram PP 512 with the deadline policy (horizon margin 8), full nodes (2 processes × 23 PEs per node, 128 LPs per PE), native psm2. Short runs (end time 512,000; 128,000 at lookahead 10; 1–4 s each) and 2 reps: the paper-grade rerun (3 reps, long runs) is still to do. Avoid Stampede3 node c455-081 (section 82).
 
 > **Launch change, 2026-10-26:** `+lci_ndevices 23` (one device per PE) replaces 16: 1.08–1.46× at 16 nodes (geometric mean 1.21), 1.03–1.07× at 4 nodes (sections 88, 90). The 1–16 node table further down used 16 devices.
@@ -203,6 +205,7 @@ Charades' controller ÷ Devastator's adaptive window: 0.68–1.03 at σ ≤ 500 
 | 111 | 2026-10-27 | 3647086 | Rings on all 8 workloads, results: no cell below 0.98, uniform 1.08–1.21×; rings are the default | current |
 | 112 | 2026-10-27 | — | Freeing another PE's message without its pool lock (`+mempool_remote_free`) | design |
 | 113 | 2026-10-27 | 3647310 | `+mempool_remote_free`, results: freeing a received message 1.45 → 0.30 µs; uniform 1.02–1.06× at 16 nodes; gate rerun needed (harness) | current |
+| 114 | 2026-10-27 | 3647898 | Correctness gate for `+mempool_remote_free`, results: 231/231; the flag joins the Stampede3 launch | current |
 
 ## Stampede3 runs, in order
 
@@ -4230,6 +4233,16 @@ The pool header grows by one pointer. Only Reconverse's LCI2 backend uses it.
 - Pass 1: `CHARADES_RUN_ARGS=+mempool_remote_free`, `test.py --tier change --launcher srun --nodes 2`, with `env.sh` and XPORT=psm2. Configs: sequential, blocking, bucket, bucket_window, conservative, agg_blocking_pp, agg_inputbuf_bucket_pp, agg_inputbuf_bucket_wps, agg_inputbuf0_bucket_pp, agg_deadline_bucket_pp, agg_ctl_sparse_bucket_pp. Core model configs, launches 1, 4 and 2 × 2.
 - Pass 2: 2 processes × 23 PEs, 5 repeats, Simple and Imbalanced PHOLD: agg_inputbuf_bucket_pp, agg_inputbuf_bucket_wps, agg_ctl_sparse_bucket_pp. This puts 23 senders on the rings, which the Mac (at most 4 PEs per process) never did.
 - **Prediction G1:** every run passes. Committed counts must match the sequential runs.
+
+### Correctness gate for `+mempool_remote_free`, results: 231/231; the flag joins the Stampede3 launch (2026-10-27; skx-dev batch job 3647898, 2 nodes)
+
+> **Status: current.** Design in section 113. 2 nodes (c454-081, c454-082); 8 min. Output `$WORK/charades-runs/gate18/j3647898/pass1.txt` and `pass2.txt`. A transient `/work2` I/O error at job start (Slurm could not `chdir` to the submit directory) affected no run.
+
+- Pass 1 (change tier, launches 1, 4 and 2 × 2 on 2 nodes, every model's core configs): **186/186**.
+- Pass 2 (2 processes × 23 PEs, 5 repeats, Simple and Imbalanced PHOLD; ring input buffers under their real load): **45/45**.
+- **G1 right.**
+
+**Decision.** `+mempool_remote_free` joins the Stampede3 launch line. It is the new default `EXTRA_ARGS` in `scripts/stampede3/ctl_sweep.sh` (`+lci_ndevices 23 +pemap 2-46:2,3-47:2 +mempool_remote_free`; the old default still said 16 devices). It needs a Reconverse with the `pads-remote-free` patch, which only `charm-pads-exp` on Stampede3 has. Whether to make it Reconverse's own default, and where to publish the `pads-*` runtime patches, is open.
 
 ## Baseline verification on the Mac
 

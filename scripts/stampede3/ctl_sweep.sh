@@ -50,7 +50,8 @@
 #     runtime with the psm2 LCI patch),
 #   XPORT=psm2 with LCI_ATTR_PACKET_SIZE=65536 (env.sh; XPORT=verbs for the old
 #     transport),
-#   EXTRA_ARGS="+lci_ndevices 16 +pemap 2-46:2,3-47:2" (appended to every run;
+#   EXTRA_ARGS="+lci_ndevices 23 +pemap 2-46:2,3-47:2 +mempool_remote_free"
+#     (the current launch, RESULTS.md sections 95 and 114; appended to every run;
 #     the pemap puts each process's PEs on its own socket),
 #   BIN_WRAP (a command srun runs the binary through, e.g. a perf wrapper),
 #   CPT=24 (cores per task for srun -c), SRUN_ARGS
@@ -66,7 +67,7 @@ START=${START:-15} END=${END:-64000} CAP=${CAP:-180} TREE=${TREE:-charades-exp}
 WORKLOADS=${WORKLOADS:-"steady:10:200:0.5 steady:100:1000:0.5 phases:10:200:100:1000:0.5:8000"}
 ARMS=${ARMS:-"w:25 w:50 w:100 w:250 w:500 q:0.02 q:0.05 q:0.1 hill:250"}
 AGG=${AGG:-pp:512} BUCKETS=${BUCKETS:-8} MARGINS=${MARGINS:-8}
-EXTRA_ARGS=${EXTRA_ARGS-"+lci_ndevices 16 +pemap 2-46:2,3-47:2"}
+EXTRA_ARGS=${EXTRA_ARGS-"+lci_ndevices 23 +pemap 2-46:2,3-47:2 +mempool_remote_free"}
 C=$WORK/$TREE
 out=${RUNS:-$WORK/charades-runs}/ctl_sweep; mkdir -p $out/logs; cd $out
 csv=${2:-$out/sweep_$(date +%Y%m%d_%H%M%S).csv}
