@@ -82,9 +82,25 @@ thread_local WaveTimers g_wave_timers;
 #ifdef CHARADES_HTRAM
 extern thread_local double htram_recv_s;
 extern thread_local unsigned long long htram_recv_n;
+extern thread_local double htram_recv_part[6];
+extern thread_local unsigned long long htram_recv_items, htram_recv_pushes;
 #endif
 
 void BucketGVT::finalize() {
+#ifdef CHARADES_HTRAM
+  // --gvt-trace=3: this PE's htram node receives over the run, split into
+  // parts (htram_group.h, htram_recv_part)
+  if (g_tw_gvt_trace >= 3) {
+    std::ofstream t(std::string(g_output_dir) + "recv_parts_" +
+                    std::to_string(CkMyPe()) + ".csv");
+    t << "pe,rank,calls,items,pushes,total_s,alloc_s,sort_s,free_in_s,"
+         "handoff_s,unref_s,own_s,drain_s\n" << std::setprecision(9);
+    t << CkMyPe() << "," << CkMyRank() << "," << htram_recv_n << ","
+      << htram_recv_items << "," << htram_recv_pushes << "," << htram_recv_s;
+    for (int k = 0; k < 6; k++) t << "," << htram_recv_part[k];
+    t << "," << g_wave_timers.drain << "\n";
+  }
+#endif
   if (g_tw_gvt_trace >= 3 && !pe_snaps.empty()) {
     std::ofstream t(std::string(g_output_dir) + "gvt_pe_" +
                     std::to_string(CkMyPe()) + ".csv");
