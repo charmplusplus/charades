@@ -84,6 +84,7 @@ extern thread_local double htram_recv_s;
 extern thread_local unsigned long long htram_recv_n;
 extern thread_local double htram_recv_part[6];
 extern thread_local unsigned long long htram_recv_items, htram_recv_pushes;
+extern thread_local unsigned long long htram_inbox_overflows;
 #endif
 
 void BucketGVT::finalize() {
@@ -94,11 +95,11 @@ void BucketGVT::finalize() {
     std::ofstream t(std::string(g_output_dir) + "recv_parts_" +
                     std::to_string(CkMyPe()) + ".csv");
     t << "pe,rank,calls,items,pushes,total_s,alloc_s,sort_s,free_in_s,"
-         "handoff_s,unref_s,own_s,drain_s\n" << std::setprecision(9);
+         "handoff_s,unref_s,own_s,drain_s,overflows\n" << std::setprecision(9);
     t << CkMyPe() << "," << CkMyRank() << "," << htram_recv_n << ","
       << htram_recv_items << "," << htram_recv_pushes << "," << htram_recv_s;
     for (int k = 0; k < 6; k++) t << "," << htram_recv_part[k];
-    t << "," << g_wave_timers.drain << "\n";
+    t << "," << g_wave_timers.drain << "," << htram_inbox_overflows << "\n";
   }
 #endif
   if (g_tw_gvt_trace >= 3 && !pe_snaps.empty()) {

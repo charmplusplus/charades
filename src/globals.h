@@ -98,6 +98,7 @@ extern unsigned g_tw_agg_auto_buffer; ///< --agg-auto: the large PP buffer
 extern unsigned g_tw_agg_pp_limit;    ///< diagnostic: PP shared buffers capped here, allocated at --agg-buffer
 extern unsigned g_tw_map_rotate;      ///< diagnostic: rotate each process's LP blocks by this many PEs
 extern unsigned g_tw_agg_flush_order; ///< htram flush pass order: 0 by index, 1 rotating start, 2 earliest timestamp
+extern unsigned g_tw_agg_inbox_mode;  ///< htram inbox: 0 mutex, 1 mutex on its own cache lines, 2 lock-free rings
 extern unsigned g_tw_agg_auto_wps;    ///< --agg-auto: may also choose WPs (makes a second htram instance)
 ///@}
 

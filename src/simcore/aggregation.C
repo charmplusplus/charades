@@ -175,6 +175,11 @@ Aggregator::Aggregator(CkGroupID tram_gid, CkGroupID wps_gid) : advances(0) {
   if (g_tw_agg_flush_order && CkMyPe() == 0)
     CkPrintf("Aggregation: htram flush passes visit destinations %s\n",
              g_tw_agg_flush_order == 1 ? "by index, starting one later each pass" : "earliest timestamp first");
+  if (g_tw_agg_inbox_mode > 2) CkAbort("--agg-inbox-mode must be 0, 1 or 2\n");
+  htram_inbox_mode = (int)g_tw_agg_inbox_mode;
+  if (g_tw_agg_inbox_mode && agg_inbox_on() && CkMyPe() == 0)
+    CkPrintf("Aggregation: htram inboxes are %s\n",
+             g_tw_agg_inbox_mode == 1 ? "mutex inboxes on their own cache lines" : "lock-free rings");
   // Before the scheduler exists, so before PE_VALUE(window): the start value
   urgent = urgent_window(g_tw_optimism_window);
   for (size_t i = 0; i < trams.size(); i++) {
