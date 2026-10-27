@@ -208,6 +208,7 @@ Charades' controller ÷ Devastator's adaptive window: 0.68–1.03 at σ ≤ 500 
 | 114 | 2026-10-27 | 3647898 | Correctness gate for `+mempool_remote_free`, results: 231/231; the flag joins the Stampede3 launch | current |
 | 115 | 2026-10-27 | — | What paces GVT at σ 2,000: events in transit or the late PE's work; GVT bucket size; horizon margin with wider windows | design |
 | 116 | 2026-10-27 | 3649213 | What paces GVT at σ 2,000, results: neither transit nor a growing straggler; the cross-process reduction (34 → 70 µs) is the whole 4→16-node loss | current |
+| 117 | 2026-10-27 | — | Where the cross-process reduction's 70 µs goes: Charades' own process tree with per-hop times; a flat tree; smaller scheduler passes | design |
 
 ## Stampede3 runs, in order
 
@@ -4319,6 +4320,37 @@ Efficiency is 99.84–99.93% at W 400 and 99.0–99.1% at W 600. Events per mess
 **Next.** Make the cross-process combine fast. A 32-process reduction of a few hundred bytes should take about 10–15 µs on Omni-Path, not 70.
 1. Measure where the 70 µs goes, per hop: the message in flight, waiting for a PE to run the nodegroup handler (PEs run handlers only between scheduler passes of up to 16 events, about 30 µs), and combining.
 2. Then reduce what dominates. If it is waiting for a PE, run GVT reduction messages promptly: check for them inside the execute loop, or give them to the free core each process already leaves idle. If it is hops, use fewer: the existing recursive doubling (`--gvt-wave-allreduce`, 5 hops), a two-level exchange (2 hops), or one all-to-all exchange of counts (1 hop, 31 small messages per process per wave).
+
+### Where the cross-process reduction's 70 µs goes: Charades' own process tree with per-hop times; a flat tree; smaller scheduler passes (design, 2026-10-27; written before any runs)
+
+> **Status: design.** Charades `scale-diag` (this commit: `--gvt-wave-tree`), htram `pdes` 699c3a9, Reconverse 22871c6; the current launch (`+lci_ndevices 23 +pemap 2-46:2,3-47:2 +mempool_remote_free`, ring input buffers). Job Q `$WORK/charades-runs/diag20.slurm` (16 nodes, skx-dev and skx, `-x c455-081`, the copy that starts second cancelled).
+
+**Why.** Section 116: at σ 2,000 the reduction floor (the slowest process's wait from its last PE's contribution to the published result) grows from 34 µs on 4 nodes to 70 µs on 16, and that is the whole 4→16-node loss. A combine of a few hundred bytes across 32 processes should take about 10–15 µs on Omni-Path.
+
+**How the reduction runs now.** The last PE of a process combines its PEs' counts and sends them to its own process's nodegroup handler (one hop through the node queue). The handler contributes to the Charm++ nodegroup reduction, which goes up a spanning tree of processes with fan-out 4 (`ST_RecursivePartition`, about 2 levels at 8 processes and 3 at 32). The result comes back down Reconverse's spanning-tree node broadcast. Every hop is a nodegroup message that waits until some PE of the receiving process runs it, and PEs run messages only between scheduler passes of up to 16 events (`--batch`, about 30 µs on the late PE). These hops are inside Charm++ and cannot be timed from Charades.
+
+**New option `--gvt-wave-tree=k`** (with `--gvt-node-waves`; 0, the Charm++ reduction, stays the default):
+- The processes form a k-ary tree rooted at process 0 (children of p are pk+1 … pk+k). The partial sums go up it in Charades' own messages and the result comes back down the same tree; k ≥ processes − 1 is one gather to process 0 and one scatter (2 hops).
+- No hop to the process's own handler: the last PE in adds its process's sums itself, under a lock. Inputs from children are added by whichever PE runs their message.
+- `--gvt-trace=2` writes `gvt_hops_<process>.csv`: every input (a child's sums, the parent's result, this process's own sums) with the sender's send time and this process's receive time, and when each process sent on. Clocks differ between nodes, so each parent–child pair's offset is taken offline from the fastest up and fastest down hop in windows of 200 waves (the two directions' fastest hops are assumed equal). A hop's time beyond its pair's fastest is time spent waiting for a PE to run it, or in network queues.
+- `gvt_waves_<process>.csv` gains `handled_s`: when the process's handler took its own sums (the Charm++ path's first hop).
+
+Mac: 54/54 on the tree configs (2, 3, 4 processes × 2 PEs; fan-out 2 and 64; bucketed, window, PP aggregation, controller, trace 2), and 252/252 on a 20-repeat pass. The job first runs the same configs through `test.py` on 2 nodes with the psm2 transport and stops if any fails.
+
+**Runs** (σ 2,000, W 400, PP 512, 2 reps, interleaved; 4 and 16 nodes):
+- **A. Reduction:** the Charm++ reduction; `--gvt-wave-tree=4` (about as deep as the Charm++ tree); `--gvt-wave-tree=64` (flat); `--gvt-wave-allreduce=1` (recursive doubling, 3 or 5 rounds). Each traced (`--gvt-trace=2`) and untraced.
+- **B. Smaller passes:** `--batch` 4 and 8 (default 16) with the Charm++ reduction, untraced; traced at 16 nodes.
+- **C. Other workloads, 16 nodes:** σ 4,000 (PP 512) and uniform (WPs 512), W 400 and the controller, the Charm++ reduction against the flat tree, untraced.
+
+**Predictions:**
+- P1. On the Charm++ path, the first hop (last PE → its process's handler) has a median under 3 µs at both node counts: the floor is in the cross-process hops.
+- P2. With `--gvt-wave-tree=4` at 16 nodes, the median hop is at least twice its pair's fastest hop (fastest about 3–5 µs, median 8–15 µs): hops wait for a PE to run them.
+- P3. The fan-out-4 tree's floor is within 15% of the Charm++ reduction's at 16 nodes, so its hops stand for the Charm++ ones.
+- P4. The flat tree's floor at 16 nodes is at most 45 µs, and its throughput at least 1.05× the Charm++ reduction's (σ 2,000, 16 nodes); within ±3% at 4 nodes. In C, no cell below 0.97×.
+- P5. If hops wait for PEs (P2), `--batch=4` lowers the 16-node floor by at least 10 µs; its throughput is within ±5% of batch 16, because every pass costs a scheduler turn.
+- P6. Recursive doubling stays within ±4% of the Charm++ reduction (section 52).
+
+If P2 and P4 hold, the fix is the flat tree (or a 2-level one) plus prompt handling of GVT messages; if hops are fast and the flat tree does not help, the floor is in the network or the send path, and the next step is timing Reconverse's send and receive of these messages.
 
 ## Baseline verification on the Mac
 
