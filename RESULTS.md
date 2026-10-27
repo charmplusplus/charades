@@ -199,6 +199,8 @@ Charades' controller ÷ Devastator's adaptive window: 0.68–1.03 at σ ≤ 500 
 | 108 | 2026-10-27 | — | Cheaper inbox pushes: padded mutex inboxes and lock-free rings | design |
 | 109 | 2026-10-27 | 3646589 | Inbox modes, results: lock-free rings make uniform 1.08–1.21× faster at 16 nodes (a push 0.73 → 0.17 µs); σ 2,000 with the controller 0.97× | current |
 | 110 | 2026-10-27 | — | Rings against the mutex inbox on all 8 scaling workloads, before making rings the default | design |
+| 111 | 2026-10-27 | 3647086 | Rings on all 8 workloads, results: no cell below 0.98, uniform 1.08–1.21×; rings are the default | current |
+| 112 | 2026-10-27 | — | Freeing another PE's message without its pool lock (`+mempool_remote_free`) | design |
 
 ## Stampede3 runs, in order
 
@@ -4129,6 +4131,54 @@ PP 512, `--agg-inbox-mode` 0 against 2, interleaved. 16 nodes with 5 reps, 4 nod
 - N1. σ 2,000 with the controller at 16 nodes is within ±2% with rings: section 109's 0.972 was this allocation's, not the rings'.
 - N2. Rings are at least 0.98× in every cell at 4 and 16 nodes. The geometric mean is at least 1.02 at 16 nodes and at least 1.00 at 4.
 - **Decision rule:** rings become the default if no cell is below 0.97 with its reps consistent (no single slow rep). The Mac change-tier tests must pass with the new default.
+
+### Rings on all 8 workloads, results: no cell below 0.98, uniform 1.08–1.21×; rings are the default (2026-10-27; skx-dev batch job 3647086, 16 nodes)
+
+> **Status: current.** Design and predictions in section 110. 16 nodes (c454-074, c454-081 to -084, c454-091, c455-021 to -024, c455-031 to -034, c455-041, c455-042; 4-node runs on the first four), 290 runs, all ok; 22 min. Summary `~/charades-data/sdiag/sdiag16_summary.py`, output and CSVs in `~/charades-data/sdiag/j3647086/`.
+
+**Rings ÷ mutex inbox** (PP 512 unless marked WPs; M committed events/s with the mutex inbox, mean of 5 reps at 16 nodes and 3 at 4 nodes; ratio higher is better):
+
+| workload | 16 nodes, W: mutex | rings ÷ mutex | 16 nodes, controller: mutex | rings ÷ mutex | 4 nodes, W: mutex | rings ÷ mutex | 4 nodes, controller: mutex | rings ÷ mutex |
+|---|---|---|---|---|---|---|---|---|
+| σ 100 | 629.4 | 1.002 | 614.3 | 0.999 | 167.0 | 0.998 | 170.3 | 0.994 |
+| σ 500 | 539.2 | 0.991 | 558.3 | 0.994 | 145.8 | 1.015 | 145.7 | 1.051 ¹ |
+| σ 1,000 | 506.4 | 0.996 | 497.9 | 1.001 | 141.1 | 1.001 | 146.3 | 1.002 |
+| σ 2,000 | 435.2 | 1.006 | 392.4 | 0.994 | 125.7 | 0.996 | 132.1 | 0.987 |
+| σ 4,000 | 419.4 | 0.999 | 363.4 | 0.993 | 114.7 | 1.005 | 119.0 | 1.006 |
+| uniform | 227.5 | **1.102** | 203.5 | **1.078** | 122.2 | 0.982 | 130.8 | 0.989 |
+| uniform, WPs | 273.8 | **1.207** | 260.8 | **1.208** | 99.9 | **1.149** | 104.6 | **1.158** |
+| lookahead 10, σ 500 | 466.9 | 1.015 | 454.6 | 0.999 | 143.6 | 1.007 | 138.7 | 1.014 |
+| lookahead 10, σ 2,000 | 357.7 | 1.004 | 342.4 | 1.008 | 109.7 | 1.009 | 108.8 | 0.998 |
+| **geometric mean** | | **1.034** | | **1.028** | | **1.017** | | **1.021** |
+
+(W 400; lookahead 10: W 50. ¹ One slow mutex rep, 131 against 153 and 153.)
+
+- **N1 right.** σ 2,000 with the controller at 16 nodes is 0.994 (section 109: 0.972). That was the allocation.
+- **N2 right.** The lowest cell is 0.982 (uniform PP, 4 nodes, W; consistent reps), so every cell is at least 0.98. The geometric mean is 1.028–1.034 at 16 nodes and 1.017–1.021 at 4.
+- **Decision: rings are the default** (`--agg-inbox-mode=2`, Charades `scale-diag`; section 110's rule met). The test configs that named rings explicitly now name the mutex inbox (`agg_inbox0_bucket_pp`, `agg_inbox0_bucket_wps`), so it stays tested. Mac: every `agg_*` config on the change tier, without the full matrix (user decision).
+
+### Freeing another PE's message without its pool lock (`+mempool_remote_free`) (design, 2026-10-27; written before any runs)
+
+> **Status: design.** Reconverse `pads-remote-free` (on `pads-dest-device`; on Stampede3 commit 22871c6 in `charm-pads-exp/contrib/reconverse`, applied as a patch, not pushed), Charades `scale-diag` with rings as the default, htram `pdes` 2d9fd13. Job O `$WORK/charades-runs/diag17.slurm` (16 nodes, skx-dev and skx, `-x c455-081`, the copy that starts second cancelled).
+
+**Why.** Section 109: with ring inboxes, freeing the received message is about a third of an htram receive (0.8–1.4 µs; WPs at uniform on 16 nodes: 1.09 → 1.43 µs as throughput rose). LCI allocates a receive buffer from the pool of the PE that drained the network. The PE that runs the htram receive frees it, and that PE is usually another PE. Every free takes the owning pool's lock and merges neighbouring free slots under it (section 99), so the lock and the pool's metadata move between cores.
+
+**Change** (Reconverse, `+mempool_remote_free`, off by default):
+- A PE freeing a block of another PE's pool pushes it onto that pool's lock-free stack with one compare-and-swap. The stack is linked through the block's first word, which is free once the message is freed.
+- The owner takes the whole stack with one exchange (so no ABA problem) at its next allocation, under the lock it takes anyway, and frees each block there.
+- Frees into the PE's own pool are unchanged.
+
+The pool header grows by one pointer. Only Reconverse's LCI2 backend uses it.
+
+**Runs** (rings on everywhere):
+- **Correctness gate first, on 2 nodes:** `test.py --tier change --launcher srun` with `CHARADES_RUN_ARGS="+mempool_remote_free --agg-inbox-mode=2"` (Charades `test.py` now takes extra flags from it). Configs: sequential, blocking, bucket, bucket_window, conservative, agg_blocking_pp, agg_inbox_bucket_pp, agg_inbox_bucket_wps, agg_deadline_bucket_pp, agg_ctl_sparse_bucket_pp. Core model configs.
+- **Throughput with and without the flag, 3 reps:** 1, 4 and 16 nodes; σ 100, σ 2,000 and uniform with PP 512, plus uniform with WPs 512; W 400 and the controller.
+- **Receive breakdown (`--gvt-trace=3`), 2 reps:** 16 nodes, uniform with WPs 512 and PP 512, W 400.
+
+**Predictions:**
+- O1. Freeing the received message falls from 1.43 µs (WPs) and 0.84 µs (PP) per receive to at most 0.3.
+- O2. With the flag, uniform on 16 nodes is at least 1.03× (both htram modes). Every other cell is at least 0.99×, and on 1 node within ±2%.
+- O3. The correctness gate passes.
 
 ## Baseline verification on the Mac
 
