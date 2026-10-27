@@ -42,8 +42,8 @@ void parse_command_line(int argc, char** argv) {
   kernel.register_argument("agg-buffer",           "htram buffer size in events (PP: a multiple of 16)", g_tw_agg_buffer);
   kernel.register_argument("agg-urgent",           "Ship an event at once if its ts < GVT + this (0 = never)", g_tw_agg_urgent);
   kernel.register_argument("agg-scope",            "Aggregate events to - ALL REMOTE CHARES=0, OTHER PROCESSES ONLY=1", g_tw_agg_scope);
-  kernel.register_argument("local-fast-path",      "Optimistic, bucketed GVT, not --sched-park: events for other chares in this process are handed over by pointer through per-PE inboxes, not htram or messages (elsewhere it turns itself off) - NO=0, YES=1 (default), THIS PE ONLY=2", g_tw_local_fast_path);
-  kernel.register_argument("agg-inbox",            "Optimistic, bucketed GVT, not --sched-park: htram node receives hand events to PEs through inboxes, not messages - NO=0, YES=1 (default)", g_tw_agg_inbox);
+  kernel.register_argument("local-fast-path",      "Optimistic, bucketed GVT, not --sched-park: events for other chares in this process are handed over by pointer through per-PE input buffers, not htram or messages (elsewhere it turns itself off) - NO=0, YES=1 (default), THIS PE ONLY=2", g_tw_local_fast_path);
+  kernel.register_argument("agg-input-buffer",            "Optimistic, bucketed GVT, not --sched-park: htram node receives hand events to PEs through input buffers, not messages - NO=0, YES=1 (default)", g_tw_agg_input_buffer);
   kernel.register_argument("event-index",          "Optimistic: index received events for cancellation by - AVL TREE=0, HASH=1 (default)", g_tw_event_index);
   kernel.register_argument("msg-pool",             "Recycle event messages through a per-PE pool - NO=0, YES=1 (default)", g_tw_msg_pool);
   kernel.register_argument("agg-gvt-flush",        "On each GVT update flush - NOTHING=0, DESTINATIONS NOT FILLING=1, EVERYTHING=2", g_tw_agg_gvt_flush);
@@ -53,7 +53,7 @@ void parse_command_line(int argc, char** argv) {
   kernel.register_argument("agg-auto-advances",    "--agg-auto: GVT advances to measure before choosing (default 128)", g_tw_agg_auto_advances);
   kernel.register_argument("agg-auto-share",       "--agg-auto: large PP buffers if at most this share of events leaves the process (default 0.3)", g_tw_agg_auto_share);
   kernel.register_argument("agg-auto-msg",         "--agg-auto: otherwise WPs if PP messages carry fewer events than this (default 25)", g_tw_agg_auto_msg);
-  kernel.register_argument("agg-inbox-mode",       "With --agg-inbox: how htram hands a PE its share of a node receive - MUTEX INBOX=0, PADDED MUTEX INBOX=1, LOCK-FREE RINGS=2 (default)", g_tw_agg_inbox_mode);
+  kernel.register_argument("agg-input-buffer-mode",       "With --agg-input-buffer: how htram hands a PE its share of a node receive - MUTEX INPUT BUFFER=0, PADDED MUTEX INPUT BUFFER=1, LOCK-FREE RINGS=2 (default)", g_tw_agg_input_buffer_mode);
   kernel.register_argument("agg-flush-order",      "Order in which an htram flush pass visits destination processes - BY INDEX=0 (default), ROTATING START=1, EARLIEST TIMESTAMP=2", g_tw_agg_flush_order);
   kernel.register_argument("map-rotate",           "Diagnostic: within each process, give rank r the LPs the block mapping gives rank (r - k) mod PEs-per-process, so the process-edge LPs sit on ranks k-1 and k (0: off, default)", g_tw_map_rotate);
   kernel.register_argument("agg-pp-limit",         "Diagnostic, PP: cap the shared buffers at this many events while buffers stay allocated at --agg-buffer (0: the same, default)", g_tw_agg_pp_limit);

@@ -77,7 +77,7 @@ class Statistics {
     uint64_t anti_cancels;
     uint64_t fast_sends;   ///< remote sends handed over by pointer (--local-fast-path)
     uint64_t fast_antis;   ///< anti events handed over by pointer (--local-fast-path)
-    uint64_t fast_push_retries; ///< inbox pushes retried because another PE pushed first
+    uint64_t fast_push_retries; ///< input buffer pushes retried because another PE pushed first
     ///@}
 
     /** \name Communication stats (--comm-stats)

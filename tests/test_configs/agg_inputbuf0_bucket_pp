@@ -1,0 +1,12 @@
+# Optimistic w/Bucketed GVT and a window, htram (PP), deadline flush policy, the mutex input buffer (--agg-input-buffer-mode=0; rings are the default)
+# node receives delivering to PEs through input buffers
+sync=3
+gvt=4
+buffer-size=655360
+optimism-window=2000
+aggregation=1
+agg-mode=2
+agg-buffer=16
+agg-policy=1
+agg-input-buffer=1
+agg-input-buffer-mode=0

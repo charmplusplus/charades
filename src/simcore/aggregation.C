@@ -73,17 +73,17 @@ static Time urgent_window(Time window) {
 }
 
 /**
- * --agg-inbox: a node-level receive hands each PE its share through an inbox
+ * --agg-input-buffer: a node-level receive hands each PE its share through an input buffer
  * the PE drains in its own loop (agg_drain), instead of a receivePerPE message
  * carrying ~2.5 events. Only where nothing waits on quiescence: the bucketed
  * GVT counts each event when its chare receives it, so an event still in an
- * inbox is in transit, but a QD-based GVT would not see it; and only with
+ * input buffer is in transit, but a QD-based GVT would not see it; and only with
  * the optimistic scheduler, whose loop never stops (hence not --sched-park,
  * where a parked PE would not drain). On by default; elsewhere node receives
  * fall back to a receivePerPE message per PE.
  */
-static bool agg_inbox_on() {
-  return g_tw_agg_inbox && g_tw_gvt_scheme == 4 &&
+static bool agg_input_buffer_on() {
+  return g_tw_agg_input_buffer && g_tw_gvt_scheme == 4 &&
          g_tw_synchronization_protocol == OPTIMISTIC && !g_tw_sched_park;
 }
 
@@ -100,7 +100,7 @@ class Aggregator : public CBase_Aggregator {
      */
     std::vector<HTram*> trams;
     /**
-     * The instances whose inboxes this PE drains: the active one, and after
+     * The instances whose input buffers this PE drains: the active one, and after
      * a switch the one before it (other processes may still send through
      * it). Only the active one is flushed. Every pass over an idle instance
      * costs a little, and most passes are window-blocked spins whose length
@@ -175,11 +175,11 @@ Aggregator::Aggregator(CkGroupID tram_gid, CkGroupID wps_gid) : advances(0) {
   if (g_tw_agg_flush_order && CkMyPe() == 0)
     CkPrintf("Aggregation: htram flush passes visit destinations %s\n",
              g_tw_agg_flush_order == 1 ? "by index, starting one later each pass" : "earliest timestamp first");
-  if (g_tw_agg_inbox_mode > 2) CkAbort("--agg-inbox-mode must be 0, 1 or 2\n");
-  htram_inbox_mode = (int)g_tw_agg_inbox_mode;
-  if (g_tw_agg_inbox_mode != 2 && agg_inbox_on() && CkMyPe() == 0)
-    CkPrintf("Aggregation: htram inboxes are %s\n",
-             g_tw_agg_inbox_mode == 1 ? "mutex inboxes on their own cache lines" : "mutex inboxes");
+  if (g_tw_agg_input_buffer_mode > 2) CkAbort("--agg-input-buffer-mode must be 0, 1 or 2\n");
+  htram_input_buffer_mode = (int)g_tw_agg_input_buffer_mode;
+  if (g_tw_agg_input_buffer_mode != 2 && agg_input_buffer_on() && CkMyPe() == 0)
+    CkPrintf("Aggregation: htram input buffers are %s\n",
+             g_tw_agg_input_buffer_mode == 1 ? "mutex input buffers on their own cache lines" : "mutex input buffers");
   // Before the scheduler exists, so before PE_VALUE(window): the start value
   urgent = urgent_window(g_tw_optimism_window);
   for (size_t i = 0; i < trams.size(); i++) {
@@ -200,7 +200,7 @@ Aggregator::Aggregator(CkGroupID tram_gid, CkGroupID wps_gid) : advances(0) {
     }
     // Node-level receives (WPs, PP) send nothing to PEs that get no items
     t->setSkipEmptyDeliveries(true);
-    if (agg_inbox_on()) t->setInboxDelivery(true);
+    if (agg_input_buffer_on()) t->setInputBufferDelivery(true);
   }
 }
 
@@ -360,7 +360,7 @@ void agg_create(CkCallback done) {
     CkAbort("--aggregation=1 with the bucketed GVT needs --agg-gvt-flush=2: "
             "an event waits for its bucket to become current\n");
   }
-  if (agg_inbox_on()) CkPrintf("Aggregation: node receives deliver through per-PE inboxes\n");
+  if (agg_input_buffer_on()) CkPrintf("Aggregation: node receives deliver through per-PE input buffers\n");
   if (g_tw_agg_auto) {
     if (g_tw_agg_mode != PP) {
       CkAbort("--agg-auto=1 starts from PP: use --agg-mode=2\n");
@@ -478,7 +478,7 @@ void agg_flush_idle() {
 
 void agg_drain() {
   if (!g_tw_aggregation) return;
-  for (HTram* t : CpvAccess(g_aggregator)->drained) t->drainInbox();
+  for (HTram* t : CpvAccess(g_aggregator)->drained) t->drainInputBuffer();
 }
 
 void agg_flush_gvt() {

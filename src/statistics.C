@@ -326,7 +326,7 @@ void Statistics::print() const {
   if (fast_sends || fast_antis) {
     print_int("Process Sends (fast path)", fast_sends);
     print_int("Process Anti Sends (fast path)", fast_antis);
-    print_int("Inbox Push Retries (fast path)", fast_push_retries);
+    print_int("Input Buffer Push Retries (fast path)", fast_push_retries);
   }
 
   /** \todo Add stats about cancellations */

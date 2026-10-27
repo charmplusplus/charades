@@ -52,7 +52,7 @@ extern unsigned g_tw_gvt_trace;       ///< bucketed gvt: PE 0 logs every count w
 
 /**
  * --gvt-trace=3: each PE's cumulative time (s) in parts of its work, read at
- * its count-wave contributions: inbox drains (htram and fast path, including
+ * its count-wave contributions: input buffer drains (htram and fast path, including
  * the rollbacks they cause), rollbacks, GVT result polls (wave_done and the
  * next contribution), and this process's node-group GVT handlers it ran
  */
@@ -82,8 +82,8 @@ extern unsigned g_tw_agg_mode;        ///< htram mode: WPs=0, WsP=1, PP=2, WW=3
 extern unsigned g_tw_agg_buffer;      ///< htram buffer size, in events
 extern Time     g_tw_agg_urgent;      ///< events with ts < GVT + this ship at once
 extern unsigned g_tw_agg_scope;       ///< 0: all remote chares, 1: other processes only
-extern unsigned g_tw_agg_inbox;       ///< node-level receives hand items to PEs through inboxes (default 1)
-extern unsigned g_tw_local_fast_path; ///< events for other chares in this process go by pointer through per-PE inboxes (fastpath.h)
+extern unsigned g_tw_agg_input_buffer;       ///< node-level receives hand items to PEs through input buffers (default 1)
+extern unsigned g_tw_local_fast_path; ///< events for other chares in this process go by pointer through per-PE input buffers (fastpath.h)
 extern unsigned g_tw_event_index;     ///< remote events indexed for cancellation by 0: AVL tree, 1: hash (default)
 extern unsigned g_tw_msg_pool;        ///< recycle RemoteEvent messages through a per-PE pool (default 1)
 extern unsigned g_tw_agg_gvt_flush;   ///< on each GVT update: 0 none, 1 stale, 2 all
@@ -98,7 +98,7 @@ extern unsigned g_tw_agg_auto_buffer; ///< --agg-auto: the large PP buffer
 extern unsigned g_tw_agg_pp_limit;    ///< diagnostic: PP shared buffers capped here, allocated at --agg-buffer
 extern unsigned g_tw_map_rotate;      ///< diagnostic: rotate each process's LP blocks by this many PEs
 extern unsigned g_tw_agg_flush_order; ///< htram flush pass order: 0 by index, 1 rotating start, 2 earliest timestamp
-extern unsigned g_tw_agg_inbox_mode;  ///< htram inbox: 0 mutex, 1 mutex on its own cache lines, 2 lock-free rings
+extern unsigned g_tw_agg_input_buffer_mode;  ///< htram input buffer: 0 mutex, 1 mutex on its own cache lines, 2 lock-free rings
 extern unsigned g_tw_agg_auto_wps;    ///< --agg-auto: may also choose WPs (makes a second htram instance)
 ///@}
 

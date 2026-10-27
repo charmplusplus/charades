@@ -14,22 +14,22 @@
 extern CProxy_LPChare lps;
 
 /**
- * A PE's inbox for messages from other PEs of its process: a lock-free list
+ * A PE's input buffer for messages from other PEs of its process: a lock-free list
  * that senders push onto and the owner takes whole (newest first). One cache
  * line each, so pushes to different PEs do not contend.
  */
-struct alignas(64) FpInbox {
+struct alignas(64) FpInputBuffer {
   std::atomic<RemoteEvent*> head;
-  FpInbox() : head(NULL) {}
+  FpInputBuffer() : head(NULL) {}
 };
 
-/** This process's inboxes, one per PE by rank, made by whichever PE needs them first */
-static FpInbox* process_inboxes() {
-  static FpInbox* inboxes = new FpInbox[CkMyNodeSize()];
-  return inboxes;
+/** This process's input buffers, one per PE by rank, made by whichever PE needs them first */
+static FpInputBuffer* process_input_buffers() {
+  static FpInputBuffer* input_buffers = new FpInputBuffer[CkMyNodeSize()];
+  return input_buffers;
 }
 
-/** Per-PE tables and the inbox for messages from this PE to itself */
+/** Per-PE tables and the input buffer for messages from this PE to itself */
 struct FpState {
   std::vector<int> chare_pe;          ///< home PE of every LP chare
   std::vector<LPChare*> local;        ///< this PE's chares, by index
@@ -74,8 +74,8 @@ void fp_resolve() {
   if (!g_tw_local_fast_path) return;
   if (g_tw_synchronization_protocol != OPTIMISTIC || g_tw_gvt_scheme != 4 ||
       g_tw_sched_park) {
-    // An event waiting in an inbox is in transit, which only the bucketed
-    // GVT's counts see, and every PE must keep draining its inbox
+    // An event waiting in an input buffer is in transit, which only the bucketed
+    // GVT's counts see, and every PE must keep draining its input buffer
     fp_off_reason = "it needs the optimistic scheduler, the bucketed GVT "
                     "(--gvt=4) and no --sched-park";
   } else if (g_tw_adaptive_buckets) {
@@ -98,7 +98,7 @@ void fp_check() {
   }
 }
 
-/** Push msg onto the inbox of the PE that owns its chare. False: elsewhere */
+/** Push msg onto the input buffer of the PE that owns its chare. False: elsewhere */
 static bool fp_push(RemoteEvent* msg, uint64_t dest_chare) {
   FpState& st = fp_state;
   int pe = st.home_pe(dest_chare);
@@ -108,7 +108,7 @@ static bool fp_push(RemoteEvent* msg, uint64_t dest_chare) {
   }
   // --local-fast-path=2: this PE only (other PEs through htram or messages)
   if (g_tw_local_fast_path == 2 || CkNodeOf(pe) != CkMyNode()) return false;
-  std::atomic<RemoteEvent*>& head = process_inboxes()[CkRankOf(pe)].head;
+  std::atomic<RemoteEvent*>& head = process_input_buffers()[CkRankOf(pe)].head;
   RemoteEvent* h = head.load(std::memory_order_relaxed);
   msg->fp_next = h;
   while (!head.compare_exchange_weak(h, msg, std::memory_order_release,
@@ -158,7 +158,7 @@ void fp_drain() {
   if (!g_tw_local_fast_path) return;
   FpState& st = fp_state;
   {
-    std::atomic<RemoteEvent*>& head = process_inboxes()[CkMyRank()].head;
+    std::atomic<RemoteEvent*>& head = process_input_buffers()[CkMyRank()].head;
     if (head.load(std::memory_order_relaxed) != NULL) {
       RemoteEvent* m = head.exchange(NULL, std::memory_order_acquire);
       // Newest first: reverse to send order, so an event precedes its

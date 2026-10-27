@@ -66,7 +66,7 @@ struct RemoteEvent : public CMessage_RemoteEvent {
     int32_t src_pe;
 
     // --local-fast-path (fastpath.h), never sent over the network: the link
-    // in the receiving PE's inbox; for an anti-message, the event message it
+    // in the receiving PE's input_buffers; for an anti-message, the event message it
     // cancels; and the receiver's event for this message once it arrived
     RemoteEvent* fp_next;
     RemoteEvent* fp_target;

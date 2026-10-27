@@ -4,8 +4,8 @@
  *
  * An event for a chare on another PE of this process, or on another chare of
  * this PE, skips htram and Charm++ messages: its message is pushed onto the
- * destination PE's inbox (a lock-free list for other PEs, a plain vector for
- * this one), and the destination drains its inbox at the start of every
+ * destination PE's input buffer (a lock-free list for other PEs, a plain vector for
+ * this one), and the destination drains its input buffer at the start of every
  * scheduler iteration. The receiver indexes nothing: an anti-message names
  * the event's message directly, and one sender's pushes arrive in order, so
  * the event always arrives first. The message stays alive until the
@@ -13,8 +13,8 @@
  * still roll back the event that sent it is not below GVT.
  *
  * GVT counting is unchanged: an event is counted sent at produce() and
- * received when drained, so one waiting in an inbox is in transit. As with
- * --agg-inbox, only where nothing waits on quiescence and every PE keeps
+ * received when drained, so one waiting in an input buffer is in transit. As with
+ * --agg-input-buffer, only where nothing waits on quiescence and every PE keeps
  * iterating: the bucketed GVT, the optimistic scheduler, not --sched-park.
  * On by default (RESULTS.md "Same-process events by pointer"); elsewhere it
  * turns itself off.
@@ -44,7 +44,7 @@ void fp_check();
 bool fp_send(RemoteEvent* msg, uint64_t dest_chare);
 /** Cancel e, a TW_sent_fast event, with an anti-message by pointer */
 void fp_send_anti(Event* e);
-/** Deliver everything waiting in this PE's inboxes */
+/** Deliver everything waiting in this PE's input buffers */
 void fp_drain();
 
 #endif

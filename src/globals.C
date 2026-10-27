@@ -56,7 +56,7 @@ unsigned g_tw_agg_mode;
 unsigned g_tw_agg_buffer;
 Time     g_tw_agg_urgent;
 unsigned g_tw_agg_scope;
-unsigned g_tw_agg_inbox;
+unsigned g_tw_agg_input_buffer;
 unsigned g_tw_local_fast_path;
 unsigned g_tw_event_index;
 unsigned g_tw_msg_pool;
@@ -72,7 +72,7 @@ unsigned g_tw_agg_auto_buffer;
 unsigned g_tw_agg_pp_limit;
 unsigned g_tw_map_rotate;
 unsigned g_tw_agg_flush_order;
-unsigned g_tw_agg_inbox_mode;
+unsigned g_tw_agg_input_buffer_mode;
 unsigned g_tw_agg_auto_wps;
 unsigned g_tw_ctl;
 double   g_tw_ctl_epsilon;
@@ -152,7 +152,7 @@ void clear_globals() {
   g_tw_agg_buffer         = 64;
   g_tw_agg_urgent         = 0;
   g_tw_agg_scope          = 0;
-  g_tw_agg_inbox          = 1;
+  g_tw_agg_input_buffer          = 1;
   g_tw_local_fast_path    = 1;
   g_tw_event_index        = 1;
   g_tw_msg_pool           = 1;
@@ -169,7 +169,7 @@ void clear_globals() {
   g_tw_agg_pp_limit       = 0;
   g_tw_map_rotate         = 0;
   g_tw_agg_flush_order    = 0;
-  g_tw_agg_inbox_mode     = 2;
+  g_tw_agg_input_buffer_mode     = 2;
   g_tw_ctl                = 0;
   g_tw_ctl_epsilon        = -1;   // set in tw_init from --ctl-cost
   g_tw_ctl_cost           = 0;

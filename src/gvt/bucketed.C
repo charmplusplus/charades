@@ -84,7 +84,7 @@ extern thread_local double htram_recv_s;
 extern thread_local unsigned long long htram_recv_n;
 extern thread_local double htram_recv_part[6];
 extern thread_local unsigned long long htram_recv_items, htram_recv_pushes;
-extern thread_local unsigned long long htram_inbox_overflows;
+extern thread_local unsigned long long htram_input_buffer_overflows;
 #endif
 
 void BucketGVT::finalize() {
@@ -99,7 +99,7 @@ void BucketGVT::finalize() {
     t << CkMyPe() << "," << CkMyRank() << "," << htram_recv_n << ","
       << htram_recv_items << "," << htram_recv_pushes << "," << htram_recv_s;
     for (int k = 0; k < 6; k++) t << "," << htram_recv_part[k];
-    t << "," << g_wave_timers.drain << "," << htram_inbox_overflows << "\n";
+    t << "," << g_wave_timers.drain << "," << htram_input_buffer_overflows << "\n";
   }
 #endif
   if (g_tw_gvt_trace >= 3 && !pe_snaps.empty()) {

@@ -94,7 +94,7 @@ class Launch:
 
   def command(self, exe, args, launcher):
     # CHARADES_RUN_ARGS: extra runtime or engine flags for every run, e.g.
-    # "+mempool_remote_free --agg-inbox-mode=2"
+    # "+mempool_remote_free --agg-input-buffer-mode=2"
     run = [exe, '+pe', str(self.pes)] + args + \
         os.environ.get('CHARADES_RUN_ARGS', '').split()
     if launcher.kind == 'srun':

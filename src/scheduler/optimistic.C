@@ -54,7 +54,7 @@ void OptimisticScheduler::execute() {
   double tp = g_tw_gvt_trace >= 3 ? CmiWallTimer() : 0;
   gvt_manager->poll();
   if (g_tw_gvt_trace >= 3) g_wave_timers.poll += CmiWallTimer() - tp;
-  // Events htram's node receives left for this PE (--agg-inbox)
+  // Events htram's node receives left for this PE (--agg-input-buffer)
   double td = g_tw_gvt_trace >= 3 ? CmiWallTimer() : 0;
   agg_drain();
   // Events chares in this process handed over by pointer (--local-fast-path)

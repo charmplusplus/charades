@@ -1,5 +1,5 @@
 # Optimistic w/Bucketed GVT and a window, htram (PP), deadline flush policy,
-# node receives delivering to PEs through inboxes
+# node receives delivering a receivePerPE message to each PE (no input buffers)
 sync=3
 gvt=4
 buffer-size=655360
@@ -8,4 +8,4 @@ aggregation=1
 agg-mode=2
 agg-buffer=16
 agg-policy=1
-agg-inbox=1
+agg-input-buffer=0
