@@ -197,6 +197,7 @@ Charades' controller ÷ Devastator's adaptive window: 0.68–1.03 at σ ≤ 500 
 | 106 | 2026-10-26 | — | `--gvt-wave-events` 32 / 64 / 128 at 1, 4 and 16 nodes; what an htram receive costs | design |
 | 107 | 2026-10-26 | 3645244 | Wave events and receive cost, results: 128 stays; a receive's fixed cost is its inbox pushes, which slow from 0.17 to 0.70 µs each as receives get frequent | current |
 | 108 | 2026-10-27 | — | Cheaper inbox pushes: padded mutex inboxes and lock-free rings | design |
+| 109 | 2026-10-27 | 3646589 | Inbox modes, results: lock-free rings make uniform 1.08–1.21× faster at 16 nodes (a push 0.73 → 0.17 µs); σ 2,000 with the controller 0.97× | current |
 
 ## Stampede3 runs, in order
 
@@ -4059,6 +4060,56 @@ Mac: the inbox configs in all three modes, PP and WPs, every model, 108/108. Rin
 - M5. Inbox drains cost no more than 0.05 µs per item extra with rings (0.31–0.49 µs per item in section 107), although each non-empty drain scans 23 rings.
 
 If M2 holds, rings become the default after the full Mac matrix.
+
+### Inbox modes, results: lock-free rings make uniform 1.08–1.21× faster at 16 nodes (a push 0.73 → 0.17 µs); σ 2,000 with the controller 0.97× (2026-10-27; skx-dev batch job 3646589, 16 nodes)
+
+> **Status: current.** Design and predictions in section 108. 16 nodes (c454-044, c454-071 to -074, c455-001 to -004, c455-011 to -013, c455-032 to -034, c455-041; 4- and 1-node runs on the first nodes), 230 runs, all ok; 17 min. The receive breakdown ran 2 reps per mode, not 3. Summary `~/charades-data/sdiag/sdiag15_summary.py`, output and CSVs in `~/charades-data/sdiag/j3646589/`.
+
+**Throughput by inbox mode** (PP 512 unless marked WPs; M committed events/s with the mutex inbox, mean of 3 reps; ratio = mode ÷ mutex inbox, higher is better):
+
+| workload | arm | 1 node: mutex | padded | rings | 4 nodes: mutex | padded | rings | 16 nodes: mutex | padded | rings |
+|---|---|---|---|---|---|---|---|---|---|---|
+| σ 100 | W 400 | 43.3 | 1.016 | 1.018 | 167.6 | 1.002 | 0.999 | 621.7 | 1.017 | 0.968 ¹ |
+| σ 2,000 | W 400 | 33.4 | 1.008 | 1.012 | 124.8 | 1.005 | 1.003 | 435.8 | 1.010 | 1.005 |
+| uniform | W 400 | 35.7 | 0.998 | 0.999 | 120.7 | 0.994 | 1.000 | 229.4 | 1.058 | **1.103** |
+| uniform, WPs | W 400 | 36.1 | 0.995 | 0.991 | 100.7 | 1.110 | **1.135** | 280.4 | 1.149 | **1.212** |
+| σ 100 | controller | 46.9 | 0.999 | 0.996 | 170.7 | 1.002 | 1.003 | 609.3 | 1.011 | 1.014 |
+| σ 2,000 | controller | 38.7 | 1.005 | 0.996 | 132.3 | 0.997 | 0.997 | 406.0 | 0.990 | **0.972** ² |
+| uniform | controller | 41.5 | 1.002 | 0.996 | 130.5 | 0.991 | 0.996 | 205.1 | 1.045 | **1.082** |
+| uniform, WPs | controller | 40.9 | 1.010 | 1.008 | 102.9 | 1.121 | **1.173** | 269.5 | 1.128 | **1.195** |
+| **geometric mean** | | | 1.004 | 1.002 | | 1.027 | 1.036 | | 1.050 | 1.065 |
+
+¹ Reps 534, 634, 637 against 618, 623, 624: one slow rep; without it, 1.02.
+² Reps 390, 393, 400 against 405, 405, 408: consistent.
+
+**Receives at uniform, 16 nodes, W 400** (all PEs, whole run, mean of 2 reps; µs, lower is better; throughput higher is better):
+
+| htram | inbox | µs per receive | hand-off | free received message | µs per push | pushes per receive | ring overflows | drain µs per item | M committed ev/s |
+|---|---|---|---|---|---|---|---|---|---|
+| WPs | mutex | 8.83 | 6.56 | 1.09 | 0.738 | 8.9 | — | 0.347 | 277.3 |
+| WPs | padded | 5.80 | 3.29 | 1.32 | 0.373 | 8.8 | — | 0.338 | 315.6 |
+| WPs | rings | 4.15 | 1.52 | 1.43 | 0.171 | 8.9 | 0 | 0.342 | 336.0 |
+| PP | mutex | 7.89 | 5.88 | 0.83 | 0.691 | 8.6 | — | 0.371 | 224.7 |
+| PP | padded | 4.96 | 2.93 | 0.85 | 0.343 | 8.6 | — | 0.363 | 243.5 |
+| PP | rings | 3.40 | 1.39 | 0.84 | 0.162 | 8.6 | 0 | 0.364 | 250.1 |
+
+- **M1 right.** With rings a push costs 0.16–0.17 µs (from 0.69–0.74), about what it cost in section 107 when receives were rare. A receive costs 3.4–4.2 µs (from 7.9–8.8).
+- **M2 mostly right.**
+  - Rings are 1.10× (PP) and 1.21× (WPs) at uniform on 16 nodes with W 400, and 1.08× and 1.20× with the controller. They are also 1.14–1.17× at uniform with WPs on 4 nodes.
+  - On 1 node every cell is within ±2%.
+  - Two cells at 16 nodes are below the predicted 0.98:
+    - σ 100 at W 400 (0.968) comes from one slow rep.
+    - σ 2,000 with the controller (0.972) is consistent across reps. At W 400 the same workload is 1.005, and its receives are rare (about 10,000 per PE, section 107), so the push cost cannot explain it. Not yet explained.
+- **M3 wrong: false sharing was the larger part.** Padding alone halves a push (0.74 → 0.37 µs) and gets 70% of the rings' gain at uniform with WPs (1.149 against 1.212). The rings remove most of the rest.
+- **M4 right.** No ring overflowed.
+- **M5 right.** Inbox drains cost 0.34–0.36 µs per item in every mode.
+- **What remains of a receive.** Freeing the received message, 0.8–1.4 µs, is now about a third of a receive. That is the cross-thread free into another PE's message pool (section 99), and it grows with throughput (WPs: 1.09 → 1.43 µs).
+- **Scaling.** Uniform with WPs at W 400 now reaches 340 M events/s on 16 nodes, against 114 on 4. That is a 4→16-node efficiency of 0.74, up from 0.70 with the mutex inbox in this job (cross-job figures, section 95: Charades 0.52, Devastator 0.69).
+
+**Next:**
+1. Rerun σ 2,000 and σ 100 at 16 nodes, rings against mutex, with the controller and W 400, 5 reps. This settles the 0.97×.
+2. If it does not hold up, make rings the default after the full Mac test matrix.
+3. Then the cross-thread free.
 
 ## Baseline verification on the Mac
 
