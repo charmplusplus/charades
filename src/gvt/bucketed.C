@@ -118,12 +118,14 @@ void BucketGVT::finalize() {
     std::ofstream t(std::string(g_output_dir) + "gvt_rec_" +
                     std::to_string(CkMyPe()) + ".csv");
     t << "wave,pick_us,prev_end_us,contrib_us,exec_us,drain_us,recv_us,"
-         "rollback_us,node_gvt_us,events,passed,reason\n" << std::fixed << std::setprecision(1);
+         "rollback_us,node_gvt_us,events,passed,reason,arrivals,near,lag_mean,"
+         "lag_min\n" << std::fixed << std::setprecision(1);
     for (const WaveRec& w : wave_recs) {
       t << w.wave << "," << w.pick_us << "," << w.prev_end_us << ","
         << w.contrib_us << "," << w.exec_us << "," << w.drain_us << ","
         << w.recv_us << "," << w.rollback_us << "," << w.node_gvt_us << ","
-        << w.events << "," << w.passed << "," << w.reason << "\n";
+        << w.events << "," << w.passed << "," << w.reason << "," << w.arrivals
+        << "," << w.near << "," << w.lag_mean << "," << w.lag_min << "\n";
     }
   }
   if (g_tw_gvt_trace >= 2 && node_waves_on && CkMyRank() == 0) {
@@ -132,12 +134,14 @@ void BucketGVT::finalize() {
   }
   if (g_tw_gvt_trace && CkMyPe() == 0) {
     std::ofstream t(std::string(g_output_dir) + "gvt_trace.csv");
-    t << "start_s,end_s,asked,passed0,valid,completed,bucket,lead0,combined_s,result_s\n";
+    t << "start_s,end_s,asked,passed0,valid,completed,bucket,lead0,combined_s,"
+         "result_s,prev_valid,transit_first,transit_total\n";
     t << std::fixed << std::setprecision(7);
     for (const WaveRecord& w : trace) {
       t << w.start << "," << w.end << "," << w.asked << "," << w.passed0
         << "," << w.valid << "," << w.completed << "," << w.bucket << ","
-        << w.lead0 << "," << w.combined << "," << w.result << "\n";
+        << w.lead0 << "," << w.combined << "," << w.result << "," << w.prev_valid
+        << "," << w.transit_first << "," << w.transit_total << "\n";
     }
   }
   if (CkMyPe() == 0) {
@@ -322,9 +326,14 @@ void BucketGVT::contribute_counts(int num_buckets, int reason) {
         us(recv - pick.recv), us(w.rollback - pick.rollback),
         us(w.node_gvt - pick.node_gvt),
         (unsigned)(s->events_executed - pick.executed), buckets_passed(),
-        reason});
+        reason, (unsigned)arr_n, (unsigned)arr_near,
+        arr_n ? (float)(arr_lag_sum / arr_n) : -1.f,
+        arr_n ? arr_lag_min : -1});
   }
   pick.valid = false;
+  arr_n = arr_near = 0;
+  arr_lag_sum = 0;
+  arr_lag_min = INT_MAX;
   executed_at_wave = get_statistics()->events_executed;
   if (g_tw_gvt_trace >= 3) {
     const int r = CkMyRank(), n = CkMyNodeSize();
@@ -449,6 +458,18 @@ void BucketGVT::wave_done(const int* counts, int num_buckets,
     lb_trigger->iteration_done();
   }
 
+  // --gvt-trace: buckets passed by every PE at the previous wave that still
+  // have events in transit (sent but not yet received)
+  const int prev_valid_in = prev_valid;
+  long long transit_first = 0, transit_total = 0;
+  if (g_tw_gvt_trace && CkMyPe() == 0) {
+    for (int i = completed_buckets; i < std::min(prev_valid, num_buckets); i++) {
+      long long t = (long long)counts[SENT_IDX(i)] - prev_recv[i];
+      if (i == completed_buckets) transit_first = t;
+      transit_total += t;
+    }
+  }
+
   /** Keep this wave's received totals for the next wave's comparison */
   prev_valid = std::max(0,
       std::min(valid_buckets, num_buckets) - completed_buckets);
@@ -470,6 +491,9 @@ void BucketGVT::wave_done(const int* counts, int num_buckets,
     w.bucket = curr_bucket;
     w.lead0 = (long long)std::min(scheduler->get_min_time(), max_ts) -
               (long long)curr_gvt;
+    w.prev_valid = prev_valid_in;
+    w.transit_first = transit_first;
+    w.transit_total = transit_total;
     trace.push_back(w);
   }
 
@@ -570,6 +594,13 @@ void BucketGVT::consume(RemoteEvent* e) {
       "but GVT completed buckets up to %d\n", (unsigned long long)e->ts, e->phase,
       curr_bucket);
   counts[RECV_IDX(e->phase)]++;
+  if (g_tw_gvt_trace >= 4) {
+    const int lag = (int)e->phase - curr_bucket;
+    arr_n++;
+    if (lag <= 1) arr_near++;
+    arr_lag_sum += lag;
+    if (lag < arr_lag_min) arr_lag_min = lag;
+  }
   attempt_gvt();
 }
 

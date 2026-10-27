@@ -6,6 +6,7 @@
 #include "event.h"
 
 #include <atomic>
+#include <climits>
 #include <list>
 #include <map>
 #include <utility>
@@ -226,6 +227,14 @@ class BucketGVT : public CBase_BucketGVT {
       double combined, result;  ///< --gvt-node-waves: PE 0's process (0 otherwise)
       int asked, passed0, valid, completed, bucket;
       long long lead0;
+      /**
+       * Buckets every PE had passed at the previous wave (only those can
+       * complete in this one), and the events sent into the ones of them that
+       * did not complete but not yet received: the first such bucket's, and
+       * all of them together. Nonzero: GVT waits on events in transit
+       */
+      int prev_valid;
+      long long transit_first, transit_total;
     };
     std::vector<WaveRecord> trace;
     /**
@@ -253,7 +262,15 @@ class BucketGVT : public CBase_BucketGVT {
       float exec_us, drain_us, recv_us, rollback_us, node_gvt_us;
       unsigned events;
       int passed;  ///< buckets past GVT this PE had passed when it contributed
-      int reason;  ///< 0 at pickup, idle; 1 later, idle; 2 later, events; 3 at pickup, events
+      int reason;
+      /**
+       * Events this PE received (counted by consume) since its previous
+       * contribution, those within one bucket of GVT when they arrived, and
+       * their mean and least distance from GVT in buckets
+       */
+      unsigned arrivals, near;
+      float lag_mean;
+      int lag_min;  ///< 0 at pickup, idle; 1 later, idle; 2 later, events; 3 at pickup, events
     };
     std::vector<WaveRec> wave_recs;
     struct PickSnap {
@@ -262,6 +279,10 @@ class BucketGVT : public CBase_BucketGVT {
       unsigned long long executed;
     } pick;
     void take_pick_snapshot(double result_t);
+    /** --gvt-trace=4: arrivals since this PE's previous contribution */
+    unsigned long long arr_n = 0, arr_near = 0;
+    double arr_lag_sum = 0;
+    int arr_lag_min = INT_MAX;
     double wave_start;
     int wave_asked, wave_passed;
 
