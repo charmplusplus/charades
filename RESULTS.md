@@ -202,6 +202,7 @@ Charades' controller ÷ Devastator's adaptive window: 0.68–1.03 at σ ≤ 500 
 | 110 | 2026-10-27 | — | Rings against the mutex input buffer on all 8 scaling workloads, before making rings the default | design |
 | 111 | 2026-10-27 | 3647086 | Rings on all 8 workloads, results: no cell below 0.98, uniform 1.08–1.21×; rings are the default | current |
 | 112 | 2026-10-27 | — | Freeing another PE's message without its pool lock (`+mempool_remote_free`) | design |
+| 113 | 2026-10-27 | 3647310 | `+mempool_remote_free`, results: freeing a received message 1.45 → 0.30 µs; uniform 1.02–1.06× at 16 nodes; gate rerun needed (harness) | current |
 
 ## Stampede3 runs, in order
 
@@ -4180,6 +4181,55 @@ The pool header grows by one pointer. Only Reconverse's LCI2 backend uses it.
 - O1. Freeing the received message falls from 1.43 µs (WPs) and 0.84 µs (PP) per receive to at most 0.3.
 - O2. With the flag, uniform on 16 nodes is at least 1.03× (both htram modes). Every other cell is at least 0.99×, and on 1 node within ±2%.
 - O3. The correctness gate passes.
+
+### `+mempool_remote_free`, results: freeing a received message 1.45 → 0.30 µs; uniform 1.02–1.06× at 16 nodes; gate rerun needed (2026-10-27; skx-dev batch job 3647310, 16 nodes)
+
+> **Status: current.** Design and predictions in section 112. 16 nodes (c454-012, c454-022, c454-032, c454-042 to -044, c454-071, c454-073, c455-043, c455-044, c455-071 to -074, c455-082, c455-083; 4- and 1-node runs on the first nodes). Throughput and receive runs: 154, all ok; 15 min. This job ran before the input-buffer rename, with `--agg-inbox-mode=2` (now `--agg-input-buffer-mode=2`, the default). Summary `~/charades-data/sdiag/sdiag17_summary.py`, output and CSVs in `~/charades-data/sdiag/j3647310/`.
+>
+> **The correctness gate did not test anything.** All 168 runs aborted at start-up in LCI's ibv backend ("inline size 64 is too large (maximum 0)"). `test.py` ran without `scripts/stampede3/env.sh`, which selects the psm2 transport that `ctl_sweep.sh` uses. Rerun with it as job `gate18` (below).
+
+**Throughput, ring input buffers, with ÷ without `+mempool_remote_free`** (PP 512 unless marked WPs; M committed events/s without it, mean of 3 reps; ratio higher is better):
+
+| workload | arm | 1 node: without | with ÷ without | 4 nodes: without | with ÷ without | 16 nodes: without | with ÷ without |
+|---|---|---|---|---|---|---|---|
+| σ 100 | W 400 | 44.1 | 0.994 | 166.3 | 1.008 | 624.9 | 1.011 |
+| σ 2,000 | W 400 | 34.0 | 0.995 | 125.2 | 1.010 | 443.6 | 1.000 |
+| uniform | W 400 | 35.7 | 1.001 | 118.9 | 1.034 | 251.6 | 1.025 |
+| uniform, WPs | W 400 | 36.0 | 1.007 | 111.5 | 1.006 | 339.6 | **1.046** |
+| σ 100 | controller | 46.6 | 0.999 | 170.7 | 0.999 | 611.5 | 1.003 |
+| σ 2,000 | controller | 38.7 | 0.995 | 128.2 | 1.032 ¹ | 408.7 | 0.983 ² |
+| uniform | controller | 41.3 | 1.005 | 129.6 | 1.014 | 221.2 | 1.018 |
+| uniform, WPs | controller | 41.3 | 1.004 | 120.7 | 1.030 | 323.4 | **1.063** |
+| **geometric mean** | | | 1.000 | | 1.017 | | 1.018 |
+
+¹ One slow rep without (122 against 132 and 131). ² Reps 395, 401, 410 against 410, 407, 409: the same cell was 0.972 for rings in section 109 and 0.994 in section 111, so it moves by about ±2% between jobs.
+
+**Receives at uniform, 16 nodes, W 400** (mean of 2 reps; µs, lower is better):
+
+| htram | `+mempool_remote_free` | µs per receive | hand-off | free received message | drain µs per item | M committed ev/s |
+|---|---|---|---|---|---|---|
+| WPs | off | 4.15 | 1.50 | 1.46 | 0.350 | 326.4 |
+| WPs | on | 3.05 | 1.57 | **0.30** | 0.327 | 350.7 |
+| PP | off | 3.43 | 1.41 | 0.85 | 0.368 | 249.4 |
+| PP | on | 2.71 | 1.26 | **0.29** | 0.352 | 255.1 |
+
+- **O1 right, just.** Freeing the received message costs 0.29–0.30 µs instead of 0.85–1.46, at the predicted bound of 0.3. A receive now costs 2.7–3.1 µs (8.8 with the mutex input buffer in section 109). Inbox drains also got slightly cheaper per item (0.350 → 0.327 with WPs): their reference drops free cross-thread too.
+- **O2 partly right.**
+  - Uniform with WPs on 16 nodes gains 1.046 and 1.063, as predicted. With PP it gains only 1.025 and 1.018, below the predicted 1.03.
+  - Elsewhere every cell is at least 0.99 except σ 2,000 with the controller on 16 nodes (0.983), a cell that moves about ±2% between jobs.
+  - On 1 node every cell is within ±1%.
+- **O3 not yet tested** (see the status note).
+- **Uniform's 4→16 node efficiency with WPs at W 400:** 350.7 ÷ (4 × 112.2) ≈ 0.78 in this job's receive runs and 0.76 in its throughput runs. That compares with 0.70 with the mutex input buffer (section 109) and Devastator's 0.69 (section 95, another job).
+
+**Next.** If the gate passes, adopt `+mempool_remote_free` in the Charades launch line on Stampede3. It is a Reconverse runtime flag, so Charades' code does not change. Making it Reconverse's default is a separate decision, because it changes a pool every Reconverse program uses.
+
+### Correctness gate for `+mempool_remote_free`, rerun with the psm2 transport (design, 2026-10-27; written before the run)
+
+> **Status: design.** Charades `main` 8344576 (after the input-buffer rename; ring input buffers are the default), htram `pdes` 699c3a9, Reconverse 22871c6. Job `gate18` `$WORK/charades-runs/gate18.slurm` (2 nodes, skx-dev and skx).
+
+- Pass 1: `CHARADES_RUN_ARGS=+mempool_remote_free`, `test.py --tier change --launcher srun --nodes 2`, with `env.sh` and XPORT=psm2. Configs: sequential, blocking, bucket, bucket_window, conservative, agg_blocking_pp, agg_inputbuf_bucket_pp, agg_inputbuf_bucket_wps, agg_inputbuf0_bucket_pp, agg_deadline_bucket_pp, agg_ctl_sparse_bucket_pp. Core model configs, launches 1, 4 and 2 × 2.
+- Pass 2: 2 processes × 23 PEs, 5 repeats, Simple and Imbalanced PHOLD: agg_inputbuf_bucket_pp, agg_inputbuf_bucket_wps, agg_ctl_sparse_bucket_pp. This puts 23 senders on the rings, which the Mac (at most 4 PEs per process) never did.
+- **Prediction G1:** every run passes. Committed counts must match the sequential runs.
 
 ## Baseline verification on the Mac
 
