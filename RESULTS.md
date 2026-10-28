@@ -5309,7 +5309,7 @@ Level 1 (at contributions only), PP 2,048, 16 nodes: 380.2 at σ 2,000 (0.982×,
   - **Charades:** the controller, plus W 250 and 400 (lookahead 10: 50 and 100). The htram setting is fixed per workload from the 1/4/16 long runs: PP 2,048 at σ ≤ 1,000 and at lookahead 10 σ 500; PP 512 at σ 2,000 and σ 4,000. Uniform and lookahead 10 σ 2,000 run both PP 512 and WPs 512, because their best setting changes with node count.
   - **Devastator:** W 500, 1,000 and 2,000 (lookahead 10: 100, 200, 400), plus 4,000 at 32 nodes.
   - **ROSS:** A0's best setting for each workload.
-- **Runtime frozen for A1 and A2:** Reconverse 22871c6 (`+mempool_remote_free`, as in the launch, without the diagnostic send timers), Charm++ 9d6a55780, htram `pdes` ed31d7e.
+- **Runtime frozen for A1 and A2:** Reconverse 22871c6 (`+mempool_remote_free`, as in the launch, without the diagnostic send timers), Charm++ 9d6a55780, htram `pdes` ed31d7e. Mac engine tier on `main` f57243e: 1,932/1,932.
 
 **Phase B, traffic and dragonfly:**
 - Both models need a change before they can be weak-scaled:
