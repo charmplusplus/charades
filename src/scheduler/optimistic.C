@@ -140,7 +140,18 @@ void OptimisticScheduler::gvt_resume() {
 }
 
 void OptimisticScheduler::gvt_done(Time gvt, bool lb) {
+  // --diag-gvt-spin-ns: a known extra cost in this step, on every PE
+  if (g_tw_diag_gvt_spin_ns) {
+    const double end = CmiWallTimer() + g_tw_diag_gvt_spin_ns * 1e-9;
+    while (CmiWallTimer() < end) {}
+  }
+  const bool t5 = g_tw_gvt_trace >= 5;
+  const double tf = t5 ? CmiWallTimer() : 0;
   collect_fossils(gvt);
+  if (t5) {
+    g_wave_timers.fossil += CmiWallTimer() - tf;
+    g_wave_timers.gvt_done_n++;
+  }
   DistributedScheduler::gvt_done(gvt, lb);
 }
 

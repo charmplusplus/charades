@@ -64,6 +64,9 @@ struct WaveTimers {
   double loop = 0, flush_idle = 0, cancel_q = 0, iter_end = 0;
   double send_total = 0, produce = 0, fp = 0, fp_miss = 0, remote = 0, local = 0;
   unsigned long long passes = 0, flush_idle_n = 0, fp_n = 0, remote_n = 0, local_n = 0;
+  /** --gvt-trace=5: applying a GVT result split into parts */
+  double fossil = 0, flush_gvt = 0, ctl_gvt = 0;
+  unsigned long long gvt_done_n = 0, flush_gvt_msgs = 0;
 };
 extern thread_local WaveTimers g_wave_timers;
 
@@ -72,6 +75,7 @@ extern unsigned g_tw_gvt_node_waves;  ///< bucketed gvt: combine each process's 
 extern unsigned g_tw_gvt_wave_allreduce; ///< bucketed gvt, node waves: processes allreduce by recursive doubling
 extern unsigned g_tw_wave_batch;         ///< bucketed gvt, node waves: batch size while a count wave is in flight, 0 = --batch
 extern unsigned g_tw_wave_batch_when;    ///< 0 = once this process's sums are sent, 1 = once this PE contributed
+extern unsigned g_tw_diag_gvt_spin_ns;   ///< diagnostic: busy-wait this long each time a PE applies a GVT result
 extern unsigned g_tw_warmup_pings;       ///< before the clock starts, messages each PE sends every PE (diagnostic)
 extern unsigned g_tw_gvt_wave_tree;      ///< bucketed gvt, node waves: fan-out of Charades' own process tree, 0 = Charm++ reduction
 extern Time     g_tw_optimism_window; ///< execute no event past GVT + this (0: off)

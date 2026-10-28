@@ -335,7 +335,14 @@ void DistributedScheduler::gvt_done(Time gvt, bool lb) {
   // The window moved with GVT: a parked PE may run again
   parked = false;
   // Buffered events may now be at GVT, holding up the next advance
+  const bool t5 = g_tw_gvt_trace >= 5;
+  const double tf = t5 ? CmiWallTimer() : 0;
+  const unsigned long long m0 = t5 ? stats->agg_msgs_gvt : 0;
   agg_flush_gvt();
+  if (t5) {
+    g_wave_timers.flush_gvt += CmiWallTimer() - tf;
+    g_wave_timers.flush_gvt_msgs += stats->agg_msgs_gvt - m0;
+  }
 
   // TODO: Make stats trigger work like print trigger does below.
 #if CMK_TRACE_ENABLED
@@ -356,7 +363,9 @@ void DistributedScheduler::gvt_done(Time gvt, bool lb) {
     gvt_manager->finalize();
     ctl_finalize();
   } else {
+    const double tc = t5 ? CmiWallTimer() : 0;
     ctl_gvt_done();
+    if (t5) g_wave_timers.ctl_gvt += CmiWallTimer() - tc;
     if (print_trigger->ready()) {
       print_progress(gvt);
     }

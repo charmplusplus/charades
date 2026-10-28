@@ -109,13 +109,15 @@ void BucketGVT::finalize() {
                     std::to_string(CkMyPe()) + ".csv");
     t << "pe,rank,passes,loop_s,send_total_s,produce_s,fp_s,fp_n,fp_miss_s,"
          "remote_s,remote_n,local_s,local_n,flush_idle_s,flush_idle_n,cancel_q_s,"
-         "iter_end_s,poll_s,drain_s,rollback_s\n" << std::setprecision(9);
+         "iter_end_s,poll_s,drain_s,rollback_s,fossil_s,flush_gvt_s,flush_gvt_msgs,ctl_gvt_s,"
+         "gvt_done_n\n" << std::setprecision(9);
     t << CkMyPe() << "," << CkMyRank() << ","
       << w.passes << "," << w.loop << "," << w.send_total << "," << w.produce << ","
       << w.fp << "," << w.fp_n << "," << w.fp_miss << "," << w.remote << ","
       << w.remote_n << "," << w.local << "," << w.local_n << "," << w.flush_idle << ","
       << w.flush_idle_n << "," << w.cancel_q << "," << w.iter_end << "," << w.poll
-      << "," << w.drain << "," << w.rollback << "\n";
+      << "," << w.drain << "," << w.rollback << "," << w.fossil << "," << w.flush_gvt
+      << "," << w.flush_gvt_msgs << "," << w.ctl_gvt << "," << w.gvt_done_n << "\n";
   }
   if (g_tw_gvt_trace >= 3 && !pe_snaps.empty()) {
     std::ofstream t(std::string(g_output_dir) + "gvt_pe_" +

@@ -1,0 +1,8 @@
+# agg_bucket_pp with --diag-gvt-spin-ns=20000: every PE busy-waits 20 µs each time it applies a GVT result
+sync=3
+gvt=4
+buffer-size=655360
+aggregation=1
+agg-mode=2
+agg-buffer=16
+diag-gvt-spin-ns=20000
