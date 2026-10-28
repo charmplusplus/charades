@@ -60,6 +60,8 @@ class Scheduler : public CBase_Scheduler {
 
     /** Entry method triggered by QD when all group chares are created */
     virtual void groups_created();
+    /** --warmup-pings: an empty message, sent before the clock starts */
+    void warmup_ping() {}
 
     /** Methods for starting and stopping the entire simulation */
     void start_simulation();  /**< Sets initial state and calls execute() */

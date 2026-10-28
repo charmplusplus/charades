@@ -47,6 +47,14 @@ Scheduler::Scheduler() {
 
 void Scheduler::groups_created() {
   DEBUG_PE("%s created!\n", scheduler_name.c_str());
+  // --warmup-pings: every PE to every PE, starting after itself so that not
+  // all PEs send to the same PE at once. Quiescence, which starts the
+  // simulation, waits for all of them.
+  for (unsigned k = 0; k < g_tw_warmup_pings; k++) {
+    for (int i = 1; i <= CkNumPes(); i++) {
+      thisProxy[(CkMyPe() + i) % CkNumPes()].warmup_ping();
+    }
+  }
   // After groups are created, create LP array, and exit upon quiescence
   if (CkMyPe() == 0) {
     CkStartQD(CkCallback(CkCallback::ckExit));

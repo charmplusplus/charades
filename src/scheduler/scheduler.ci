@@ -9,6 +9,7 @@ module scheduler {
     entry [notrace] void finalize(CkReductionMsg* msg);
     entry [notrace] void pe_stats(CkReductionMsg* msg);
     entry [notrace] void groups_created();
+    entry [notrace] void warmup_ping();
   };
 
   group SequentialScheduler : Scheduler {
