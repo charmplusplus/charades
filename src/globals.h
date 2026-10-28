@@ -60,6 +60,10 @@ struct WaveTimers {
   double drain = 0, rollback = 0, poll = 0, node_gvt = 0;
   unsigned long long node_gvt_n = 0;
   double exec_end = 0;  ///< --gvt-trace=4: when this PE's last execute() ended
+  /** --gvt-trace=5: execute() and remote sends split into parts (exec_parts_<pe>.csv) */
+  double loop = 0, flush_idle = 0, cancel_q = 0, iter_end = 0;
+  double send_total = 0, produce = 0, fp = 0, fp_miss = 0, remote = 0, local = 0;
+  unsigned long long passes = 0, flush_idle_n = 0, fp_n = 0, remote_n = 0, local_n = 0;
 };
 extern thread_local WaveTimers g_wave_timers;
 

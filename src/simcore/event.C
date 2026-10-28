@@ -186,6 +186,9 @@ void tw_event_send(Event* e) {
     dest_chare = NULL;
   }
 
+  // --gvt-trace=5: the send's parts (exec_parts_<pe>.csv)
+  const bool t5 = g_tw_gvt_trace >= 5;
+  const double ts0 = t5 ? CmiWallTimer() : 0;
   if (dest_chare != NULL) {
     // Check if an LP is sending to an LP other than itself (for stats).
     if (e->dest_lp == e->src_lp) {
@@ -194,6 +197,10 @@ void tw_event_send(Event* e) {
       PE_STATS(local_sends)++;
     }
     dest_chare->recv_local_event(e);
+    if (t5) {
+      g_wave_timers.local += CmiWallTimer() - ts0;
+      g_wave_timers.local_n++;
+    }
   } else {
     PE_STATS(remote_sends)++;
     Time delay = e->ts - e->owner->get_current_time();
@@ -203,16 +210,31 @@ void tw_event_send(Event* e) {
     msg->far = window && delay >= window;
     // The bucketed GVT may hold the event back and send it later
     // (charm_event_release) or delete it with its anti-message.
+    const double ts1 = t5 ? CmiWallTimer() : 0;
     bool send_now = scheduler->produce(msg);
+    if (t5) g_wave_timers.produce += CmiWallTimer() - ts1;
     e->offset = msg->offset;
     bool fast = false;
     if (send_now) {
       // A chare in this process gets the message by pointer (--local-fast-path)
+      const double ts2 = t5 ? CmiWallTimer() : 0;
       fast = fp_send(msg, dest_chare_id);
+      const double ts3 = t5 ? CmiWallTimer() : 0;
       if (fast) {
         e->peer = msg;
       } else {
         send_remote(msg, dest_chare_id);
+      }
+      if (t5) {
+        const double ts4 = CmiWallTimer();
+        if (fast) {
+          g_wave_timers.fp += ts3 - ts2;
+          g_wave_timers.fp_n++;
+        } else {
+          g_wave_timers.fp_miss += ts3 - ts2;
+          g_wave_timers.remote += ts4 - ts3;
+          g_wave_timers.remote_n++;
+        }
       }
     }
     e->msg = NULL;
@@ -221,6 +243,7 @@ void tw_event_send(Event* e) {
     } else {
       tw_event_free(e, false);
     }
+    if (t5) g_wave_timers.send_total += CmiWallTimer() - ts0;
   }
 }
 

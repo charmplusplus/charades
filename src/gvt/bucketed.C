@@ -102,6 +102,21 @@ void BucketGVT::finalize() {
     t << "," << g_wave_timers.drain << "," << htram_input_buffer_overflows << "\n";
   }
 #endif
+  if (g_tw_gvt_trace >= 5) {
+    // execute() and remote sends split into parts, over the run (WaveTimers)
+    const WaveTimers& w = g_wave_timers;
+    std::ofstream t(std::string(g_output_dir) + "exec_parts_" +
+                    std::to_string(CkMyPe()) + ".csv");
+    t << "pe,rank,passes,loop_s,send_total_s,produce_s,fp_s,fp_n,fp_miss_s,"
+         "remote_s,remote_n,local_s,local_n,flush_idle_s,flush_idle_n,cancel_q_s,"
+         "iter_end_s,poll_s,drain_s,rollback_s\n" << std::setprecision(9);
+    t << CkMyPe() << "," << CkMyRank() << ","
+      << w.passes << "," << w.loop << "," << w.send_total << "," << w.produce << ","
+      << w.fp << "," << w.fp_n << "," << w.fp_miss << "," << w.remote << ","
+      << w.remote_n << "," << w.local << "," << w.local_n << "," << w.flush_idle << ","
+      << w.flush_idle_n << "," << w.cancel_q << "," << w.iter_end << "," << w.poll
+      << "," << w.drain << "," << w.rollback << "\n";
+  }
   if (g_tw_gvt_trace >= 3 && !pe_snaps.empty()) {
     std::ofstream t(std::string(g_output_dir) + "gvt_pe_" +
                     std::to_string(CkMyPe()) + ".csv");
