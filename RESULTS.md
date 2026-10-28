@@ -231,6 +231,7 @@ Charades' controller ÷ Devastator's adaptive window: 0.68–1.03 at σ ≤ 500 
 | 125 | 2026-10-27 | — | Uniform's steady loss: thinner htram messages or more destinations? A buffer-size perturbation on 4 nodes | design |
 | 126 | 2026-10-27 | 3651140 | Uniform's buffer perturbation, results: thinning explains only 16% of the loss; 45% is inside `execute()`, which the timers do not split | current |
 | 127 | 2026-10-28 | — | Splitting `execute()` on uniform at 4 and 16 nodes, against σ 4,000 as a control | design |
+| 128 | 2026-10-28 | 3652542 | `execute()` split, results: on uniform the event handlers and sends do not grow; half of `execute()`'s rise is applying each GVT result | current |
 
 ## Stampede3 runs, in order
 
@@ -4753,6 +4754,59 @@ The event handlers' own time is the loop minus the sends.
 - V5. **Closure:** the timed parts cover at least 95% of `execute()`, and traced ÷ untraced is at least 0.90.
 
 Whatever part carries most of the +0.25 µs then gets a perturbation before any fix. For example, if it is the idle flush: run the flush only every k-th non-full pass, and check that the 16-node time moves by the predicted amount.
+
+### `execute()` split, results: on uniform the event handlers and sends do not grow; half of `execute()`'s rise is applying each GVT result (2026-10-28; skx-dev batch job 3652542, 16 nodes)
+
+> **Status: current.** Design and predictions in section 127. 16 nodes (c454-002, c454-074, c454-081, c454-082, c454-102 to -104, c455-073, c455-074, c455-082 to -084, c455-091, c455-092, c455-103, c455-104; 4-node runs on the first four), 18 runs, all ok; gate 24/24; 5 min. Summary `~/charades-data/exec25/exec25_summary.py`, with `summary.txt` and the CSVs in `~/charades-data/exec25/j3652542/`.
+
+**`execute()` split, uniform (WPs 512) and σ 4,000 (PP 512), W 400, short runs** (µs of PE time per committed event, mean of 2 reps, `--gvt-trace=5`; lower is better):
+
+| part | uniform, 4 nodes | uniform, 16 nodes | uniform, 16 − 4 (share) | σ 4,000, 4 nodes | σ 4,000, 16 nodes | σ 4,000, 16 − 4 |
+|---|---|---|---|---|---|---|
+| event handlers (loop minus sends) | 0.502 | 0.498 | −0.004 (−1%) | 0.605 | 0.599 | −0.006 |
+| remote sends, all parts | 0.322 | 0.332 | +0.010 (4%) | 0.369 | 0.365 | −0.003 |
+| **applying the GVT result (`poll`)** | 0.289 | 0.426 | **+0.136 (52%)** | 0.165 | 0.163 | −0.002 |
+| input-buffer drains | 0.283 | 0.315 | +0.033 (12%) | 0.260 | 0.258 | −0.003 |
+| idle flush | 0.016 | 0.047 | +0.031 (12%) | 0.025 | 0.091 | +0.067 |
+| cancel queue | 0.017 | 0.022 | +0.005 (2%) | 0.022 | 0.033 | +0.011 |
+| untimed, including the timer calls | 0.172 | 0.225 | +0.052 (20%) | 0.190 | 0.244 | +0.054 |
+| **`execute()`** | 1.602 | 1.865 | +0.264 | 1.636 | 1.754 | +0.119 |
+
+Other figures:
+- **Event handlers per executed event:** uniform 0.498 → 0.496 µs; σ 4,000 0.600 → 0.597.
+- **One remote send** (htram insert, plus any flush it triggers): uniform 0.082 → 0.093 µs; σ 4,000 0.131 → 0.128.
+- **Share of sends on the fast path:** uniform 0.124 → 0.031; σ 4,000 0.280 both.
+- **One idle flush:** uniform 0.076 → 0.164 µs (0.21 → 0.29 per event); σ 4,000 0.090 → 0.198.
+- **Timed share of `execute()`:** 0.86–0.89.
+- **Traced ÷ untraced:** 0.85–0.90 (untraced: uniform 116.4 and 348.6, σ 4,000 117.2 and 428.3 M ev/s).
+
+- **V1 wrong.** The idle flush grows by 0.031 (12%), not by at least 0.08 (30%), although each call costs twice as much on 16 nodes (more destination buffers to scan).
+- **V2 about right.** A remote send costs 13% more on 16 nodes (predicted within 10%). The send total rises only 0.010.
+- **V3 right.** The event handlers' time per event is unchanged.
+- **V4 partly wrong.** σ 4,000's idle flush and untimed time grow too. Its whole 4→16 loss in short runs is start-up (section 122), and these are whole-run totals, so this growth is probably start-up; a long-run trace would show it. The GVT result step, which grows on uniform, does not grow on σ 4,000.
+- **V5 wrong.** The timers cover 86–89% of `execute()` (predicted ≥ 95%) and cost 10–15% (predicted ≤ 10%). Most of the untimed part is the timer calls and the bookkeeping between them, which grow with the number of passes.
+
+**What `poll` does when a result arrives** (`BucketGVT::poll` → `wave_done` → `gvt_done`):
+- fossil collection over every LP on the PE;
+- the GVT-time flush (`agg_flush_gvt`), which with the deadline policy runs htram's `flushDue`: every destination buffer holding an event now due is sent;
+- the controller's update.
+
+On uniform, a PE's events go to all 32 processes on 16 nodes against 8 on 4. So each GVT update sends up to 4× as many small messages from this step. Messages per committed event rise from 0.032 to 0.081. If all the extra messages went out here, the step's rise (+0.136) would mean about 2.8 µs per message, against 1.7 µs per extra message measured in section 126.
+
+**Status of the uniform loss (+0.54 µs of PE time per committed event, 4 → 16 nodes, section 126):**
+- **Not grown:** event handlers, sends.
+- **Grown:**
+  - applying the GVT result (+0.14);
+  - htram receives (+0.09, section 126);
+  - the runtime loop and idle outside `execute()` (+0.17, section 126);
+  - input-buffer drains (+0.03);
+  - the idle flush (+0.03).
+
+Messages per event (section 126) can account for part of the receives and of the GVT result step. These totals are PE time, so they say where the time goes, not which part limits throughput.
+
+**Next.**
+1. Split `poll` into fossil collection, the GVT-time flush (with the messages it sends) and the rest. Use long runs, so start-up does not mix in.
+2. Then a perturbation of the largest part. For the GVT-time flush, send the due buffers of far destinations less often. For fossil collection, collect every k-th GVT.
 
 ## Baseline verification on the Mac
 
