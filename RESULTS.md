@@ -265,6 +265,7 @@ Sections 1–128 were re-read before planning sections 129 onward.
 | 138 | 2026-10-28 | — | Sending what the next GVT will make due before it is published (`--agg-flush-ahead`), against holding the window back (`--diag-window-lag-ns`) | design |
 | 139 | 2026-10-28 | 3653291 | Flush ahead and window lag, results: sending early removes the late events but doubles messages; the race costs PP 512 3–5% on 16 nodes; the capped setting no longer helps | current |
 | 140 | 2026-10-28 | — | Paper-grade scaling, 1–32 nodes: the plan; A0, ROSS tuning | design |
+| 141 | 2026-10-28 | 3653550 | A0, ROSS tuning, results (batch 16 / GVT interval 64, and conservative); A1 and A2 design | current / design |
 
 ## Stampede3 runs, in order
 
@@ -5328,6 +5329,63 @@ Level 1 (at contributions only), PP 2,048, 16 nodes: 380.2 at σ 2,000 (0.982×,
   - **R2.** Conservative ROSS is at most 0.8× the best optimistic setting at lookahead 100 σ 2,000 and uniform, and at most 0.5× at lookahead 10.
   - **R3.** For at least 3 of the 4 workloads, the best setting at 4 nodes is within 3% of the best at 16 nodes. One setting per workload then serves every node count; otherwise A1 and A2 use the two best.
   - **R4.** With its best setting, ROSS at 16 nodes on σ 2,000 is at most a third of Charades' long-run 518.9 M ev/s (section 124).
+
+### A0, ROSS tuning, results; A1 and A2, paper-grade weak scaling (A0 results and A1/A2 design, 2026-10-28; skx-dev batch job 3653550, 16 nodes; A1/A2 design written before their runs)
+
+> **Status: current (A0) / design (A1, A2).** A0's design is in section 140. 80 runs, 40 minutes. One run (σ 100, 4 nodes, batch 4, GVT interval 16) printed full results and then hung on exit until the 400 s timeout; its numbers are used. Data and script in `~/charades-data/ross31/j3653550/`.
+
+**ROSS, M committed ev/s** (higher is better; end time 512,000, 128,000 at lookahead 10; 1 rep):
+
+| workload | nodes | conservative | b4/g16 | b4/g64 | b4/g256 | **b16/g16 (default)** | **b16/g64** | b16/g256 | b64/g16 | b64/g64 | b64/g256 |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| σ 100 | 4 | **67.0** | 40.3 | 49.6 | 54.7 | 52.0 | 55.0 | 39.1 | 54.7 | 26.1 | 9.4 |
+| | 16 | **227.2** | 128.0 | 170.0 | 195.9 | 175.1 | 199.7 | 119.2 | 185.6 | 86.1 | 23.3 |
+| σ 2,000 | 4 | **30.0** | 21.6 | 25.9 | 27.5 | 26.8 | 29.6 | 28.9 | 29.5 | 26.9 | 1.0 |
+| | 16 | 109.2 | 72.0 | 90.9 | 104.9 | 97.5 | 111.1 | 108.7 | **112.1** | 104.7 | 3.6 |
+| uniform | 4 | 26.8 | 19.2 | 22.7 | 25.0 | 23.5 | 26.6 | 26.7 | **27.3** | 26.6 | 23.6 |
+| | 16 | 93.9 | 64.6 | 82.0 | 91.9 | 86.0 | 98.8 | 101.2 | 101.1 | **102.8** | 3.0 |
+| lookahead 10, σ 2,000 | 4 | 26.9 | 21.1 | 25.4 | 26.9 | 26.4 | **29.1** | 26.2 | 28.9 | 23.5 | 0.7 |
+| | 16 | 94.1 | 71.4 | 92.1 | 103.0 | 96.1 | **108.4** | 94.4 | 106.4 | 87.4 | 2.5 |
+
+(b = `--batch`, g = `--gvt-interval`; the other columns are optimistic with `--read-buffer=1`.) Every setting committed the same events within a workload.
+
+- **R1 right.** Tuning is worth 1.06–1.20× over ROSS's default (1.15× at 16 nodes on σ 2,000).
+- **R2 wrong.**
+  - Conservative ROSS is ROSS's *fastest* mode at σ 100 (1.22× and 1.14× the best optimistic setting) and level at σ 2,000 (1.01, 0.97).
+  - It is behind on uniform (0.98, 0.91) and at lookahead 10 (0.92, 0.87), less than predicted.
+  - With 128 LPs per rank most σ 100 events stay on their rank, so conservative ROSS rarely waits.
+- **R3 right.** Batch 16 / GVT interval 64 is the best setting or within 4% of it in every cell, at both node counts.
+- **R4 right.** ROSS's best at 16 nodes on σ 2,000 (112.1) is 0.22 of Charades' long-run 518.9. The runs are of different lengths; A1 compares equal ones.
+- Batch 64 with GVT interval 256 collapses (efficiency reported negative), so it is never used.
+
+**Decision:** ROSS runs two arms in A1 and A2: optimistic batch 16 / GVT interval 64, and conservative. Each cell reports ROSS's better arm.
+
+**A1 and A2: design.**
+- **Jobs** (`$WORK/charades-runs/scale32.slurm`):
+  - **A1a and A1b**, 16 nodes each: workload groups a (σ 100, σ 1,000, σ 4,000, lookahead 10 σ 2,000) and b (σ 500, σ 2,000, uniform, lookahead 10 σ 500). Each runs the 8-, 4-, 2- and 1-node series side by side on disjoint nodes of its allocation, then 16 nodes alone.
+  - **A2**, 32 nodes: groups a and b at 16 nodes side by side on the two halves, then all eight workloads at 32 nodes.
+  - Every job starts with a 2-node Charades gate. Each series starts with one discarded warm-up run.
+- **Why run series side by side:**
+  - It fits all five node counts into one allocation of under 2 hours, against about 4.5 hours one after another.
+  - 1-node runs use no network. Runs on 2–8 nodes share only the fabric with the others, never a node.
+  - Each series checks within itself that the engines committed the same events.
+- **Arms, per workload and rep, interleaved:**
+  - **Charades:** the controller (ε 0.001), plus W 250 and 400 (lookahead 10: 50 and 100), with the htram setting of section 140. Uniform and lookahead 10 σ 2,000 run both PP 512 and WPs 512.
+  - **Devastator:** W 500, 1,000 and 2,000 (lookahead 10: 100, 200 and 400), plus 4,000 at 32 nodes; CLCG4.
+  - **ROSS:** the two arms above, 46 ranks per node.
+- **Runs:** long runs (end time 2,048,000; 512,000 at lookahead 10), 3 reps.
+
+**Predictions:**
+- **P1.** Every cell has the same committed events in all three engines.
+- **P2.** At 1, 4 and 16 nodes, Charades ÷ Devastator is within ±0.07 of the long-run table (sections 124 and 130).
+- **P3.** Each engine's per-node rate falls steadily with node count, so 2 and 8 nodes lie between their neighbours, with no step from running series side by side.
+- **P4.** 16→32 nodes, per-node rate at 32 ÷ at 16:
+  - Charades ≥ 0.85 on the Gaussian workloads;
+  - Charades ≤ 0.85 on uniform, whose off-node share rises from 94% to 97%;
+  - Devastator ≥ 0.88 on the Gaussian workloads.
+- **P5.** Charades' controller is within 3% of its better fixed W at every node count, or better.
+- **P6.** Charades ÷ ROSS (ROSS's better arm) is ≥ 3 at every node count on σ ≥ 1,000 and uniform, and ≥ 2.5 at σ 100.
+- **P7.** Charades leads Devastator in at least 42 of the 48 workload × node-count cells.
 
 ## Baseline verification on the Mac
 
