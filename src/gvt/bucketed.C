@@ -8,6 +8,7 @@
 #include "trigger.h"
 #include "util.h"
 
+#include <dlfcn.h>
 #include <algorithm>
 #ifdef __linux__
 #include <sys/syscall.h>
@@ -83,6 +84,8 @@ thread_local WaveTimers g_wave_timers;
 extern thread_local double htram_recv_s;
 extern thread_local unsigned long long htram_recv_n;
 extern thread_local double htram_recv_part[6];
+extern thread_local double htram_send_part[3];
+extern thread_local unsigned long long htram_send_n;
 extern thread_local unsigned long long htram_recv_items, htram_recv_pushes;
 extern thread_local unsigned long long htram_input_buffer_overflows;
 #endif
@@ -110,14 +113,29 @@ void BucketGVT::finalize() {
     t << "pe,rank,passes,loop_s,send_total_s,produce_s,fp_s,fp_n,fp_miss_s,"
          "remote_s,remote_n,local_s,local_n,flush_idle_s,flush_idle_n,cancel_q_s,"
          "iter_end_s,poll_s,drain_s,rollback_s,fossil_s,flush_gvt_s,flush_gvt_msgs,ctl_gvt_s,"
-         "gvt_done_n\n" << std::setprecision(9);
+         "gvt_done_n,send_trim_s,send_charm_s,send_renew_s,send_n,cmi_ipc_s,cmi_am_s,"
+         "cmi_send_s,cmi_ipc_n,cmi_am_n,cmi_send_n\n" << std::setprecision(9);
     t << CkMyPe() << "," << CkMyRank() << ","
       << w.passes << "," << w.loop << "," << w.send_total << "," << w.produce << ","
       << w.fp << "," << w.fp_n << "," << w.fp_miss << "," << w.remote << ","
       << w.remote_n << "," << w.local << "," << w.local_n << "," << w.flush_idle << ","
       << w.flush_idle_n << "," << w.cancel_q << "," << w.iter_end << "," << w.poll
       << "," << w.drain << "," << w.rollback << "," << w.fossil << "," << w.flush_gvt
-      << "," << w.flush_gvt_msgs << "," << w.ctl_gvt << "," << w.gvt_done_n << "\n";
+      << "," << w.flush_gvt_msgs << "," << w.ctl_gvt << "," << w.gvt_done_n;
+#ifdef CHARADES_HTRAM
+    t << "," << htram_send_part[0] << "," << htram_send_part[1] << ","
+      << htram_send_part[2] << "," << htram_send_n;
+#else
+    t << ",0,0,0,0";
+#endif
+    // Reconverse's node sends (branch pads-send-timers), if the runtime has them
+    double ct[3] = {0, 0, 0};
+    unsigned long long cn[3] = {0, 0, 0};
+    auto get = (void (*)(double*, unsigned long long*))dlsym(RTLD_DEFAULT,
+        "_Z16CmiSendTimersGetPdPy");
+    if (get) get(ct, cn);
+    t << "," << ct[0] << "," << ct[1] << "," << ct[2] << "," << cn[0] << "," << cn[1]
+      << "," << cn[2] << "\n";
   }
   if (g_tw_gvt_trace >= 3 && !pe_snaps.empty()) {
     std::ofstream t(std::string(g_output_dir) + "gvt_pe_" +

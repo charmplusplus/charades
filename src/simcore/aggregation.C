@@ -1,3 +1,4 @@
+#include <dlfcn.h>
 #include "aggregation.h"
 
 #include "event.h"
@@ -169,6 +170,15 @@ Aggregator::Aggregator(CkGroupID tram_gid, CkGroupID wps_gid) : advances(0) {
   }
   // --gvt-trace=3: time htram's node-level receives (one flag per process)
   if (g_tw_gvt_trace >= 3 && CkMyRank() == 0) htram_time_receives = true;
+  // --gvt-trace=5: time htram's sends, split into parts (exec_parts_<pe>.csv)
+  if (g_tw_gvt_trace >= 5 && CkMyRank() == 0) {
+    htram_time_sends = true;
+    // and Reconverse's node sends, where the runtime has the diagnostic
+    // (Reconverse branch pads-send-timers); looked up so that other runtimes
+    // still link
+    auto on = (void (*)(int))dlsym(RTLD_DEFAULT, "_Z15CmiSendTimersOni");
+    if (on) on(1);
+  }
   // One setting per process, the same on every PE; read only by flushes
   if (g_tw_agg_flush_order > 2) CkAbort("--agg-flush-order must be 0, 1 or 2\n");
   htram_flush_order = (int)g_tw_agg_flush_order;
