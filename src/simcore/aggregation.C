@@ -18,6 +18,8 @@ bool agg_send(RemoteEvent*, uint64_t) { return false; }
 void agg_flush_idle() {}
 void agg_drain() {}
 void agg_flush_gvt() {}
+void agg_flush_ahead() {}
+Time agg_horizon() { return 0; }
 void agg_flush_all() {}
 void agg_collect_stats(Statistics*) {}
 void agg_set_window(uint64_t) {}
@@ -460,11 +462,20 @@ bool agg_send(RemoteEvent* msg, uint64_t dest_chare) {
   return true;
 }
 
-/** Deadline policy: ship every destination holding an event now due */
-static void flush_due(Aggregator* a) {
+/**
+ * Deadline policy: ship every destination holding an event now due. With
+ * ahead, also those holding one the next GVT will make due, predicted as one
+ * GVT step on (the largest of this PE's last 8): --agg-flush-ahead.
+ */
+static void flush_due(Aggregator* a, bool ahead = false) {
   if (a->urgent == 0) return;  // nothing is ever due (blocking GVT, no window)
+  const Globals* g = get_globals();
+  Time step = 0;
+  if (ahead) {
+    for (Time s : g->gvt_steps) step = std::max(step, s);
+  }
   // Due: ts < GVT + horizon, i.e. ts <= GVT + horizon - 1
-  a->tram->flushDue((long long)(PE_VALUE(g_last_gvt) + a->urgent - 1));
+  a->tram->flushDue((long long)(g->g_last_gvt + step + a->urgent - 1));
 }
 
 /** Messages sent by every htram instance on this PE */
@@ -479,7 +490,9 @@ void agg_flush_idle() {
   Aggregator* a = CpvAccess(g_aggregator);
   unsigned long long m0 = msgs_sent(a);
   if (g_tw_agg_policy == 1) {
-    flush_due(a);
+    // --agg-flush-ahead=2: a PE at its window edge inserts nothing more until
+    // the next GVT, so what that GVT will make due can go now
+    flush_due(a, g_tw_agg_flush_ahead >= 2);
   } else {
     a->tram->flushIdle();
   }
@@ -504,6 +517,18 @@ void agg_flush_gvt() {
   }
   get_statistics()->agg_msgs_gvt += msgs_sent(a) - m0;
   if (g_tw_agg_auto) a->auto_count_advance();
+}
+
+void agg_flush_ahead() {
+  if (!g_tw_aggregation || !g_tw_agg_flush_ahead || g_tw_agg_policy != 1) return;
+  Aggregator* a = CpvAccess(g_aggregator);
+  unsigned long long m0 = msgs_sent(a);
+  flush_due(a, true);
+  get_statistics()->agg_msgs_ahead += msgs_sent(a) - m0;
+}
+
+Time agg_horizon() {
+  return g_tw_aggregation ? CpvAccess(g_aggregator)->urgent : 0;
 }
 
 void agg_set_window(uint64_t window) {

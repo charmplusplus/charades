@@ -22,6 +22,8 @@
 #include <charm++.h>
 #include <cstdint>
 
+#include "typedefs.h"
+
 class RemoteEvent;
 class Statistics;
 
@@ -44,6 +46,17 @@ void agg_flush_idle();
 void agg_drain();
 /** GVT moved: ship per --agg-gvt-flush */
 void agg_flush_gvt();
+/**
+ * --agg-flush-ahead: this PE is adding its counts to a GVT wave. Ship every
+ * destination holding an event that the GVT this wave may produce will make
+ * due, predicted as GVT + the largest of the last 8 GVT steps, so those
+ * events leave before any PE can learn that GVT and run past them. At level
+ * 2, idle flushes (a PE at its window edge, or out of events) look as far
+ * ahead too.
+ */
+void agg_flush_ahead();
+/** The deadline horizon (window + margin; 0 without aggregation) */
+Time agg_horizon();
 /** Ship everything this PE has buffered (before a blocking GVT round) */
 void agg_flush_all();
 

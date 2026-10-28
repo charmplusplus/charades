@@ -76,6 +76,7 @@ extern unsigned g_tw_gvt_wave_allreduce; ///< bucketed gvt, node waves: processe
 extern unsigned g_tw_wave_batch;         ///< bucketed gvt, node waves: batch size while a count wave is in flight, 0 = --batch
 extern unsigned g_tw_wave_batch_when;    ///< 0 = once this process's sums are sent, 1 = once this PE contributed
 extern unsigned g_tw_diag_gvt_spin_ns;   ///< diagnostic: busy-wait this long each time a PE applies a GVT result
+extern unsigned g_tw_diag_window_lag_ns; ///< diagnostic: for this long after a PE learns a new GVT, its window stays at the previous GVT
 extern unsigned g_tw_warmup_pings;       ///< before the clock starts, messages each PE sends every PE (diagnostic)
 extern unsigned g_tw_gvt_wave_tree;      ///< bucketed gvt, node waves: fan-out of Charades' own process tree, 0 = Charm++ reduction
 extern Time     g_tw_optimism_window; ///< execute no event past GVT + this (0: off)
@@ -102,6 +103,7 @@ extern unsigned g_tw_agg_gvt_flush;   ///< on each GVT update: 0 none, 1 stale, 
 extern unsigned g_tw_agg_policy;      ///< 0: eager flushes, 1: flush by timestamp deadline
 extern Time     g_tw_agg_horizon;     ///< deadline policy: events with ts < GVT + this are due
 extern Time     g_tw_agg_horizon_margin; ///< deadline policy, horizon following the window: W + this
+extern unsigned g_tw_agg_flush_ahead;    ///< deadline policy: send what the next GVT will make due at each count-wave contribution (1), and at idle flushes (2)
 extern unsigned g_tw_agg_auto;        ///< choose the htram mode and buffer from the run's own traffic (aggregation.h)
 extern unsigned g_tw_agg_auto_advances; ///< --agg-auto: GVT advances measured before choosing
 extern double   g_tw_agg_auto_share;  ///< --agg-auto: at most this share of events leaving the process -> large PP buffers
@@ -192,12 +194,28 @@ class Globals {
      * not allocate and free a Charm message for every event.
      */
     std::vector<RemoteEvent*> msg_pool;
+    /**
+     * The GVT the window is measured from: g_last_gvt, except for
+     * --diag-window-lag-ns after each update, when it is the GVT before.
+     */
+    Time window_gvt;
+    double window_open_at; ///< when window_gvt catches up with g_last_gvt
+    Time prev_gvt;         ///< the GVT before g_last_gvt
+    double gvt_learned_t;  ///< wall time this PE applied g_last_gvt
+    bool last_blocked;     ///< this PE's last pass stopped at the window
+    bool blocked_at_learn; ///< ... as it was when g_last_gvt arrived
+    /** The last 8 GVT steps (--agg-flush-ahead predicts the next from them) */
+    Time gvt_steps[8];
+    unsigned gvt_step_i;
 
     Globals() : g_last_gvt(0),
                 abort_event(NULL),
                 event_buffer(NULL),
                 avl_list_head(NULL),
-                window(g_tw_optimism_window) {}
+                window(g_tw_optimism_window),
+                window_gvt(0), window_open_at(0), prev_gvt(0),
+                gvt_learned_t(0), last_blocked(false),
+                blocked_at_learn(false), gvt_steps{}, gvt_step_i(0) {}
 };
 
 void clear_globals();   ///< sets all global variables to default values

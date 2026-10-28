@@ -72,7 +72,9 @@ void Statistics::clear() {
   agg_items = agg_urgent = agg_direct = 0;
   agg_msgs = agg_bytes = agg_idle_flushes = agg_pp_bypasses = 0;
   agg_msgs_full = agg_msgs_urgent = agg_msgs_idle = agg_msgs_gvt = 0;
-  agg_msgs_round = 0;
+  agg_msgs_round = agg_msgs_ahead = 0;
+  for (int b = 0; b < HELD_BINS; b++) held_dt[b] = held_off[b] = 0;
+  held_blocked = 0;
   remote_arrivals = remote_stragglers = 0;
   iter_full = iter_window = iter_empty = 0;
   exec_time = 0.0;
@@ -198,6 +200,12 @@ void Statistics::add_comm(const Statistics* other) {
   agg_msgs_idle += other->agg_msgs_idle;
   agg_msgs_gvt += other->agg_msgs_gvt;
   agg_msgs_round += other->agg_msgs_round;
+  agg_msgs_ahead += other->agg_msgs_ahead;
+  for (int b = 0; b < HELD_BINS; b++) {
+    held_dt[b] += other->held_dt[b];
+    held_off[b] += other->held_off[b];
+  }
+  held_blocked += other->held_blocked;
   remote_arrivals += other->remote_arrivals;
   remote_stragglers += other->remote_stragglers;
   for (int b = 0; b < SLACK_BUCKETS; b++) slack_hist[b] += other->slack_hist[b];
@@ -381,6 +389,24 @@ void Statistics::print() const {
     print_int("htram Messages: Idle Flush", agg_msgs_idle);
     print_int("htram Messages: GVT Update", agg_msgs_gvt);
     print_int("htram Messages: GVT Round", agg_msgs_round);
+    if (g_tw_agg_flush_ahead) print_int("htram Messages: Flush Ahead", agg_msgs_ahead);
+    uint64_t held = 0;
+    for (int b = 0; b < HELD_BINS; b++) held += held_dt[b];
+    if (held) {
+      print_section("HELD STRAGGLERS");
+      static const char* dt[HELD_BINS] = {"0-5", "5-10", "10-20", "20-50", "50-100", "100+"};
+      static const char* off[HELD_BINS] = {"below", "0-8", "8-16", "16-32", "32-64", "64+"};
+      char name[96];
+      for (int b = 0; b < HELD_BINS; b++) {
+        snprintf(name, sizeof(name), "Held Stragglers, us after its GVT %s", dt[b]);
+        print_int(name, held_dt[b]);
+      }
+      for (int b = 0; b < HELD_BINS; b++) {
+        snprintf(name, sizeof(name), "Held Stragglers, past previous horizon %s", off[b]);
+        print_int(name, held_off[b]);
+      }
+      print_int("Held Stragglers, at a PE blocked at its window", held_blocked);
+    }
   }
 
   if (remote_arrivals) {

@@ -1,4 +1,5 @@
 #include "bucketed.h"
+#include "aggregation.h"
 
 #include "controller.h"
 #include "event.h"
@@ -348,6 +349,9 @@ void BucketGVT::take_pick_snapshot(double result_t) {
 }
 
 void BucketGVT::contribute_counts(int num_buckets, int reason) {
+  // Before the counts leave: what the GVT this wave may produce will make
+  // due goes now, not when this PE learns that GVT (--agg-flush-ahead)
+  agg_flush_ahead();
   if (g_tw_gvt_trace >= 4 && pick.valid && contributions % 4 == 0) {
     Statistics* s = get_statistics();
     const WaveTimers& w = g_wave_timers;

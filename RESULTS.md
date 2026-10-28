@@ -115,7 +115,7 @@ Sections 1–128 were re-read before planning sections 129 onward.
 - **Section 126's smaller buffers extend section 66.** That section swept buffers of 128, 512 and 2,048 (WPs 128 ≈ WPs 512 on uniform at 16 nodes); sizes 16 and 32 are new.
 
 **Dropped threads, still open:**
-- **`flushDue` misses PP shared buffers whose events are due** (section 80, "Next" item 2). This is why PP 2,048 collapses at σ ≥ 2,000 (8× more events held past their due time), and PP 512 has the same gap at a smaller scale. Never fixed.
+- ~~`flushDue` misses PP shared buffers whose events are due~~ (section 80, "Next" item 2). **Wrong, corrected in section 137:** `flushDue` does send them. Their events go out at the update that makes them due and lose a race to PEs that open their window at once. That race is PP 2,048's loss at σ 2,000 (not at σ 4,000), and it costs PP 512 0.03–0.13% of events. Sections 137–138.
 - **Fewer destinations for uniform's receives** (section 107, "Next" item 3: per-socket buffers or two-hop routing). Never tried, though section 78's one-process-per-node result argues against expecting much.
 - **glibc no-trim** (section 95) is still a candidate, not part of the launch.
 - **Rank 0 late at σ 100** (sections 88–103): open, with no explanation beyond the lower-edge effect.
@@ -261,6 +261,8 @@ Sections 1–128 were re-read before planning sections 129 onward.
 | 134 | 2026-10-28 | 3652869 | An htram message's cost, results: 92–95% is the LCI backend's send call, which polls the network after every post | current |
 | 135 | 2026-10-28 | — | The post and the network poll inside each send, and skipping the poll (`+lci_send_progress 0`) | design |
 | 136 | 2026-10-28 | 3652896 | The poll inside each send, results: it does useful work; skipping it costs uniform 6% on 16 nodes, and the time moves into allocating the next buffer | current |
+| 137 | 2026-10-28 | 3639554, 3650921, 3652595 (existing logs) | PP's late held events: a race at each GVT update, not a missed flush | current |
+| 138 | 2026-10-28 | — | Sending what the next GVT will make due before it is published (`--agg-flush-ahead`), against holding the window back (`--diag-window-lag-ns`) | design |
 
 ## Stampede3 runs, in order
 
@@ -3151,7 +3153,7 @@ Best ÷ best (each arm set at its best W): 4 nodes σ 100 1.01, σ 2,000 0.97; 1
 - **V1 right.** Every run decided as predicted, after 128 GVT advances (about 2% of the run).
 - **V2 wrong.** Where it switches to PP 2,048 it gets 0.93–0.95 of PP 2,048, almost none of the gain.
 - **Why: PP 2,048's gain at σ ≤ 1,000 does not come from aggregation.** At the same window, PP 512 and PP 2,048 send the same number of messages with the same events per message (σ 100, W 250: 499,353 vs 497,388 messages, 39.3 vs 39.5 events per message; σ 500: 73.7 vs 74.0; σ 1,000: 87.1 vs 87.5), at the same efficiency and the same GVT advance count. Every "buffer full" send at σ 100 is a PE sending its 16-event local buffer while the shared buffer is being sent (17,642 vs 14,988), not a shared buffer filling. Growing the limit live therefore changes nothing, which is what `--agg-auto` shows. What PP 2,048 changes at startup is allocation sizes (each PE's initial buffers are allocated at the buffer size), so this is most likely the startup-layout effect of section 75 (±10% at 16 nodes from groups or allocations), not a better aggregation setting. Not yet tested.
-- **PP 2,048's loss at σ ≥ 2,000 is real and is a deadline-policy gap.** At σ 2,000, W 250: events held past their due time by htram rise from 233,332 to 1,948,172 (8×), urgent sends from 1,955 to 175,108, and efficiency drops from 99.92% to 98.63% (94–95% at W 400–600), with events per message about the same (74 vs 78). With a larger limit, shared buffers that previously went out when full now wait, and `flushDue` does not send them by their deadline. PP 512 has the same gap at a smaller scale (233,332 held events at σ 2,000 against 57,475 at σ 100).
+- **PP 2,048's loss at σ ≥ 2,000 is real and is a deadline-policy gap.** *(Corrected in section 137: `flushDue` does send the shared buffers; their events lose a race at the update that makes them due, and at σ 4,000 part of the loss is something else.)* At σ 2,000, W 250: events held past their due time by htram rise from 233,332 to 1,948,172 (8×), urgent sends from 1,955 to 175,108, and efficiency drops from 99.92% to 98.63% (94–95% at W 400–600), with events per message about the same (74 vs 78). With a larger limit, shared buffers that previously went out when full now wait, and `flushDue` does not send them by their deadline. PP 512 has the same gap at a smaller scale (233,332 held events at σ 2,000 against 57,475 at σ 100).
 **4 nodes (job 3638969; 185 runs ok, canary passed, committed counts identical), same layout as the 16-node table:**
 
 | workload | PP 512 (M ev/s) | PP 2,048 ÷ PP 512 | `--agg-auto` ÷ PP 512 | `--agg-auto` ÷ the setting it chose |
@@ -5095,6 +5097,128 @@ If Z2 holds, `+lci_send_progress 0` (or Reconverse polling only when a post is r
 - `+lci_send_progress 0` stays off; it remains a diagnostic on the `pads-send-timers` branch.
 
 **Next, if continued.** Split a poll's 2.8 µs into the cost of an empty poll and of handling what it finds (LCI's completion handlers, Reconverse's copy into a Converse message). If empty polls are most of it, a cheaper or less frequent poll is worth testing. If handling dominates, that is the receive path's cost per message, which only fewer messages would reduce.
+
+### PP's late held events: a race at each GVT update, not a missed flush (analysis of existing data, 2026-10-28; no new job)
+
+> **Status: current.** Corrects section 76 and the re-read's first dropped thread. Data: section 80C (job 3639554, 16 nodes, short runs, rep 1; logs in `$WORK/charades-runs/sdiag/j3639554/C_*`) and the long runs (jobs 3650921 and 3652595, rep 1, W 250 and 400; logs in `$WORK/charades-runs/long2[36]/j*/hi_*/ctl_sweep/logs/`).
+
+**Why.** The re-read listed "`flushDue` misses PP shared buffers whose events are due" (section 76) as a thread that was dropped and never fixed. Before building a fix, this section checks the claim against the code and the logs already on disk.
+
+**The claim repeated an error already corrected.**
+- **Section 28 (2026-10-22) had found this race** and said explicitly that buffered events *are* re-checked at every update ("a first reading of this result said they were not; that was wrong"). It also showed margin 64 removes the late events at a cost in messages. Section 76 (2026-10-25) made the corrected claim again, and the re-read carried it forward.
+- **The code.** htram's `flushDue` checks each shared buffer's minimum key and sends the buffer (`shipSharedPP`) when it is due. It has done so since htram f07aceb (2026-10-20), five days before section 76's job.
+- **The counter.** Section 76's "events held past their due time" is `Held Stragglers`: stragglers that were *held* in an htram buffer when sent (not due then). It does not say how long they waited after becoming due.
+
+**When they were sent.** Section 80C raised the horizon margin. That sends every event earlier by the extra margin, both when it is inserted and at every flush. On 16 nodes at W 250, GVT moves about 60 time units per update. An event sent k updates after it became due would survive any margin below about k × 60.
+
+Held stragglers by margin (16 nodes, W 250, rep 1; % of committed events; lower is better):
+
+| workload | setting | margin 8 | 32 | 64 | 128 |
+|---|---|---|---|---|---|
+| σ 2,000 | PP 2,048 | 1,903,856 (0.263%) | 129,023 (0.018%) | 1,136 | 2 |
+| σ 2,000 | PP 512 | 231,416 (0.032%) | 8,782 (0.001%) | 688 | 9 |
+| σ 4,000 | PP 2,048 | 2,174,101 (0.300%) | 277,704 (0.038%) | 3,019 | 10 |
+| σ 4,000 | PP 512 | 702,545 (0.097%) | 31,742 (0.004%) | 2,107 | 9 |
+
+- **Margin 64 (just above one GVT step) removes 99.7–99.9%.** So almost every late held event was sent at the update that made it due, not later. No shared buffer was skipped for a whole update.
+- **Margin 32 already removes 87–96%.** So most late events have timestamps within about 24 time units above the previous horizon. Those are the first events a PE that waited at its window edge executes when the window opens.
+- **PP 2,048 sends its shared buffers at nearly every update.** In the long runs on 1 node (2 processes), it sends 3.2 GVT-update messages per update against 0.9 for PP 512. PP 512's buffers fill at 512 and go out before most of their events are due; with a limit of 2,048 they rarely fill, so their events wait until due.
+
+**The mechanism, from the code.**
+- A scheduler pass first applies any new GVT (`gvt_manager->poll()`). That is also when this PE flushes its own buffers that the update made due.
+- It then drains its input buffer and runs up to 128 events.
+- So a PE that was blocked at its window edge learns the update within one short pass and starts executing from the old edge at once. The events that update made due only now leave their senders:
+  - a busy sender learns of the update after its 128-event batch;
+  - a shared buffer leaves with the first PE in its process to learn.
+- Those events reach the receiver's input buffer after it has already run past them.
+
+**Closure: does the race explain PP 2,048's loss?**
+- **σ 2,000: yes.**
+  - Margin 32 removes 93% of PP 2,048's held stragglers and takes it from 251.5 to 384.2 M ev/s (+53%).
+  - The same margin costs PP 512 4% (352.8 → 337.5), through 22% more messages.
+  - So removing the late events is worth about +59% to PP 2,048, which puts it at about 1.1× PP 512. That is the capped setting's level (section 80B, 1.12). The race accounts for the whole loss.
+  - In the long runs it is also 99.8–99.9% of PP 2,048's rollbacks: 1,522,030 of 1,525,046 timestamp rollbacks on 1 node, and 8,968,992 of 8,981,313 on 16 nodes (W 250).
+- **σ 4,000: no.**
+  - With margin 32, PP 2,048 has fewer held stragglers (0.038%) and higher efficiency (99.87%) than PP 512 at margin 8 (0.097%, 99.74%). Yet it is still 0.75 of PP 512's rate (229.2 against 306.6), with 23% more messages.
+  - Margin 32 costs PP 512 12% at σ 4,000 (306.6 → 271.2), so the extra messages do not explain 0.75 either.
+  - Something else makes the 2,048 limit slow at σ 4,000. That is not this thread.
+- **σ ≤ 1,000 on 4 and 16 nodes:** PP 512 and PP 2,048 have the same held stragglers (0.007–0.07% of committed events) and the same efficiency. The gap appears only where PP 512's buffers fill before their events are due and PP 2,048's do not (for example σ 1,000 on 1 node: 0.22% against 0.003%).
+
+**What the race costs the default (PP 512).**
+- In the long runs on 16 nodes at σ ≥ 2,000, held stragglers are 0.03–0.13% of committed events (W 250–400), the most at σ 4,000 (efficiency 99.62–99.65%).
+- Removing them with a larger margin costs more in messages than it saves (section 80C).
+- What removing them is worth *without* the margin's extra messages is unknown. Section 138 measures it.
+
+**New here, against sections 28, 80 and 116:** how much of PP 2,048's loss the race explains (all of it at σ 2,000, not at σ 4,000), and that at margin 8 most late events are within 24 time units of the previous horizon.
+
+**Corrections.**
+- Section 76: "`flushDue` does not send them by their deadline" is wrong. The shared buffers are sent at the update that makes them due, and their events lose a race to receivers that open their window at once.
+- The re-read's first dropped thread is replaced by this section.
+
+### Sending what the next GVT will make due before it is published (`--agg-flush-ahead`), against holding the window back (`--diag-window-lag-ns`) (design, 2026-10-28; written before any runs)
+
+> **Status: design.** Charades `scale-diag` (this commit), htram `pdes` ed31d7e, Reconverse `pads-send-timers` 8b67e60 (no flags of its own set), the current launch. Job `$WORK/charades-runs/late30.slurm` (16 nodes, skx-dev and skx, `-x c455-081`).
+
+**Why.** Section 137: held events go out at the GVT update that makes them due, and PEs waiting at their window edge run past them before they arrive.
+
+**What was tried before:**
+- A larger margin (sections 28, 80C and 116) removes the late events, but it sends earlier at insert and at every flush, which costs messages.
+- Section 116 found that GVT at σ 2,000 with PP 512 is not paced by late arrivals: the late PE receives no events close to GVT. So PP 512 should gain little from removing the race.
+
+Neither option below has been tried. Each removes the race without the larger margin's extra messages, one from each side:
+- **Sender: send them before the update exists.** There are two moments when a PE knows the next GVT has not been published yet, and can send what it will make due:
+  - **When it adds its counts to the next count wave.** The result cannot be published before every PE has done so. A busy PE contributes after 128 events.
+  - **When it stops at its window edge.** It inserts nothing more until it learns the next GVT, so everything it holds that the next GVT will make due can go now. This moment matters most: a PE whose last pass was blocked contributes at once when it learns a GVT, *before* it runs its newly opened window. Most of its inserts therefore come after its contribution.
+  - Either way the update's flush moves earlier instead of being repeated.
+- **Receiver: open the window a little later.**
+  - A PE that learns a new GVT keeps its old window edge for D µs, so the events the update made due arrive first.
+  - That changes no message, so it tests the mechanism directly.
+  - It may cost time if waiting PEs are on the critical path; σ 100, with almost nothing to remove, measures that cost.
+
+**New options (all off by default):**
+- **`--agg-flush-ahead=1|2`:**
+  - Level 1: at each count-wave contribution, the PE first runs htram's `flushDue` with the horizon one GVT step ahead: GVT + the largest of its last 8 GVT steps + window + margin. These messages are counted as "htram Messages: Flush Ahead".
+  - Level 2 adds the same horizon to idle flushes, which run after every pass that stopped at the window edge or ran out of events. These are counted as "Idle Flush", as before.
+  - The insert-time urgency test and the flush at each update are unchanged; that flush finds less to send.
+- **`--diag-window-lag-ns=D`:**
+  - For D ns after a PE applies a new GVT, its window edge stays at the previous GVT + W.
+  - Only the edge moves. Flushes, urgency, fossil collection and the GVT itself use the new GVT.
+- **Held-straggler counts (always on; they run only when a held straggler arrives):**
+  - µs since the receiving PE learned its latest GVT (bins 0–5, 5–10, 10–20, 20–50, 50–100, 100+);
+  - ts minus the previous horizon (the GVT before + W + margin): below it (due a whole update earlier), then 0–8, 8–16, 16–32, 32–64, 64+;
+  - how many arrived at a PE whose pass before that GVT stopped at its window edge.
+
+Mac: test configs `agg_deadline_bucket_pp_flushahead` (level 2), `agg_deadline_bucket_pp_flushahead1`, `agg_deadline_bucket_wps_flushahead` (level 2) and `agg_deadline_bucket_pp_windowlag`; change tier 90/90 on the core models (five configs), committed counts unchanged. Every new option is off by default; the engine tier runs before any of them becomes a default.
+
+**Runs** (long runs, end time 2,048,000, 3 reps; base = margin 8, the current launch):
+- **A. 16 nodes:** σ 2,000 and σ 4,000 × PP 512 and PP 2,048 × W 400 (PP 512's best fixed W there in section 124) × {base, flush ahead (level 2), lag 50 µs}, plus PP 2,048 with level 1. 14 arms.
+- **A′. 16 nodes, the capped setting:** PP 2,048 capped at 512 (`--agg-pp-limit=512`, sections 80B and 82), same workloads and W, {base, flush ahead}. This is what a repaired PP 2,048 has to beat.
+- **B. 16 nodes, control:** σ 100, PP 2,048, W 250 × {base, flush ahead, lag 50 µs}.
+- **C. 16 nodes, uniform:** WPs 512, W 400 × {base, flush ahead}. The GVT-time flush is on uniform's critical path (section 132).
+- **D. 1 node:** σ 2,000, PP 512 and PP 2,048, W 250 × {base, flush ahead, lag 50 µs}.
+- **Gate (2 nodes):** the three new configs plus `agg_deadline_bucket_pp`, `agg_bucket_pp` and `bucket_window`, Simple PHOLD.
+
+**Predictions:**
+- **F1. Where and when (base arms, σ ≥ 2,000):**
+  - ≥ 85% of held stragglers are at most 32 past the previous horizon, and ≤ 5% are below it;
+  - ≥ 60% arrive at a PE that was blocked at its window when it learned the latest GVT;
+  - ≥ 70% arrive within 50 µs of that.
+- **F2. The lag tests the mechanism:** lag 50 µs removes ≥ 70% of held stragglers in every σ ≥ 2,000 cell, within 15 points of the share F1 puts under 50 µs.
+- **F3. Flush ahead (level 2):** removes ≥ 60% of held stragglers in every σ ≥ 2,000 cell, with htram messages per committed event within ±10% of the base. Level 1 removes less than half of what level 2 does, because blocked PEs contribute before they run their new window.
+- **F4. Cost where there is nothing to remove (σ 100):**
+  - flush ahead (level 2) ≥ 0.98 of the base;
+  - lag 50 µs ≥ 0.95. A PE waiting at its window edge is ahead of the PE that paces each advance by about the straggler cost (93 µs at σ 100 in section 80), which is more than the lag.
+- **F5. Value, 16 nodes:**
+  - PP 2,048 with the better of the two is ≥ 1.25× its base at σ 2,000, and ≥ 1.10× at σ 4,000 (section 137's other loss caps it there);
+  - PP 512 gains 0–4% at σ 2,000 and 0–8% at σ 4,000;
+  - on 1 node, PP 2,048 gains ≥ 1.20×.
+- **F6. Uniform:** flush ahead is 0.97–1.05× the base. The late PE contributes after its 128th event and flushes then, so most of the GVT-time flush stays on the critical path.
+- **F7. The capped setting:** on this launch and on long runs it is 1.00–1.12× PP 512 (1.07–1.14 on short runs in sections 80B and 82). At σ 2,000, PP 2,048 with flush ahead is within 5% of it; at σ 4,000 it stays below it.
+
+**Then:**
+- **If F3 and F5 hold:** `--agg-flush-ahead` runs the full engine tier, then all eight workloads on long runs as a candidate default. After that, PP 2,048 and the capped setting are compared again at σ ≥ 2,000.
+- **If F2 holds but F3 fails:** the mechanism is right but senders contribute too late. The µs bins say by how much.
+- **If F2 fails:** the offset bins say where the late events come from.
 
 ## Baseline verification on the Mac
 

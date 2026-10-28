@@ -10,6 +10,7 @@
 #include "avl_tree.h"
 #include "event.h"
 #include "factory.h"
+#include "aggregation.h"
 #include "globals.h"
 #include "mapper.h"
 #include "mpi-interoperate.h"
@@ -59,6 +60,26 @@ void init_lps() {
 
 #undef PE_STATS
 #define PE_STATS(x) scheduler->stats->x
+
+/**
+ * A held straggler (sent through htram, not due when sent): when it arrived
+ * after this PE learned its latest GVT, how far its ts is past the horizon
+ * of the GVT before, and whether this PE was then waiting at its window
+ * (RESULTS.md section 138)
+ */
+static void count_held_straggler(Statistics* s, Time ts) {
+  const Globals* g = get_globals();
+  const double us = 1e6 * (CmiWallTimer() - g->gvt_learned_t);
+  s->held_dt[us < 5 ? 0 : us < 10 ? 1 : us < 20 ? 2 : us < 50 ? 3 : us < 100 ? 4 : 5]++;
+  const Time horizon = g->prev_gvt + agg_horizon();
+  int off = 0;
+  if (ts >= horizon) {
+    const Time d = ts - horizon;
+    off = d < 8 ? 1 : d < 16 ? 2 : d < 32 ? 3 : d < 64 ? 4 : 5;
+  }
+  s->held_off[off]++;
+  if (g->blocked_at_learn) s->held_blocked++;
+}
 
 /** Initializes all member variables for this LP chare */
 LPChare::LPChare() : next_token(this), next_event_id(0), cancel_q(NULL),
@@ -291,6 +312,7 @@ void LPChare::recv_remote_event(RemoteEvent* event) {
   if (isOptimistic && e->ts <= get_current_time()) {
     if (event->far) PE_STATS(late_stragglers)++;
     if (event->far || event->held) PE_STATS(held_stragglers)++;
+    if (event->held) count_held_straggler(scheduler->stats, e->ts);
   }
 
   /**

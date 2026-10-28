@@ -331,7 +331,23 @@ void DistributedScheduler::gvt_resume() {}
 void DistributedScheduler::gvt_done(Time gvt, bool lb) {
   TW_ASSERT(gvt >= PE_VALUE(g_last_gvt), "GVT Causality Violation\n");
   PE_STATS(total_gvts)++;
-  PE_VALUE(g_last_gvt) = gvt;
+  Globals* g = get_globals();
+  g->prev_gvt = g->g_last_gvt;
+  g->g_last_gvt = gvt;
+  g->gvt_steps[g->gvt_step_i++ % 8] = gvt - g->prev_gvt;
+  // For the held-straggler counts (Statistics::held_*): when this PE learned
+  // the GVT, and whether it was then waiting at its window edge
+  g->gvt_learned_t = CmiWallTimer();
+  g->blocked_at_learn = g->last_blocked;
+  // --diag-window-lag-ns: the window stays at the GVT before this one for a
+  // while, so events this update made due can arrive before this PE runs
+  // past them (RESULTS.md section 138)
+  if (g_tw_diag_window_lag_ns) {
+    g->window_gvt = g->prev_gvt;
+    g->window_open_at = g->gvt_learned_t + 1e-9 * g_tw_diag_window_lag_ns;
+  } else {
+    g->window_gvt = gvt;
+  }
   // The window moved with GVT: a parked PE may run again
   parked = false;
   // Buffered events may now be at GVT, holding up the next advance

@@ -1,0 +1,11 @@
+# agg_deadline_bucket_wps with margin 8 and --agg-flush-ahead=2
+sync=3
+gvt=4
+buffer-size=655360
+optimism-window=2000
+aggregation=1
+agg-mode=0
+agg-buffer=16
+agg-policy=1
+agg-horizon-margin=8
+agg-flush-ahead=2

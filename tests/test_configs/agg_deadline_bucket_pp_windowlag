@@ -1,0 +1,11 @@
+# agg_deadline_bucket_pp with margin 8 and --diag-window-lag-ns=20000: the window stays at the previous GVT for 20 us after each update
+sync=3
+gvt=4
+buffer-size=655360
+optimism-window=2000
+aggregation=1
+agg-mode=2
+agg-buffer=16
+agg-policy=1
+agg-horizon-margin=8
+diag-window-lag-ns=20000

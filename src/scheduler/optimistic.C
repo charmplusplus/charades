@@ -64,14 +64,19 @@ void OptimisticScheduler::execute() {
   // comes back to the scheduler sooner to run the wave's messages
   const unsigned batch = gvt_manager->batch_size();
   const bool t5 = g_tw_gvt_trace >= 5;
+  Globals* g = get_globals();
+  if (g->window_gvt != g->g_last_gvt && CmiWallTimer() >= g->window_open_at) {
+    g->window_gvt = g->g_last_gvt;
+  }
   double tl = t5 ? CmiWallTimer() : 0;
   for (; num_executed < batch; num_executed++) {
     // With an optimism window, events past GVT + window wait for GVT to
     // advance. The iteration still completes, so the GVT trigger keeps
     // firing and stragglers inside the window are still processed.
+    // (window_gvt is the GVT, except under --diag-window-lag-ns.)
     Time window = PE_VALUE(window);
     if (window && next_lps.top() != NULL &&
-        next_lps.top()->ts > PE_VALUE(g_last_gvt) + window) {
+        next_lps.top()->ts > g->window_gvt + window) {
       blocked = true;
       break;
     }
@@ -83,6 +88,7 @@ void OptimisticScheduler::execute() {
     g_wave_timers.loop += CmiWallTimer() - tl;
     g_wave_timers.passes++;
   }
+  g->last_blocked = blocked;
   if (num_executed == batch) {
     PE_STATS(iter_full)++;
   } else if (blocked) {
@@ -123,7 +129,10 @@ void OptimisticScheduler::execute() {
     double until = CmiWallTimer() + 1e-9 * g_tw_blocked_pause_ns;
     while (CmiWallTimer() < until) {}
   }
-  if (blocked && g_tw_sched_park && gvt_manager->is_continuous()) {
+  // Not while --diag-window-lag-ns holds the window back: nothing would wake
+  // this PE when the lag runs out
+  if (blocked && g_tw_sched_park && gvt_manager->is_continuous() &&
+      g->window_gvt == g->g_last_gvt) {
     parked = true;
     gvt_manager->gvt_begin();
   }
@@ -132,7 +141,7 @@ void OptimisticScheduler::execute() {
 
 void OptimisticScheduler::maybe_wake(Time ts) {
   Time window = PE_VALUE(window);
-  if (!window || ts <= PE_VALUE(g_last_gvt) + window) wake();
+  if (!window || ts <= PE_VALUE(window_gvt) + window) wake();
 }
 
 void OptimisticScheduler::gvt_resume() {

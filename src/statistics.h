@@ -105,6 +105,18 @@ class Statistics {
     /// an urgent event, an idle PE, a GVT update, a blocking GVT round
     uint64_t agg_msgs_full, agg_msgs_urgent, agg_msgs_idle, agg_msgs_gvt,
              agg_msgs_round;
+    uint64_t agg_msgs_ahead;  ///< ... and a count-wave contribution (--agg-flush-ahead)
+    /**
+     * Held stragglers (sent through htram, not due when sent) by when and
+     * where they arrived: microseconds since the receiving PE learned its
+     * latest GVT (bins HELD_DT_US), the event's ts minus the PE's previous
+     * horizon (the GVT before + window + margin; bins HELD_OFF: below it,
+     * i.e. due one update earlier, then [0,8) [8,16) [16,32) [32,64) 64+),
+     * and how many arrived at a PE whose pass before that GVT stopped at its
+     * window edge.
+     */
+    static const int HELD_BINS = 6;
+    uint64_t held_dt[HELD_BINS], held_off[HELD_BINS], held_blocked;
     ///@}
 
     /** \name Remote event slack (--comm-stats): on arrival, the event's ts
