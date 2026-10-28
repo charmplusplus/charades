@@ -217,6 +217,7 @@ Charades' controller ÷ Devastator's adaptive window: 0.68–1.03 at σ ≤ 500 
 | 121 | 2026-10-27 | — | Closure check: 78% of σ 2,000's 4→16-node loss is in the first 10% of waves, which sections 116–120 left out; a warm-up test and long runs | design |
 | 122 | 2026-10-27 | 3650843 | Warm-up and long runs, results: in 4× longer runs σ 2,000 scales at 0.96–0.97 and σ 4,000's loss is all start-up; warm-up pings do nothing; uniform's loss is steady | current |
 | 123 | 2026-10-27 | — | Charades and Devastator on long runs, 1 / 4 / 16 nodes: σ 2,000, σ 4,000, uniform | design |
+| 125 | 2026-10-27 | — | Uniform's steady loss: thinner htram messages or more destinations? A buffer-size perturbation on 4 nodes | design |
 
 ## Stampede3 runs, in order
 
@@ -4597,6 +4598,41 @@ The short warm-up-0 cell's second 4-node rep (116.9) is slow; without it the sho
 - T4. **Charades' controller ÷ its best fixed W at 16 nodes:** at least 0.92 at σ 2,000 and 0.88 at σ 4,000 (short: 0.92, 0.86).
 
 If T1 and T3 hold, Charades both scales as well as Devastator and leads it on these workloads, and the scaling gap at σ ≥ 2,000 was an artefact of run length. If T1 fails at σ 2,000 or σ 4,000, the start-up explanation of section 122 is incomplete.
+
+### Uniform's steady loss: thinner htram messages or more destinations? A buffer-size perturbation on 4 nodes (analysis of existing traces and design, 2026-10-27; written before any runs)
+
+> **Status: design.** Analysis from job 3650843's traced uniform runs (`--gvt-trace=2`, WPs 512, W 400, short runs; script `uni_steady.py` in `~/charades-data/sdiag/j3650843/`). Job U: Charades `scale-diag` 4e6d8b8 (defaults), htram 699c3a9, Reconverse 22871c6, the current launch; `$WORK/charades-runs/uni24.slurm` (16 nodes, skx-dev and skx, `-x c455-081`), submitted after job T (one job per dev queue).
+
+**Closure.**
+- **Uniform's 4→16-node loss is 81% steady-state** (section 122).
+- **In the steady state, time per simulated bucket accounts for all of it:** 24.5 µs on 4 nodes against 31.8 µs on 16 (ratio 0.77, the steady efficiency). A 16-node wave completes more buckets (9.5 against 8.4) but takes longer (300 against 207 µs).
+- **σ 4,000 has no steady loss:** 23.7 against 23.5 µs per bucket.
+
+**What differs between them** (job 3650843, untraced, 2 reps):
+
+| workload | events per htram message, 4 / 16 nodes (higher is better) | remote sends per committed event, 4 / 16 nodes | time per bucket, 4 / 16 nodes (µs; lower is better) |
+|---|---|---|---|
+| uniform (WPs 512) | 31.1 / **12.4** | 1.006 / 1.002 | 24.5 / 31.8 |
+| σ 4,000 (PP 512) | 46.0 / 45.6 | 1.004 / 1.000 | 23.7 / 23.5 |
+
+On 16 nodes a uniform event goes to one of 32 processes instead of 8. Each PE's per-destination buffers fill 4× more slowly and are flushed by the deadline policy with fewer events, so there are 2.5× as many messages per event (0.032 → 0.081). Two explanations fit:
+- **(H1) Thinning:** each message has a fixed cost (sending, network progress, the receive's fixed part), and there are more messages per event. If H1 holds, the PE time per event (1.58 → 2.10 µs) implies about 10.6 µs of PE time per extra message.
+- **(H2) More destinations:** the flush scans and per-destination bookkeeping grow with the number of destination buffers, whatever the message count.
+
+**Perturbation.** Cap the WPs buffer on 4 nodes so that messages are as thin as on 16 nodes, without adding destinations. A buffer of 16 events allows at most 16 events per message (now 31). Runs (uniform, W 400, short runs, 2 reps):
+- **A. 4 nodes:** WPs 512 (default), 64, 32 and 16, untraced. Also WPs 512 and 16 traced (`--gvt-trace=4`), for the late PE's time split.
+- **B. 16 nodes:** WPs 512 and 16, untraced. Also WPs 512 traced (`--gvt-trace=4`).
+
+**Predictions:**
+- U1. Under H1, 4-node WPs 16 lowers throughput by at least 15% (time per bucket 24.5 → 28.8 µs or more). The slope, extra PE time per extra message, comes out at 10.6 µs ± 30%, so thinning would account for the whole 4→16 steady loss. Under H2, WPs 16 costs less than 5%.
+- U2. WPs 32 and 64 on 4 nodes are within ±3% of WPs 512 (messages already carry about 31 events).
+- U3. On 16 nodes, WPs 16 is within ±5% of WPs 512 (messages already carry about 12).
+
+If U1 holds with the slope: uniform's loss is the per-message cost under thinning. The fixes are then:
+- fewer, fuller messages at 16 nodes: aggregating by destination node through an intermediate PE (2-D routing), or a longer horizon for far destinations;
+- or a cheaper message: its send and receive path, priced from the traced split.
+
+If U1 fails, H2 is next: the cost per destination buffer.
 
 ## Baseline verification on the Mac
 
