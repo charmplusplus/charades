@@ -258,6 +258,8 @@ Sections 1–128 were re-read before planning sections 129 onward.
 | 131 | 2026-10-28 | — | Is applying a GVT result on uniform's critical path? A known delay in that step, and its parts | design |
 | 132 | 2026-10-28 | 3652815 | The GVT-result step, results: on 16 nodes it is fully on the critical path, and the GVT-time flush is 97% of its rise | current |
 | 133 | 2026-10-28 | — | Where an htram message's 2.9 µs goes: htram, Charm++, Reconverse and LCI | design |
+| 134 | 2026-10-28 | 3652869 | An htram message's cost, results: 92–95% is the LCI backend's send call, which polls the network after every post | current |
+| 135 | 2026-10-28 | — | The post and the network poll inside each send, and skipping the poll (`+lci_send_progress 0`) | design |
 
 ## Stampede3 runs, in order
 
@@ -4952,7 +4954,7 @@ If X1's overlap case holds instead, this step is not worth fixing, and the next 
 | 16 | 58.5 | 13.4 | **42.1** | **10.21** | 0.0 | 3.0 |
 | 16 − 4 | +19.9 | −0.1 (−1%) | **+19.4 (97%)** | +6.71 | 0.0 | +0.6 (3%) |
 
-- **The two points fit the GVT-time flush** as about 12.6 µs per update plus **2.9 µs per message** sent.
+- **The two points fit the GVT-time flush** as about 12.6 µs per update plus **2.9 µs per message** sent. (Section 134: this split is wrong. A message costs 6.6 µs on 4 nodes and 4.2 on 16, and sends are 95% of the flush on both.)
 - **Per committed event,** the step is 0.300 µs of PE time on 4 nodes and 0.433 on 16 (section 128 had 0.289 and 0.426 on short runs).
 
 - **X1: the critical-path case holds on 16 nodes.** Each microsecond added to the step adds a microsecond to the advance: 0.968 and 0.935 against predicted 0.967 and 0.936. On 4 nodes only about two thirds of it shows: some of the delay there falls on PEs that would have waited anyway.
@@ -4990,6 +4992,69 @@ On the Mac (uniform, 2 processes × 2 PEs, WPs 512 and 32): trim 0.02 µs, renew
 - Y4. **A send costs the same on 4 and 16 nodes within 15%:** what grows is how many there are.
 
 Then the largest part gets a perturbation and a fix: for example, skipping one part's work and checking that the 16-node GVT-time flush, and throughput, move by the predicted amount (section 132: each µs off the flush is a µs off the advance on 16 nodes).
+
+### An htram message's cost, results: 92–95% is the LCI backend's send call, which polls the network after every post (2026-10-28; skx-dev batch job 3652869, 16 nodes)
+
+> **Status: current.** Design and predictions in section 133. 16 nodes (c454-004, c454-021 to -024, c454-031 to -034, c454-041 to -044, c454-071 to -073; 4-node runs on the first four), 10 runs, all ok; gate 24/24; 6 min. Summary `~/charades-data/send28/send28_summary.py`, with `summary.txt` and the CSVs in `~/charades-data/send28/j3652869/`.
+
+**One htram send, split** (uniform, WPs 512, W 400, long runs; µs per send, mean over PEs and 2 reps; lower is better):
+
+| part | 4 nodes | 16 nodes |
+|---|---|---|
+| sizing the envelope (`trim`) | 0.04 | 0.04 |
+| Charm++'s own part of the send | 0.09 | 0.11 |
+| Reconverse's shared-memory attempt (never used: 0% of sends) | 0.05 | 0.04 |
+| **the LCI backend's `issueAm`** | **6.10** | **3.82** |
+| allocating the replacement buffer (`renewBuffer`) | 0.24 | 0.18 |
+| **a whole send** | 6.64 | 4.22 |
+
+**The GVT-time flush:**
+- 4 nodes: 24.4 µs per update and 3.48 messages, so 7.03 µs per message.
+- 16 nodes: 43.8 µs per update and 9.87 messages, so 4.44 µs per message.
+- Sends × their cost come to 95% of the flush on both node counts.
+
+Traced ÷ untraced is 0.82–0.86 (untraced 115.2 and 356.0 M ev/s).
+
+- **Y1 right.** The Charm++ send call is 96% of a send. The buffer allocation is cheap (0.2 µs) although it reserves the whole 37 KB buffer.
+- **Y2 right, and more so.** LCI's `issueAm` is 96% of the Charm++ send; Charm++'s and Reconverse's own code take 0.1–0.15 µs.
+- **Y3 right, but section 132's split was wrong.**
+  - The flush is sends: 95% of it.
+  - Section 132's fit of "12.6 µs per update + 2.9 µs per message" assumed a message costs the same on 4 and 16 nodes. It does not, so its fixed part was an artefact.
+- **Y4 wrong.** A send costs 6.6 µs on 4 nodes and 4.2 on 16: 4-node messages carry 31 events (about 2.3 KB), 16-node ones 12 (about 0.9 KB).
+
+**What `issueAm` does** (Reconverse `comm_backend_lci2.cpp`):
+- It posts the message (`lci::post_am_x`).
+- Then, after every post, not only on a retry, it calls `progress()`. That polls the PE's own LCI device and runs the handler for everything that has arrived: completed sends, and received messages, which it copies into Converse messages and queues.
+
+So some or most of these 4–6 µs may be receive work, or the cost of a poll, done inside each send. The message size dependence fits either the post's copy into a packet or larger incoming messages being handled.
+
+**Next.** Time the post and the progress call separately inside `issueAm`, count how often progress finds anything, and test `+lci_send_progress 0`, which skips the progress call after a successful post (section 135).
+
+### The post and the network poll inside each send, and skipping the poll (`+lci_send_progress 0`) (design, 2026-10-28; written before any runs)
+
+> **Status: design.** Charades `scale-diag` (this commit), htram `pdes` ed31d7e, Reconverse `pads-send-timers` (this commit: post and progress timed separately in `issueAm`, and `+lci_send_progress`), the current launch. Job Z `$WORK/charades-runs/send29.slurm` (16 nodes, skx-dev and skx, `-x c455-081`).
+
+**Why.** Section 134: on 16 nodes, 3.8 µs of a message's 4.2 µs is the LCI backend's `issueAm`, which calls `progress()` after every post. Two explanations need different fixes:
+- **(a) the poll itself is slow,** even when it finds nothing;
+- **(b) it does real receive work** that the PE would have to do anyway, only earlier.
+
+**New, in Reconverse `pads-send-timers`:**
+- **Timers** for the time in `post_am_x` and in the `progress()` call after it, with how many progress calls completed something.
+- **`+lci_send_progress 0`:** `issueAm` calls `progress()` only when a post must be retried, not after a successful one. The scheduler loop still polls the device as before.
+
+It compiles on the Mac (standalone Release build); Charades: 24/24 on the trace configs.
+
+**Runs** (uniform, WPs 512, W 400, long runs, 2 reps), on 4 and 16 nodes:
+- `+lci_send_progress` 1 (default) and 0, traced (`--gvt-trace=5`) and untraced;
+- then, on 16 nodes, σ 2,000 (PP 512) and σ 100 (PP 2,048, the controller), with 1 and 0, untraced, as a check that nothing else suffers.
+
+**Predictions:**
+- Z1. **Most of `issueAm` is the poll:** of 3.8 µs on 16 nodes, the post is under 1.5 µs and progress over 2.
+- Z2. **If (a) holds** (most polls complete nothing and still cost), `+lci_send_progress 0` cuts a send to under 1.5 µs and the 16-node GVT-time flush from about 44 to under 20 µs per update. Since the flush is on the critical path (section 132), 16-node uniform then gains at least 6% (24 µs of a 291 µs advance); 4 nodes gain less.
+- Z3. **If (b) holds** (most polls do receive work), the work moves to the scheduler loop on the same PE, and throughput changes by under 3% either way.
+- Z4. On σ 2,000 and σ 100 at 16 nodes, `+lci_send_progress 0` is not below 0.98×.
+
+If Z2 holds, `+lci_send_progress 0` (or Reconverse polling only when a post is retried) joins the Stampede3 launch after a correctness gate, as `+mempool_remote_free` did.
 
 ## Baseline verification on the Mac
 
