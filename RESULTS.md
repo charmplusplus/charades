@@ -78,7 +78,7 @@ Charades leads in 22 of 24 cells (all but lookahead 10, σ 500 at 1 and 4 nodes,
 - The late PE in the slowest process is usually rank 0 (62–80% of waves at σ 100, 22–31% at σ 2,000; chance 4%): the process-edge PEs (ranks 0 and 22) take the htram-held cross-process events and roll back 35–50× more at σ 100, and rank 0 carries process-level work.
 - One process per node (46 PEs) is 0.71–0.87 of two (section 78). Horizon margins above 8 cost more than they save (section 80).
 
-**Not yet default:** htram buffers allocated at 2,048 but capped at 512 (`--agg-buffer=2048 --agg-pp-limit=512`) give 1.07–1.14× PP 512 at 16 nodes, σ 100 and 2,000, in two allocations, with identical messages; the cause is not understood (an allocator top pad recovers about 40% of it; sections 80, 82). `--agg-auto` picks its buffer correctly but does not deliver the gain (section 76).
+**Dropped (section 139):** htram buffers allocated at 2,048 but capped at 512 (`--agg-buffer=2048 --agg-pp-limit=512`) gave 1.07–1.14× PP 512 on short runs before the current launch (sections 80, 82); on the current launch and long runs they are 0.93–0.96×. `--agg-auto` picks its buffer correctly but does not deliver the gain (section 76).
 
 **Older 4-node figures** (before the fast path and node waves; jobs 3629783, 3629781, 3632385; kept because the controller, aggregation and transport ratios below have not been remeasured on the current stack):
 
@@ -115,7 +115,7 @@ Sections 1–128 were re-read before planning sections 129 onward.
 - **Section 126's smaller buffers extend section 66.** That section swept buffers of 128, 512 and 2,048 (WPs 128 ≈ WPs 512 on uniform at 16 nodes); sizes 16 and 32 are new.
 
 **Dropped threads, still open:**
-- ~~`flushDue` misses PP shared buffers whose events are due~~ (section 80, "Next" item 2). **Wrong, corrected in section 137:** `flushDue` does send them. Their events go out at the update that makes them due and lose a race to PEs that open their window at once. That race is PP 2,048's loss at σ 2,000 (not at σ 4,000), and it costs PP 512 0.03–0.13% of events. Sections 137–138.
+- ~~`flushDue` misses PP shared buffers whose events are due~~ (section 80, "Next" item 2). **Wrong, corrected in section 137:** `flushDue` does send them. Their events go out at the update that makes them due and lose a race to PEs that open their window at once. It costs PP 512 0.03–0.13% of events, worth 3–5% at σ ≥ 2,000 on 16 nodes. Sending those events early doubles messages and costs more (section 139). Closed; defaults unchanged.
 - **Fewer destinations for uniform's receives** (section 107, "Next" item 3: per-socket buffers or two-hop routing). Never tried, though section 78's one-process-per-node result argues against expecting much.
 - **glibc no-trim** (section 95) is still a candidate, not part of the launch.
 - **Rank 0 late at σ 100** (sections 88–103): open, with no explanation beyond the lower-edge effect.
@@ -263,6 +263,7 @@ Sections 1–128 were re-read before planning sections 129 onward.
 | 136 | 2026-10-28 | 3652896 | The poll inside each send, results: it does useful work; skipping it costs uniform 6% on 16 nodes, and the time moves into allocating the next buffer | current |
 | 137 | 2026-10-28 | 3639554, 3650921, 3652595 (existing logs) | PP's late held events: a race at each GVT update, not a missed flush | current |
 | 138 | 2026-10-28 | — | Sending what the next GVT will make due before it is published (`--agg-flush-ahead`), against holding the window back (`--diag-window-lag-ns`) | design |
+| 139 | 2026-10-28 | 3653291 | Flush ahead and window lag, results: sending early removes the late events but doubles messages; the race costs PP 512 3–5% on 16 nodes; the capped setting no longer helps | current |
 
 ## Stampede3 runs, in order
 
@@ -5133,7 +5134,7 @@ Held stragglers by margin (16 nodes, W 250, rep 1; % of committed events; lower 
 - Those events reach the receiver's input buffer after it has already run past them.
 
 **Closure: does the race explain PP 2,048's loss?**
-- **σ 2,000: yes.**
+- **σ 2,000: yes, at W 250 on short runs.** *(Section 139: on long runs at W 400, a third of PP 2,048's late events were held through a whole update, so there it is not only the race.)*
   - Margin 32 removes 93% of PP 2,048's held stragglers and takes it from 251.5 to 384.2 M ev/s (+53%).
   - The same margin costs PP 512 4% (352.8 → 337.5), through 22% more messages.
   - So removing the late events is worth about +59% to PP 2,048, which puts it at about 1.1× PP 512. That is the capped setting's level (section 80B, 1.12). The race accounts for the whole loss.
@@ -5219,6 +5220,73 @@ Mac: test configs `agg_deadline_bucket_pp_flushahead` (level 2), `agg_deadline_b
 - **If F3 and F5 hold:** `--agg-flush-ahead` runs the full engine tier, then all eight workloads on long runs as a candidate default. After that, PP 2,048 and the capped setting are compared again at σ ≥ 2,000.
 - **If F2 holds but F3 fails:** the mechanism is right but senders contribute too late. The µs bins say by how much.
 - **If F2 fails:** the offset bins say where the late events come from.
+
+### Flush ahead and window lag, results: sending early removes the late events but doubles messages; the race costs PP 512 3–5% on 16 nodes; the capped setting no longer helps (2026-10-28; skx-dev batch job 3653291, 16 nodes)
+
+> **Status: current.** Design and predictions in section 138. 16 nodes (c454-001, -014, -023, -024, -044, -072, -082, -091, -092, c455-023, -071 to -074, -094, -101; 1-node runs on the first), 16 min. 87 runs, all ok; gate 42/42. Charades 6b37262. Summary `~/charades-data/late30/late30_summary.py`, with `summary.txt`, the CSVs and the job log in `~/charades-data/late30/j3653291/`. The 3 reps of every cell are within 2% of each other.
+
+**Throughput** (long runs; M committed ev/s, median of 3; ÷ base, higher is better; "removed" = held stragglers removed against the base; messages = htram messages per committed event ÷ the base's):
+
+| workload | nodes | setting | base | flush ahead (level 2) | ÷ base | removed | messages | lag 50 µs | ÷ base | removed |
+|---|---|---|---|---|---|---|---|---|---|---|
+| σ 2,000, W 400 | 16 | PP 512 | 482.2 | 440.7 | **0.914** | 97.8% | 2.01 | 497.5 | **1.032** | 95.2% |
+| | 16 | PP 2,048 | 387.1 | 431.1 | 1.113 | 95.9% | 2.21 | 397.1 | 1.026 | 28.5% |
+| | 16 | capped (2,048 allocated, 512 limit) | 462.1 | 446.9 | 0.967 | 97.8% | 1.95 | — | | |
+| σ 4,000, W 400 | 16 | PP 512 | 446.5 | 395.0 | **0.885** | 98.6% | 2.33 | 468.1 | **1.048** | 92.8% |
+| | 16 | PP 2,048 | 357.3 | 391.8 | 1.097 | 97.5% | 2.07 | 371.8 | 1.041 | 24.2% |
+| | 16 | capped | 415.1 | 407.7 | 0.982 | 98.9% | 1.89 | — | | |
+| σ 100, W 250 | 16 | PP 2,048 | 662.7 | 652.4 | 0.984 | 100% | 1.90 | 571.4 | **0.862** | 99.4% |
+| uniform, W 400 | 16 | WPs 512 | 342.5 | 312.9 | **0.914** | 98.3% | 1.43 | — | | |
+| σ 2,000, W 250 | 1 | PP 512 | 37.8 | 36.3 | 0.961 | 97.5% | 3.02 | 35.3 | 0.933 | 92.0% |
+| | 1 | PP 2,048 | 30.9 | 34.8 | 1.127 | 96.0% | 5.29 | 30.1 | 0.975 | 49.3% |
+
+Level 1 (at contributions only), PP 2,048, 16 nodes: 380.2 at σ 2,000 (0.982×, 74% removed) and 345.6 at σ 4,000 (0.967×, 84% removed), with 1.9× the messages.
+
+**Where and when the late held events arrive** (base arms, 16 nodes, all 3 reps; shares of held stragglers):
+
+| workload, setting | held stragglers, % of committed | at most 32 past the previous horizon | below it (due a whole update earlier) | arrived < 50 µs / ≥ 100 µs after the receiver learned its GVT | at a PE then blocked at its window |
+|---|---|---|---|---|---|
+| σ 2,000, PP 512 | 0.034% | 0.98 | 0.00 | 0.60 / 0.02 | 0.96 |
+| σ 4,000, PP 512 | 0.11% | 0.97 | 0.00 | 0.24 / 0.05 | 0.96 |
+| σ 2,000, capped | 0.033% | 0.98 | 0.00 | 0.59 / 0.02 | 0.95 |
+| σ 100, PP 2,048 | 0.011% | 0.99 | 0.00 | 0.84 / 0.00 | 0.97 |
+| uniform, WPs 512 | 0.20% | 0.99 | 0.00 | 0.00 / 0.95 | 0.97 |
+| σ 2,000, PP 2,048 | 0.78% | 0.35 | 0.30 | 0.19 / 0.66 | 0.69 |
+| σ 4,000, PP 2,048 | 0.76% | 0.42 | 0.27 | 0.16 / 0.65 | 0.72 |
+
+**Predictions.**
+- **F1:**
+  - **Where:** right for PP 512, the capped setting, σ 100 and uniform. 97–99% of late events are at most 32 past the previous horizon, none are below it, and 95–97% reach a PE that was blocked at its window.
+  - **When:** wrong. Within 50 µs is 60% at σ 2,000, 24% at σ 4,000 and 0% on uniform; uniform's arrive 100 µs or more after the update.
+  - **PP 2,048:** wrong in both. A third of its late events were due a whole update earlier, and two-thirds arrive 100 µs or more after the receiver's GVT.
+- **F2:** right for PP 512 (the lag removes 95% and 93%; 92% on 1 node). Wrong for PP 2,048 (28% and 24%; 49% on 1 node).
+- **F3:** half right.
+  - Level 2 removes 96–99% everywhere, but it does not keep messages within ±10%: it sends 1.9–2.3× the htram messages per event on 16 nodes, 1.4× on uniform, and 3–5× on 1 node. Most leave as "Flush Ahead" messages, at about twice the per-update count of the update flushes they replace.
+  - Level 1 removes 74–84%, more than predicted.
+- **F4:** half right. Flush ahead at σ 100 is 0.984; the lag costs 14% (0.862). A PE waiting at its window edge is on the critical path at σ 100.
+- **F5:**
+  - Wrong for PP 2,048: 1.113 at σ 2,000, 1.097 at σ 4,000 and 1.127 on 1 node, against ≥ 1.25, ≥ 1.10 and ≥ 1.20.
+  - Right for PP 512 with the lag: +3.2% at σ 2,000 and +4.8% at σ 4,000. With flush ahead it loses 9–12%.
+- **F6:** wrong. Flush ahead costs uniform 8.6%.
+- **F7:** wrong. On this launch and on long runs the capped setting is 0.958 (σ 2,000) and 0.930 (σ 4,000) of PP 512. Its 1.07–1.14× in sections 80B and 82 (short runs, the launch before 23 devices, ring input buffers and `+mempool_remote_free`) is gone.
+
+**What it says.**
+- **The race costs the default (PP 512) about 3–5% at σ ≥ 2,000 on 16 nodes.**
+  - The lag removes 93–95% of its late events with the same messages and gains 3.2% and 4.8%.
+  - That is a lower bound on the race's cost, since the lag also costs something: 14% at σ 100, where there was nothing to remove, and 7% on 1 node.
+- **Sending early removes the race but costs more than the race does.**
+  - It doubles htram messages, and on 16 nodes messages cost more than the 0.03–0.2% of events the race rolls back. The margin did the same in sections 28 and 80C.
+  - `--agg-flush-ahead` stays off.
+- **The lag is not a default either.**
+  - It helps where late events are frequent (σ ≥ 2,000 on 16 nodes) and costs 7–14% where they are not.
+  - Only a lag that turns itself on from the measured rate of late held events could gain those 3–5%, on two workloads at 16 nodes. Not built.
+- **The capped setting is no longer a candidate.** Its earlier gain did not survive the current launch and long runs.
+- **PP 2,048's problem at σ ≥ 2,000 is not only the race.**
+  - On long runs at W 400, a third of its late events were held through a whole update, and most arrive long after the receiver's GVT.
+  - So its shared buffers do leave late, or take long to arrive, beyond the one-step race. Flush ahead fixes most of that (+10–11%), but PP 2,048 still trails PP 512 by 11–12%.
+  - Not pursued: PP 512 is the setting at σ ≥ 2,000, and PP 2,048 wins only at σ ≤ 1,000, where the two have the same late events.
+
+**Thread closed.** Defaults unchanged.
 
 ## Baseline verification on the Mac
 
