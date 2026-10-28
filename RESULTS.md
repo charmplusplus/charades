@@ -100,6 +100,22 @@ Charades' controller ÷ Devastator's adaptive window: 0.68–1.03 at σ ≤ 500 
 
 **Cost per committed event at σ 100** (perf, node 0): Charades about 4,000 cycles and 4,850 instructions; Devastator about 3,170 and 3,920 (1.27× the cycles).
 
+## Re-read, 2026-10-28: repeats and dropped threads
+
+Sections 1–128 were re-read before planning sections 129 onward.
+
+**Repeats.**
+- **Sections 116–120 repeated section 54.** Section 54 (job 3636110) had already found that faster GVT advances do not make the run faster, because the slowest PE sets the pace. Sections 116–120 then spent three jobs on the cross-process reduction (per-hop times, trees, `--wave-batch`) before reaching the same conclusion in section 120. Smaller batches had also lost in section 54 (0.88–0.98), as `--wave-batch` did again.
+- **Section 126's thinning question was half answered by section 78.** There, one process per node made uniform's messages 3.7× fuller and was still 0.78–0.87× as fast; it was confounded by one process spanning both sockets. Section 126's same-layout perturbation settled it.
+- **Section 126's smaller buffers extend section 66.** That section swept buffers of 128, 512 and 2,048 (WPs 128 ≈ WPs 512 on uniform at 16 nodes); sizes 16 and 32 are new.
+
+**Dropped threads, still open:**
+- **`flushDue` misses PP shared buffers whose events are due** (section 80, "Next" item 2). This is why PP 2,048 collapses at σ ≥ 2,000 (8× more events held past their due time), and PP 512 has the same gap at a smaller scale. Never fixed.
+- **Fewer destinations for uniform's receives** (section 107, "Next" item 3: per-socket buffers or two-hop routing). Never tried, though section 78's one-process-per-node result argues against expecting much.
+- **glibc no-trim** (section 95) is still a candidate, not part of the launch.
+- **Rank 0 late at σ 100** (sections 88–103): open, with no explanation beyond the lower-edge effect.
+- **Reconverse's `+backend_poll_thread` hang** (section 25) was never reported upstream.
+
 ## Index of runs
 
 | # | date | job | run | status |
@@ -232,6 +248,7 @@ Charades' controller ÷ Devastator's adaptive window: 0.68–1.03 at σ ≤ 500 
 | 126 | 2026-10-27 | 3651140 | Uniform's buffer perturbation, results: thinning explains only 16% of the loss; 45% is inside `execute()`, which the timers do not split | current |
 | 127 | 2026-10-28 | — | Splitting `execute()` on uniform at 4 and 16 nodes, against σ 4,000 as a control | design |
 | 128 | 2026-10-28 | 3652542 | `execute()` split, results: on uniform the event handlers and sends do not grow; half of `execute()`'s rise is applying each GVT result | current |
+| 129 | 2026-10-28 | — | Charades and Devastator on long runs, 1 / 4 / 16 nodes: the other five workloads | design |
 
 ## Stampede3 runs, in order
 
@@ -4807,6 +4824,31 @@ Messages per event (section 126) can account for part of the receives and of the
 **Next.**
 1. Split `poll` into fossil collection, the GVT-time flush (with the messages it sends) and the rest. Use long runs, so start-up does not mix in.
 2. Then a perturbation of the largest part. For the GVT-time flush, send the due buffers of far destinations less often. For fossil collection, collect every k-th GVT.
+
+### Charades and Devastator on long runs, 1 / 4 / 16 nodes: the other five workloads (design, 2026-10-28; written before any runs)
+
+> **Status: design.** Charades `scale-diag` 0cf5341 (defaults, current launch), htram 699c3a9, Reconverse 22871c6; Devastator as in sections 95 and 124. Job W `$WORK/charades-runs/long26.slurm` (16 nodes, skx-dev and skx, `-x c455-081`, the copy that starts second cancelled).
+
+**Why.** Section 124 put σ 2,000, σ 4,000 and uniform on long runs. The other five workloads of section 95 have only short-run numbers, from the launch before ring input buffers and `+mempool_remote_free`. Section 122 showed that short runs misstate 16-node throughput by up to 16%. This is not a repeat: no earlier section ran these workloads on long runs (re-read, top of this file).
+
+**Runs.** Section 95's grids, run 4× longer, 3 reps, interleaved by rep and node count (16, 4, 1):
+- **Lookahead 100, mean 1,000, σ 100, 500 and 1,000:**
+  - Charades: PP 512 and PP 2,048 × W 250, 400, 600 and the controller.
+  - Devastator: W 500 and 1,000 (and 2,000 on 16 nodes).
+  - End time 2,048,000.
+- **Lookahead 10, mean 200, σ 500 and 2,000:**
+  - Charades: PP 512 and PP 2,048 × W 50, 100, 200 and the controller; WPs 512 at σ 2,000.
+  - Devastator: W 100, 200 and 400.
+  - End time 512,000 (4× section 95's 128,000).
+- The run time cap is 120 s for Charades and 300 s for Devastator. Section 95 had two 1-node cells at lookahead 10, σ 2,000, W 200 reach its 60 s cap; at 4× they will reach 120 s and be dropped (never the best setting there).
+
+**Predictions** (section 95's short-run values in brackets):
+- W1. **Charades ÷ Devastator is at least 1.0 in all 15 cells.** The narrowest is lookahead 10 σ 500 on 1 and 4 nodes [0.98].
+- W2. **Charades' 4→16 efficiency is at least 0.95** at σ 100, 500, 1,000 and lookahead 10 σ 500 [0.95–0.99], and at least 0.92 at lookahead 10 σ 2,000 [0.89].
+- W3. **Devastator's efficiency changes by at most 0.03 with run length** (as in section 124) [0.97, 0.88, 0.86, 0.86, 0.91].
+- W4. **Charades' controller is within 5% of its best fixed W in every cell.**
+
+With section 124, this completes the long-run version of the 8-workload table, the comparison the paper reports.
 
 ## Baseline verification on the Mac
 
