@@ -260,6 +260,7 @@ Sections 1–128 were re-read before planning sections 129 onward.
 | 133 | 2026-10-28 | — | Where an htram message's 2.9 µs goes: htram, Charm++, Reconverse and LCI | design |
 | 134 | 2026-10-28 | 3652869 | An htram message's cost, results: 92–95% is the LCI backend's send call, which polls the network after every post | current |
 | 135 | 2026-10-28 | — | The post and the network poll inside each send, and skipping the poll (`+lci_send_progress 0`) | design |
+| 136 | 2026-10-28 | 3652896 | The poll inside each send, results: it does useful work; skipping it costs uniform 6% on 16 nodes, and the time moves into allocating the next buffer | current |
 
 ## Stampede3 runs, in order
 
@@ -5055,6 +5056,45 @@ It compiles on the Mac (standalone Release build); Charades: 24/24 on the trace 
 - Z4. On σ 2,000 and σ 100 at 16 nodes, `+lci_send_progress 0` is not below 0.98×.
 
 If Z2 holds, `+lci_send_progress 0` (or Reconverse polling only when a post is retried) joins the Stampede3 launch after a correctness gate, as `+mempool_remote_free` did.
+
+### The poll inside each send, results: it does useful work; skipping it costs uniform 6% on 16 nodes, and the time moves into allocating the next buffer (2026-10-28; skx-dev batch job 3652896, 16 nodes)
+
+> **Status: current.** Design and predictions in section 135. 16 nodes (c454-021 to -024, c454-031 to -034, c454-041 to -044, c454-071 to -074; 4-node runs on the first four), 26 runs, all ok; gate 30/30 with `+lci_send_progress 0`; 8 min. Summary `~/charades-data/send29/send29_summary.py`, with `summary.txt` and the CSVs in `~/charades-data/send29/j3652896/`.
+
+**Throughput, long runs** (M committed ev/s, mean of 2 reps; `+lci_send_progress 0` ÷ the default; higher is better):
+
+| workload | nodes | default | poll skipped | ratio |
+|---|---|---|---|---|
+| uniform, WPs 512, W 400 | 4 | 112.3 | 111.7 | 0.995 |
+| uniform, WPs 512, W 400 | 16 | 357.5 | 336.6 | **0.942** |
+| σ 2,000, PP 512, W 400 | 16 | 488.0 | 492.5 | 1.009 |
+| σ 100, PP 2,048, the controller | 16 | 679.6 | 669.1 | 0.985 |
+
+**Inside a send, 16 nodes** (traced; µs per htram send; lower is better):
+
+| part | default | poll skipped |
+|---|---|---|
+| LCI post (`post_am_x`; 1.06–1.13 posts per send, retries included) | 0.83 | 0.86 |
+| the poll after the post (`progress()`; 2.82 µs per call, 55% of calls complete something) | 3.00 | — |
+| **allocating the next buffer (`renewBuffer`)** | 0.18 | **2.62** |
+| a whole send | 4.25 | 3.70 |
+| GVT-time flush, per update (10 messages) | 44.5 | 39.0 |
+
+**On 4 nodes:** post 1.46 µs and poll 4.81 µs (3.77 per call, 47% complete something), against the poll skipped: allocation 0.24 → **4.08** µs, and a whole send 6.55 → 5.83.
+
+- **Z1 right.** The poll is most of the LCI send call: on 16 nodes the post is 0.8 µs and the poll 3.0 µs.
+- **Z2 wrong.** Skipping the poll does not make a message cheap. The time moves into allocating the next 37 KB buffer (0.18 → 2.62 µs on 16 nodes, 0.24 → 4.08 on 4), so a send gets only 0.55–0.72 µs cheaper.
+- **Z3 wrong in size.** Throughput does not stay within ±3%: uniform falls 5.8% on 16 nodes.
+- **Z4 half right.** σ 2,000 1.009×, but σ 100 0.985×, below the 0.98 bar only within noise (its two reps differ by 3.7%).
+
+**What it says.**
+- **The poll after each send does useful work.** More than half the time it completes something: incoming messages, which other PEs are waiting for, and this PE's own completed sends.
+- **Without it, the next buffer allocation gets expensive.** A likely reason, not tested: sent messages are returned to the memory pool only when their completion is processed, so the next 37 KB allocation no longer finds a block ready.
+- **Bottom line:** of an htram message's 4.2 µs on 16 nodes, the send itself is about 0.8 µs. The rest is network progress, which has to happen somewhere, and doing it later costs more.
+- **So option 1 (a cheaper message) has no cheap part left to cut** in Charm++, Reconverse's send or htram: they are 0.1–0.2 µs. What remains is LCI and psm2's poll and receive handling.
+- `+lci_send_progress 0` stays off; it remains a diagnostic on the `pads-send-timers` branch.
+
+**Next, if continued.** Split a poll's 2.8 µs into the cost of an empty poll and of handling what it finds (LCI's completion handlers, Reconverse's copy into a Converse message). If empty polls are most of it, a cheaper or less frequent poll is worth testing. If handling dominates, that is the receive path's cost per message, which only fewer messages would reduce.
 
 ## Baseline verification on the Mac
 
