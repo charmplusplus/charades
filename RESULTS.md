@@ -19,15 +19,20 @@ Every number from every run: Stampede3 runs in order (each design, written befor
 
 ## Current numbers
 
-**Charades and Devastator on long runs, 1 / 4 / 16 nodes** (job 3650921, section 124; end time 2,048,000 for both, median of 3, each engine at its best setting: Charades over PP 512 and PP 2,048 (uniform: WPs 512 and PP 512) × W 250/400/600 and the controller; Devastator over W 500/1,000 (2,000 at 16 nodes), CLCG4; current launch):
+**Charades and Devastator on long runs, 1 / 4 / 16 nodes, all eight workloads** (jobs 3650921 and 3652595, sections 124 and 130; end time 2,048,000, lookahead 10: 512,000; median of 3; each engine at its best setting: Charades over PP 512 and PP 2,048 (uniform: WPs 512 and PP 512; lookahead 10 σ 2,000: also WPs 512) × W 250/400/600 (lookahead 10: 50/100/200) and the controller; Devastator over W 500/1,000 (2,000 at 16 nodes; lookahead 10: 100/200/400), CLCG4; current launch):
 
 | workload | Charades, 16 nodes (M ev/s) | Devastator, 16 nodes (M ev/s) | Charades ÷ Devastator, 1 / 4 / 16 nodes (higher is better) | efficiency 4→16, Charades / Devastator (1.0 is perfect) |
 |---|---|---|---|---|
-| lookahead 100, mean 1,000, σ 2,000 | 518.9 | 366.8 | 1.33 / 1.37 / 1.41 | 0.93 / 0.90 |
+| lookahead 100, mean 1,000, σ 100 | 683.1 | 640.1 | 1.14 / 1.07 / 1.07 | 0.94 / 0.95 |
+| σ 500 | 607.1 | 496.0 | 1.10 / 1.15 / 1.22 | 0.93 / 0.87 |
+| σ 1,000 | 554.1 | 428.1 | 1.11 / 1.26 / 1.29 | 0.89 / 0.87 |
+| σ 2,000 | 518.9 | 366.8 | 1.33 / 1.37 / 1.41 | 0.93 / 0.90 |
 | σ 4,000 | 486.8 | 291.2 | 1.37 / 1.67 / 1.67 | 0.93 / 0.93 |
 | uniform remote 1.0 | 363.3 | 190.9 | 1.43 / 1.98 / 1.90 | 0.67 / 0.70 |
+| lookahead 10, mean 200, σ 500 | 561.5 | 492.6 | 0.99 / 1.06 / 1.14 | 0.94 / 0.87 |
+| lookahead 10, σ 2,000 | 459.3 | 346.7 | 1.20 / 1.32 / 1.32 | 0.92 / 0.91 |
 
-Charades' controller is 0.98–1.03 of its best fixed W in every cell (0.98–0.99 on 16 nodes). The tables below are short runs.
+Charades is ahead in 23 of 24 cells (level, 0.99, at lookahead 10 σ 500 on 1 node) and scales as well or better in 6 of 8 workloads. Its controller is 0.98–1.03 of its best fixed W in every cell. The tables below are short runs.
 
 > **Run length (2026-10-27, section 122):** the short runs below (end time 512,000) understate 16-node throughput by up to 16%: each run starts with a fixed transient of about 0.16 s on 16 nodes. In 4× longer runs σ 2,000 scales 4→16 at 0.96–0.97 and σ 4,000 at about 1.00. Devastator's efficiencies below come from the same short runs; both engines must be compared on long runs.
 >
@@ -249,6 +254,7 @@ Sections 1–128 were re-read before planning sections 129 onward.
 | 127 | 2026-10-28 | — | Splitting `execute()` on uniform at 4 and 16 nodes, against σ 4,000 as a control | design |
 | 128 | 2026-10-28 | 3652542 | `execute()` split, results: on uniform the event handlers and sends do not grow; half of `execute()`'s rise is applying each GVT result | current |
 | 129 | 2026-10-28 | — | Charades and Devastator on long runs, 1 / 4 / 16 nodes: the other five workloads | design |
+| 130 | 2026-10-28 | 3652595 | The other five workloads on long runs, results: Charades ahead in 14 of 15 cells (level in the 15th), scales as well or better in 4 of 5; its controller is its best setting or within 1% | current |
 | 131 | 2026-10-28 | — | Is applying a GVT result on uniform's critical path? A known delay in that step, and its parts | design |
 
 ## Stampede3 runs, in order
@@ -4850,6 +4856,50 @@ Messages per event (section 126) can account for part of the receives and of the
 - W4. **Charades' controller is within 5% of its best fixed W in every cell.**
 
 With section 124, this completes the long-run version of the 8-workload table, the comparison the paper reports.
+
+### The other five workloads on long runs, results: Charades ahead in 14 of 15 cells (level in the 15th), scales as well or better in 4 of 5; its controller is its best setting or within 1% (2026-10-28; skx-dev batch job 3652595, 16 nodes)
+
+> **Status: current.** Design and predictions in section 129. 16 nodes, 1 h 24 min. 398 Charades runs and 117 Devastator runs, all ok (no cap reached). 3 reps. Summary `~/charades-data/long26/long26_summary.py`, with `summary.txt`, the CSVs and Devastator's `results.txt` in `~/charades-data/long26/j3652595/`.
+
+**Each engine at its best setting** (M committed ev/s, median of 3; Charades ÷ Devastator, higher is better for Charades; efficiency 4→16 = per-node rate at 16 ÷ at 4 nodes, 1.0 is perfect):
+
+| workload | Charades 1 / 4 / 16 nodes | Devastator 1 / 4 / 16 nodes | Charades ÷ Devastator 1 / 4 / 16 | short runs, section 95 | efficiency 4→16, Charades / Devastator | short runs |
+|---|---|---|---|---|---|---|
+| lookahead 100, mean 1,000, σ 100 | 47.6 / 181.4 / 683.1 | 42.0 / 169.1 / 640.1 | **1.14 / 1.07 / 1.07** | 1.17 / 1.04 / 1.06 | 0.94 / 0.95 | 0.99 / 0.97 |
+| σ 500 | 42.2 / 164.0 / 607.1 | 38.5 / 142.9 / 496.0 | **1.10 / 1.15 / 1.22** | 1.09 / 1.08 / 1.19 | 0.93 / 0.87 | 0.97 / 0.88 |
+| σ 1,000 | 40.9 / 155.3 / 554.1 | 37.0 / 123.6 / 428.1 | **1.11 / 1.26 / 1.29** | 1.08 / 1.19 / 1.31 | 0.89 / 0.87 | 0.95 / 0.86 |
+| lookahead 10, mean 200, σ 500 | 38.6 / 149.7 / 561.5 | 39.0 / 141.5 / 492.6 | **0.99 / 1.06 / 1.14** | 0.98 / 0.98 / 1.09 | 0.94 / 0.87 | 0.97 / 0.86 |
+| lookahead 10, σ 2,000 | 34.4 / 125.0 / 459.3 | 28.7 / 94.8 / 346.7 | **1.20 / 1.32 / 1.32** | 1.14 / 1.18 / 1.15 | 0.92 / 0.91 | 0.89 / 0.91 |
+
+**Best settings.**
+- **Charades:**
+  - PP 512 on 1 node (W 250, W 50 at lookahead 10, or the controller).
+  - PP 2,048 with the controller on 4 and 16 nodes at σ ≤ 1,000 and lookahead 10 σ 500.
+  - WPs 512 at lookahead 10 σ 2,000 (W 50 or the controller).
+- **Devastator:** W 500–1,000 (lookahead 10: 100–200).
+
+**Charades' controller ÷ its best fixed W:** 0.99–1.03 in all 15 cells. It *is* the best setting in 8 of the 10 cells on 4 and 16 nodes.
+
+**Spread over the 3 reps of the best 16-node cell:** 1.006–1.008×, except σ 100 at 1.037×.
+
+**Long against short runs, 16 nodes.**
+- **Both engines are 0–5% slower on long runs** at the low-σ workloads: σ 100, 683.1 against 704.4 (Charades) and 640.1 against 663.0 (Devastator); σ 1,000, 554.1 against 579.4 and 428.1 against 442.8.
+- **On 4 nodes, Charades is 2–3% faster on long runs and Devastator 1–5% slower.** So Charades' low-σ efficiency drops (0.99 → 0.94 at σ 100) while Devastator's hardly changes.
+- **Possible causes** (not tested):
+  - Section 95 ran on a different allocation, under the launch before ring input buffers and `+mempool_remote_free`; efficiencies from different allocations have differed by up to ±0.1 (section 77).
+  - Or something long runs do to both engines on 16 nodes.
+- At σ ≥ 2,000 and lookahead 10, long runs raise Charades' efficiency (sections 122, 124 and this one: lookahead 10 σ 2,000, 0.89 → 0.92).
+
+- **W1 right but for one cell.** Charades ÷ Devastator is at least 1.0 in 14 of 15 cells; lookahead 10 σ 500 on 1 node is 0.99 (level).
+- **W2 wrong.** Charades' efficiency is 0.94, 0.93, 0.89 and 0.94 (predicted ≥ 0.95), and 0.92 at lookahead 10 σ 2,000 (right).
+- **W3 right.** Devastator's efficiency moves by at most 0.02.
+- **W4 right.** The controller is within 1% of the best fixed W, or better, everywhere.
+
+**All eight workloads on long runs** (with section 124):
+- **Charades ÷ Devastator:** 0.99–1.98 over 24 cells, at least 1.0 in 23. On 16 nodes it is 1.07–1.90.
+- **4→16 efficiency, Charades against Devastator:**
+  - Charades scales as well or better in 6 of 8 workloads: σ 500, 1,000, 2,000 and 4,000, and lookahead 10 σ 500 and σ 2,000.
+  - It is slightly worse at σ 100 (0.94 against 0.95) and uniform (0.67 against 0.70).
 
 ### Is applying a GVT result on uniform's critical path? A known delay in that step, and its parts (design, 2026-10-28; written before any runs)
 
