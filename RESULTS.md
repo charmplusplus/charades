@@ -230,6 +230,7 @@ Charades' controller ÷ Devastator's adaptive window: 0.68–1.03 at σ ≤ 500 
 | 124 | 2026-10-27 | 3650921 | Both engines on long runs, results: Charades leads Devastator 1.33–1.98×, scales as well at σ ≥ 2,000 (0.93), and its controller is within 2% of its best W on 16 nodes | current |
 | 125 | 2026-10-27 | — | Uniform's steady loss: thinner htram messages or more destinations? A buffer-size perturbation on 4 nodes | design |
 | 126 | 2026-10-27 | 3651140 | Uniform's buffer perturbation, results: thinning explains only 16% of the loss; 45% is inside `execute()`, which the timers do not split | current |
+| 127 | 2026-10-28 | — | Splitting `execute()` on uniform at 4 and 16 nodes, against σ 4,000 as a control | design |
 
 ## Stampede3 runs, in order
 
@@ -4724,6 +4725,34 @@ Per committed event, window-blocked passes rise from 0.416 to 0.549, and htram r
 **Next.**
 1. Split `execute()`: timers for the idle flush, for remote sends (htram insert), for the same-process fast path and for the event handlers. This closes the +0.246 µs.
 2. Then a perturbation of whichever piece dominates, before any fix. For example, if it is the idle flush, flush only when the PE has gone idle k passes in a row, and check that the 16-node time moves by the predicted amount.
+
+### Splitting `execute()` on uniform at 4 and 16 nodes, against σ 4,000 as a control (design, 2026-10-28; written before any runs)
+
+> **Status: design.** Charades `scale-diag` (this commit: `--gvt-trace=5`), htram 699c3a9, Reconverse 22871c6, the current launch. Job V `$WORK/charades-runs/exec25.slurm` (16 nodes, skx-dev and skx, `-x c455-081`, the copy that starts second cancelled).
+
+**Why.** Section 126: on uniform, `execute()` without input-buffer drains is 45% of the 4→16-node rise in PE time per committed event (+0.246 µs), and more messages do not explain it. `execute()` was timed only as a whole.
+
+**New `--gvt-trace=5`:** each PE writes `exec_parts_<pe>.csv` over the run:
+- inside `execute()`: the event loop, the idle flush (`agg_flush_idle`, which with the deadline policy runs htram's `flushDue` over every destination buffer), the cancel queue, the result pickup (`poll`) and the input-buffer drains;
+- inside the event loop's sends: GVT counting (`produce`), the same-process fast path (hits and misses), the remote send (htram insert and any flush), and sends to the same chare;
+- `iteration_end`, which runs outside the `execute()` timer.
+
+On the Mac (2 processes × 2 PEs, uniform), the parts cover 99.9% of `execute()`. The timers add about 6 calls per pass and 4 per remote send, so traced runs are paired with untraced ones. Mac: trace configs 36/36.
+
+**Runs** (W 400, short runs, 2 reps; `--gvt-trace=5 --pe-stats=1`, each with an untraced pair):
+- uniform, WPs 512, 4 and 16 nodes;
+- σ 4,000, PP 512, 4 and 16 nodes, as a control: it has no steady 4→16-node loss (section 122).
+
+The event handlers' own time is the loop minus the sends.
+
+**Predictions** (µs per committed event, 4 → 16 nodes, uniform):
+- V1. **The idle flush** grows by at least 0.08 and is at least 30% of the +0.25 µs: it scans 32 destination buffers on 16 nodes against 8 on 4, on each of 0.42–0.55 non-full passes per committed event.
+- V2. **A remote send costs within 10% the same** on 4 and 16 nodes (an htram insert is constant work). The send total grows only because fewer sends take the fast path: 1/8 of sends on 4 nodes against 1/32 on 16.
+- V3. **The event handlers' time per executed event is within ±5%** on 4 and 16 nodes.
+- V4. **Control:** on σ 4,000 no part grows by more than 0.03.
+- V5. **Closure:** the timed parts cover at least 95% of `execute()`, and traced ÷ untraced is at least 0.90.
+
+Whatever part carries most of the +0.25 µs then gets a perturbation before any fix. For example, if it is the idle flush: run the flush only every k-th non-full pass, and check that the 16-node time moves by the predicted amount.
 
 ## Baseline verification on the Mac
 
