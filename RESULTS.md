@@ -19,6 +19,16 @@ Every number from every run: Stampede3 runs in order (each design, written befor
 
 ## Current numbers
 
+**Charades and Devastator on long runs, 1 / 4 / 16 nodes** (job 3650921, section 124; end time 2,048,000 for both, median of 3, each engine at its best setting: Charades over PP 512 and PP 2,048 (uniform: WPs 512 and PP 512) × W 250/400/600 and the controller; Devastator over W 500/1,000 (2,000 at 16 nodes), CLCG4; current launch):
+
+| workload | Charades, 16 nodes (M ev/s) | Devastator, 16 nodes (M ev/s) | Charades ÷ Devastator, 1 / 4 / 16 nodes (higher is better) | efficiency 4→16, Charades / Devastator (1.0 is perfect) |
+|---|---|---|---|---|
+| lookahead 100, mean 1,000, σ 2,000 | 518.9 | 366.8 | 1.33 / 1.37 / 1.41 | 0.93 / 0.90 |
+| σ 4,000 | 486.8 | 291.2 | 1.37 / 1.67 / 1.67 | 0.93 / 0.93 |
+| uniform remote 1.0 | 363.3 | 190.9 | 1.43 / 1.98 / 1.90 | 0.67 / 0.70 |
+
+Charades' controller is 0.98–1.03 of its best fixed W in every cell (0.98–0.99 on 16 nodes). The tables below are short runs.
+
 > **Run length (2026-10-27, section 122):** the short runs below (end time 512,000) understate 16-node throughput by up to 16%: each run starts with a fixed transient of about 0.16 s on 16 nodes. In 4× longer runs σ 2,000 scales 4→16 at 0.96–0.97 and σ 4,000 at about 1.00. Devastator's efficiencies below come from the same short runs; both engines must be compared on long runs.
 >
 > **Launch changes since these numbers (2026-10-26/27):** `+lci_ndevices 23` (section 95), ring input buffers as Charades' default (section 111; uniform 1.08–1.21× at 16 nodes) and `+mempool_remote_free` (sections 113–114; Reconverse `pads-remote-free`, Stampede3 only). The tables below predate the last two; the paper-grade rerun will use all three.
@@ -217,6 +227,7 @@ Charades' controller ÷ Devastator's adaptive window: 0.68–1.03 at σ ≤ 500 
 | 121 | 2026-10-27 | — | Closure check: 78% of σ 2,000's 4→16-node loss is in the first 10% of waves, which sections 116–120 left out; a warm-up test and long runs | design |
 | 122 | 2026-10-27 | 3650843 | Warm-up and long runs, results: in 4× longer runs σ 2,000 scales at 0.96–0.97 and σ 4,000's loss is all start-up; warm-up pings do nothing; uniform's loss is steady | current |
 | 123 | 2026-10-27 | — | Charades and Devastator on long runs, 1 / 4 / 16 nodes: σ 2,000, σ 4,000, uniform | design |
+| 124 | 2026-10-27 | 3650921 | Both engines on long runs, results: Charades leads Devastator 1.33–1.98×, scales as well at σ ≥ 2,000 (0.93), and its controller is within 2% of its best W on 16 nodes | current |
 | 125 | 2026-10-27 | — | Uniform's steady loss: thinner htram messages or more destinations? A buffer-size perturbation on 4 nodes | design |
 
 ## Stampede3 runs, in order
@@ -4598,6 +4609,43 @@ The short warm-up-0 cell's second 4-node rep (116.9) is slow; without it the sho
 - T4. **Charades' controller ÷ its best fixed W at 16 nodes:** at least 0.92 at σ 2,000 and 0.88 at σ 4,000 (short: 0.92, 0.86).
 
 If T1 and T3 hold, Charades both scales as well as Devastator and leads it on these workloads, and the scaling gap at σ ≥ 2,000 was an artefact of run length. If T1 fails at σ 2,000 or σ 4,000, the start-up explanation of section 122 is incomplete.
+
+### Both engines on long runs, results: Charades leads Devastator 1.33–1.98×, scales as well at σ ≥ 2,000 (0.93), and its controller is within 2% of its best W on 16 nodes (2026-10-27; skx-dev batch job 3650921, 16 nodes)
+
+> **Status: current.** Design and predictions in section 123. 16 nodes (c454-012, c454-013, c454-031, c454-032, c454-034, c454-041, c455-014, c455-021 to -024, c455-082, c455-093, c455-094, c455-101, c455-102; 4-node runs on the first four, 1-node on the first), 45 min. 218 Charades runs and 63 Devastator runs, all ok. End time 2,048,000 for both engines, 3 reps. Summary `~/charades-data/long23/long23_summary.py`, with `summary.txt`, the CSVs and Devastator's `results.txt` in `~/charades-data/long23/j3650921/`.
+
+**Each engine at its best setting** (M committed ev/s, median of 3; Charades ÷ Devastator, higher is better for Charades; efficiency 4→16 = per-node rate at 16 ÷ at 4 nodes, 1.0 is perfect):
+
+| workload | Charades 1 / 4 / 16 nodes | Devastator 1 / 4 / 16 nodes | Charades ÷ Devastator 1 / 4 / 16 | short runs, section 95 | efficiency 4→16, Charades / Devastator | short runs |
+|---|---|---|---|---|---|---|
+| σ 2,000 | 39.4 / 139.9 / 518.9 | 29.6 / 102.0 / 366.8 | **1.33 / 1.37 / 1.41** | 1.29 / 1.28 / 1.14 | **0.93 / 0.90** | 0.81 / 0.91 |
+| σ 4,000 | 38.8 / 130.8 / 486.8 | 28.4 / 78.1 / 291.2 | **1.37 / 1.67 / 1.67** | 1.34 / 1.48 / 1.41 | **0.93 / 0.93** | 0.87 / 0.92 |
+| uniform | 42.3 / 135.4 / 363.3 | 29.6 / 68.4 / 190.9 | **1.43 / 1.98 / 1.90** | 1.41 / 1.90 / 1.42 | 0.67 / 0.70 | 0.52 / 0.69 |
+
+The short-run columns are from section 95, under the launch before ring input buffers and `+mempool_remote_free`. So Charades' change from them mixes run length with those two improvements. Devastator's binary and settings are unchanged, so its change is run length alone.
+
+**Best settings.**
+- **Charades:** PP 512 at σ ≥ 2,000 (W 250 on 1 node, the controller on 4, W 400 on 16).
+- **Uniform:** PP 512 up to 4 nodes, WPs 512 on 16. On 4 nodes, PP 512 is 135.4 against WPs 512's 123.2; on 16 nodes WPs 512 is 363.3 against PP 512's 293.6. Each mode's own 4→16 efficiency is 0.74 for WPs and 0.54 for PP.
+- **Devastator:** W 500 on 1 node, 1,000 on 16 (uniform: 500 up to 4 nodes).
+
+**Charades' controller ÷ its best fixed W:** 0.98–1.03 everywhere. On 16 nodes it is 0.98 at σ 2,000 and σ 4,000 (short runs: 0.92 and 0.86) and 0.99 on uniform.
+
+**Spread over the 3 reps of the best 16-node cell:**
+- σ 2,000: 518.9, 524.8 and 452.9 (one slow rep).
+- σ 4,000: 1.020× from slowest to fastest; uniform: 1.007×.
+- One Devastator rep was slow too: uniform, 4 nodes, W 1,000, 22.4 M ev/s against 68–69. Medians are unaffected.
+
+- **T1 wrong on the thresholds.** Charades' efficiency is 0.93 at σ 2,000 and σ 4,000 (predicted ≥ 0.95), and 0.67 on uniform (predicted about 0.78). Section 122's 0.97 compared W 400 with W 400, but on 4 nodes the controller is 6% faster (139.9 against 131.8), and comparing best with best lowers the efficiency. Uniform's best 4-node setting (PP 512) loses much more by 16 nodes than WPs does.
+- **T2 right in direction.** Devastator's efficiency hardly moves with run length: 0.90, 0.93 and 0.70, against 0.91, 0.92 and 0.69 on short runs. Its start-up cost is small.
+- **T3 right.** Charades ÷ Devastator on 16 nodes is 1.41, 1.67 and 1.90.
+- **T4 right, more than predicted.** The controller is 0.98–0.99 of the best fixed W on 16 nodes. The controller gap at 16 nodes (sections 95, 116) was mostly the short runs.
+
+**What this changes.**
+- On long runs Charades is ahead of Devastator in all 9 cells, by 1.33–1.98×.
+- At σ ≥ 2,000 it now scales as well as Devastator (0.93 against 0.90–0.93).
+- Uniform is the one workload where it still scales a little worse (0.67 against 0.70), though at 1.90× the throughput. That is section 125's question.
+- The paper-grade rerun should use these long runs for every workload. The other five workloads of section 95 still have only short-run numbers.
 
 ### Uniform's steady loss: thinner htram messages or more destinations? A buffer-size perturbation on 4 nodes (analysis of existing traces and design, 2026-10-27; written before any runs)
 
