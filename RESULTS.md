@@ -211,7 +211,8 @@ Charades' controller ÷ Devastator's adaptive window: 0.68–1.03 at σ ≤ 500 
 | 117 | 2026-10-27 | — | Where the cross-process reduction's 70 µs goes: Charades' own process tree with per-hop times; a flat tree; smaller scheduler passes | design |
 | 118 | 2026-10-27 | 3649717 | Where the reduction's time goes, results: a hop's network time is about 4 µs; the rest is waiting for a PE to run the message. Fewer hops do not help | current |
 | 119 | 2026-10-27 | — | Shorter scheduler passes only while a count wave is in flight (`--wave-batch`) | design |
-| 120 | 2026-10-27 | 3650537 | `--wave-batch`, results: the floor falls by 27 µs but the advance does not; the floor was never on the critical path. The late PE's 128 events pace each advance | current |
+| 120 | 2026-10-27 | 3650537 | `--wave-batch`, results: the floor falls by 27 µs but the advance does not; the floor was never on the critical path. The late PE's 128 events pace each advance | superseded in part (121) |
+| 121 | 2026-10-27 | — | Closure check: 78% of σ 2,000's 4→16-node loss is in the first 10% of waves, which sections 116–120 left out; a warm-up test and long runs | design |
 
 ## Stampede3 runs, in order
 
@@ -4435,7 +4436,7 @@ If P1 and P2 hold, `--wave-batch` becomes the default at the best k and goes int
 
 ### `--wave-batch`, results: the floor falls by 27 µs but the advance does not; the floor was never on the critical path. The late PE's 128 events pace each advance (2026-10-27; skx-dev batch job 3650537, 16 nodes)
 
-> **Status: current.** Design and predictions in section 119. 16 nodes (c454-014, c454-024, c454-033, c454-084, c454-091, c454-092, c454-103, c455-003, c455-004, c455-011, c455-014, c455-031 to -033, c455-043, c455-044; 4-node runs on the first four), 56 runs, all ok; 7 min. Gate 30/30 at the second try. The first attempt in this job, and job 3650177 before it, each lost one test to /work2 failing to read `liblci-ucx.so` (Input/output error); the job now reruns the gate once when that is the only failure. Summary `~/charades-data/sdiag/j3650537/sdiag21_summary.py`, output and CSVs alongside.
+> **Status: superseded in part by section 121:** the `--wave-batch` measurements and the count-paced advance stand; the late PE's steady loss is 4% of simulated time, not the 4→16-node loss, and the arrival-burst explanation fails (htram receives are 0.5–2.1 µs per wave). Design and predictions in section 119. 16 nodes (c454-014, c454-024, c454-033, c454-084, c454-091, c454-092, c454-103, c455-003, c455-004, c455-011, c455-014, c455-031 to -033, c455-043, c455-044; 4-node runs on the first four), 56 runs, all ok; 7 min. Gate 30/30 at the second try. The first attempt in this job, and job 3650177 before it, each lost one test to /work2 failing to read `liblci-ucx.so` (Input/output error); the job now reruns the gate once when that is the only failure. Summary `~/charades-data/sdiag/j3650537/sdiag21_summary.py`, output and CSVs alongside.
 
 **A. Throughput, σ 2,000, W 400, PP 512, Charm++ reduction** (M committed ev/s, mean of 2 reps; ÷ batch 16; higher is better):
 
@@ -4477,6 +4478,57 @@ So the 4→16-node loss is the late PE running its events more slowly after it p
 `--wave-batch` stays off (default 0). The option and `--gvt-wave-tree` remain as diagnostics.
 
 **Next.** Find what slows the late PE after pickup on 16 nodes: receiving (the htram receive parts and input-buffer drains, `--gvt-trace=3`'s per-PE timers), rollbacks, or fossil collection, split by before and after pickup. Then make that PE cheaper, or give it less: the late PE is rank 0 in 15–18% of waves (the lower-edge effect, sections 84–103).
+
+### Closure check: 78% of σ 2,000's 4→16-node loss is in the first 10% of waves, which sections 116–120 left out; a warm-up test and long runs (analysis of existing traces and design, 2026-10-27; written before any runs)
+
+> **Status: design.** No new runs for the analysis: job 3649717's traced runs (`--gvt-trace=2`) and job 3649213's (`--gvt-trace=4`). Scripts `closure.py`, `startup.py`, `startup_split.py`, `startup_late.py`, `late_split.py` in `~/charades-data/sdiag/j3650537/` (copies in `$WORK/charades-runs`). Job S: Charades `scale-diag` (this commit: `--warmup-pings`), htram `pdes` 699c3a9, Reconverse 22871c6, the current launch; `$WORK/charades-runs/diag22.slurm` (16 nodes, skx-dev and skx, `-x c455-081`, the copy that starts second cancelled).
+
+**Why the last three jobs went in a circle.** Sections 116–120 explained σ 2,000's 4→16-node loss (efficiency 0.88) from waves 10–95% of each run, and never checked that those waves hold the loss. They do not:
+
+| σ 2,000, W 400, Charm++ reduction (job 3649717, traced, mean of 2 reps) | first 10% of waves (s) | waves 10–95% (s) | last 5% (s) | whole run, `exec_s` (s) |
+|---|---|---|---|---|
+| 4 nodes | 0.172 | 1.208 | 0.065 | 1.445 |
+| 16 nodes | 0.336 | 1.254 | 0.063 | 1.655 |
+| 16 − 4 nodes | **+0.164 (78% of the loss)** | +0.046 (22%) | −0.002 | +0.210 |
+
+Waves 10–95% cover the same simulated time on 4 and 16 nodes (a 16-node wave completes 9.6 buckets against 8.7, and there are fewer of them). So their efficiency is 1.208 ÷ 1.254 = **0.96**. Section 120's "+30 µs per advance" overstated the steady loss for the same reason: per advance it is 15%, but per unit of simulated time it is 4%.
+
+**The start-up waves.**
+- **Shape:** on 16 nodes, the time above the steady median decays smoothly over the first ~1,000 waves, from 46–48 ms per 100 waves to 7–13 ms. It is not a few long stalls: waves over 1 ms hold only 18–25 ms. On 4 nodes it is 18–21 ms in the first 100 waves and 2–11 ms after. The flat and fan-out-4 trees look the same.
+- **It is in the PEs' work, not the reduction.** In the first 200 waves on 16 nodes, the slowest process's last PE comes in 570–590 µs after the previous result, against 340 µs then 180 µs on 4 nodes. The spread inside that process is 550–570 µs; the floor stays at 50–80 µs.
+- **The late PE is busy outside Charades' code.** First 10% of waves, job 3649213, `--gvt-trace=4`, µs from picking up the result to contributing:
+
+| late PE | after pickup | event execution | htram receive handlers | everything else | events | per event in execution |
+|---|---|---|---|---|---|---|
+| 4 nodes, start-up | 187 | 107 | 2.0 | 78 | 80 | 1.33 |
+| 4 nodes, steady | 140 | 120 | 2.1 | 18 | 92 | 1.30 |
+| 16 nodes, start-up | 364 | 62 | 0.5 | **302** | 42 | 1.47 |
+| 16 nodes, steady | 116 | 77 | 1.6 | 37 | 54 | 1.43 |
+
+"Everything else" is time outside `execute()`, outside htram's receive handlers and outside the GVT nodegroup handlers. That is the runtime's own loop: network progress, message allocation and freeing, and any other messages. It is about 4× larger during start-up on 16 nodes than on 4, and it fades. Something warms up, and its cost grows with the number of processes. Candidates: the psm2 endpoints connecting to their peers on first use (each process has 23, so 736 on 16 nodes against 184 on 4), or the message pools growing.
+
+Section 120's arrival-burst explanation also fails this check: the late PE spends 0.5–2.1 µs per wave in htram receives.
+
+**Method, from now on.** A diagnosis must:
+1. state what share of the measured loss it accounts for (closure);
+2. be tested by a perturbation that moves the total by the predicted amount, before any fix is built.
+
+Splits within part of a run (for example floor + work, or waves 10–95%) are descriptions, not causes.
+
+**New option `--warmup-pings=N`** (diagnostic, 0 = off): before the clock starts, every PE sends N empty messages to every PE, under the quiescence that already gates the start. On 16 nodes that is 736 × 736 messages per round. This is a test, not a fix: it warms whatever the first messages between two PEs warm (connections, pools), whatever the mechanism. Mac: 48/48 (4 models, 1×1, 1×4, 2×2, 4×2).
+
+**Runs** (σ 2,000, W 400, PP 512, Charm++ reduction, 2 reps, interleaved):
+- **A. Warm-up:** `--warmup-pings` 0 and 1, 4 and 16 nodes, short runs (end time 512,000), untraced; and traced (`--gvt-trace=2`) on 16 nodes.
+- **B. Long runs:** end time 2,048,000 (4× longer), `--warmup-pings` 0 and 1, 4 and 16 nodes, untraced; traced on 16 nodes without warm-up.
+- **C. Closure on the other workloads,** short runs, traced (`--gvt-trace=2`), 4 and 16 nodes: uniform (WPs 512) and σ 4,000 (PP 512), W 400; untraced with `--warmup-pings` 0 and 1.
+
+**Predictions:**
+- P1. **Long runs:** if the start-up excess is a fixed cost (about 0.16 s), 4→16-node efficiency at 4× the length is 0.93–0.95 (from the table: (0.172 + 4 × 1.208 + 0.065) ÷ (0.336 + 4 × 1.254 + 0.063) = 0.94). If it stays at 0.90 or below, the excess is not a start-up cost.
+- P2. **Warm-up:** if the start-up excess is warming connections or pools, `--warmup-pings=1` cuts the 16-node first 10% of waves from 0.34 s to 0.22 s or less, and short-run efficiency rises to 0.92 or more. If it does not, the pings do not warm what is slow. The next step is then a Reconverse-level split of the runtime's loop during start-up (network progress, allocation, other handlers), not a fix.
+- P3. The pings run before the clock, so on 4 nodes `exec_s` changes by less than 2%.
+- P4. **Closure on the other workloads:** σ 4,000's loss is also mostly in the first 10% of waves. Uniform's is mostly in waves 10–95%: its fixed input-buffer cost (sections 107–113) was a steady effect.
+
+What follows from the results: if P1 holds, the paper-grade rerun's long runs already remove most of the σ 2,000 gap. Devastator must then be measured on the same long runs, because its own start-up is in its 0.91 too. If P2 holds as well, a warm-up phase (or eager connection) becomes part of Charades' start.
 
 ## Baseline verification on the Mac
 
