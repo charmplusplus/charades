@@ -19,6 +19,8 @@ Every number from every run: Stampede3 runs in order (each design, written befor
 
 ## Current numbers
 
+> **Run length (2026-10-27, section 122):** the short runs below (end time 512,000) understate 16-node throughput by up to 16%: each run starts with a fixed transient of about 0.16 s on 16 nodes. In 4× longer runs σ 2,000 scales 4→16 at 0.96–0.97 and σ 4,000 at about 1.00. Devastator's efficiencies below come from the same short runs; both engines must be compared on long runs.
+>
 > **Launch changes since these numbers (2026-10-26/27):** `+lci_ndevices 23` (section 95), ring input buffers as Charades' default (section 111; uniform 1.08–1.21× at 16 nodes) and `+mempool_remote_free` (sections 113–114; Reconverse `pads-remote-free`, Stampede3 only). The tables below predate the last two; the paper-grade rerun will use all three.
 >
 > **As of 2026-10-25 (`main` 2369301).** Defaults: same-process fast path and `--gvt-node-waves` on, htram PP 512 with the deadline policy (horizon margin 8), full nodes (2 processes × 23 PEs per node, 128 LPs per PE), native psm2. Short runs (end time 512,000; 128,000 at lookahead 10; 1–4 s each) and 2 reps: the paper-grade rerun (3 reps, long runs) is still to do. Avoid Stampede3 node c455-081 (section 82).
@@ -213,6 +215,7 @@ Charades' controller ÷ Devastator's adaptive window: 0.68–1.03 at σ ≤ 500 
 | 119 | 2026-10-27 | — | Shorter scheduler passes only while a count wave is in flight (`--wave-batch`) | design |
 | 120 | 2026-10-27 | 3650537 | `--wave-batch`, results: the floor falls by 27 µs but the advance does not; the floor was never on the critical path. The late PE's 128 events pace each advance | superseded in part (121) |
 | 121 | 2026-10-27 | — | Closure check: 78% of σ 2,000's 4→16-node loss is in the first 10% of waves, which sections 116–120 left out; a warm-up test and long runs | design |
+| 122 | 2026-10-27 | 3650843 | Warm-up and long runs, results: in 4× longer runs σ 2,000 scales at 0.96–0.97 and σ 4,000's loss is all start-up; warm-up pings do nothing; uniform's loss is steady | current |
 
 ## Stampede3 runs, in order
 
@@ -4529,6 +4532,47 @@ Splits within part of a run (for example floor + work, or waves 10–95%) are de
 - P4. **Closure on the other workloads:** σ 4,000's loss is also mostly in the first 10% of waves. Uniform's is mostly in waves 10–95%: its fixed input-buffer cost (sections 107–113) was a steady effect.
 
 What follows from the results: if P1 holds, the paper-grade rerun's long runs already remove most of the σ 2,000 gap. Devastator must then be measured on the same long runs, because its own start-up is in its 0.91 too. If P2 holds as well, a warm-up phase (or eager connection) becomes part of Charades' start.
+
+### Warm-up and long runs, results: in 4× longer runs σ 2,000 scales at 0.96–0.97 and σ 4,000's loss is all start-up; warm-up pings do nothing; uniform's loss is steady (2026-10-27; skx-dev batch job 3650843, 16 nodes)
+
+> **Status: current.** Design and predictions in section 121. 16 nodes (c454-004, c454-012, c454-013, c454-024, c454-031, c454-032, c454-074, c454-081, c455-014, c455-021 to -023, c455-093, c455-094, c455-101, c455-102; 4-node runs on the first four), 48 runs, all ok; gate 24/24; 7 min. Summary `~/charades-data/sdiag/j3650843/sdiag22_summary.py`, with `summary.txt` and the CSVs.
+
+**σ 2,000, W 400, PP 512** (M committed ev/s, mean of 2 reps; higher is better; `exec_s` in s, lower is better):
+
+| run length | warm-up pings | 4 nodes | 16 nodes | efficiency 4→16 | `exec_s`, 4 / 16 nodes |
+|---|---|---|---|---|---|
+| short (end time 512,000) | 0 | 121.3 (125.6, 116.9) | 442.1 | 0.91 | 1.495 / 1.635 |
+| short | 1 | 126.5 | 444.3 | 0.88 | 1.430 / 1.630 |
+| **long (end time 2,048,000)** | 0 | 131.8 | **512.4** | **0.97** | 5.495 / 5.655 |
+| long | 1 | 131.8 | 505.0 | 0.96 | 5.490 / 5.735 |
+
+The short warm-up-0 cell's second 4-node rep (116.9) is slow; without it the short efficiency is 0.88 at both settings, as in sections 116–120. Long ÷ short (warm-up 0): 1.09× on 4 nodes, **1.16× on 16 nodes**.
+
+**Where the 16 − 4-node difference sits** (traced, short runs, s; closure as in section 121):
+
+| workload | whole run | first 10% of waves | waves 10–95% | last 5% | efficiency over waves 10–95% |
+|---|---|---|---|---|---|
+| σ 2,000 (section 121) | +0.210 | +0.164 (78%) | +0.046 (22%) | −0.002 | 0.96 |
+| σ 4,000 | +0.110 | +0.109 (99%) | +0.004 (3%) | −0.002 | 1.00 |
+| uniform (WPs 512) | +0.485 | +0.073 (15%) | **+0.391 (81%)** | +0.017 | 0.77 |
+
+**Start-up shape.** On 16 nodes the decay is the same with and without pings, and in the long runs: the time above the steady median per 100 waves goes from about 50 ms to 9–14 ms over the first 1,000 waves. It is a fixed transient at the start of every run. In absolute terms it does not grow with run length: the 16 − 4-node `exec_s` difference is 0.14–0.20 s in short runs and 0.16–0.25 s in long ones.
+
+**Warm-up on the other workloads** (short runs; pings ÷ none; higher is better): uniform 0.987 (4 nodes), 1.004 (16 nodes); σ 4,000 0.992, 0.990.
+
+- **P1 right, and more so than predicted.** In long runs σ 2,000's efficiency is 0.96–0.97 (predicted 0.93–0.95): the start-up excess is a fixed cost, and long runs dilute it.
+- **P2 wrong.** The pings change neither the start-up (0.339 → 0.333 s in the first 10% of waves) nor throughput (1.005× on 16 nodes). Whatever is slow at start-up is not warmed by one small message between every pair of PEs. That rules out connecting the network endpoints (every pair of PEs exchanged a message before the clock started). It does not rule out pools of large message buffers (htram's PP messages are about 37 KB; the pings were empty) or the model's own transient.
+- **P3 right within noise.** On 4 nodes the pings' cell is 1.043× the no-ping cell, but only because of the slow rep; the first reps are equal (125.6).
+- **P4 right.** σ 4,000's loss is all start-up (efficiency over waves 10–95%: 1.00). Uniform's is 81% steady-state (0.77 over waves 10–95%).
+
+**What this changes.**
+- **Short runs understate 16-node throughput by up to 16%,** and every scaling efficiency in this file from short runs is low for that reason. On long runs σ 2,000 and σ 4,000 already scale at 0.96–1.00. The paper-grade rerun must use long runs (end time 2,048,000 or more) for every engine. **Devastator's 0.91 (section 95) also came from short runs and includes its own start-up,** so it must be remeasured on the same long runs before any scaling comparison.
+- **The start-up transient** (about 0.16 s on 16 nodes) matters only for short runs. Its cause is still unknown (large-buffer pools or the model's own transient). It stays open, behind the two items below.
+- **The real steady-state scaling problem left is uniform** (0.77 over waves 10–95%).
+
+**Next.**
+1. Charades and Devastator on long runs at 1, 4 and 16 nodes, on σ 2,000, σ 4,000 and uniform: the scaling comparison that counts.
+2. Uniform's steady loss, diagnosed with the method of section 121 (closure first, then a perturbation, then a fix).
 
 ## Baseline verification on the Mac
 
