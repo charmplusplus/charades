@@ -249,6 +249,7 @@ Sections 1–128 were re-read before planning sections 129 onward.
 | 127 | 2026-10-28 | — | Splitting `execute()` on uniform at 4 and 16 nodes, against σ 4,000 as a control | design |
 | 128 | 2026-10-28 | 3652542 | `execute()` split, results: on uniform the event handlers and sends do not grow; half of `execute()`'s rise is applying each GVT result | current |
 | 129 | 2026-10-28 | — | Charades and Devastator on long runs, 1 / 4 / 16 nodes: the other five workloads | design |
+| 131 | 2026-10-28 | — | Is applying a GVT result on uniform's critical path? A known delay in that step, and its parts | design |
 
 ## Stampede3 runs, in order
 
@@ -4849,6 +4850,36 @@ Messages per event (section 126) can account for part of the receives and of the
 - W4. **Charades' controller is within 5% of its best fixed W in every cell.**
 
 With section 124, this completes the long-run version of the 8-workload table, the comparison the paper reports.
+
+### Is applying a GVT result on uniform's critical path? A known delay in that step, and its parts (design, 2026-10-28; written before any runs)
+
+> **Status: design.** Charades `scale-diag` (this commit: `--diag-gvt-spin-ns`, and fossil collection, the GVT-time flush and the controller update timed under `--gvt-trace=5`), htram 699c3a9, Reconverse 22871c6, the current launch. Job X `$WORK/charades-runs/exec27.slurm` (16 nodes, skx-dev and skx, `-x c455-081`), after job W.
+
+**Why.**
+- **Section 128:** on uniform, applying each GVT result (`poll`) is the largest part of `execute()`'s 4→16-node rise: +0.136 µs of PE time per committed event, about 37 → 63 µs per PE per GVT update.
+- **What sections 116–120 and 54 teach** (re-read note at the top): time a step takes is not throughput lost unless the step is on the critical path. Every PE applies each result, but most PEs are then blocked on the window anyway; only the PE that paces the advance matters.
+- **So the first test is causal, not a split.** It adds a known delay to this one step and checks whether throughput falls as the critical path predicts.
+
+**New `--diag-gvt-spin-ns=N`** (diagnostic, 0 = off): every PE busy-waits N ns each time it applies a GVT result. The split (`--gvt-trace=5`) adds:
+- the time in fossil collection;
+- the GVT-time flush (`agg_flush_gvt`), with the messages it sends;
+- the controller's update;
+- the number of results applied.
+
+Mac: 36/36 (the trace and spin configs at 1×4, 2×2 and 4×2; committed counts unchanged by the spin).
+
+**Runs** (uniform, WPs 512, W 400, long runs, end time 2,048,000, 2 reps):
+- **A. Spin**, untraced: N = 0, 10,000 and 20,000 (0, 10 and 20 µs), on 4 and 16 nodes.
+- **B. Split**, traced (`--gvt-trace=5 --pe-stats=1`), on 4 and 16 nodes.
+
+**Predictions:**
+- X1. **If the step is on the critical path** (the pacing PE applies each result once per advance, and its next contribution waits for that), every advance gets longer by N.
+  - At 20 µs, throughput falls by about 20 ÷ 300 = 6–7% on 16 nodes and 20 ÷ 207 = 9–10% on 4 nodes (advances from section 125); 10 µs costs half that.
+  - **If the step mostly overlaps waiting,** 20 µs costs under 2%.
+- X2. **Of the step's 4→16-node rise,** the GVT-time flush is at least half: messages sent per GVT update per PE rise about 3× (to up to 32 destinations instead of 8). Fossil collection per committed event changes by under 10%.
+- X3. **Closure:** the step's measured sensitivity times its 4→16 rise per advance gives the share of uniform's loss that this step explains. If X1's critical-path case holds, the rise of about 26 µs per update predicts about 25–30% of uniform's steady loss; a fix would then target the larger of its parts.
+
+If X1's overlap case holds instead, this step is not worth fixing, and the next candidates are the htram receives and the runtime loop (section 126), tested the same way.
 
 ## Baseline verification on the Mac
 
