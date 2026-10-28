@@ -229,6 +229,7 @@ Charades' controller ÷ Devastator's adaptive window: 0.68–1.03 at σ ≤ 500 
 | 123 | 2026-10-27 | — | Charades and Devastator on long runs, 1 / 4 / 16 nodes: σ 2,000, σ 4,000, uniform | design |
 | 124 | 2026-10-27 | 3650921 | Both engines on long runs, results: Charades leads Devastator 1.33–1.98×, scales as well at σ ≥ 2,000 (0.93), and its controller is within 2% of its best W on 16 nodes | current |
 | 125 | 2026-10-27 | — | Uniform's steady loss: thinner htram messages or more destinations? A buffer-size perturbation on 4 nodes | design |
+| 126 | 2026-10-27 | 3651140 | Uniform's buffer perturbation, results: thinning explains only 16% of the loss; 45% is inside `execute()`, which the timers do not split | current |
 
 ## Stampede3 runs, in order
 
@@ -4681,6 +4682,48 @@ If U1 holds with the slope: uniform's loss is the per-message cost under thinnin
 - or a cheaper message: its send and receive path, priced from the traced split.
 
 If U1 fails, H2 is next: the cost per destination buffer.
+
+### Uniform's buffer perturbation, results: thinning explains only 16% of the loss; 45% is inside `execute()`, which the timers do not split (2026-10-27; skx-dev batch job 3651140, 16 nodes)
+
+> **Status: current.** Design and predictions in section 125. 16 nodes (c454-001, c454-002, c454-021, c454-043, c454-044, c454-073, c454-083, c454-084, c455-041, c455-042, c455-083, c455-084, c455-091, c455-092, c455-103, c455-104; 4-node runs on the first four), 20 runs, all ok; 5 min. Summaries `~/charades-data/uni24/uni24_summary.py` and `pe_split.py`, with `summary.txt`, `pe_split.txt` and the CSVs in `~/charades-data/uni24/j3651140/`.
+
+**Buffer sizes** (uniform, W 400, short runs, mean of 2 reps; M committed ev/s, higher is better; PE time per committed event = PEs ÷ rate, lower is better):
+
+| nodes | WPs buffer | M ev/s | ÷ WPs 512 | events per message | messages per event | PE time per event (µs) |
+|---|---|---|---|---|---|---|
+| 4 | 512 | 115.1 | 1.000 | 30.9 | 0.0325 | 1.598 |
+| 4 | 64 | 115.6 | 1.004 | 30.8 | 0.0327 | 1.592 |
+| 4 | 32 | 121.5 | **1.056** | 26.3 | 0.0382 | 1.514 |
+| 4 | 16 | 111.3 | 0.967 | 15.4 | 0.0650 | 1.653 |
+| 16 | 512 | 350.5 | 1.000 | 12.4 | 0.0811 | 2.100 |
+| 16 | 16 | 365.5 | **1.043** | 11.4 | 0.0878 | 2.014 |
+
+- **U1 wrong.** Twice the messages per event on 4 nodes (WPs 16) costs 3.3%: **1.7 µs of PE time per extra message**, against the 10.3 µs that thinning would need to explain the 4→16 loss. At that slope thinning accounts for **16%** of the rise in PE time per event from 4 to 16 nodes.
+- **U2 half wrong.** WPs 64 is equal to 512, but **WPs 32 is 1.056× faster**.
+- **U3 right, with a sign.** On 16 nodes WPs 16 is within ±5%, but faster: 1.043×.
+
+A smaller buffer sends some events when it fills, before the deadline policy would. PEs then wait less on the window: window-blocked passes per committed event are 0.416 at WPs 512 and 0.358 at WPs 16 on 4 nodes. This is a separate, cheap gain to check on other workloads; it is not the scaling loss.
+
+**Closure over all PE time** (traced runs, `--gvt-trace=4 --pe-stats=1`, WPs 512; µs of PE time per committed event, mean of 2 reps; lower is better):
+
+| part | 4 nodes | 16 nodes | 16 − 4 | share | 4 nodes, WPs 16 |
+|---|---|---|---|---|---|
+| `execute()` without input-buffer drains | 1.045 | 1.291 | +0.246 | **45%** | 1.014 |
+| input-buffer drains | 0.285 | 0.320 | +0.035 | 6% | 0.319 |
+| htram receive handlers | 0.140 | 0.232 | +0.092 | 17% | 0.172 |
+| everything else (runtime loop, idle) | 0.144 | 0.313 | +0.169 | 31% | 0.201 |
+| **total** | 1.613 | 2.155 | +0.542 | 100% | 1.706 |
+
+Per committed event, window-blocked passes rise from 0.416 to 0.549, and htram receives from 0.028 to 0.079 (31.0 → 12.3 items each). `execute()` without drains costs 1.037 µs per executed event on 4 nodes and **1.286 on 16**. The thinner messages of WPs 16 on 4 nodes raise the receives and the rest, but not `execute()`. So the largest piece, +0.246 µs in `execute()`, is not caused by message count.
+
+**What `execute()` contains that grows with the number of processes** (untested; `execute()` is timed only as a whole):
+- the idle flush, `agg_flush_idle()`, on every pass that is not full (0.55 per event on 16 nodes), which scans this PE's per-destination buffers: 32 destination processes on 16 nodes against 8 on 4;
+- sends: the share of events to the PE's own process (the same-process fast path) falls from 1/8 to 1/32;
+- cache footprint: the per-destination buffers touched per pass.
+
+**Next.**
+1. Split `execute()`: timers for the idle flush, for remote sends (htram insert), for the same-process fast path and for the event handlers. This closes the +0.246 µs.
+2. Then a perturbation of whichever piece dominates, before any fix. For example, if it is the idle flush, flush only when the PE has gone idle k passes in a row, and check that the 16-node time moves by the predicted amount.
 
 ## Baseline verification on the Mac
 
