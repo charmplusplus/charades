@@ -264,6 +264,7 @@ Sections 1–128 were re-read before planning sections 129 onward.
 | 137 | 2026-10-28 | 3639554, 3650921, 3652595 (existing logs) | PP's late held events: a race at each GVT update, not a missed flush | current |
 | 138 | 2026-10-28 | — | Sending what the next GVT will make due before it is published (`--agg-flush-ahead`), against holding the window back (`--diag-window-lag-ns`) | design |
 | 139 | 2026-10-28 | 3653291 | Flush ahead and window lag, results: sending early removes the late events but doubles messages; the race costs PP 512 3–5% on 16 nodes; the capped setting no longer helps | current |
+| 140 | 2026-10-28 | — | Paper-grade scaling, 1–32 nodes: the plan; A0, ROSS tuning | design |
 
 ## Stampede3 runs, in order
 
@@ -5287,6 +5288,46 @@ Level 1 (at contributions only), PP 2,048, 16 nodes: 380.2 at σ 2,000 (0.982×,
   - Not pursued: PP 512 is the setting at σ ≥ 2,000, and PP 2,048 wins only at σ ≤ 1,000, where the two have the same late events.
 
 **Thread closed.** Defaults unchanged.
+
+### Paper-grade scaling, 1–32 nodes: the plan; A0, ROSS tuning (design, 2026-10-28; written before any runs)
+
+> **Status: design.** Charades `main` f57243e (`scale-diag` fast-forwarded into it). ROSS dc3a6a0 + `phold-gauss`, mvapich 3.0. Devastator 2c90067-era binaries (`$WORK/devastator/bin/ofi-psm2`, CLCG4). Job A0 `$WORK/charades-runs/ross31.slurm` (16 nodes, skx-dev and skx, `-x c455-081`).
+
+**Decisions (the user, 2026-10-28):**
+- Node counts 1, 2, 4, 8, 16 and 32. Charades against Devastator and ROSS on Gaussian PHOLD, then on traffic and dragonfly.
+- Charades' number is its controller, with two fixed W beside it.
+- Both models are ported to both other engines.
+- glibc no-trim stays out of every launch.
+
+**Phase A, Gaussian PHOLD:**
+- **A0 (this section):** ROSS tuning. ROSS has only ever run with its default batch and GVT interval (sections 16, 43).
+- **A1, 16 nodes:** 1/2/4/8/16 nodes.
+- **A2, 32 nodes:** 16 and 32 nodes. Running 16 again gives the 16→32 step within one allocation; efficiencies from different allocations have differed by up to ±0.1 (section 77).
+- **Common to A1 and A2:**
+  - All 8 workloads, long runs (end time 2,048,000; 512,000 at lookahead 10), 3 reps, engines interleaved within each rep. Every cell checks that the engines committed the same number of events.
+  - 128 LPs per PE or rank. Charades and Devastator run 2 processes × 23 per node, ROSS 46 ranks per node, so all three engines simulate the same LPs.
+  - **Charades:** the controller, plus W 250 and 400 (lookahead 10: 50 and 100). The htram setting is fixed per workload from the 1/4/16 long runs: PP 2,048 at σ ≤ 1,000 and at lookahead 10 σ 500; PP 512 at σ 2,000 and σ 4,000. Uniform and lookahead 10 σ 2,000 run both PP 512 and WPs 512, because their best setting changes with node count.
+  - **Devastator:** W 500, 1,000 and 2,000 (lookahead 10: 100, 200, 400), plus 4,000 at 32 nodes.
+  - **ROSS:** A0's best setting for each workload.
+- **Runtime frozen for A1 and A2:** Reconverse 22871c6 (`+mempool_remote_free`, as in the launch, without the diagnostic send timers), Charm++ 9d6a55780, htram `pdes` ed31d7e.
+
+**Phase B, traffic and dragonfly:**
+- Both models need a change before they can be weak-scaled:
+  - **Traffic:** cars leave at their destination, and routes grow with the grid, so the load per PE changes with scale. Cars need a new destination on arrival, or destinations within a fixed distance.
+  - **Dragonfly:** each process sends 3,000 / arrive-rate messages and the network then drains. It needs a generation window as an option.
+- Then: port both models to ROSS and Devastator, each checked for the same committed events as Charades on the Mac; size each model with Charades on Stampede3; then the same shape as A1 and A2.
+
+**A0, ROSS tuning:**
+- **Runs:**
+  - Optimistic ROSS (`--synch=3 --read-buffer=1`): `--batch` 4, 16 and 64 × `--gvt-interval` 16, 64 and 256, plus conservative ROSS (`--synch=2`, the defaults).
+  - Workloads: σ 100, σ 2,000, uniform, and lookahead 10 σ 2,000.
+  - 4 and 16 nodes, end time 512,000 (128,000 at lookahead 10), 1 rep. At this end time ROSS's reps agree to within 2.5% (section 43).
+  - 80 runs, about 30 minutes.
+- **Predictions:**
+  - **R1.** At 16 nodes on σ 2,000, the best optimistic setting is 1.1–1.5× ROSS's default (batch 16, GVT interval 16: 95.1 M ev/s in section 43).
+  - **R2.** Conservative ROSS is at most 0.8× the best optimistic setting at lookahead 100 σ 2,000 and uniform, and at most 0.5× at lookahead 10.
+  - **R3.** For at least 3 of the 4 workloads, the best setting at 4 nodes is within 3% of the best at 16 nodes. One setting per workload then serves every node count; otherwise A1 and A2 use the two best.
+  - **R4.** With its best setting, ROSS at 16 nodes on σ 2,000 is at most a third of Charades' long-run 518.9 M ev/s (section 124).
 
 ## Baseline verification on the Mac
 
