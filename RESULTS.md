@@ -207,10 +207,11 @@ Charades' controller ÷ Devastator's adaptive window: 0.68–1.03 at σ ≤ 500 
 | 113 | 2026-10-27 | 3647310 | `+mempool_remote_free`, results: freeing a received message 1.45 → 0.30 µs; uniform 1.02–1.06× at 16 nodes; gate rerun needed (harness) | current |
 | 114 | 2026-10-27 | 3647898 | Correctness gate for `+mempool_remote_free`, results: 231/231; the flag joins the Stampede3 launch | current |
 | 115 | 2026-10-27 | — | What paces GVT at σ 2,000: events in transit or the late PE's work; GVT bucket size; horizon margin with wider windows | design |
-| 116 | 2026-10-27 | 3649213 | What paces GVT at σ 2,000, results: neither transit nor a growing straggler; the cross-process reduction (34 → 70 µs) is the whole 4→16-node loss | current |
+| 116 | 2026-10-27 | 3649213 | What paces GVT at σ 2,000, results: neither transit nor a growing straggler; the cross-process reduction (34 → 70 µs) is the whole 4→16-node loss | superseded in part (120) |
 | 117 | 2026-10-27 | — | Where the cross-process reduction's 70 µs goes: Charades' own process tree with per-hop times; a flat tree; smaller scheduler passes | design |
 | 118 | 2026-10-27 | 3649717 | Where the reduction's time goes, results: a hop's network time is about 4 µs; the rest is waiting for a PE to run the message. Fewer hops do not help | current |
 | 119 | 2026-10-27 | — | Shorter scheduler passes only while a count wave is in flight (`--wave-batch`) | design |
+| 120 | 2026-10-27 | 3650537 | `--wave-batch`, results: the floor falls by 27 µs but the advance does not; the floor was never on the critical path. The late PE's 128 events pace each advance | current |
 
 ## Stampede3 runs, in order
 
@@ -4283,7 +4284,7 @@ Mac: trace configs 54/54.
 
 ### What paces GVT at σ 2,000, results: neither transit nor a growing straggler; the cross-process reduction (34 → 70 µs) is the whole 4→16-node loss (2026-10-27; skx-dev batch job 3649213, 16 nodes)
 
-> **Status: current.** Design and predictions in section 115. 16 nodes (c454-013, c454-022, c454-032, c454-033, c454-072, c454-073, c454-084, c454-092, c454-093, c454-101, c455-004, c455-011, c455-031 to -033, c455-071; 4-node runs on the first four), 78 runs, all ok; 8 min. Current launch (`+lci_ndevices 23 +pemap 2-46:2,3-47:2 +mempool_remote_free`, ring input buffers). Summary `~/charades-data/sdiag/sdiag19_summary.py`, output and CSVs in `~/charades-data/sdiag/j3649213/`; the advance split below was computed inline from the `gvt_waves_*.csv` files, as in section 80.
+> **Status: superseded in part by section 120:** the measurements stand, but the conclusion that the reduction floor causes the 4→16-node loss is wrong (the floor overlaps the late PE's work). Design and predictions in section 115. 16 nodes (c454-013, c454-022, c454-032, c454-033, c454-072, c454-073, c454-084, c454-092, c454-093, c454-101, c455-004, c455-011, c455-031 to -033, c455-071; 4-node runs on the first four), 78 runs, all ok; 8 min. Current launch (`+lci_ndevices 23 +pemap 2-46:2,3-47:2 +mempool_remote_free`, ring input buffers). Summary `~/charades-data/sdiag/sdiag19_summary.py`, output and CSVs in `~/charades-data/sdiag/j3649213/`; the advance split below was computed inline from the `gvt_waves_*.csv` files, as in section 80.
 
 **Throughput, σ 2,000, PP 512** (M committed events/s, mean of 2 reps; higher is better): W 400: 125.4 on 4 nodes and 442.5 on 16, a **4→16-node efficiency of 0.88** (0.81 in section 95 under the old launch; Devastator 0.91 there). On 16 nodes, W 250 is 403.8 (0.91× W 400) and W 600 is 392.2 (0.89×). Traced ÷ untraced: 0.95–0.99.
 
@@ -4319,7 +4320,7 @@ Efficiency is 99.84–99.93% at W 400 and 99.0–99.1% at W 600. Events per mess
 - **P3 right.** Bucket size changes nothing (−2.4% to +1.0%).
 - **P4 right.** The margin changes nothing at W 400 (±0.7%), and a wider window loses 10–11% at any margin.
 
-**Next.** Make the cross-process combine fast. A 32-process reduction of a few hundred bytes should take about 10–15 µs on Omni-Path, not 70.
+**Next (withdrawn in section 120: the floor is not on the critical path).** Make the cross-process combine fast. A 32-process reduction of a few hundred bytes should take about 10–15 µs on Omni-Path, not 70.
 1. Measure where the 70 µs goes, per hop: the message in flight, waiting for a PE to run the nodegroup handler (PEs run handlers only between scheduler passes of up to 16 events, about 30 µs), and combining.
 2. Then reduce what dominates. If it is waiting for a PE, run GVT reduction messages promptly: check for them inside the execute loop, or give them to the free core each process already leaves idle. If it is hops, use fewer: the existing recursive doubling (`--gvt-wave-allreduce`, 5 hops), a two-level exchange (2 hops), or one all-to-all exchange of counts (1 hop, 31 small messages per process per wave).
 
@@ -4431,6 +4432,51 @@ Mac: 30/30 on the new configs and their bases (1×4, 2×2, 4×2), and 258/258 on
 - P5. In B, no cell is below 0.98×.
 
 If P1 and P2 hold, `--wave-batch` becomes the default at the best k and goes into the paper-grade rerun. If the floor falls but throughput does not rise, the short passes cost too much, and the next step is the free core (section 118, candidate 3).
+
+### `--wave-batch`, results: the floor falls by 27 µs but the advance does not; the floor was never on the critical path. The late PE's 128 events pace each advance (2026-10-27; skx-dev batch job 3650537, 16 nodes)
+
+> **Status: current.** Design and predictions in section 119. 16 nodes (c454-014, c454-024, c454-033, c454-084, c454-091, c454-092, c454-103, c455-003, c455-004, c455-011, c455-014, c455-031 to -033, c455-043, c455-044; 4-node runs on the first four), 56 runs, all ok; 7 min. Gate 30/30 at the second try. The first attempt in this job, and job 3650177 before it, each lost one test to /work2 failing to read `liblci-ucx.so` (Input/output error); the job now reruns the gate once when that is the only failure. Summary `~/charades-data/sdiag/j3650537/sdiag21_summary.py`, output and CSVs alongside.
+
+**A. Throughput, σ 2,000, W 400, PP 512, Charm++ reduction** (M committed ev/s, mean of 2 reps; ÷ batch 16; higher is better):
+
+| pass size | 4 nodes | ÷ batch 16 | 16 nodes | ÷ batch 16 | efficiency 4→16 |
+|---|---|---|---|---|---|
+| batch 16 (default) | 127.0 | 1.000 | 443.8 | 1.000 | 0.87 |
+| `--wave-batch=2` | 119.2 | 0.939 | 404.9 | 0.912 | 0.85 |
+| `--wave-batch=4` | 122.5 | 0.965 | 414.2 | 0.933 | 0.85 |
+| `--wave-batch=8` | 124.8 | 0.983 | 434.6 | 0.979 | 0.87 |
+| `--wave-batch=4`, when 1 | 119.1 | 0.938 | 410.6 | 0.925 | 0.86 |
+
+**A'. A GVT advance, 16 nodes, traced** (µs, waves 10–95%, both reps; lower is better):
+
+| setting | advance | floor | critical-path wait per hop, up / down (mean) |
+|---|---|---|---|
+| batch 16 | 224 | 74.9 | — |
+| `--wave-batch=4` | 226 | **47.9** | — |
+| `--wave-batch=4`, when 1 | 231 | 39.4 | — |
+| tree 4, batch 16 | 223 | 75.3 | 17.5 / 8.7 |
+| tree 4, `--wave-batch=4` | 226 | 50.4 | **8.8** / 6.1 |
+
+**B. `--wave-batch=4` ÷ batch 16, 16 nodes** (higher is better): σ 100 0.984 (W 400) and 0.956 (controller); σ 4,000 0.927 and 0.976; uniform 0.937 and 0.966.
+
+- **P1 right.** The floor falls from 75 to 48 µs (39 µs with when 1).
+- **P2 wrong.** Throughput falls: 0.933× at 16 nodes and 0.965× at 4. **The advance stays at 224–226 µs** although the floor is 27 µs shorter.
+- **P3 right.** When 1 is no better (0.925×).
+- **P4 right on the up hops** (17.5 → 8.8 µs). The down hops improve less (8.7 → 6.1 µs, prediction ≤ 4).
+- **P5 wrong.** σ 4,000 and uniform at W 400 drop to 0.927–0.937×.
+
+**Why the advance did not shrink: section 116's split was an accounting identity, not a critical path.** The late PE contributes by count, after 128 events since its previous contribution, in 93–99% of waves (section 116). So the time between its contributions, which is the advance, is the time it takes to run 128 events. The reduction runs while it keeps executing. A shorter floor means it picks the result up earlier, but it still contributes only after its 128th event. From section 116's records (job 3649213, W 400; assuming 128 events between contributions):
+
+| nodes | advance (µs) | per event, overall (µs; lower is better) | per event before it picks up the result (µs) | per event after it picks up the result (µs) | arrivals per wave, late PE ÷ median PE |
+|---|---|---|---|---|---|
+| 4 | 196 | 1.53 | 1.56 (36 events) | 1.52 (92 events) | 1.07 |
+| 16 | 226 | 1.77 | 1.48 (74 events) | **2.15** (54 events) | 1.24 |
+
+So the 4→16-node loss is the late PE running its events more slowly after it picks up each result: 2.15 against 1.52 µs per event, about +30 µs per advance. That is when GVT has just advanced, the other PEs leave the window and send, and the late PE receives a burst (174 arrivals per wave on 16 nodes against 144 on 4). **The reduction floor is not the cause, and section 116's "Next" is withdrawn.** The section 116 numbers themselves stand. Section 118's per-hop times stand too: hops do wait for a PE, but that wait is hidden behind the late PE's work.
+
+`--wave-batch` stays off (default 0). The option and `--gvt-wave-tree` remain as diagnostics.
+
+**Next.** Find what slows the late PE after pickup on 16 nodes: receiving (the htram receive parts and input-buffer drains, `--gvt-trace=3`'s per-PE timers), rollbacks, or fossil collection, split by before and after pickup. Then make that PE cheaper, or give it less: the late PE is rank 0 in 15–18% of waves (the lower-edge effect, sections 84–103).
 
 ## Baseline verification on the Mac
 
