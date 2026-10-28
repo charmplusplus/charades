@@ -266,6 +266,7 @@ Sections 1–128 were re-read before planning sections 129 onward.
 | 139 | 2026-10-28 | 3653291 | Flush ahead and window lag, results: sending early removes the late events but doubles messages; the race costs PP 512 3–5% on 16 nodes; the capped setting no longer helps | current |
 | 140 | 2026-10-28 | — | Paper-grade scaling, 1–32 nodes: the plan; A0, ROSS tuning | design |
 | 141 | 2026-10-28 | 3653550 | A0, ROSS tuning, results (batch 16 / GVT interval 64, and conservative); A1 and A2 design | current / design |
+| 142 | 2026-10-28 | 3653803 | A1a, weak scaling 1–16 nodes, group a: Charades leads Devastator in 19 of 20 cells and ROSS 2.4–4.9×; same events in all three engines; σ 1,000 on 1 node needs PP 512 | current |
 
 ## Stampede3 runs, in order
 
@@ -5386,6 +5387,73 @@ Level 1 (at contributions only), PP 2,048, 16 nodes: 380.2 at σ 2,000 (0.982×,
 - **P5.** Charades' controller is within 3% of its better fixed W at every node count, or better.
 - **P6.** Charades ÷ ROSS (ROSS's better arm) is ≥ 3 at every node count on σ ≥ 1,000 and uniform, and ≥ 2.5 at σ 100.
 - **P7.** Charades leads Devastator in at least 42 of the 48 workload × node-count cells.
+
+### A1a, weak scaling 1–16 nodes, group a (σ 100, σ 1,000, σ 4,000, lookahead 10 σ 2,000), results (2026-10-28; skx-dev batch job 3653803, 16 nodes)
+
+> **Status: current.** Design and predictions in section 141. 16 nodes (c454-024, -101, -102, c455-001, -012 to -014, -024, -031 to -034, -041 to -044), 53 minutes; gate 30/30.
+> - 525 runs, all ok: Charades 225, Devastator 180, ROSS 120.
+> - **Every cell has the same committed events in all three engines.**
+> - The job log printed no Charades commit (a `git` error on the compute node). The tree was `main` 4331e65, with code identical to f57243e.
+> - Summary `~/charades-data/scale32/scale32_summary.py`; data and `summary.txt` in `~/charades-data/scale32/scale32/a_j3653803/`.
+
+**M committed ev/s, median of 3** (Charades: its controller; Devastator: its best W; ROSS: its better arm. C÷D and C÷R are Charades ÷ the other engine, higher is better):
+
+| workload | nodes | Charades | Devastator (W) | ROSS (arm) | C÷D | C÷R |
+|---|---|---|---|---|---|---|
+| σ 100 | 1 | 45.9 | 41.6 (2,000) | 18.9 (cons.) | 1.10 | 2.42 |
+| | 2 | 89.9 | 85.0 (500) | 33.5 (cons.) | 1.06 | 2.69 |
+| | 4 | 172.8 | 167.2 (500) | 63.0 (cons.) | 1.03 | 2.74 |
+| | 8 | 323.9 | 313.0 (1,000) | 117.3 (cons.) | 1.03 | 2.76 |
+| | 16 | 674.5 | 647.9 (1,000) | 224.4 (cons.) | 1.04 | 3.01 |
+| σ 1,000 | 1 | 36.2 ¹ | 36.4 (1,000) | 9.5 (cons.) | 0.99 ¹ | 3.82 |
+| | 2 | 75.3 | 66.8 (1,000) | 17.8 (cons.) | 1.13 | 4.24 |
+| | 4 | 148.4 | 122.3 (1,000) | 34.0 (cons.) | 1.21 | 4.37 |
+| | 8 | 278.1 | 214.9 (1,000) | 64.3 (cons.) | 1.29 | 4.32 |
+| | 16 | 557.5 | 429.9 (1,000) | 125.5 (cons.) | 1.30 | 4.44 |
+| σ 4,000 | 1 | 37.0 | 28.1 (500) | 9.0 (cons.) | 1.32 | 4.10 |
+| | 2 | 68.8 | 41.3 (500) | 14.1 (cons.) | 1.66 | 4.87 |
+| | 4 | 126.7 | 75.9 (1,000) | 26.7 (cons.) | 1.67 | 4.75 |
+| | 8 | 237.9 | 143.7 (1,000) | 51.7 (opt.) | 1.66 | 4.60 |
+| | 16 | 462.9 | 288.7 (1,000) | 101.4 (opt.) | 1.60 | 4.56 |
+| lookahead 10, σ 2,000 | 1 | 33.7 | 28.3 (100) | 8.5 (opt.) | 1.19 | 3.98 |
+| | 2 | 62.2 | 48.6 (200) | 14.0 (opt.) | 1.28 | 4.44 |
+| | 4 | 119.4 | 94.0 (200) | 27.1 (opt.) | 1.27 | 4.41 |
+| | 8 | 230.0 | 179.3 (200) | 53.2 (opt.) | 1.28 | 4.33 |
+| | 16 | 457.8 | 339.5 (200) | 103.6 (opt.) | 1.35 | 4.42 |
+
+¹ With PP 2,048, which is 9% slower than PP 512 on 1 node at σ 1,000 (see below).
+
+**Weak-scaling efficiency** (per-node rate ÷ the 1-node rate; 1.0 is perfect), Charades / Devastator / ROSS:
+
+| workload | 2 nodes | 4 | 8 | 16 |
+|---|---|---|---|---|
+| σ 100 | 0.98 / 1.02 / 0.88 | 0.94 / 1.00 / 0.83 | 0.88 / 0.94 / 0.77 | 0.92 / 0.97 / 0.74 |
+| σ 1,000 ¹ | 1.04 / 0.92 / 0.94 | 1.03 / 0.84 / 0.90 | 0.96 / 0.74 / 0.85 | 0.96 / 0.74 / 0.83 |
+| σ 4,000 | 0.93 / 0.74 / 0.78 | 0.86 / 0.68 / 0.74 | 0.80 / 0.64 / 0.72 | 0.78 / 0.64 / 0.70 |
+| lookahead 10, σ 2,000 | 0.92 / 0.86 / 0.83 | 0.88 / 0.83 / 0.80 | 0.85 / 0.79 / 0.78 | 0.85 / 0.75 / 0.76 |
+
+**Charades' controller ÷ its better fixed W:** 0.97–1.02 in all 20 cells.
+
+**Predictions (group a):**
+- **P1 right.** The three engines committed the same events in all 20 cells.
+- **P2 right in 11 of 12 cells.** Charades ÷ Devastator at 1/4/16 nodes is within ±0.07 of the long-run table. The exception, σ 1,000 on 1 node (0.99 against 1.11), is the htram setting.
+- **P3 partly wrong.**
+  - At σ 100, 8 nodes is below 16 nodes for both Charades (0.88 against 0.92) and Devastator (0.94 against 0.97). The 8-node series ran beside the 4- and 2-node ones; the 16-node series ran alone.
+  - Elsewhere every engine declines steadily, apart from the σ 1,000 baseline.
+  - A2's 16-node series also run side by side; set against A1's 16 nodes alone, they test whether that costs anything.
+- **P5 right.** The controller is 0.97–1.02 of the better fixed W.
+- **P6 right except σ 100 on 1 node.** That cell is 2.42, against ≥ 2.5. Elsewhere Charades ÷ ROSS is 2.69–3.01 at σ 100 and 3.82–4.87 on the other three workloads.
+- **P7: on track.** Charades leads Devastator in 19 of 20 cells; the 20th is the σ 1,000 setting.
+
+**A design error, and its fix.**
+- **The error.** Section 140 fixed PP 2,048 for σ ≤ 1,000 at every node count. But section 130's long runs had PP 512 best *on 1 node* (σ 1,000: controller 40.5 with PP 512, 37.1 with PP 2,048), and PP 2,048 best only from 4 nodes up.
+- **The effect.** Charades' 1-node σ 1,000 rate is understated by about 9%. That pushes its σ 1,000 efficiency above 1.0 (1.04 at 2 nodes) and puts Charades ÷ Devastator at 0.99 on 1 node.
+- **Unaffected:** σ 100, σ 500 and lookahead 10 σ 500, where PP 512 and PP 2,048 are level on 1 node (within 0.5%).
+- **The fix.** A1b (resubmitted as 3654651 / 3654652 before it started) adds a Charades-only σ 1,000 series with both PP 512 and PP 2,048 at every node count. Charades' σ 1,000 numbers will be taken from it, with the better setting at each node count, as the long-run tables did.
+
+**Other observations:**
+- **ROSS's better arm** is conservative at σ 100 and σ 1,000 at every node count, and at σ 4,000 up to 4 nodes. Elsewhere it is optimistic.
+- **Devastator's largest loss is its first network step:** 1→2 nodes at σ 4,000 costs it 0.74, against Charades' 0.93.
 
 ## Baseline verification on the Mac
 
