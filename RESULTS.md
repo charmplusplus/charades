@@ -257,6 +257,7 @@ Sections 1–128 were re-read before planning sections 129 onward.
 | 130 | 2026-10-28 | 3652595 | The other five workloads on long runs, results: Charades ahead in 14 of 15 cells (level in the 15th), scales as well or better in 4 of 5; its controller is its best setting or within 1% | current |
 | 131 | 2026-10-28 | — | Is applying a GVT result on uniform's critical path? A known delay in that step, and its parts | design |
 | 132 | 2026-10-28 | 3652815 | The GVT-result step, results: on 16 nodes it is fully on the critical path, and the GVT-time flush is 97% of its rise | current |
+| 133 | 2026-10-28 | — | Where an htram message's 2.9 µs goes: htram, Charm++, Reconverse and LCI | design |
 
 ## Stampede3 runs, in order
 
@@ -4966,6 +4967,29 @@ If X1's overlap case holds instead, this step is not worth fixing, and the next 
 1. **A cheaper message.** About 2.9 µs of the sending PE's time per message: building the htram message, copying the items, and Charm++'s and Reconverse's send path. Time those parts first.
 2. **Fewer messages from the PE that paces the advance.** At a GVT update, send only destinations holding events due before the next advance is likely to need them; leave the rest to buffer fills and idle flushes. Risk: the flush-versus-GVT-update race (`--ctl-floor`).
 3. **Take the flush off the pacing PE.** A PE that still has events to run inside the window postpones its GVT-time flush to its next idle pass, or another PE of its process sends its buffers. Risk: the events it holds may then be what GVT waits for.
+
+### Where an htram message's 2.9 µs goes: htram, Charm++, Reconverse and LCI (design, 2026-10-28; written before any runs)
+
+> **Status: design.** Charades `scale-diag` (this commit), htram `pdes` (this commit: send timers), Reconverse branch `pads-send-timers` (diagnostic, local and on Stampede3 only; on `pads-remote-free`), the current launch. Job Y `$WORK/charades-runs/send28.slurm` (16 nodes, skx-dev and skx, `-x c455-081`).
+
+**Why.** Section 132: on 16 nodes the GVT-time flush is on uniform's critical path and costs about 12.6 µs per update plus 2.9 µs per message. Option 1 (agreed 2026-10-28) is a cheaper message, so the first step is to find where those 2.9 µs go. No earlier section split htram's send path: section 3's per-message costs are from the old Debug runtime, and section 23's profile saw only message allocation (1.5%).
+
+**New timers, under `--gvt-trace=5`, in `exec_parts_<pe>.csv`:**
+- **htram** (every send site): sizing the envelope (`trim`), the Charm++ send call, and allocating the replacement buffer (`renewBuffer`, which allocates room for the whole buffer, about 37 KB at WPs 512).
+- **Reconverse** (`CmiSyncNodeSendAndFree` to another process, found at run time with `dlsym`): the shared-memory attempt, LCI's `issueAm`, and the whole call.
+- **Charm++'s own part** is the Charm++ send call minus Reconverse's.
+
+On the Mac (uniform, 2 processes × 2 PEs, WPs 512 and 32): trim 0.02 µs, renew 0.10 µs whatever the buffer size, and the Charm++ send call 18 µs (the Mac's LCI path is slow, so that number means nothing for Stampede3). Mac: 90/90 on the trace and aggregation configs.
+
+**Runs** (uniform, WPs 512, W 400, long runs, end time 2,048,000, 2 reps; `--gvt-trace=5 --pe-stats=1` with untraced pairs), on 4 and 16 nodes.
+
+**Predictions:**
+- Y1. **The Charm++ send call is at least 80% of a send;** trim and renew together are under 0.2 µs.
+- Y2. **Inside it, LCI's `issueAm` is at least half;** the rest is Charm++'s own path and Reconverse's.
+- Y3. **Closure:** sends × their measured cost account for the 2.9 µs per message of the GVT-time flush within 25%. The flush's 12.6 µs per update that does not scale with messages is not in the sends.
+- Y4. **A send costs the same on 4 and 16 nodes within 15%:** what grows is how many there are.
+
+Then the largest part gets a perturbation and a fix: for example, skipping one part's work and checking that the 16-node GVT-time flush, and throughput, move by the predicted amount (section 132: each µs off the flush is a µs off the advance on 16 nodes).
 
 ## Baseline verification on the Mac
 
