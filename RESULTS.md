@@ -216,6 +216,7 @@ Charades' controller ÷ Devastator's adaptive window: 0.68–1.03 at σ ≤ 500 
 | 120 | 2026-10-27 | 3650537 | `--wave-batch`, results: the floor falls by 27 µs but the advance does not; the floor was never on the critical path. The late PE's 128 events pace each advance | superseded in part (121) |
 | 121 | 2026-10-27 | — | Closure check: 78% of σ 2,000's 4→16-node loss is in the first 10% of waves, which sections 116–120 left out; a warm-up test and long runs | design |
 | 122 | 2026-10-27 | 3650843 | Warm-up and long runs, results: in 4× longer runs σ 2,000 scales at 0.96–0.97 and σ 4,000's loss is all start-up; warm-up pings do nothing; uniform's loss is steady | current |
+| 123 | 2026-10-27 | — | Charades and Devastator on long runs, 1 / 4 / 16 nodes: σ 2,000, σ 4,000, uniform | design |
 
 ## Stampede3 runs, in order
 
@@ -4573,6 +4574,29 @@ The short warm-up-0 cell's second 4-node rep (116.9) is slow; without it the sho
 **Next.**
 1. Charades and Devastator on long runs at 1, 4 and 16 nodes, on σ 2,000, σ 4,000 and uniform: the scaling comparison that counts.
 2. Uniform's steady loss, diagnosed with the method of section 121 (closure first, then a perturbation, then a fix).
+
+### Charades and Devastator on long runs, 1 / 4 / 16 nodes: σ 2,000, σ 4,000, uniform (design, 2026-10-27; written before any runs)
+
+> **Status: design.** Charades `scale-diag` 4e6d8b8 (defaults, current launch: `+lci_ndevices 23 +pemap 2-46:2,3-47:2 +mempool_remote_free`, ring input buffers), htram `pdes` 699c3a9, Reconverse 22871c6; Devastator as in section 95 (`$WORK/devastator/bin/ofi-psm2`, CLCG4, glibc defaults). Job T `$WORK/charades-runs/long23.slurm` (16 nodes, skx-dev and skx, `-x c455-081`, the copy that starts second cancelled).
+
+**Why.** Section 122: short runs (end time 512,000) understate 16-node throughput by up to 16%, because every run starts with a fixed transient. On 4× longer runs σ 2,000 scales 4→16 at 0.96–0.97, not 0.88. Every scaling comparison so far, including Devastator's 0.91–0.92 at σ ≥ 2,000 (section 95), came from short runs.
+
+**Runs.** Same grids as section 95, end time **2,048,000** for both engines, 3 reps, interleaved by rep and node count (16, 4, 1):
+- **Charades:**
+  - σ 2,000 and σ 4,000: PP 512 and PP 2,048 × W 250, 400, 600 and the controller (ε 0.001).
+  - Uniform (remote 1.0): WPs 512 and PP 512 × the same arms.
+- **Devastator:** W 500 and 1,000 (and 2,000 at 16 nodes), on the same three workloads.
+- Each engine is reported at its best setting per cell (median of 3). Short-run reference: section 95 (job 3642157, the launch before ring input buffers and `+mempool_remote_free`).
+
+**Predictions:**
+- T1. **Charades:**
+  - 4→16 efficiency at least 0.95 at σ 2,000 and σ 4,000 (short runs: 0.81, 0.87).
+  - About 0.78 on uniform: its loss is 81% steady-state (section 122), so long runs dilute it only a little.
+- T2. **Devastator:** its efficiency rises less than Charades', to 0.92–0.96 at σ 2,000 and 4,000 and about 0.72 on uniform (short: 0.91, 0.92, 0.69).
+- T3. **Charades ÷ Devastator at 16 nodes:** at least 1.2 at σ 2,000 and σ 4,000, and at least 1.3 on uniform (short: 1.14, 1.41, 1.42).
+- T4. **Charades' controller ÷ its best fixed W at 16 nodes:** at least 0.92 at σ 2,000 and 0.88 at σ 4,000 (short: 0.92, 0.86).
+
+If T1 and T3 hold, Charades both scales as well as Devastator and leads it on these workloads, and the scaling gap at σ ≥ 2,000 was an artefact of run length. If T1 fails at σ 2,000 or σ 4,000, the start-up explanation of section 122 is incomplete.
 
 ## Baseline verification on the Mac
 
