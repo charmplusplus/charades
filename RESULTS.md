@@ -256,6 +256,7 @@ Sections 1–128 were re-read before planning sections 129 onward.
 | 129 | 2026-10-28 | — | Charades and Devastator on long runs, 1 / 4 / 16 nodes: the other five workloads | design |
 | 130 | 2026-10-28 | 3652595 | The other five workloads on long runs, results: Charades ahead in 14 of 15 cells (level in the 15th), scales as well or better in 4 of 5; its controller is its best setting or within 1% | current |
 | 131 | 2026-10-28 | — | Is applying a GVT result on uniform's critical path? A known delay in that step, and its parts | design |
+| 132 | 2026-10-28 | 3652815 | The GVT-result step, results: on 16 nodes it is fully on the critical path, and the GVT-time flush is 97% of its rise | current |
 
 ## Stampede3 runs, in order
 
@@ -4930,6 +4931,41 @@ Mac: 36/36 (the trace and spin configs at 1×4, 2×2 and 4×2; committed counts 
 - X3. **Closure:** the step's measured sensitivity times its 4→16 rise per advance gives the share of uniform's loss that this step explains. If X1's critical-path case holds, the rise of about 26 µs per update predicts about 25–30% of uniform's steady loss; a fix would then target the larger of its parts.
 
 If X1's overlap case holds instead, this step is not worth fixing, and the next candidates are the htram receives and the runtime loop (section 126), tested the same way.
+
+### The GVT-result step, results: on 16 nodes it is fully on the critical path, and the GVT-time flush is 97% of its rise (2026-10-28; skx-dev batch job 3652815, 16 nodes)
+
+> **Status: current.** Design and predictions in section 131. 16 nodes (c454-021 to -023, c454-041 to -044, c454-071 to -073, c454-083, c454-084, c454-091 to -094; 4-node runs on the first four), 18 runs, all ok; gate 24/24; 7 min. Summary `~/charades-data/exec27/exec27_summary.py`, with `summary.txt` and the CSVs in `~/charades-data/exec27/j3652815/`.
+
+**A. A known delay in the step** (uniform, WPs 512, W 400, long runs; M committed ev/s, mean of 2 reps; higher is better). The critical-path prediction is 1 ÷ (1 + delay ÷ µs per GVT update):
+
+| nodes | no delay | 10 µs: measured / predicted | 20 µs: measured / predicted | µs per GVT update | measured ÷ predicted cost |
+|---|---|---|---|---|---|
+| 4 | 111.1 | 0.971 / 0.956 | 0.939 / 0.915 | 215 | 0.64 |
+| 16 | 358.8 | **0.968 / 0.967** | **0.935 / 0.936** | 291 | **0.94** |
+
+**B. The step split** (traced; µs per PE per GVT update; lower is better):
+
+| nodes | the whole step | fossil collection | GVT-time flush | messages it sends | controller | other |
+|---|---|---|---|---|---|---|
+| 4 | 38.6 | 13.6 | 22.7 | 3.50 | 0.0 | 2.3 |
+| 16 | 58.5 | 13.4 | **42.1** | **10.21** | 0.0 | 3.0 |
+| 16 − 4 | +19.9 | −0.1 (−1%) | **+19.4 (97%)** | +6.71 | 0.0 | +0.6 (3%) |
+
+- **The two points fit the GVT-time flush** as about 12.6 µs per update plus **2.9 µs per message** sent.
+- **Per committed event,** the step is 0.300 µs of PE time on 4 nodes and 0.433 on 16 (section 128 had 0.289 and 0.426 on short runs).
+
+- **X1: the critical-path case holds on 16 nodes.** Each microsecond added to the step adds a microsecond to the advance: 0.968 and 0.935 against predicted 0.967 and 0.936. On 4 nodes only about two thirds of it shows: some of the delay there falls on PEs that would have waited anyway.
+- **X2 right.** The GVT-time flush is 97% of the step's rise: each PE sends 2.9× as many messages per update (10.2 against 3.5). Fossil collection does not change.
+- **X3 right.** As a share of uniform's steady loss (24.5 → 31.8 µs per bucket, section 125), the step's rise per bucket is 31% if both node counts are equally sensitive, and 55% with the measured sensitivities (0.64 and 0.94).
+
+**This is the first piece of uniform's 4→16-node loss that is both measured and shown to be on the critical path.**
+- **What a fix is worth:** on 16 nodes, every microsecond taken out of the GVT-time flush shortens the advance by a microsecond.
+- **At the limit:** bringing it back to its 4-node cost (−19.4 µs per update) would make uniform about 1.07× faster on 16 nodes (291 ÷ 272). Its WPs-to-WPs 4→16 efficiency would rise from about 0.74 to 0.79, and the best-to-best efficiency (section 124) from 0.67 to about 0.71, against Devastator's 0.70.
+
+**Fix candidates** (not yet chosen; each would be checked against this prediction):
+1. **A cheaper message.** About 2.9 µs of the sending PE's time per message: building the htram message, copying the items, and Charm++'s and Reconverse's send path. Time those parts first.
+2. **Fewer messages from the PE that paces the advance.** At a GVT update, send only destinations holding events due before the next advance is likely to need them; leave the rest to buffer fills and idle flushes. Risk: the flush-versus-GVT-update race (`--ctl-floor`).
+3. **Take the flush off the pacing PE.** A PE that still has events to run inside the window postpones its GVT-time flush to its next idle pass, or another PE of its process sends its buffers. Risk: the events it holds may then be what GVT waits for.
 
 ## Baseline verification on the Mac
 
