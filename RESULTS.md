@@ -284,6 +284,7 @@ Sections 1–128 were re-read before planning sections 129 onward.
 | 142 | 2026-10-28 | 3653803 | A1a, weak scaling 1–16 nodes, group a: Charades leads Devastator in 19 of 20 cells and ROSS 2.4–4.9×; same events in all three engines; σ 1,000 on 1 node needs PP 512 | current |
 | 143 | 2026-10-28 | 3654651 | A1b, weak scaling 1–16 nodes, group b; all eight workloads at 1–16 nodes: Charades ahead of Devastator in 38 of 40 cells, 2.4–5.3× ROSS, scales best in 6 of 8 | current |
 | 144 | 2026-10-29 | 3653806 | A2, 32 nodes: a noisy allocation (every engine slower, Charades most; rep spread up to 3.6×; not placement: job 3633770 was as spread and quiet), not used; A2r design (job 3657016), 32 nodes alone, plus traced runs at 16 and 32 nodes | not for use / design |
+| 145 | 2026-10-29 | 3657717 or 3657718 | Why Charades rolls back more than Devastator at the same window: htram against direct sends against Devastator, W 400–1,600 (job R) | design |
 
 ## Stampede3 runs, in order
 
@@ -5662,6 +5663,48 @@ M committed ev/s, higher is better; C÷D and C÷R are Charades' controller ÷ th
   - **T2.** Unlike 4→16 nodes on long runs, most of the 16→32 loss is steady: the first 10% of waves hold at most 40% of it.
   - **T3.** The growth is in the spread between the first and the last process to contribute to a wave, not in the reduction: the spread grows by at least as much as the advance.
   - **T4.** On uniform, events per htram message (WPs 512) fall by at least 1.6× (twice the destinations).
+
+### Why Charades rolls back more than Devastator at the same window (design, 2026-10-29; written before any runs)
+
+> **Status: design.** First step toward a scaling fix (section 144).
+
+**Why.**
+- Charades runs at its window edge. At 16 nodes 95–97% of scheduler batches end blocked by the window (section 47), so its rate follows the GVT update rate one for one (section 132). A late message or a rollback delays a GVT update, and every PE waits; a rollback's cost is mostly this (section 18).
+- Devastator runs at W 1,000 with slack to spare.
+- Charades can't widen W:
+  - At σ 100 on 16 nodes it rolled back 3.1% of executed events at W 600 and 12.7% at W 800, losing 36% and 92% of W 400's rate (section 45, old stack).
+  - Devastator rolls back 0.05% at W 1,000 (job 3653806).
+- Setting the flush deadline below W was tried (section 5). Receivers ran past held events: 8% stragglers, 47–62% efficiency.
+- So before any fix: why does Charades roll back so much more than Devastator at the same W?
+  - **Hypothesis H (the hold):** htram's deadline policy sends each held event when GVT makes it due, which is the last moment before some receiver may need it. Any delay in that flush makes a straggler, and a wider W makes more events wait at that edge.
+  - **Alternative H′:** Charades' own dynamics, such as coarse GVT steps (about 60 time units per update), let PEs drift apart within the window.
+  - Direct sends separate the two: they hold nothing.
+
+**Job R** (`$WORK/charades-runs/roll45.slurm`, 16 nodes; skx-dev copy 3657717 and skx copy 3657718, the later one to start is cancelled; frozen build 0a212f0):
+- **Workloads:** σ 100 (htram PP 2,048), σ 2,000 (PP 512), uniform (WPs 512).
+- **Run length:** end time 512,000, as section 45. 2 reps, arms interleaved.
+- **Arms:**
+  - **Charades with htram:** W 400, 600, 800. W 1,200 stalled in section 45.
+  - **Charades with direct sends:** W 400, 800, 1,600.
+  - **Devastator:** W 400, 800, 1,600 (CLCG4).
+  - **GVT delay at σ 2,000:** Charades with htram at W 400 and W 800, with `--diag-gvt-spin-ns=20000` (20 µs on every GVT update). This tests whether a wider W absorbs late GVT updates.
+- **Recorded:**
+  - rolled-back share;
+  - primary stragglers (timestamp rollback calls), split into held by htram, late (delay ≥ W) and the rest;
+  - rollbacks caused by anti-messages;
+  - events per htram message;
+  - throughput.
+
+**Predictions:**
+- **R1.** With htram at W 800, Charades' rolled-back share is at least 5× Devastator's at W 800, at σ 100 and σ 2,000.
+- **R2 (H).** With direct sends at W 800, Charades' rolled-back share is within 3× of Devastator's. So the excess comes from htram's hold.
+- **R3 (H).** With htram at W 800, held stragglers are at least half of the primary stragglers.
+- **R4.** With htram, W 800 is slower than W 400 at σ 100 and σ 2,000, as in section 45. With direct sends, W 800 is at least as fast as W 400.
+- **R5.** The 20 µs GVT delay costs W 800 at most half the share it costs W 400.
+
+**What follows:**
+- **If H holds:** the fix is in when htram sends a held event. Send it ahead of the GVT update that makes it due, at a lower cost than `--agg-flush-ahead`, which doubled messages (section 139).
+- **If H′ holds:** the fix is in the scheduler or the GVT step.
 
 ## Baseline verification on the Mac
 
