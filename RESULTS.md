@@ -283,7 +283,7 @@ Sections 1–128 were re-read before planning sections 129 onward.
 | 141 | 2026-10-28 | 3653550 | A0, ROSS tuning, results (batch 16 / GVT interval 64, and conservative); A1 and A2 design | current / design |
 | 142 | 2026-10-28 | 3653803 | A1a, weak scaling 1–16 nodes, group a: Charades leads Devastator in 19 of 20 cells and ROSS 2.4–4.9×; same events in all three engines; σ 1,000 on 1 node needs PP 512 | current |
 | 143 | 2026-10-28 | 3654651 | A1b, weak scaling 1–16 nodes, group b; all eight workloads at 1–16 nodes: Charades ahead of Devastator in 38 of 40 cells, 2.4–5.3× ROSS, scales best in 6 of 8 | current |
-| 144 | 2026-10-29 | 3653806 | A2, 32 nodes: a noisy allocation over 15 racks (every engine slower, Charades most; rep spread up to 3.6×), not used; A2r design, 32 nodes alone on contiguous nodes | not for use / design |
+| 144 | 2026-10-29 | 3653806 | A2, 32 nodes: a noisy allocation (every engine slower, Charades most; rep spread up to 3.6×; not placement: job 3633770 was as spread and quiet), not used; A2r design (job 3657010), 32 nodes alone | not for use / design |
 
 ## Stampede3 runs, in order
 
@@ -5549,7 +5549,7 @@ The two allocations agree within 1.2% at every node count, so the σ 1,000 numbe
 - **Devastator's largest losses are at its first network step.** 1→2 nodes costs it 0.66 on uniform and 0.74 at σ 4,000, against Charades' 0.90 and 0.93.
 - **Uniform from 4 to 16 nodes** is still Charades' weak spot: 0.66, against Devastator's 0.72. Section 124 found the same.
 
-### A2, 32 nodes: a noisy allocation, so the 32-node point is rerun on contiguous nodes (A2 results and A2r design, 2026-10-29; skx batch job 3653806, 32 nodes; A2r design written before its run)
+### A2, 32 nodes: a noisy allocation, so the 32-node point is rerun (A2 results and A2r design, 2026-10-29; skx batch job 3653806, 32 nodes; A2r design written before its run)
 
 > **Status: not for use (A2) / design (A2r).** A2's design and predictions are in section 141.
 > - **Placement:** 32 nodes over 15 racks (c476-091 to c500-033), against two racks (c454, c455) for each of A1's allocations.
@@ -5629,9 +5629,10 @@ M committed ev/s, higher is better; C÷D and C÷R are Charades' controller ÷ th
 - **Predictions:** P1 right where checkable; P4 and P7 untestable here.
 
 **A2r: design.**
-- **Job:** `scale32.slurm n32`, run as `sbatch -p skx -N 32 -n 1536 -x c455-081 --contiguous -t 03:15:00`.
-  - `--contiguous` is the only placement control: Stampede3's Slurm has no switch topology (`topology/flat`), so `--switches` does nothing.
-  - It may make the queue wait longer.
+- **Job:** `scale32.slurm n32`, run as `sbatch -p skx -N 32 -n 1536 -x c455-081 -t 03:15:00` (job 3657010).
+  - The first submission (3656992) asked for `--contiguous` and was cancelled before it started: placement alone is unlikely to be the cause (below), and `--contiguous` can lengthen the queue wait.
+  - Stampede3's Slurm has no switch topology (`topology/flat`), so `--switches` does nothing.
+  - **Acceptance:** rep spread ≤ 1.10 (Q2). Noisy reps are rerun.
 - **Series:** 32 nodes alone, all eight workloads, 3 reps, engines interleaved, one discarded warm-up run.
 - **Arms, as in A2, except:**
   - **Charades:** the controller runs a second time at the end of each block (tag `_qlast`; left out of the headline numbers).
@@ -5641,7 +5642,7 @@ M committed ev/s, higher is better; C÷D and C÷R are Charades' controller ÷ th
 - **Time:** about 40 min per rep with quiet runs (54 min for A2's rep 1, including 8 min of ROSS timeouts), so about 2 h 15 min with the gate.
 
 **Predictions** (A2r against A1's 16-node numbers, section 143):
-- **Q1.** The allocation spans at most 3 racks.
+- **Q1.** Dropped with `--contiguous`.
 - **Q2.** Rep spread ≤ 1.10 for every Charades arm and for Devastator's best W in every workload, apart from single outlier reps as in A1.
 - **Q3.** In each block the controller's first and last runs agree within 5%. The controller is 0.95–1.05 of its better fixed W (P5 at 32 nodes).
 - **P4 as before.** Per-node rate at 32 nodes ÷ at 16 nodes (A1):
