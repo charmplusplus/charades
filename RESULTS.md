@@ -288,7 +288,8 @@ Sections 1–128 were re-read before planning sections 129 onward.
 | 146 | 2026-10-29 | 3657717 | Job R results: not the hold; Charades makes 5–120× more stragglers than Devastator at the same W with direct sends too; a wider W absorbs 2/3 of a GVT delay | current |
 | 147 | 2026-10-29 | 3657892 | The rollback unit: 16, 4 and 1 LPs per chare at lookahead 100, W 400–1,600 (job L) | design |
 | 148 | 2026-10-29 | 3657892 | Job L results: 1 LP per chare cuts rollbacks 5–23× (below Devastator's at σ 2,000 and uniform; σ 100 has a second cause); wider W still slower because the flush deadline follows W; 4 LPs per chare free at W 400 | current |
-| 149 | 2026-10-29 | 3658017 or 3658018 | A wide window with the flush deadline held at 408, 4 and 1 LPs per chare, plus a GVT delay (job H) | design |
+| 149 | 2026-10-29 | 3658017 | A wide window with the flush deadline held at 408, 4 and 1 LPs per chare, plus a GVT delay (job H) | design |
+| 150 | 2026-10-29 | 3658017 | Job H results: held deadline gives 2–12× bigger messages and 3× less GVT-delay sensitivity; 1.12× at σ 2,000 with 1 LP per chare, a loss on uniform (held stragglers); W and h need setting together | current |
 
 ## Stampede3 runs, in order
 
@@ -5863,6 +5864,45 @@ Rollbacks caused by anti-messages are 0–0.2% of rollback calls at W 400 and 12
 **What follows:**
 - **If H2 and H4 hold:** the scaling fix is per-LP rollback inside a chare (LP-level speed at 16-LP chares' cost) plus a flush deadline set apart from the window. Then a 32-node test with the noise benchmark.
 - **If H2 fails:** find out what the held deadline costs: late events from the senders, or the GVT.
+
+### A wide window with the flush deadline held, results: much bigger messages and 3× less sensitivity to a late GVT update, but held events straggle; 1.12× at σ 2,000, a loss on uniform (2026-10-29; skx-dev batch job 3658017, 16 nodes)
+
+> **Status: current.** Design and predictions in section 149.
+> - **Allocation:** 16 nodes, 8 min, gate 30/30. The skx copy (3658018) was cancelled before it started.
+> - **Runs:** 52, all ok. Every workload committed the same events in every run.
+> - **Data:** summary `~/charades-data/hor49/hor49_summary.py`, output in `j3658017/summary.txt`, with every run log.
+> - **Reproducibility:** 4 LPs per chare at W 400 reproduces job L within 1.8% (662.7 against 664.7 at σ 100; 437.6 against 429.8 at σ 2,000).
+
+**Median of 2, htram, end time 512,000.** Rolled back (% of executed; lower is better), M committed ev/s (higher is better), primary stragglers per million executed events (share htram held), events per htram message. "W + 8" is the default deadline; "408" holds it there.
+
+| workload | LPs per chare | W 400, W + 8 | W 800, W + 8 | W 800, 408 | W 1,600, 408 |
+|---|---|---|---|---|---|
+| σ 100 | 4 | 0.017%, **662.7**, 77 (53%), 34 | 0.73%, 477.1, 1,217 (3%), 10 | 3.45%, 438.4, 4,736 (55%), 120 | 49.3%, 104.2, 20,130 (19%), 418 |
+| | 1 | 0.005%, 583.7, 34 (39%), 33 | 0.26%, 472.8, 960 (1%), 10 | 0.69%, 574.2, 2,969 (65%), 110 | 11.3%, 189.8, 15,502 (44%), 345 |
+| σ 2,000 | 4 | 0.037%, 437.6, 203 (73%), 49 | 1.77%, 326.6, 2,067 (8%), 26 | 8.64%, 409.1, 12,337 (88%), 128 | 30.1%, 258.9, 23,196 (74%), 158 |
+| | 1 | 0.009%, 399.6, 72 (65%), 47 | 0.47%, 343.9, 1,567 (3%), 25 | 2.26%, **445.7**, 7,986 (91%), 130 | 9.14%, 402.1, 20,753 (80%), 153 |
+| uniform | 4 | 0.134%, **333.3**, 906 (90%), 13 | 2.65%, 267.6, 2,946 (28%), 11 | 44.8%, 121.7, 67,686 (99%), 27 | 63.1%, 68.8, 69,210 (98%), 41 |
+| | 1 | 0.036%, 310.8, 309 (84%), 13 | 0.54%, 263.2, 1,684 (15%), 11 | 15.8%, 251.7, 70,847 (99%), 22 | 57.8%, 77.4, 139,028 (98%), 47 |
+
+**20 µs on every GVT update** (σ 2,000, 1 LP per chare; M ev/s, with ÷ without, higher is better): W 400 with the default deadline 364.8 ÷ 399.6 = **0.913**; W 1,600 with the deadline at 408 389.8 ÷ 402.1 = **0.969**.
+
+**Predictions:**
+- **H1 wrong, in the good direction.** Messages did not just hold their size; they grew. Holding the deadline at 408 while W widens gives 3.3× W 400's events per message at σ 100 (110 against 33 at W 800, 1 LP per chare), 2.8× at σ 2,000 and 1.8× on uniform. PEs run further ahead, so each event waits longer in a buffer before it is due.
+- **H2 right at σ 2,000 and σ 100, wrong on uniform.** With 1 LP per chare, W 800 with the deadline at 408 is 1.115× W 400 at σ 2,000 (1.02× the best setting of all, 4 LPs per chare at W 400). It is 0.98× at σ 100 and 0.81× on uniform.
+- **H3 wrong.** Held events are most of the stragglers (44–99% at W 1,600), but the rolled-back share is far above 2%: 9–63% at W 1,600, and 0.7–45% at W 800.
+- **H4 about right.** The GVT delay costs W 1,600 with the held deadline 3.1%, against 8.7% at W 400: 0.36 of it.
+
+**What it says:**
+- **Section 5's failure was mostly the rollback unit.** With 4 LPs per chare the held deadline still collapses (σ 2,000 W 1,600: 30% rolled back). With 1 LP per chare it works at σ 2,000 and is level at σ 100.
+- **But the held deadline makes stragglers of held events, as section 5 said.** Receivers run past events their senders hold until the deadline. On uniform, where every event crosses processes, that is 99% of stragglers and 16% of events rolled back at W 800.
+- **The tradeoff is a curve, not a switch.** Between "deadline = W" (small messages, few stragglers) and "deadline far below W" (big messages, many stragglers), the best point depends on the workload: about h = W/2 at σ 2,000, and h = W on uniform. Setting W and h together is the joint control of optimism and aggregation the paper argues for. The controller today sets only W, with h following.
+- **For scale, the wide window is what matters.** It absorbs a late GVT update about 3× better. At 32 nodes GVT updates are slower and noisier (sections 144, 146), so the gain there should be larger than at 16.
+- **Per-LP rollback is needed whatever the deadline.** 1 LP per chare costs 7–12% at W 400 against 4 (scheduler and fossil-collection visits). Rolling back one LP inside a 4- or 16-LP chare would keep 1 LP per chare's rollbacks at 4's cost.
+
+**Next:**
+- Implement per-LP rollback inside a chare. Correctness on the Mac (test tiers), then 16 nodes against 1 and 4 LPs per chare.
+- Then grid h ∈ {408, W/2, W + 8} × W ∈ {400, 600, 800} at 16 and 32 nodes, with the GVT delay.
+- The σ 100 residual (stragglers unchanged by chare size) is still open.
 
 ## Baseline verification on the Mac
 
