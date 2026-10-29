@@ -5766,6 +5766,12 @@ Rollbacks caused by anti-messages are 0–0.2% of rollback calls at W 400 and 12
 **Why.**
 - Charades judges a straggler against its chare's time, not its LP's (`LP::get_current_time()` returns the owner chare's, lp.h:330). It also rolls back the whole chare. With 16 LPs per chare, an event is a straggler if it is earlier than the chare's latest event on any of its 16 LPs, and each straggler undoes every later event of all 16.
 - Devastator registers each LP as its own rollback domain (section 68).
+- **16 was never chosen by measurement.**
+  - It first appears in our first Stampede3 script (`gvt_cost.sh`, 5ca0ac6, 2026-10-19), probably taken from the test harness's `wide` config (e7f3b38, a correctness test for wide chares). Every sweep since copied it.
+  - Charades' own PHOLD and traffic test configs use 4.
+  - Mikida's thesis (2019, ch. 3) leaves the grouping to the model, as ROSS does with kernel processes, whose purpose is cheaper fossil collection (one history per group). Its profile puts fossil collection at 12% of time.
+  - The thesis's only tuned grouping is for locality: dragonfly runs best with one router and its terminal and MPI LPs per chare.
+  - It does not discuss what the grouping costs in rollbacks.
 - Section 68 suspected this at lookahead 10. On the Mac (lookahead 10, W 100), efficiency rose from 62.8% at 16 LPs per chare to 95.1% at 1 (section 69). The 16-node test was planned but never reported.
 - **Rough model:** with exponential delays (mean 900 past the lookahead), an LP's latest event sits on average about 67 time units behind its chare's. So judging by LP removes most stragglers from senders that lag just past the lookahead. Each remaining rollback undoes about 1/16 of the events.
 - Job R measured about 20 events rolled back per primary straggler at σ 100, W 800, direct sends.
