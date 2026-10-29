@@ -291,7 +291,7 @@ Sections 1–128 were re-read before planning sections 129 onward.
 | 149 | 2026-10-29 | 3658017 | A wide window with the flush deadline held at 408, 4 and 1 LPs per chare, plus a GVT delay (job H) | design |
 | 150 | 2026-10-29 | 3658017 | Job H results: held deadline gives 2–12× bigger messages and 3× less GVT-delay sensitivity; 1.12× at σ 2,000 with 1 LP per chare, a loss on uniform (held stragglers); W and h need setting together | current |
 | 151 | 2026-10-29 | 3658328 | Per-LP rollback inside a chare (`--rollback-unit=1`): implementation, a bug found on the Mac (rollback inside a forward handler), job P design | design |
-| 152 | 2026-10-29 | 3658328 | Job P results: per-LP rollback gives 1 LP per chare's rollbacks (4–15× fewer at W 400) at no cost; held deadline 1.09× at σ 2,000 (new best) but 0.89–0.92× σ 100, 0.68–0.70× uniform; GVT delay not absorbed at W 800 | current |
+| 152 | 2026-10-29 | 3658328 | Job P results: per-LP rollback gives 1 LP per chare's rollbacks (3.5–15× fewer at W 400) at no cost; held deadline 1.09× at σ 2,000 (new best) but 0.89–0.92× σ 100, 0.68–0.70× uniform; GVT delay not absorbed at W 800 | current |
 
 ## Stampede3 runs, in order
 
@@ -5986,8 +5986,8 @@ Events rolled back per rollback call at W 400: 3.7–4.0 (16, chare), 1.5–2.0 
 - **P4 wrong.** The GVT delay costs W 800 with the held deadline 9.1%, against 8.5% at W 400. Job H's smaller cost (3.1%) was at W 1,600: a window of twice the deadline does not leave enough room to absorb a late update.
 
 **What it says:**
-- **Per-LP rollback does what 1 LP per chare did, at chare cost.** It cuts the rolled-back share at W 400 4–15× (σ 100: 0.046% to 0.004%; σ 2,000: 0.134% to 0.009%; uniform: 0.429% to 0.056%), and each rollback undoes 1.2–1.3 events. Throughput at W 400 is unchanged. It removes the reason section 45 found W 600–800 so costly, and it should become the default after the full test matrix.
-- **The held deadline is a per-workload choice.** At σ 2,000 it is the best setting measured (1.09×). At σ 100 it loses 8–11%, and on uniform 30%, where held events make 98–99% of stragglers. The controller has to set the deadline and the window together; today it sets only the window.
+- **Per-LP rollback does what 1 LP per chare did, at chare cost.** It cuts the rolled-back share at W 400 7.7–15× at 16 LPs per chare (σ 100: 0.046% to 0.004%; σ 2,000: 0.134% to 0.009%; uniform: 0.429% to 0.056%) and 3.5–3.8× at 4, and each rollback undoes 1.2–1.3 events. Throughput at W 400 is unchanged. It removes the reason section 45 found W 600–800 so costly, and it should become the default after the full test matrix.
+- **The held deadline is a per-workload choice.** At σ 2,000 it is the best setting measured (1.09×). At σ 100 it loses 8–11%, and on uniform 30%, where held events made 98–99% of stragglers in job H. The controller has to set the deadline and the window together; today it sets only the window.
 - **The robustness goal is not met yet.** A late GVT update still costs about what it costs at W 400. Only a window well beyond the deadline (W 1,600 with deadline 408 in job H) absorbed it, and that loses throughput on every workload but σ 2,000.
 - **So per-LP rollback is a clean improvement, but not yet the scaling fix.** The next step is the 16→32-node breakdown in A2r (section 144), to see whether the 32-node loss is the GVT step, as at 16 nodes, before choosing between a wider window and faster GVT updates.
 
