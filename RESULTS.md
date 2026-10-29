@@ -5610,6 +5610,13 @@ M committed ev/s, higher is better; C÷D and C÷R are Charades' controller ÷ th
   - All three engines were hit in the same job.
   - Both 16-node halves were hit, so it is not one slow node.
   - This job and A1's differ in placement (15 racks against 2) and in time of day (02:26–05:06). One job cannot separate the two, or either from other jobs' traffic on the fabric.
+  - **Added after the A2r submission: placement alone is unlikely.**
+    - Job 3633770 (section 43; 2026-10-24, 07:49–07:58) ran on production skx nodes over 15 racks (c476–c506), as spread as A2.
+    - Its Charades runs repeated well: rep spread over 16 settings at 32 nodes had a median of 1.014 and a maximum of 1.075. Those were short runs with 2 reps on an older stack.
+    - Our own traffic is too small to congest the fabric. Uniform at 16 nodes sends about 1.5 GB/s per node (355 M ev/s × 94% off-node × about 70 B), 12% of a 100 Gb/s link. A leaf switch serves 28 nodes with 20 uplinks.
+    - Extra switch hops cost about 0.2 µs, against a GVT step of about 200 µs. A1's allocations already spanned 3–4 leaf switches.
+    - So the likelier cause is load from other jobs on shared links while A2 ran. A2's gate also hit a /work2 read error at 02:31.
+    - `--contiguous` reduces how many shared links we cross, but does not avoid them.
 - **Charades lost more than Devastator in all eight workloads:** 0.50–0.87 against 0.79–1.00. It lost about as much as ROSS, and more in 4 of 8.
   - A hypothesis, not tested here: section 78 found that time per GVT advance limits Charades at 16 nodes, and a GVT wave waits for its slowest message. Uneven message latency would therefore cost Charades the most.
   - If it holds, this is a robustness weakness to report, not just noise to avoid.
