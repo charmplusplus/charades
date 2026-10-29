@@ -290,6 +290,7 @@ Sections 1–128 were re-read before planning sections 129 onward.
 | 148 | 2026-10-29 | 3657892 | Job L results: 1 LP per chare cuts rollbacks 5–23× (below Devastator's at σ 2,000 and uniform; σ 100 has a second cause); wider W still slower because the flush deadline follows W; 4 LPs per chare free at W 400 | current |
 | 149 | 2026-10-29 | 3658017 | A wide window with the flush deadline held at 408, 4 and 1 LPs per chare, plus a GVT delay (job H) | design |
 | 150 | 2026-10-29 | 3658017 | Job H results: held deadline gives 2–12× bigger messages and 3× less GVT-delay sensitivity; 1.12× at σ 2,000 with 1 LP per chare, a loss on uniform (held stragglers); W and h need setting together | current |
+| 151 | 2026-10-29 | — | Per-LP rollback inside a chare (`--rollback-unit=1`): implementation, a bug found on the Mac (rollback inside a forward handler), job P design | design |
 
 ## Stampede3 runs, in order
 
@@ -5903,6 +5904,41 @@ Rollbacks caused by anti-messages are 0–0.2% of rollback calls at W 400 and 12
 - Implement per-LP rollback inside a chare. Correctness on the Mac (test tiers), then 16 nodes against 1 and 4 LPs per chare.
 - Then grid h ∈ {408, W/2, W + 8} × W ∈ {400, 600, 800} at 16 and 32 nodes, with the GVT delay.
 - The σ 100 residual (stragglers unchanged by chare size) is still open.
+
+### Per-LP rollback inside a chare, `--rollback-unit=1` (implementation and design, 2026-10-29; design written before any runs)
+
+> **Status: design.** Charades branch `lp-rollback`. Follows sections 148 and 150.
+
+**Implementation.**
+- A straggler is judged against its own LP's latest processed event, and only that LP's events at or after it are rolled back.
+- Each processed event is also linked into its LP's chain (`Event::lp_prev`/`lp_next`; head and tail in `LPBase`). The chare's processed queue stays, in execution order, for migration.
+- An anti-message rolls back the cancelled event's LP only.
+- Fossil collection commits each LP's chain below GVT: the chare queue is no longer in time order.
+- A migrated chare rebuilds the chains.
+- **The option:** `--rollback-unit=0` is the chare (the default for now), 1 the LP.
+- **Why it is safe:** LPs share no state; no model in the tree reaches another LP (`owner->`, `lp_structs`). An event one LP sent another is cancelled through its causality chain as before.
+- **A bug found on the Mac:**
+  - **Symptom:** dragonfly committed the wrong number of events without a window: 9–287 too many on its base config, 99–456 too few on its congested config, on 1, 4 and 2 × 2 PEs.
+  - **Cause:** a send to an LP of the same chare is delivered at once (`tw_event_send`). Under per-LP rollback the receiving LP can be ahead of the sender, so the send can roll it back inside the sender's forward handler. The rollback then set the chare's current event to another event, and the handler's later sends took their time and causal parent from that.
+  - **Fix:** a rollback inside a forward handler (`in_forward`) restores the running event.
+  - **Under chare rollback:** the same can happen only with a zero-delay send, because a chare's processed events are never ahead of its running event.
+- **Mac tests:**
+  - Change tier: the six new configs (bucketed, bucketed with a window, htram PP with the deadline policy, the same with the deadline held at 500 below a window of 2,000, blocking, CD). All pass except CD at 4 PEs, which fails with and without the option. CD is on the harness's known-broken list (issue #11), and its config was dropped.
+  - Engine tier with 20 repeats of the five per-LP configs (bucketed, bucketed with a window, htram PP, htram PP with the held deadline, blocking): **2,422/2,422** on the Mac. Commit df75cd2 on branch `lp-rollback`.
+
+**Job P** (16 nodes; build `charades-lprb` on the same Charm++, Reconverse and htram as job H):
+- σ 100 (PP 2,048), σ 2,000 (PP 512), uniform (WPs 512); end time 512,000; 2 reps.
+- **Arms per workload:**
+  - Chare rollback: 16 LPs per chare at W 400 (the paper runs' setting); 4 LPs per chare at W 400 (the best setting so far).
+  - Per-LP rollback at 16 and at 4 LPs per chare: W 400, W 800 with the default deadline, and W 800 with the deadline held at 408.
+  - Reference: 1 LP per chare, chare rollback, W 800 with the deadline at 408 (job H's best at σ 2,000).
+- **GVT delay at σ 2,000:** per-LP rollback at 4 LPs per chare, W 400 and W 800 with the deadline at 408, each with `--diag-gvt-spin-ns=20000`.
+
+**Predictions:**
+- **P1.** With per-LP rollback, the rolled-back share at 16 or 4 LPs per chare is within 1.5× of 1 LP per chare's (jobs L and H) at the same W and deadline, in every workload.
+- **P2.** At W 400, per-LP rollback costs at most 2% against chare rollback at the same chare size.
+- **P3.** The best per-LP setting is at least 1.05× today's best (4 LPs per chare, chare rollback, W 400) at σ 2,000, and within ±2% at σ 100 and uniform.
+- **P4.** With per-LP rollback at 4 LPs per chare, the 20 µs GVT delay costs W 800 with the held deadline at most half what it costs W 400.
 
 ## Baseline verification on the Mac
 
