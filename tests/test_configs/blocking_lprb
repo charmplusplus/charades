@@ -1,4 +1,0 @@
-# Per-LP rollback (--rollback-unit=1): Optimistic w/Blocking GVT
-sync=3
-gvt=1
-rollback-unit=1

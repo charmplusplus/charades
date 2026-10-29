@@ -50,7 +50,7 @@ void parse_command_line(int argc, char** argv) {
   kernel.register_argument("agg-scope",            "Aggregate events to - ALL REMOTE CHARES=0, OTHER PROCESSES ONLY=1", g_tw_agg_scope);
   kernel.register_argument("local-fast-path",      "Optimistic, bucketed GVT, not --sched-park: events for other chares in this process are handed over by pointer through per-PE input buffers, not htram or messages (elsewhere it turns itself off) - NO=0, YES=1 (default), THIS PE ONLY=2", g_tw_local_fast_path);
   kernel.register_argument("agg-input-buffer",            "Optimistic, bucketed GVT, not --sched-park: htram node receives hand events to PEs through input buffers, not messages - NO=0, YES=1 (default)", g_tw_agg_input_buffer);
-  kernel.register_argument("rollback-unit",        "Optimistic: a straggler is judged against, and rolls back, 0 = its whole LPChare (default), 1 = only its LP", g_tw_rollback_unit);
+  kernel.register_argument("rollback-unit",        "Optimistic: a straggler is judged against, and rolls back, 0 = its whole LPChare, 1 = only its LP (default)", g_tw_rollback_unit);
   kernel.register_argument("event-index",          "Optimistic: index received events for cancellation by - AVL TREE=0, HASH=1 (default)", g_tw_event_index);
   kernel.register_argument("msg-pool",             "Recycle event messages through a per-PE pool - NO=0, YES=1 (default)", g_tw_msg_pool);
   kernel.register_argument("agg-gvt-flush",        "On each GVT update flush - NOTHING=0, DESTINATIONS NOT FILLING=1, EVERYTHING=2", g_tw_agg_gvt_flush);

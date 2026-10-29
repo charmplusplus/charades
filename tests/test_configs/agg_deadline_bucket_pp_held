@@ -1,0 +1,10 @@
+# The flush deadline held below the window (500 < 2000), per-LP rollback: Optimistic w/Bucketed GVT and a window, htram (PP), deadline flush policy
+sync=3
+gvt=4
+buffer-size=655360
+optimism-window=2000
+aggregation=1
+agg-mode=2
+agg-buffer=16
+agg-policy=1
+agg-horizon=500

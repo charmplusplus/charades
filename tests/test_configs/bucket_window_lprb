@@ -1,7 +1,0 @@
-# Per-LP rollback (--rollback-unit=1): Optimistic w/Bucketed GVT and an optimism window: no event executes past
-# GVT + 2000 (the bucketed GVT itself never throttles execution)
-sync=3
-gvt=4
-buffer-size=655360
-optimism-window=2000
-rollback-unit=1

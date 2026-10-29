@@ -1,0 +1,4 @@
+# Chare rollback (--rollback-unit=0, not the default): Optimistic w/Blocking GVT
+sync=3
+gvt=1
+rollback-unit=0

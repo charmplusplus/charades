@@ -1,5 +1,0 @@
-# Per-LP rollback (--rollback-unit=1): Optimistic w/Bucketed GVT
-sync=3
-gvt=4
-buffer-size=655360
-rollback-unit=1
