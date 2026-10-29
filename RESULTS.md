@@ -286,6 +286,7 @@ Sections 1–128 were re-read before planning sections 129 onward.
 | 144 | 2026-10-29 | 3653806 | A2, 32 nodes: a noisy allocation (every engine slower, Charades most; rep spread up to 3.6×; not placement: job 3633770 was as spread and quiet), not used; A2r design (job 3657016), 32 nodes alone, plus traced runs at 16 and 32 nodes | not for use / design |
 | 145 | 2026-10-29 | 3657717 | Why Charades rolls back more than Devastator at the same window: htram against direct sends against Devastator, W 400–1,600 (job R) | design |
 | 146 | 2026-10-29 | 3657717 | Job R results: not the hold; Charades makes 5–120× more stragglers than Devastator at the same W with direct sends too; a wider W absorbs 2/3 of a GVT delay | current |
+| 147 | 2026-10-29 | 3657892 or 3657893 | The rollback unit: 16, 4 and 1 LPs per chare at lookahead 100, W 400–1,600 (job L) | design |
 
 ## Stampede3 runs, in order
 
@@ -5757,6 +5758,34 @@ Rollbacks caused by anti-messages are 0–0.2% of rollback calls at W 400 and 12
   - **Lazy delivery inside the process.** Fast-path events wait in an input buffer until the receiver's next pass.
 - **Why this is the scaling lever:** a wider window absorbs late GVT updates (R5), and that slack is what Devastator has. If Charades rolled back like Devastator, it could run at W 800–1,600 and keep its aggregation advantage.
 - **At W 400 Charades is still ahead** of Devastator's best W on σ 2,000 (1.15×) and uniform (1.70×), and level at σ 100 (0.99×).
+
+### The rollback unit: LPs per chare at lookahead 100 and wide W (design, 2026-10-29; written before any runs)
+
+> **Status: design.** Follows section 146.
+
+**Why.**
+- Charades judges a straggler against its chare's time, not its LP's (`LP::get_current_time()` returns the owner chare's, lp.h:330). It also rolls back the whole chare. With 16 LPs per chare, an event is a straggler if it is earlier than the chare's latest event on any of its 16 LPs, and each straggler undoes every later event of all 16.
+- Devastator registers each LP as its own rollback domain (section 68).
+- Section 68 suspected this at lookahead 10. On the Mac (lookahead 10, W 100), efficiency rose from 62.8% at 16 LPs per chare to 95.1% at 1 (section 69). The 16-node test was planned but never reported.
+- **Rough model:** with exponential delays (mean 900 past the lookahead), an LP's latest event sits on average about 67 time units behind its chare's. So judging by LP removes most stragglers from senders that lag just past the lookahead. Each remaining rollback undoes about 1/16 of the events.
+- Job R measured about 20 events rolled back per primary straggler at σ 100, W 800, direct sends.
+- The Mac can't test it at lookahead 100: there, rollback shares at 16, 4 and 1 LPs per chare (2–5%) move with thread scheduling, not with the chare size.
+
+**Job L** (`$WORK/charades-runs/lpc47.slurm`, 16 nodes; skx-dev copy 3657892 and skx copy 3657893, the later one to start is cancelled; frozen build 0a212f0):
+- σ 100 (PP 2,048), σ 2,000 (PP 512), uniform (WPs 512).
+- 16, 4 and 1 LPs per chare; W 400, 800, 1,600.
+- End time 512,000, 2 reps, chare sizes interleaved.
+- Compared with Devastator's numbers from job R (same nodes' partition, same settings).
+
+**Predictions:**
+- **L1.** At W 800, 1 LP per chare cuts the rolled-back share at least 10× against 16 at σ 100 and σ 2,000, to within 3× of Devastator's.
+- **L2.** Primary stragglers per executed event fall at least 2× from 16 to 1 LP per chare at W 800, and events rolled back per straggler at least 4×.
+- **L3.** With 1 LP per chare the best W is 800 or wider at σ 100 and σ 2,000. Its throughput there is within ±10% of 16 LPs per chare at W 400: the saved rollbacks against the extra scheduler and fossil-collection work per chare (0.87× on the Mac at lookahead 10, section 69).
+- **L4.** 4 LPs per chare lies between the two in rolled-back share at every W.
+
+**What follows:**
+- **If L1 and L2 hold:** the fix is to roll back one LP inside a chare, judging stragglers by the LP's time. Chares stay large, keeping their scheduling cost, but roll back like Devastator. Then the window can widen.
+- **If L1 fails:** the rollback unit is not the cause, and the next step is to trace where stragglers come from: the sender's lag and the depth behind the receiver.
 
 ## Baseline verification on the Mac
 
