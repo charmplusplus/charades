@@ -283,7 +283,7 @@ Sections 1–128 were re-read before planning sections 129 onward.
 | 141 | 2026-10-28 | 3653550 | A0, ROSS tuning, results (batch 16 / GVT interval 64, and conservative); A1 and A2 design | current / design |
 | 142 | 2026-10-28 | 3653803 | A1a, weak scaling 1–16 nodes, group a: Charades leads Devastator in 19 of 20 cells and ROSS 2.4–4.9×; same events in all three engines; σ 1,000 on 1 node needs PP 512 | current |
 | 143 | 2026-10-28 | 3654651 | A1b, weak scaling 1–16 nodes, group b; all eight workloads at 1–16 nodes: Charades ahead of Devastator in 38 of 40 cells, 2.4–5.3× ROSS, scales best in 6 of 8 | current |
-| 144 | 2026-10-29 | 3653806 | A2, 32 nodes: a noisy allocation (every engine slower, Charades most; rep spread up to 3.6×; not placement: job 3633770 was as spread and quiet), not used; A2r design (job 3657010), 32 nodes alone | not for use / design |
+| 144 | 2026-10-29 | 3653806 | A2, 32 nodes: a noisy allocation (every engine slower, Charades most; rep spread up to 3.6×; not placement: job 3633770 was as spread and quiet), not used; A2r design (job 3657016), 32 nodes alone, plus traced runs at 16 and 32 nodes | not for use / design |
 
 ## Stampede3 runs, in order
 
@@ -5629,8 +5629,8 @@ M committed ev/s, higher is better; C÷D and C÷R are Charades' controller ÷ th
 - **Predictions:** P1 right where checkable; P4 and P7 untestable here.
 
 **A2r: design.**
-- **Job:** `scale32.slurm n32`, run as `sbatch -p skx -N 32 -n 1536 -x c455-081 -t 03:15:00` (job 3657010).
-  - The first submission (3656992) asked for `--contiguous` and was cancelled before it started: placement alone is unlikely to be the cause (below), and `--contiguous` can lengthen the queue wait.
+- **Job:** `scale32.slurm n32`, run as `sbatch -p skx -N 32 -n 1536 -x c455-081 -t 03:15:00` (job 3657016).
+  - Earlier submissions were cancelled before they started. 3657010 lacked the traced block below. 3656992 asked for `--contiguous`, which was dropped: placement alone is unlikely to be the cause (below), and `--contiguous` can lengthen the queue wait.
   - Stampede3's Slurm has no switch topology (`topology/flat`), so `--switches` does nothing.
   - **Acceptance:** rep spread ≤ 1.10 (Q2). Noisy reps are rerun.
 - **Series:** 32 nodes alone, all eight workloads, 3 reps, engines interleaved, one discarded warm-up run.
@@ -5639,7 +5639,12 @@ M committed ev/s, higher is better; C÷D and C÷R are Charades' controller ÷ th
   - **Devastator:** W 500, 1,000 and 2,000; lookahead 10: 100, 200 and 400. W 4,000 is dropped: in A2 it was never best, and it fell to 31–76 M ev/s at σ ≥ 2,000 and uniform.
   - **ROSS:** timeout 360 s.
   - **σ 1,000:** PP 2,048 only. A1b's PP 512 series (`g1000x`) is left out, because PP 2,048 was the better setting at 16 nodes.
-- **Time:** about 40 min per rep with quiet runs (54 min for A2's rep 1, including 8 min of ROSS timeouts), so about 2 h 15 min with the gate.
+- **Traced block, after the 3 reps:**
+  - Charades W 400 with `--gvt-trace=2 --pe-stats=1` at σ 100 (PP 2,048), σ 2,000 (PP 512) and uniform (WPs 512).
+  - First on 16 of the nodes, then on all 32: one run each, about 5 min.
+  - Purpose: close the 16→32-node loss, which has never been broken down. Section 122 did this for 4→16 nodes.
+  - Split it into start-up (first 10% of waves) and steady state. Then split the steady part into time per GVT advance and events per advance, and the advance into the spread between the first and last process to contribute and the rest.
+- **Time:** about 40 min per rep with quiet runs (54 min for A2's rep 1, including 8 min of ROSS timeouts), so about 2 h 20 min with the gate and the traced block.
 
 **Predictions** (A2r against A1's 16-node numbers, section 143):
 - **Q1.** Dropped with `--contiguous`.
@@ -5652,6 +5657,11 @@ M committed ev/s, higher is better; C÷D and C÷R are Charades' controller ÷ th
 - **P7 as before.** Charades ahead of Devastator in at least 42 of 48 cells, which needs 4 of the 8 at 32 nodes.
   - More specifically: ahead at σ ≥ 500, uniform and lookahead 10 σ 2,000;
   - 0.90–1.10 at σ 100 and lookahead 10 σ 500.
+- **Traced block** (16 → 32 nodes, same allocation):
+  - **T1.** At σ 100 and σ 2,000, steady-state time per GVT advance (waves 10–95%) grows by 15–35%, and events per advance stay within ±5%. The per-node loss then matches the advance-time growth within 5 points (closure).
+  - **T2.** Unlike 4→16 nodes on long runs, most of the 16→32 loss is steady: the first 10% of waves hold at most 40% of it.
+  - **T3.** The growth is in the spread between the first and the last process to contribute to a wave, not in the reduction: the spread grows by at least as much as the advance.
+  - **T4.** On uniform, events per htram message (WPs 512) fall by at least 1.6× (twice the destinations).
 
 ## Baseline verification on the Mac
 
