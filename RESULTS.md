@@ -290,7 +290,8 @@ Sections 1–128 were re-read before planning sections 129 onward.
 | 148 | 2026-10-29 | 3657892 | Job L results: 1 LP per chare cuts rollbacks 5–23× (below Devastator's at σ 2,000 and uniform; σ 100 has a second cause); wider W still slower because the flush deadline follows W; 4 LPs per chare free at W 400 | current |
 | 149 | 2026-10-29 | 3658017 | A wide window with the flush deadline held at 408, 4 and 1 LPs per chare, plus a GVT delay (job H) | design |
 | 150 | 2026-10-29 | 3658017 | Job H results: held deadline gives 2–12× bigger messages and 3× less GVT-delay sensitivity; 1.12× at σ 2,000 with 1 LP per chare, a loss on uniform (held stragglers); W and h need setting together | current |
-| 151 | 2026-10-29 | 3658328 or 3658329 | Per-LP rollback inside a chare (`--rollback-unit=1`): implementation, a bug found on the Mac (rollback inside a forward handler), job P design | design |
+| 151 | 2026-10-29 | 3658328 | Per-LP rollback inside a chare (`--rollback-unit=1`): implementation, a bug found on the Mac (rollback inside a forward handler), job P design | design |
+| 152 | 2026-10-29 | 3658328 | Job P results: per-LP rollback gives 1 LP per chare's rollbacks (4–15× fewer at W 400) at no cost; held deadline 1.09× at σ 2,000 (new best) but 0.89–0.92× σ 100, 0.68–0.70× uniform; GVT delay not absorbed at W 800 | current |
 
 ## Stampede3 runs, in order
 
@@ -5939,6 +5940,56 @@ Rollbacks caused by anti-messages are 0–0.2% of rollback calls at W 400 and 12
 - **P2.** At W 400, per-LP rollback costs at most 2% against chare rollback at the same chare size.
 - **P3.** The best per-LP setting is at least 1.05× today's best (4 LPs per chare, chare rollback, W 400) at σ 2,000, and within ±2% at σ 100 and uniform.
 - **P4.** With per-LP rollback at 4 LPs per chare, the 20 µs GVT delay costs W 800 with the held deadline at most half what it costs W 400.
+
+### Per-LP rollback inside a chare, results: 1 LP per chare's rollbacks at no cost; the held deadline is a new best at σ 2,000 but loses elsewhere, and a late GVT update costs as much as at W 400 (2026-10-29; skx-dev batch job 3658328, 16 nodes)
+
+> **Status: current.** Design and predictions in section 151.
+> - **Allocation:** 16 nodes, 8 min, gate 48/48 (including the three per-LP configs on 2 nodes). The skx copy (3658329) was cancelled before it started.
+> - **Build:** `charades-lprb`, a worktree at df75cd2; the first build failed on a parallel-make race (`scheduler.decl.h` not yet generated) and was rebuilt serially.
+> - **Runs:** 58, all ok. Every workload committed the same events in every run.
+> - **Data:** summary `~/charades-data/lprb51/lprb51_summary.py`, output in `j3658328/summary.txt`, with every run log.
+
+**Median of 2, htram, end time 512,000.** Rolled back (% of executed; lower is better), M committed ev/s (higher is better), and the rate ÷ 4 LPs per chare with chare rollback at W 400 (the best setting before; higher is better). "Chare" and "LP" are the rollback unit; "W + 8" and "408" the flush deadline.
+
+| workload | LPs per chare, unit, deadline | W 400 | W 800 |
+|---|---|---|---|
+| σ 100 | 16, chare, W + 8 | 0.046%, 659.7, 0.97 | — |
+| | 4, chare, W + 8 | 0.014%, **678.5**, 1.00 | — |
+| | 16, LP, W + 8 | 0.004%, 674.4, 0.99 | 0.31%, 516.2, 0.76 |
+| | 4, LP, W + 8 | 0.004%, 667.4, 0.98 | 0.28%, 514.3, 0.76 |
+| | 16, LP, 408 | — | 0.69%, 622.0, 0.92 |
+| | 4, LP, 408 | — | 0.72%, 604.8, 0.89 |
+| | 1, chare, 408 | — | 0.68%, 567.3, 0.84 |
+| σ 2,000 | 16, chare, W + 8 | 0.134%, 434.5, 1.00 | — |
+| | 4, chare, W + 8 | 0.034%, 432.9, 1.00 | — |
+| | 16, LP, W + 8 | 0.009%, 436.5, 1.01 | 0.40%, 369.3, 0.85 |
+| | 4, LP, W + 8 | 0.009%, 430.8, 1.00 | 0.39%, 370.9, 0.86 |
+| | 16, LP, 408 | — | 2.25%, 471.0, 1.09 |
+| | 4, LP, 408 | — | 2.20%, **473.7**, 1.09 |
+| | 1, chare, 408 | — | 2.21%, 452.1, 1.04 |
+| uniform | 16, chare, W + 8 | 0.429%, **347.9**, 1.08 | — |
+| | 4, chare, W + 8 | 0.136%, 321.9, 1.00 | — |
+| | 16, LP, W + 8 | 0.056%, 333.4, 1.04 | 0.50%, 274.3, 0.85 |
+| | 4, LP, W + 8 | 0.036%, 325.9, 1.01 | 0.49%, 272.2, 0.85 |
+| | 16, LP, 408 | — | 22.8%, 218.9, 0.68 |
+| | 4, LP, 408 | — | 21.1%, 226.8, 0.70 |
+| | 1, chare, 408 | — | 15.9%, 249.6, 0.78 |
+
+Events rolled back per rollback call at W 400: 3.7–4.0 (16, chare), 1.5–2.0 (4, chare), 1.2–1.3 (per-LP at 16 or 4).
+
+**20 µs on every GVT update** (σ 2,000, 4 LPs per chare, per-LP rollback; with ÷ without, higher is better): W 400, deadline W + 8: 394.4 ÷ 430.8 = **0.915**. W 800, deadline 408: 430.6 ÷ 473.7 = **0.909**.
+
+**Predictions:**
+- **P1 right but for one cell.** Per-LP rollback at 16 or 4 LPs per chare rolls back within 1.5× of 1 LP per chare (jobs H and P) in 17 of 18 cells. The exception is uniform at 16 LPs per chare, W 400: 0.056% against 0.036%, 1.56×.
+- **P2 right in 5 of 6 cells.** At W 400 per-LP rollback is −1.6% to +2.2% against chare rollback at the same chare size. The exception is uniform at 16 LPs per chare: −4.2% (333.4 against 347.9), which is near this workload's rep-to-rep spread, since 16 against 4 LPs per chare with chare rollback differs by 8% here and by 1% in job L.
+- **P3 right at σ 2,000 and σ 100.** The best per-LP setting is 1.094× the old best at σ 2,000 (4 LPs per chare, W 800, deadline 408) and 0.994× at σ 100 (16 LPs per chare, W 400). On uniform it is 1.036× the old best but 0.958× 16 LPs per chare with chare rollback in this job.
+- **P4 wrong.** The GVT delay costs W 800 with the held deadline 9.1%, against 8.5% at W 400. Job H's smaller cost (3.1%) was at W 1,600: a window of twice the deadline does not leave enough room to absorb a late update.
+
+**What it says:**
+- **Per-LP rollback does what 1 LP per chare did, at chare cost.** It cuts the rolled-back share at W 400 4–15× (σ 100: 0.046% to 0.004%; σ 2,000: 0.134% to 0.009%; uniform: 0.429% to 0.056%), and each rollback undoes 1.2–1.3 events. Throughput at W 400 is unchanged. It removes the reason section 45 found W 600–800 so costly, and it should become the default after the full test matrix.
+- **The held deadline is a per-workload choice.** At σ 2,000 it is the best setting measured (1.09×). At σ 100 it loses 8–11%, and on uniform 30%, where held events make 98–99% of stragglers. The controller has to set the deadline and the window together; today it sets only the window.
+- **The robustness goal is not met yet.** A late GVT update still costs about what it costs at W 400. Only a window well beyond the deadline (W 1,600 with deadline 408 in job H) absorbed it, and that loses throughput on every workload but σ 2,000.
+- **So per-LP rollback is a clean improvement, but not yet the scaling fix.** The next step is the 16→32-node breakdown in A2r (section 144), to see whether the 32-node loss is the GVT step, as at 16 nodes, before choosing between a wider window and faster GVT updates.
 
 ## Baseline verification on the Mac
 
