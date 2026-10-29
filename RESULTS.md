@@ -284,7 +284,8 @@ Sections 1–128 were re-read before planning sections 129 onward.
 | 142 | 2026-10-28 | 3653803 | A1a, weak scaling 1–16 nodes, group a: Charades leads Devastator in 19 of 20 cells and ROSS 2.4–4.9×; same events in all three engines; σ 1,000 on 1 node needs PP 512 | current |
 | 143 | 2026-10-28 | 3654651 | A1b, weak scaling 1–16 nodes, group b; all eight workloads at 1–16 nodes: Charades ahead of Devastator in 38 of 40 cells, 2.4–5.3× ROSS, scales best in 6 of 8 | current |
 | 144 | 2026-10-29 | 3653806 | A2, 32 nodes: a noisy allocation (every engine slower, Charades most; rep spread up to 3.6×; not placement: job 3633770 was as spread and quiet), not used; A2r design (job 3657016), 32 nodes alone, plus traced runs at 16 and 32 nodes | not for use / design |
-| 145 | 2026-10-29 | 3657717 or 3657718 | Why Charades rolls back more than Devastator at the same window: htram against direct sends against Devastator, W 400–1,600 (job R) | design |
+| 145 | 2026-10-29 | 3657717 | Why Charades rolls back more than Devastator at the same window: htram against direct sends against Devastator, W 400–1,600 (job R) | design |
+| 146 | 2026-10-29 | 3657717 | Job R results: not the hold; Charades makes 5–120× more stragglers than Devastator at the same W with direct sends too; a wider W absorbs 2/3 of a GVT delay | current |
 
 ## Stampede3 runs, in order
 
@@ -5705,6 +5706,57 @@ M committed ev/s, higher is better; C÷D and C÷R are Charades' controller ÷ th
 **What follows:**
 - **If H holds:** the fix is in when htram sends a held event. Send it ahead of the GVT update that makes it due, at a lower cost than `--agg-flush-ahead`, which doubled messages (section 139).
 - **If H′ holds:** the fix is in the scheduler or the GVT step.
+
+### Why Charades rolls back more than Devastator at the same window, results: not the hold; Charades' own engine makes 5–120× more stragglers (2026-10-29; skx-dev batch job 3657717, 16 nodes)
+
+> **Status: current.** Design and predictions in section 145.
+> - **Allocation:** 16 nodes (c454-101, -102, -104, c455-023, -024, -031, -033, -034, -041, -083, -084, -093, -101 to -104), 8 min, gate 30/30. The skx copy (3657718) was cancelled before it started.
+> - **Runs:** 54, all ok. Every workload committed the same events in every run of all three engines.
+> - **Data:** summary `~/charades-data/roll45/roll45_summary.py`, output in `j3657717/summary.txt`, with the CSVs, Devastator's `results.txt` and every Charades run log.
+
+**Rolled back (% of executed events; lower is better) and M committed ev/s (higher is better), median of 2, end time 512,000:**
+
+| workload | W | Charades htram | Charades direct | Devastator | M ev/s: Charades htram / direct / Devastator |
+|---|---|---|---|---|---|
+| σ 100 | 400 | 0.058 | 0.083 | 0.000 | 657.6 / 339.0 / 635.2 |
+| | 600 | 0.478 | — | — | 551.5 / — / — |
+| | 800 | 1.193 | 2.661 | 0.022 | 477.4 / 298.6 / 661.9 |
+| | 1,600 | — | 9.597 | 0.309 | — / 303.8 / 656.6 |
+| σ 2,000 | 400 | 0.155 | 0.152 | 0.062 | 430.2 / 204.7 / 300.7 |
+| | 600 | 1.107 | — | — | 378.6 / — / — |
+| | 800 | 4.098 | 3.678 | 0.737 | 282.1 / 188.0 / 357.6 |
+| | 1,600 | — | 9.400 | 4.506 | — / 184.3 / 375.4 |
+| uniform | 400 | 0.514 | 0.157 | 0.759 | 338.1 / 142.6 / 178.3 |
+| | 600 | 2.824 | — | — | 298.7 / — / — |
+| | 800 | 9.754 | 8.225 | 4.818 | 253.5 / 132.8 / 199.0 |
+| | 1,600 | — | 8.815 | 17.825 | — / 131.6 / 166.1 |
+
+**Primary stragglers with htram** (timestamp rollback calls per million executed events, and the share of them that htram held):
+
+| workload | W 400 | W 600 | W 800 | direct sends, W 800 |
+|---|---|---|---|---|
+| σ 100 | 130 (68% held) | 484 (13%) | 887 (7%) | 1,347 |
+| σ 2,000 | 389 (80%) | 937 (33%) | 2,502 (12%) | 2,153 |
+| uniform | 2,068 (95%) | 3,042 (67%) | 5,060 (25%) | 3,791 |
+
+Rollbacks caused by anti-messages are 0–0.2% of rollback calls at W 400 and 12–32% at W 800–1,600.
+
+**Predictions:**
+- **R1 right.** With htram at W 800, Charades rolls back 54× Devastator's share at σ 100 (1.19% against 0.022%) and 5.6× at σ 2,000.
+- **R2 wrong, so H is out.** With direct sends at W 800, Charades rolls back 121× Devastator's share at σ 100 and 5.0× at σ 2,000. That is as much as with htram, or more.
+- **R3 wrong.** At W 800 htram held only 7% (σ 100), 12% (σ 2,000) and 25% (uniform) of the primary stragglers. Held events dominate only at W 400, where stragglers are few (section 139's race).
+- **R4 half right.** With htram, W 800 is 0.73× (σ 100) and 0.66× (σ 2,000) of W 400. With direct sends it is 0.88–0.93×, not faster.
+- **R5 right.** The 20 µs delay on every GVT update costs W 400 8.6% at σ 2,000 (393.4 against 430.2) and W 800 2.8% (274.2 against 282.1). A wider window absorbs two thirds of a late update.
+
+**What it says:**
+- **Charades makes far more stragglers than Devastator at the same W, whatever the transport.** Primary stragglers grow steeply with W: with direct sends at σ 100, 91 per million executed events at W 400, 1,347 at W 800 and 3,872 at W 1,600. Devastator at σ 100 rolls back 0.31% at W 1,600, against Charades' 9.6%.
+- **htram is not the cause.** At W 800 it rolls back less than direct sends at σ 100 (1.19% against 2.66%) and about as much elsewhere.
+- **So the fix is in Charades' engine (H′), not in when htram sends.** At σ 100 almost all events stay inside the process (fast path), so the stragglers come from other PEs of the same process. Something lets PEs of a process drift much further apart within the window than Devastator's ranks do, or creates stragglers some other way. Candidates:
+  - **A laggard PE.** Rank 0 and the edge ranks are known to be late (sections 85–101). A PE far behind sends into its neighbours' past.
+  - **Equal timestamps.** A PE rolls back when an event arrives with ts equal to its LP's current time (`<=`), and integer timestamps make ties common.
+  - **Lazy delivery inside the process.** Fast-path events wait in an input buffer until the receiver's next pass.
+- **Why this is the scaling lever:** a wider window absorbs late GVT updates (R5), and that slack is what Devastator has. If Charades rolled back like Devastator, it could run at W 800–1,600 and keep its aggregation advantage.
+- **At W 400 Charades is still ahead** of Devastator's best W on σ 2,000 (1.15×) and uniform (1.70×), and level at σ 100 (0.99×).
 
 ## Baseline verification on the Mac
 
