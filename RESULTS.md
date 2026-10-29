@@ -19,7 +19,7 @@ Every number from every run: Stampede3 runs in order (each design, written befor
 
 ## Current numbers
 
-**Paper-grade weak scaling, Charades against Devastator and ROSS, 1–16 nodes, all eight workloads** (jobs 3653803 and 3654651, sections 142–143; long runs, 3 reps; Charades: its controller, the better htram setting at each node count; Devastator: its best of three W; ROSS: the better of optimistic batch 16 / GVT interval 64 and conservative; the same committed events in all three engines in every cell. 32 nodes: job A2, still queued):
+**Paper-grade weak scaling, Charades against Devastator and ROSS, 1–16 nodes, all eight workloads** (jobs 3653803 and 3654651, sections 142–143; long runs, 3 reps; Charades: its controller, the better htram setting at each node count; Devastator: its best of three W; ROSS: the better of optimistic batch 16 / GVT interval 64 and conservative; the same committed events in all three engines in every cell. 32 nodes: A2 ran on a noisy allocation and is not used (section 144); A2r reruns it on contiguous nodes):
 
 | workload | Charades ÷ Devastator at 1 / 2 / 4 / 8 / 16 nodes (higher is better) | Charades ÷ ROSS | efficiency 1→16 nodes, Charades / Devastator / ROSS (1.0 is perfect) | M ev/s at 16 nodes, Charades / Devastator / ROSS |
 |---|---|---|---|---|
@@ -283,6 +283,7 @@ Sections 1–128 were re-read before planning sections 129 onward.
 | 141 | 2026-10-28 | 3653550 | A0, ROSS tuning, results (batch 16 / GVT interval 64, and conservative); A1 and A2 design | current / design |
 | 142 | 2026-10-28 | 3653803 | A1a, weak scaling 1–16 nodes, group a: Charades leads Devastator in 19 of 20 cells and ROSS 2.4–4.9×; same events in all three engines; σ 1,000 on 1 node needs PP 512 | current |
 | 143 | 2026-10-28 | 3654651 | A1b, weak scaling 1–16 nodes, group b; all eight workloads at 1–16 nodes: Charades ahead of Devastator in 38 of 40 cells, 2.4–5.3× ROSS, scales best in 6 of 8 | current |
+| 144 | 2026-10-29 | 3653806 | A2, 32 nodes: a noisy allocation over 15 racks (every engine slower, Charades most; rep spread up to 3.6×), not used; A2r design, 32 nodes alone on contiguous nodes | not for use / design |
 
 ## Stampede3 runs, in order
 
@@ -5535,7 +5536,7 @@ The two allocations agree within 1.2% at every node count, so the σ 1,000 numbe
 - **P2 right in 24 of 24 cells,** once σ 1,000 on 1 node uses PP 512 (1.07 against 1.11). Charades ÷ Devastator at 1/4/16 nodes is within ±0.07 of the long-run table; σ 500 is at the edge on 1 and 4 nodes (−0.07). Ratios here run a little below the long-run table's, because Charades' number is now its controller rather than its best setting.
 - **P3 partly wrong.**
   - At the low-σ workloads (σ 100, σ 500, lookahead 10 σ 500), 8 nodes is below 16 nodes for both Charades (0.88/0.92, 0.91/0.93, 0.92/0.95) and Devastator (0.94/0.97, 0.78/0.81, 0.76/0.79). Elsewhere every engine declines steadily.
-  - Both engines dip together, so the cause is probably the 8-node series running beside the others, not either engine. A2 tests that directly: its 16-node series run side by side.
+  - Both engines dip together, so the cause is probably the 8-node series running beside the others, not either engine. A2 was meant to test that directly, with its 16-node series side by side, but could not (section 144).
 - **P5 right in 39 of 40 cells.** The controller is 0.96–1.03 of the better fixed W; the exception is σ 2,000 on 1 node (0.96).
 - **P6 right except σ 100 on 1 node** (2.42 against ≥ 2.5).
 - **P7: 38 of 40 cells so far,** with A2's 32-node cells to come. The two cells where Charades trails are lookahead 10 σ 500 on 1 and 2 nodes (0.95 and 0.97).
@@ -5547,6 +5548,102 @@ The two allocations agree within 1.2% at every node count, so the σ 1,000 numbe
   - On uniform, ROSS scales best (0.62) but runs at a quarter of Charades' rate.
 - **Devastator's largest losses are at its first network step.** 1→2 nodes costs it 0.66 on uniform and 0.74 at σ 4,000, against Charades' 0.90 and 0.93.
 - **Uniform from 4 to 16 nodes** is still Charades' weak spot: 0.66, against Devastator's 0.72. Section 124 found the same.
+
+### A2, 32 nodes: a noisy allocation, so the 32-node point is rerun on contiguous nodes (A2 results and A2r design, 2026-10-29; skx batch job 3653806, 32 nodes; A2r design written before its run)
+
+> **Status: not for use (A2) / design (A2r).** A2's design and predictions are in section 141.
+> - **Placement:** 32 nodes over 15 racks (c476-091 to c500-033), against two racks (c454, c455) for each of A1's allocations.
+> - **Timing:** ran 02:26–05:06 and was cancelled at its 2 h 40 min limit, 1 h 31 min into the 32-node series.
+> - **Gate:** 29/30 at first. The failure was a /work2 read error, and the rerun passed 30/30.
+> - **Completed:**
+>   - the side-by-side 16-node series, 3 reps for both groups;
+>   - at 32 nodes, rep 1 of all eight workloads;
+>   - rep 2 of six workloads, plus part of uniform; lookahead 10 σ 500 got no rep 2;
+>   - no rep 3.
+> - **Committed events:** the same in every cell where all three engines finished.
+> - **Failed runs:**
+>   - ROSS uniform hit its 240 s timeout three times: 16 nodes conservative rep 1, and both arms of rep 1 at 32 nodes.
+>   - ROSS σ 2,000, optimistic rep 2 at 16 nodes, printed results and then hit the timeout.
+>   - Three Devastator runs at 32 nodes (σ 500 and σ 4,000, W 1,000) printed results but exited with code 1. They are left out.
+> - **Data:** result files only, in `~/charades-data/scale32/scale32/big_j3653806/`. The 53,459 files of per-run output stay on /work2.
+
+**Every engine ran slower and less evenly than in A1.** Median rate at 16 nodes in A2 ÷ in A1 (each engine's headline arm: Charades' controller, Devastator's best W, ROSS's better arm; below 1.00 means slower in A2):
+
+| workload | Charades | Devastator | ROSS |
+|---|---|---|---|
+| σ 100 | 0.79 | 0.90 | 0.72 |
+| σ 500 | 0.87 | 1.00 | 0.70 |
+| σ 1,000 | 0.71 | 0.91 | 0.76 |
+| σ 2,000 | 0.50 | 0.93 | 0.58 |
+| σ 4,000 | 0.75 | 0.79 | 0.61 |
+| uniform | 0.72 | 0.83 | 0.44 |
+| lookahead 10, σ 500 | 0.69 | 0.91 | 0.71 |
+| lookahead 10, σ 2,000 | 0.55 | 0.84 | 0.79 |
+
+**Rep spread at 16 nodes** (max ÷ min over the 3 reps of one arm; 1.00 is perfectly repeatable, lower is better):
+- **Charades:** 1.00–1.09 in A1, 1.04–3.56 in A2.
+- **Devastator:** 1.00–1.08 in A1, apart from three single slow reps (88, 79 and 65 M ev/s); 1.06–1.85 in A2.
+
+**32 nodes, median of 1–2 reps.** These numbers are recorded, not used: at 32 nodes Charades' runs of one workload span 2–4×.
+
+M committed ev/s, higher is better; C÷D and C÷R are Charades' controller ÷ the other engine:
+
+| workload | reps | Charades controller | Charades best fixed W | Devastator (W) | ROSS (arm) | C÷D | C÷R | Charades, every run, min–max |
+|---|---|---|---|---|---|---|---|---|
+| σ 100 | 2 | 441.6 | 990.2 (W 400) | 1,165.1 (1,000) | 237.9 (cons.) | 0.38 | 1.86 | 399–990 |
+| σ 500 | 2 | 406.9 | 705.3 (W 400) | 767.0 (1,000) | 120.6 (cons.) | 0.53 | 3.37 | 372–960 |
+| σ 1,000 | 2 | 403.5 | 651.7 (W 400) | 767.4 (1,000) | 114.2 (cons.) | 0.53 | 3.53 | 324–937 |
+| σ 2,000 | 2 | 298.6 | 659.5 (W 400) | 475.2 (1,000) | 134.7 (opt.) | 0.63 | 2.22 | 239–817 |
+| σ 4,000 | 2 | 363.3 | 553.8 (W 250) | 359.7 (500) | 98.8 (opt.) | 1.01 | 3.68 | 253–772 |
+| uniform | 2, partial | 246.9 (WPs) | 241.1 (WPs, W 400) | 234.4 (1,000) | — (timed out) | 1.05 | — | 149–263 |
+| lookahead 10, σ 500 | 1 | 512.5 | 465.9 (W 50) | 626.2 (400) | 82.0 (cons.) | 0.82 | 6.25 | 439–512 |
+| lookahead 10, σ 2,000 | 2 | 486.2 | 479.2 (W 50) | 513.8 (200) | 92.3 (opt.) | 0.95 | 5.27 | 208–594 |
+
+**What it says:**
+- **The slow runs did the same work, only more slowly.** Across the reps of one arm (one workload, htram setting and node count):
+  - **GVT count** varies by a median of 0.9% (at most 15%);
+  - **events per message** by a median of 1.2% (at most 12%);
+  - **efficiency** by a median of 0.07 points (at most 2.4, uniform).
+  - Neither the GVT count nor events per message follows the rate (correlation 0.01).
+  - Rate and execution time vary by a median of 1.50× and at most 3.56×. For example, σ 1,000 at W 400 on 32 nodes took 6.2 s against 15.8 s.
+- **The cause is outside the engines:**
+  - All three engines were hit in the same job.
+  - Both 16-node halves were hit, so it is not one slow node.
+  - This job and A1's differ in placement (15 racks against 2) and in time of day (02:26–05:06). One job cannot separate the two, or either from other jobs' traffic on the fabric.
+- **Charades lost more than Devastator in all eight workloads:** 0.50–0.87 against 0.79–1.00. It lost about as much as ROSS, and more in 4 of 8.
+  - A hypothesis, not tested here: section 78 found that time per GVT advance limits Charades at 16 nodes, and a GVT wave waits for its slowest message. Uneven message latency would therefore cost Charades the most.
+  - If it holds, this is a robustness weakness to report, not just noise to avoid.
+- **P3's side-by-side question is still open.** It asked whether running series side by side caused A1's 8-node dip. Placement changed together with side-by-side running, so this job cannot answer it.
+- **The controller at 32 nodes is probably not special.**
+  - On the five lookahead-100 Gaussian workloads it never reached the fast group: 0 of 10 runs, best 484 M ev/s. Fixed-W runs reached 737–990 in 10 of 20.
+  - Over all 19 blocks (one workload, htram setting and rep) at 32 nodes it was the fastest arm in 5, second in 6 and third in 8. Chance gives about 6.3 each. At 16 nodes in the same job: 12, 9, 9.
+  - Its window (291–315) lies between the fixed ones, and its counters match theirs.
+  - It is always the first Charades run of a block, straight after ROSS. A2r also runs it last.
+- **Predictions:** P1 right where checkable; P4 and P7 untestable here.
+
+**A2r: design.**
+- **Job:** `scale32.slurm n32`, run as `sbatch -p skx -N 32 -n 1536 -x c455-081 --contiguous -t 03:15:00`.
+  - `--contiguous` is the only placement control: Stampede3's Slurm has no switch topology (`topology/flat`), so `--switches` does nothing.
+  - It may make the queue wait longer.
+- **Series:** 32 nodes alone, all eight workloads, 3 reps, engines interleaved, one discarded warm-up run.
+- **Arms, as in A2, except:**
+  - **Charades:** the controller runs a second time at the end of each block (tag `_qlast`; left out of the headline numbers).
+  - **Devastator:** W 500, 1,000 and 2,000; lookahead 10: 100, 200 and 400. W 4,000 is dropped: in A2 it was never best, and it fell to 31–76 M ev/s at σ ≥ 2,000 and uniform.
+  - **ROSS:** timeout 360 s.
+  - **σ 1,000:** PP 2,048 only. A1b's PP 512 series (`g1000x`) is left out, because PP 2,048 was the better setting at 16 nodes.
+- **Time:** about 40 min per rep with quiet runs (54 min for A2's rep 1, including 8 min of ROSS timeouts), so about 2 h 15 min with the gate.
+
+**Predictions** (A2r against A1's 16-node numbers, section 143):
+- **Q1.** The allocation spans at most 3 racks.
+- **Q2.** Rep spread ≤ 1.10 for every Charades arm and for Devastator's best W in every workload, apart from single outlier reps as in A1.
+- **Q3.** In each block the controller's first and last runs agree within 5%. The controller is 0.95–1.05 of its better fixed W (P5 at 32 nodes).
+- **P4 as before.** Per-node rate at 32 nodes ÷ at 16 nodes (A1):
+  - Charades ≥ 0.85 on the Gaussian workloads and ≤ 0.85 on uniform;
+  - Devastator ≥ 0.88 on the Gaussian workloads.
+- **P6 as before at 32 nodes.** Charades ÷ ROSS ≥ 3 on σ ≥ 1,000 and uniform, ≥ 2.5 at σ 100.
+- **P7 as before.** Charades ahead of Devastator in at least 42 of 48 cells, which needs 4 of the 8 at 32 nodes.
+  - More specifically: ahead at σ ≥ 500, uniform and lookahead 10 σ 2,000;
+  - 0.90–1.10 at σ 100 and lookahead 10 σ 500.
 
 ## Baseline verification on the Mac
 
