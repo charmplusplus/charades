@@ -286,7 +286,9 @@ Sections 1–128 were re-read before planning sections 129 onward.
 | 144 | 2026-10-29 | 3653806 | A2, 32 nodes: a noisy allocation (every engine slower, Charades most; rep spread up to 3.6×; not placement: job 3633770 was as spread and quiet), not used; A2r design (job 3657016), 32 nodes alone, plus traced runs at 16 and 32 nodes | not for use / design |
 | 145 | 2026-10-29 | 3657717 | Why Charades rolls back more than Devastator at the same window: htram against direct sends against Devastator, W 400–1,600 (job R) | design |
 | 146 | 2026-10-29 | 3657717 | Job R results: not the hold; Charades makes 5–120× more stragglers than Devastator at the same W with direct sends too; a wider W absorbs 2/3 of a GVT delay | current |
-| 147 | 2026-10-29 | 3657892 or 3657893 | The rollback unit: 16, 4 and 1 LPs per chare at lookahead 100, W 400–1,600 (job L) | design |
+| 147 | 2026-10-29 | 3657892 | The rollback unit: 16, 4 and 1 LPs per chare at lookahead 100, W 400–1,600 (job L) | design |
+| 148 | 2026-10-29 | 3657892 | Job L results: 1 LP per chare cuts rollbacks 5–23× (below Devastator's at σ 2,000 and uniform; σ 100 has a second cause); wider W still slower because the flush deadline follows W; 4 LPs per chare free at W 400 | current |
+| 149 | 2026-10-29 | 3658017 or 3658018 | A wide window with the flush deadline held at 408, 4 and 1 LPs per chare, plus a GVT delay (job H) | design |
 
 ## Stampede3 runs, in order
 
@@ -5792,6 +5794,75 @@ Rollbacks caused by anti-messages are 0–0.2% of rollback calls at W 400 and 12
 **What follows:**
 - **If L1 and L2 hold:** the fix is to roll back one LP inside a chare, judging stragglers by the LP's time. Chares stay large, keeping their scheduling cost, but roll back like Devastator. Then the window can widen.
 - **If L1 fails:** the rollback unit is not the cause, and the next step is to trace where stragglers come from: the sender's lag and the depth behind the receiver.
+
+### The rollback unit, results: one LP per chare cuts rollbacks 5–23× and beats Devastator's at σ 2,000 and uniform; a wider W is still slower, because the flush deadline follows it (2026-10-29; skx-dev batch job 3657892, 16 nodes)
+
+> **Status: current.** Design and predictions in section 147.
+> - **Allocation:** 16 nodes (c454-093, c455-002 to -004, -011 to -014, -021, -023, -024, -031, -101 to -104), 9 min, gate 30/30. The skx copy (3657893) was cancelled before it started.
+> - **Runs:** 54, all ok. Every workload committed the same events in every run, and the same as Devastator in job R.
+> - **Data:** summary `~/charades-data/lpc47/lpc47_summary.py`, output in `j3657892/summary.txt`, with the CSVs and every run log.
+
+**Median of 2, htram, end time 512,000.** Rolled back (% of executed; lower is better), M committed ev/s (higher is better), events rolled back per rollback call, events per htram message:
+
+| workload | W | 16 LPs per chare | 4 | 1 | Devastator (job R) |
+|---|---|---|---|---|---|
+| σ 100 | 400 | 0.054%, 665.7, 4.3, 35 | 0.017%, 664.7, 2.1, 34 | 0.004%, 597.0, 1.3, 33 | 0.000%, 635.2 |
+| | 800 | 1.42%, 470.7, 12.2, 9 | 0.79%, 490.3, 5.4, 9 | 0.28%, 499.7, 2.5, 9 | 0.022%, 661.9 |
+| | 1,600 | 5.14%, 301.5, 16.2, 7 | 5.18%, 352.8, 7.1, 4 | 2.00%, 333.3, 3.5, 6 | 0.31%, 656.6 |
+| σ 2,000 | 400 | 0.144%, 430.9, 3.8, 49 | 0.038%, 429.8, 1.9, 49 | 0.009%, 411.0, 1.2, 48 | 0.062%, 300.7 |
+| | 800 | 4.16%, 289.1, 13.2, 20 | 1.74%, 339.1, 6.5, 25 | 0.45%, 359.6, 2.7, 25 | 0.74%, 357.6 |
+| | 1,600 | 71.7%, 23.1, 20.3, 4 | 17.5%, 113.8, 8.4, 7 | 5.65%, 196.8, 3.6, 13 | 4.51%, 375.4 |
+| uniform | 400 | 0.535%, 335.3, 2.5, 13 | 0.133%, 338.0, 1.5, 13 | 0.035%, 322.5, 1.2, 13 | 0.76%, 178.3 |
+| | 800 | 12.2%, 237.8, 14.3, 11 | 2.68%, 264.7, 6.5, 12 | 0.54%, 263.2, 2.7, 11 | 4.82%, 199.0 |
+| | 1,600 | 16.9%, 116.1, 16.1, 2 | 19.7%, 135.5, 8.1, 3 | 11.0%, 184.2, 4.2, 8 | 17.8%, 166.1 |
+
+**Primary stragglers per million executed events at W 800** (16 / 4 / 1 LPs per chare): σ 100 1,020 / 1,304 / 1,059; σ 2,000 2,606 / 2,088 / 1,513; uniform 5,780 / 2,886 / 1,706.
+
+**Predictions:**
+- **L1 right except at σ 100.** At W 800, 1 LP per chare cuts the rolled-back share against 16 by 9.2× at σ 2,000 (to 0.61× Devastator's) and 23× on uniform (0.11× Devastator's). At σ 100 the cut is only 5.1×, and Charades still rolls back 12.6× Devastator's share.
+- **L2 half right.** Events rolled back per rollback call fall 4.9–5.3× from 16 to 1 LP per chare at W 800 in all three workloads. Primary stragglers fall 3.4× on uniform and 1.7× at σ 2,000, but not at all at σ 100.
+- **L3 wrong.** With 1 LP per chare the best W is still 400 everywhere: W 800 is 0.84× (σ 100), 0.87× (σ 2,000) and 0.82× (uniform) of it. 1 LP per chare at W 400 is 0.90× of 16 at σ 100, 0.95× at σ 2,000 and 0.96× on uniform.
+- **L4 mostly right.** 4 LPs per chare lies between 16 and 1, with three exceptions: W 1,600 on uniform (19.7%, above both), W 1,600 at σ 100 (5.18%, level with 16's 5.14%), and the straggler count at W 800, σ 100.
+
+**What it says:**
+- **The rollback unit was most of Charades' excess rollbacks at σ 2,000 and uniform.** With 1 LP per chare, Charades rolls back less than Devastator at the same W there.
+- **Shallower rollbacks are most of the gain:** about 2.5 events undone per straggler instead of 12–14.
+- **σ 100 has a second cause.** There the number of stragglers doesn't change with chare size: the LPs themselves have passed the event. Events at σ 100 mostly go to the same PE, which can't straggle (a PE runs its lowest event first), or to adjacent PEs. So adjacent PEs drift apart by more than the lookahead much more often than Devastator's ranks do.
+- **A wider window still loses throughput, even with few rollbacks.** At σ 2,000 with 1 LP per chare, W 800 rolls back only 0.45% yet runs at 0.87× of W 400. Events per htram message halve (48 to 25), because the flush deadline follows W (h = W + 8). That is the other half of the coupling in section 145.
+- **4 LPs per chare is a free improvement at W 400:** 1.00× of 16 at σ 100, 1.00× at σ 2,000, 1.01× on uniform, with 3–4× fewer rollbacks. 1 LP per chare costs 4–10% there: more chares for the scheduler and fossil collection.
+
+**Next (section 149):**
+- With rollbacks cheap, test the decoupling again: a wider W with the flush deadline held near 400.
+- Section 5's failure of that setting (8% stragglers, 47–62% efficiency) was with 16-LP chares, where each straggler undid 12–20 events.
+
+### A wide window with the flush deadline held: decoupling again, now that rollbacks are shallow (design, 2026-10-29; written before any runs)
+
+> **Status: design.** Follows section 148.
+
+**Why.**
+- Charades' window is tied to its flush deadline (h = W + 8). A wider W therefore halves events per htram message (section 148) even when it barely rolls back, and stays slower than W 400.
+- Holding h below W was tried in section 5: receivers ran past held events, giving 8% stragglers and 47–62% efficiency. But each straggler then undid a 16-LP chare (12–20 events). With 1 or 4 LPs per chare it undoes 1.2–2.7 (section 148).
+- A wider window absorbs late GVT updates: a 20 µs delay cost W 400 8.6% and W 800 2.8% (section 146). That is the robustness we want at scale.
+
+**Job H** (`$WORK/charades-runs/hor49.slurm`, 16 nodes; skx-dev copy 3658017 and skx copy 3658018, the later one to start is cancelled; frozen build 0a212f0; `--agg-horizon` already exists):
+- **Workloads:** σ 100 (PP 2,048), σ 2,000 (PP 512), uniform (WPs 512).
+- **Chare sizes:** 4 and 1 LPs per chare.
+- **Arms, per chare size:**
+  - W 400 with the default deadline (408);
+  - W 800 with the default deadline (808);
+  - W 800 and W 1,600 with the deadline held at 408 (`--agg-horizon=408`).
+- **GVT delay at σ 2,000, 1 LP per chare:** W 400 (default deadline) and W 1,600 (held deadline), each with `--diag-gvt-spin-ns=20000`.
+- End time 512,000, 2 reps.
+
+**Predictions:**
+- **H1.** With the deadline held at 408, events per htram message at W 800 and 1,600 stay within 15% of W 400's in every workload.
+- **H2.** With 1 LP per chare and the held deadline, W 800 or W 1,600 is at least as fast as W 400 at σ 2,000 and uniform. At σ 100, where the second straggler cause remains, it is at most 5% slower.
+- **H3.** Held-event stragglers rise, to at least half the primary stragglers at W 1,600 with the held deadline, but the rolled-back share stays below 2%.
+- **H4.** The 20 µs GVT delay costs W 1,600 with the held deadline at most a third of what it costs W 400.
+
+**What follows:**
+- **If H2 and H4 hold:** the scaling fix is per-LP rollback inside a chare (LP-level speed at 16-LP chares' cost) plus a flush deadline set apart from the window. Then a 32-node test with the noise benchmark.
+- **If H2 fails:** find out what the held deadline costs: late events from the senders, or the GVT.
 
 ## Baseline verification on the Mac
 
