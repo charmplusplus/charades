@@ -61,6 +61,7 @@ void LPChare::pup(PUP::er& p) {
         reconstruct_processed_event(processed[i], pending, processed);
       }
       current_event = processed_events.front();
+      if (g_tw_rollback_unit) lp_chain_rebuild();
     }
   }
 

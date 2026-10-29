@@ -74,6 +74,7 @@ class LPChare : public CBase_LPChare {
     LPToken next_token;
     Time current_time;    ///< Time of most recently executed event
     Event* current_event; ///< Most recently executed event
+    bool in_forward = false; ///< a forward handler of this chare is running
 
     /** The next available ID for uniquely identifying events from this LP */
     uint64_t next_event_id;
@@ -175,6 +176,17 @@ class LPChare : public CBase_LPChare {
         current_time = current_event->ts;
       }
     }
+    /**
+     * The time an event for lp is judged against: lp's latest processed event
+     * with --rollback-unit=1, else this chare's (any of its LPs')
+     */
+    Time straggler_time(const LPBase* lp) const;
+    /** --rollback-unit=1: add e, just executed, to its LP's chain */
+    static void lp_chain_push(LPBase* lp, Event* e);
+    /** --rollback-unit=1: take e out of its LP's chain */
+    static void lp_chain_unlink(LPBase* lp, Event* e);
+    /** --rollback-unit=1: rebuild every LP's chain from the processed queue */
+    void lp_chain_rebuild();
 
     /** Stops the Charm++ scheduler and returns control to main */
     void stop_scheduler();
@@ -263,6 +275,8 @@ class LPChare : public CBase_LPChare {
      * \param ts the virtual timestamp to rollback to
      */
     void rollback_me(Time ts);
+    /** --rollback-unit=1: roll back lp's events at or after ts only */
+    void rollback_lp(LPBase* lp, Time ts);
     /**
      * Do a secondary rollback to a particular event
      * \param event the event to rollback to
@@ -301,6 +315,13 @@ class LPBase {
     unsigned gid;
     /** The random number generator for this %LP */
     RNG rng;
+    /**
+     * --rollback-unit=1: this LP's processed events, newest first, linked
+     * through Event::lp_next (they are also in the owner's processed queue,
+     * in execution order). A straggler rolls back only these.
+     */
+    Event* lp_head = NULL;
+    Event* lp_tail = NULL;
 
     /** Called to initialize LP state and seed initial events */
     virtual void initialize() {}

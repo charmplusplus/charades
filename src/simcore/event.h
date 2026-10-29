@@ -187,6 +187,8 @@ public:
   Event* caused_by_me;  // Start of event list caused by this event
   Event* cause_next;    // Next in parent's caused_by_me chain
   Event* cancel_next;   // next in cancel list
+  Event* lp_prev;       // --rollback-unit=1: newer processed event of the same LP
+  Event* lp_next;       // --rollback-unit=1: older processed event of the same LP
 
   // Index of the event in the pending heap and the order of event pupping.
   // Was uint8_t: a chare with more than 256 pending events wrapped it and
@@ -219,6 +221,7 @@ public:
     state.owner = state.remote = state.cancel_q = state.avl_tree = 0;
 
     next = prev = caused_by_me = cause_next = cancel_next = NULL;
+    lp_prev = lp_next = NULL;
 
     type_id = type_size = index = offset = 0;
 
