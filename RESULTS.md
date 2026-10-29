@@ -290,7 +290,7 @@ Sections 1–128 were re-read before planning sections 129 onward.
 | 148 | 2026-10-29 | 3657892 | Job L results: 1 LP per chare cuts rollbacks 5–23× (below Devastator's at σ 2,000 and uniform; σ 100 has a second cause); wider W still slower because the flush deadline follows W; 4 LPs per chare free at W 400 | current |
 | 149 | 2026-10-29 | 3658017 | A wide window with the flush deadline held at 408, 4 and 1 LPs per chare, plus a GVT delay (job H) | design |
 | 150 | 2026-10-29 | 3658017 | Job H results: held deadline gives 2–12× bigger messages and 3× less GVT-delay sensitivity; 1.12× at σ 2,000 with 1 LP per chare, a loss on uniform (held stragglers); W and h need setting together | current |
-| 151 | 2026-10-29 | — | Per-LP rollback inside a chare (`--rollback-unit=1`): implementation, a bug found on the Mac (rollback inside a forward handler), job P design | design |
+| 151 | 2026-10-29 | 3658328 or 3658329 | Per-LP rollback inside a chare (`--rollback-unit=1`): implementation, a bug found on the Mac (rollback inside a forward handler), job P design | design |
 
 ## Stampede3 runs, in order
 
@@ -5926,7 +5926,7 @@ Rollbacks caused by anti-messages are 0–0.2% of rollback calls at W 400 and 12
   - Change tier: the six new configs (bucketed, bucketed with a window, htram PP with the deadline policy, the same with the deadline held at 500 below a window of 2,000, blocking, CD). All pass except CD at 4 PEs, which fails with and without the option. CD is on the harness's known-broken list (issue #11), and its config was dropped.
   - Engine tier with 20 repeats of the five per-LP configs (bucketed, bucketed with a window, htram PP, htram PP with the held deadline, blocking): **2,422/2,422** on the Mac. Commit df75cd2 on branch `lp-rollback`.
 
-**Job P** (16 nodes; build `charades-lprb` on the same Charm++, Reconverse and htram as job H):
+**Job P** (`$WORK/charades-runs/lprb51.slurm`, 16 nodes; skx-dev copy 3658328 and skx copy 3658329, the later one to start is cancelled; tree `charades-lprb`, a worktree at df75cd2 on the same Charm++, Reconverse and htram as job H):
 - σ 100 (PP 2,048), σ 2,000 (PP 512), uniform (WPs 512); end time 512,000; 2 reps.
 - **Arms per workload:**
   - Chare rollback: 16 LPs per chare at W 400 (the paper runs' setting); 4 LPs per chare at W 400 (the best setting so far).
