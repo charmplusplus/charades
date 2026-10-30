@@ -307,6 +307,8 @@ Sections 1–128 were re-read before planning sections 129 onward.
 | 159 | 2026-10-29 | 3660356 | Job A16: PP's ramp is not the allocator (TLB shootdowns not raised; fixed mmap threshold 0.37 s, no-trim 0.26 s lost); no-trim 1.074× PP in steady state; WPs 512 1.047× PP 512 at σ 2,000, 16 nodes | current |
 | 160 | 2026-10-29 | — | `--agg-pp-alloc=1` (PP's shared buffers at their own limit, not ~1.2 MB) and WPs 512 against PP on σ 100/1,000/2,000/4,000 at 16 nodes; job P16 design | design |
 | 161 | 2026-10-30 | 3660590 | Job P16: `--agg-pp-alloc=1` removes most of PP's start-up ramp (σ 2,000 0.40 → 0.14 s) and gains 1.050× (σ 2,000), 1.015× (σ 4,000), level at σ 100/1,000; with it PP leads WPs 512 on all four; to become the default | current |
+| 162 | 2026-10-30 | 3660196 | Job E (32 nodes): no start-up stretch this time (A2r's was an episode); TLB-shootdown bursts at a fixed time after setup (1.5–2.25 s, 3.0, 5.0 s; about 25×) hold 36–82% of σ 100's lost time; a 5 s start delay moves them before the clock: 1.128× paired; tree 4 0.894×, tree 8 0.856×, wave batch 0.952×; stretched waves are one slow hop each; no transmit wait or overflow at σ 100; σ 2,000 stalls (old PP allocation) | current |
+| 163 | 2026-10-30 | — | Are the TLB-shootdown bursts automatic NUMA balancing? `/proc/vmstat` sampled; `numactl --localalloc` against the default and the start delay at σ 100, σ 2,000 and uniform, 16 nodes; job N16 design | design |
 
 ## Stampede3 runs, in order
 
@@ -6054,7 +6056,7 @@ Events rolled back per rollback call at W 400: 3.7–4.0 (16, chare), 1.5–2.0 
 
 ### Section 153's start-up transient is a slow cross-process reduction, in episodes of seconds; a diagnostic job (analysis of existing traces and design, 2026-10-29; written before any runs)
 
-> **Status: design.**
+> **Status: design; results in section 162** (job E) **and 155** (job E16). Section 162: the start-up stretch did not recur; the time lost at 32 nodes follows TLB-shootdown bursts at a fixed time after setup.
 > - **Analysis:** no new runs; A2r's six traced runs (job 3657016). Scripts `turn.py`, `epis.py`, `valid.py`, `steady.py`, `shape2.py` in `~/charades-data/scale32/episodes/`.
 > - **Job E:** Charades `episode-diag` (this commit; per-LP rollback, now the default), htram, Reconverse and the launch as in A2r; `$WORK/charades-runs/episode54.slurm` (32 nodes, skx, `-x c455-081`).
 > - **Job E16:** the same blocks at 16 nodes on skx-dev, without block C (`episode54.slurm n16`). It was added while job E waited for 32 skx nodes, to get the instruments' first data sooner; the predictions below are for 32 nodes.
@@ -6372,6 +6374,160 @@ This is a diagnosis; neither setting is a candidate for the paper's launch (sect
 - it is 1.050× and 1.015× where PP 512 is used, level where PP 2,048 is used, and removes most of the ramp;
 - it needs htram `pp-alloc-limit` merged into `pdes`;
 - it gets checked at 32 nodes in the next 32-node job.
+
+### Job E results: no start-up stretch this time; TLB-shootdown bursts at a fixed process age cost 0.26–0.60 s a run at 32 nodes, and a 5 s start delay that moves them out of the clocked run gains 1.13×; the tree and wave batching lose; stretched waves are one slow hop each (2026-10-30; skx batch job 3660196, 32 nodes)
+
+> **Status: current.** Design and predictions in sections 154 and 155.
+> - **Allocation:** 32 nodes in 14 racks (c476-002 to c506-112), 12:10–12:21. Gate 24/24.
+> - **Runs:** all 36 Charades runs ok, plus Devastator 4 of 4. Committed counts are equal within each workload, and equal to Devastator's.
+> - **Binary:** charades-lprb, built from e6c5efc. It predates `--agg-pp-alloc`, so σ 2,000 used PP's old 1.2 MB shared buffers.
+> - **Sampler:** on all 32 nodes, on its step's own CPU, from the warm-up to the end of block D. Again it left no end dumps; the 5 s flushes kept every CSV.
+> - **Data:** `~/charades-data/scale32/episodes/n32_j3660196/`, with `summary.txt` (`epi_summary.py`).
+> - **Scripts:** `course32.py` (time course), `irq32.py` (interrupts by 0.25 s bin), `tlb_closure.py`, `hopwave.py` and `hoppairs.py` (tree hops), all in `~/charades-data/scale32/episodes/`.
+
+**Untraced, 32 nodes** (M ev/s, higher is better; "paired" is each rep's arm ÷ the default run of the same rep, which ran within a minute of it; "lost" is the time the first 2 s lose against the rest of the run's rate):
+
+| arm | M ev/s, median (reps) | ÷ default, paired median (per rep) | lost in the first 2 s (s) |
+|---|---|---|---|
+| σ 100, Charm++ reduction (default) | 1,098.2 (1,098.2, 927.1, 1,159.7) | 1.000 | 0.26 |
+| σ 100, `--gvt-wave-tree=4` | 1,010.4 (981.3, 1,177.3, 1,010.4) | 0.894 (0.894, 1.270, 0.871) | 0.13 |
+| σ 100, `--gvt-wave-tree=8` | 942.6 (939.8, 1,153.6, 942.6) | 0.856 (0.856, 1.244, 0.813) | 0.21 |
+| σ 100, `--wave-batch=4` | 1,045.4 (1,045.4, 915.9, 1,091.7) | 0.952 (0.952, 0.988, 0.941) | 0.26 |
+| σ 100, `--start-delay-ms=5000` | **1,241.1** (1,241.1, 1,046.2, 1,258.8) | **1.128** (1.130, 1.128, 1.085) | 0.34 |
+| σ 100, sampler off (block E, after Devastator) | 944.6 (961.3, 927.9) | — | 0.27 |
+| σ 2,000 (PP 512, old allocation) | 829.2 (909.8, 803.7, 829.2) | 1.000 | 0.45 |
+| σ 2,000, `--start-delay-ms=5000` | 747.4 (665.5, 954.0, 747.4) | 0.901 (0.731, 1.187, 0.901) | 0.21 |
+| uniform (WPs 512) | 430.6 (430.6, 357.0, 481.7) | — | 0.57 |
+| σ 100 at 16 nodes (block C, the first 16) | 629.3 (606.6, 652.0) | — | 0.07 |
+
+- **Devastator, W 1,000:** σ 100 852.2 and 878.0 M ev/s; uniform 247.8 and 253.6. That is 0.70× and 0.82× its A2r rates at the same W (1,242.2 and 306.8). Charades' σ 100 W 400 is 0.94× its A2r rate (1,171.9, chare rollback then).
+  - So in this allocation Charades ÷ Devastator is 1.27 at σ 100 and 1.72 on uniform (A2r: 0.89 and 1.66). One allocation each; Devastator's best W was not swept here.
+- **With the start delay, σ 100 runs at 0.99 of twice the 16-node rate** (1,241.1 against 2 × 629.3). The 16-node runs had no delay, but the dip costs only about 2% there.
+- **Large run-to-run spread.** Every arm has a fast and a slow rep (1.25× apart for the default). Only the paired ratios separate the arms.
+
+**Simulated time per wall second, 0.5 s bins from the clock start** (thousands; higher is faster):
+
+| run | 0 | 0.5 | 1.0 | **1.5** | 2.0 | 2.5 | 3.0 | 3.5 | 4.0 | 4.5 |
+|---|---|---|---|---|---|---|---|---|---|---|
+| default r1 | 267 | 448 | 349 | **233** | 363 | 419 | 409 | 441 | 443 | 475 |
+| default r2 | 225 | 334 | 382 | **246** | 309 | 356 | 338 | 382 | 311 | 327 |
+| default r3 | 260 | 459 | 455 | **305** | 379 | 448 | 421 | 457 | 462 | — |
+| tree 4, r2 | 256 | 459 | 479 | **287** | 398 | 458 | 418 | 453 | 486 | — |
+| start delay r1 | 235 | 405 | 455 | 474 | 479 | 472 | 474 | 476 | 469 | — |
+| start delay r2 | 283 | 374 | 244 | 397 | 443 | 387 | 389 | 468 | 370 | 366 |
+| start delay r3 | 281 | 451 | 473 | 474 | 473 | 461 | 471 | 451 | 469 | — |
+
+**The dip lines up with bursts of TLB shootdowns.** Default r1, per 0.25 s, interrupts per second summed over the 32 nodes (thousands; from `/proc/interrupts`; the function-call interrupts track the TLB ones):
+
+| wall s | 0.75 | 1.0 | 1.25 | **1.5** | **1.75** | **2.0** | 2.25 | 2.5 | 2.75 | **3.0** | 3.25 | … | **5.0** |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| simulated time per s (thousands) | 455 | 338 | 360 | **261** | **206** | **301** | 426 | 455 | 383 | **391** | 427 | … | **453** |
+| TLB shootdowns per s (thousands) | 13.9 | 13.8 | 14.9 | **133** | **359** | **133** | 22.8 | 9.4 | 44.9 | **149** | 25.9 | … | **83** |
+
+- **What it shows:**
+  - In every run without the delay, TLB shootdowns rise about 25× at 1.5–2.25 s of clock time: about 11 k/s per node, on most nodes at once. Smaller bursts follow near 3.0 s and 5.0 s. In uniform's 13–16 s runs there are more, near 11 s and 14 s.
+  - The gaps between bursts grow (about 1.3, 2, 6 s).
+  - **The delayed σ 100 runs have the same bursts at the same times after setup, while no events run:** 156–349 k/s at 1.5–2.25 s after setup, and 119–168 k/s at 3.0 s. The clocked part then stays at 5–17 k/s, except for one 36–42 k/s bin at 4.0 s. So the bursts follow the time since setup (launch and setup take under 2 s, so a process age of about 3–4 s), not the simulation's work.
+- **The same burst at 16 nodes.** Job A16's σ 2,000 runs (section 159) have it at the same clock time (75, 163 and 87 k/s summed over 16 nodes at 1.5–2.25 s; again at 3.0 s), with the dip. Section 159 compared only the first 0.75 s with 2–5 s, so it missed this.
+  - The per-node rate is the same at 16 and 32 nodes. The dip is deeper at 32 nodes (35–50% of the rate, against 15–25% at 16), as expected if any one of 64 processes being slow holds up a wave.
+- **Closure.** σ 100 runs, 0.25 s bins from 0.75 s to the end, time lost against the delayed runs' 470 k/s (`tlb_closure.py`, threshold 50 k/s summed):
+  - In the 12 runs without the delay (default, both trees, wave batching), the 4–7 high-TLB bins hold 0.26–0.60 s, 36–82% of each run's loss. Their mean rate is 283–347 k/s against 347–466 in the other bins.
+  - The delayed runs have no high-TLB bins. Two lose 0.04 s each; the third (r2) loses 0.93 s in ordinary bins.
+  - **The rest of the loss is a slow-run state.** Outside the bursts, 7 of the 15 σ 100 runs run at 347–390 k/s, against 421–470 for the other eight, with no TLB rise. Arms of both kinds are among them.
+- **Kernel settings.** On the login node automatic NUMA balancing is on (`kernel.numa_balancing = 1`) and transparent huge pages are `always`; the compute nodes are not yet checked.
+  - Automatic NUMA balancing makes page-table entries inaccessible to sample where a process's memory is used. Every such change interrupts the process's other CPUs to flush their TLBs, and a misplaced page is migrated on its next use.
+  - Its scan period starts short and lengthens while the faults it sees are local. Each process here runs on one socket, so its faults would be local.
+  - That fits both the timing and the growing gaps, but it is not shown: the sampler did not read `/proc/vmstat`.
+
+**Traced runs:**
+- **No start-up stretch.** In both traced Charm++ runs the reduction after the last process is 83–108 µs over 0–1.5 s; in A2r it was 292–411 µs. It peaks at 117–193 µs in the dip.
+- **In the 1.75–2.0 s dip:**
+  - the slowest process's turnaround is 172–266 µs (45–65 µs otherwise);
+  - kernel time per PE per wave rises from 0.4 to 0.7–0.8 µs, and minor faults per PE per wave from 0.03–0.05 to 0.07–0.10.
+  - As averages these are small. They cannot show one PE held in the kernel on a wave's critical path.
+- **Mid-run episodes** have the section 154 signature: reduction 150–581 µs with turnarounds normal (39–71 µs). Examples: default trace r1 at 2.0–2.75, 3.5–3.75 and 5.25–5.5 s; the tree runs at 1.0–1.5 s and 3.25–3.5 s.
+- **The tree is slower in steady state:** its reduction is mostly 150–230 µs against 110–125 µs for the Charm++ path. Up hops wait 14–22 µs beyond their pair's fastest at σ 100, and 58–76 µs on uniform.
+- **Each stretched wave is one slow hop** (`hopwave.py`). For waves whose reduction is at least 2× the median, the slowest single hop holds at least 70% of the wave's excess in 98–99% of them (2,645 of 2,691; 2,955 of 3,025; 2,979 of 3,039; 7,260 of 7,344). The median share is 1.3–1.4, so that hop holds all the excess.
+  - They are up and down hops in about equal numbers.
+  - They spread over many node pairs (`hoppairs.py`). The worst pairs are slow (≥ 100 µs beyond their fastest) in 4–6% of waves, against 0.85% for the median pair.
+  - In all four tree runs the top pairs involve c479-044 as sender (processes 14 and 15) and c477-021 (processes 2 and 3) in both directions.
+  - The lifetime error counters dumped at the start do not single out these nodes.
+
+**hfi1 counters:**
+- **No receive overflow in any run.** Eager buffers full, header queue full, receive overflow, `SeqDrop0` and the per-context `RcvHdrOvr` stay at 0.
+- **Transmit wait:**
+  - σ 100: 0 in 11 of the 15 32-node runs; at most 7 × 10⁴ ticks/s in the other four.
+  - σ 2,000: 0.6–5 × 10⁷ ticks/s.
+  - uniform: 1–4 × 10⁸ ticks/s.
+- So at σ 100 the slow-run state and the reduction episodes come with no back-pressure at our ports.
+
+**Two more things seen:**
+- **σ 2,000 stalls (old PP allocation).** In 3 of 6 σ 2,000 runs, 64 GVT advances took 0.39–0.83 s instead of about 16 ms, once or twice a run (default r2 at 1.6 s; delay r1 at 1.4 and 2.3 s; delay r3 at 2.1 s). That cost 0.4–1.7 s a run.
+  - There is no TLB rise and no overflow during them. One CAL-only burst (2.5 M/s summed) followed delay r1's second stall.
+  - Unexplained. None of the 95 runs of jobs E16, R16, A16 and P16 at 16 nodes, with the old allocation or the new, has a gap over 0.2 s. They make E10 unreadable.
+- **Uniform's clock start** brings 2.0 M TLB shootdowns/s summed (62 k/s per node) in the first 0.25 s. This is tied to the simulation's own start, presumably WPs' buffers being allocated.
+
+**Predictions:**
+- **E1 wrong.** No systematic start-up stretch at 32 nodes: rest ÷ first 2 s is 1.15 (1.15–1.31), and 0.26 s is lost. A2r's stretch was an episode that happened to fall at the start.
+- **E2:** wrong at start-up, where there was no stretch. The signature is right for the mid-run episodes.
+- **E3:** the tree is not faster (0.894 paired) and has episodes too, so the Charm++ path is not the cause (H4 out). Each stretched wave is one slow hop, not most hops. Those hops are not confined to two receiving processes: they spread over node pairs, led by c479-044's sends.
+- **E4 wrong as stated.** Average kernel time and faults rise less than 3×. The kernel is still involved, through the TLB-shootdown bursts, which the averages cannot attribute.
+- **E5 wrong at σ 100.** The episodes come without transmit wait at our ports or any overflow (H3 out at our ports). Congestion deeper in the fabric is not excluded.
+- **E6 right in part.** The start delay removes the 1.5–2.0 s dip (two of three runs stay at 470 k/s throughout) and gains 1.128× paired. The first 2 s still lose 0.34 s to the first 0.75 s's ramp, which the delay does not touch.
+- **E7 wrong:** `--wave-batch=4` 0.952×.
+- **E8 not separable.** Block E ran 0.86× the default, but last and after Devastator, as in E16. E16's interleaved check found no sampler cost.
+- **E9 wrong:** fan-out 8 is 0.856×, below both the 4-ary tree and the Charm++ path.
+- **E10 unreadable:** σ 2,000's stalls dominate (0.731–1.187 paired).
+
+**What follows:**
+- **Remove the TLB-shootdown bursts without a start delay.**
+  - First check that they are automatic NUMA balancing (`/proc/vmstat`), then turn it off for our processes. `numactl --localalloc` gives each process a memory policy other than the default, and NUMA balancing skips memory under such a policy.
+  - Allocation is unchanged: each thread's pages still come from its own socket.
+  - Every engine gets the same launch in the paper runs. Devastator ran 0.70× its A2r rate here and may be exposed too.
+  - Job N16, section 163.
+- **Still unexplained:**
+  - the slow-run state;
+  - the single slow hops spread over node pairs;
+  - σ 2,000's stalls, to be checked with the new PP allocation.
+- **Dropped:** the 4-ary and 8-ary trees and wave batching at 32 nodes.
+
+### Are the TLB-shootdown bursts automatic NUMA balancing, and does turning it off for our processes remove the dip? (design, 2026-10-30; written before any runs)
+
+> **Status: design.**
+> - **Job N16:** Charades `main` a035fbc (`--agg-pp-alloc=1` and per-LP rollback are the defaults) with htram `pdes` 42d347f, Reconverse and the launch as in job E.
+> - **Sampler:** it now also reads `/proc/vmstat`'s counters for:
+>   - NUMA balancing (`numa_pte_updates`, `numa_huge_pte_updates`, `numa_hint_faults`, `numa_hint_faults_local`, `numa_pages_migrated`);
+>   - migration (`pgmigrate_success`, `pgmigrate_fail`);
+>   - transparent huge pages (`thp_fault_alloc`, `thp_collapse_alloc`, `thp_split_pmd`, `thp_migration_success`);
+>   - compaction (`compact_stall`, `compact_migrate_scanned`), and `pgfault`.
+>
+>   Its start dump records `kernel.numa_balancing` and the transparent-huge-page settings.
+> - **Script:** `$WORK/charades-runs/numa63.slurm`, 16 nodes on skx-dev, with an skx copy; the loser is cancelled.
+
+**Why 16 nodes.** The burst and the dip appear at 16 nodes at the same clock time and per-node rate (job A16), and skx-dev starts within hours, where 32 skx nodes took 15 h. The dip costs only about 2% at 16 nodes, so the decision rests on the counters and the time course, not on throughput. The 32-node measurement follows if the mechanism is confirmed.
+
+**Runs** (16 nodes, W 400, end time 2,048,000, untraced, the sampler on, 3 reps interleaved, a warm-up launch first):
+- σ 100 (PP 2,048): the default; under `numactl --localalloc`; with `--start-delay-ms=5000`.
+- σ 2,000 (PP 512): the default; under `numactl --localalloc`.
+- Uniform (WPs 512): the default; under `numactl --localalloc`.
+- The job logs `numactl --show` from one task under the same srun options.
+
+**Predictions:**
+- **N1. Mechanism.** In the default runs, `numa_pte_updates` and `numa_hint_faults`, summed over nodes, rise at least 10× during the 1.5–2.25 s TLB burst against 0.75–1.5 s. If instead `thp_collapse_alloc`, `compact_*` or `pgmigrate_*` rise with the burst and the NUMA counters do not, the cause is huge-page collapse or compaction, and N2 should fail.
+- **N2. Perturbation.** Under `numactl --localalloc`, in all 3 reps of each workload:
+  - `numa_pte_updates` stays below 1% of the default runs';
+  - TLB shootdowns at 1.5–2.25 s stay below 2× their 0.75–1.5 s rate;
+  - the time course has no 1.5–2.0 s dip (that bin within 10% of 1.0–1.5 s).
+- **N3. Throughput at 16 nodes.** At σ 100 `numactl --localalloc` is at least 1.01× the default (paired median) and within 0.02 of the start delay's ratio. At σ 2,000 it is at least 1.01×.
+- **N4. Uniform's burst at the clock start** (2 M/s at 32 nodes) is unchanged by `numactl`, because it comes from the simulation's own allocations.
+- **N5. σ 2,000 with the new PP allocation** has no stretch where 64 GVT advances take more than 0.2 s.
+
+**What follows:**
+- **N1 and N2 right:** add `numactl --localalloc` to the Stampede3 launch for Charades, Devastator and ROSS. Measure it at 32 nodes in the next skx job (prediction: at least 1.08× paired at σ 100, against the start delay's 1.128×), together with the checks already queued there:
+  - `--agg-pp-alloc=1`;
+  - the controller with per-LP rollback;
+  - Devastator under the same launch.
+- **N1 wrong:** follow whichever `/proc/vmstat` counter moves with the burst.
 
 ## Baseline verification on the Mac
 
