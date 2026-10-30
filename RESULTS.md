@@ -36,6 +36,8 @@ Every number from every run: Stampede3 runs in order (each design, written befor
 
 Charades is faster than Devastator in 44 of 48 cells and 2.4–5.3× faster than ROSS everywhere. At 32 nodes it leads in 6 of 8 workloads (1.04–1.66×), trails at σ 100 (0.89) and is level at lookahead 10 σ 500 (0.99). **But from 16 to 32 nodes Charades loses more per node than Devastator in every workload** (0.72–0.87 against 0.80–0.98), so it scales best from 1 to 32 nodes in only 4 of 8 workloads (6 of 8 from 1 to 16). Its controller is 0.93–0.97 of its best fixed W at 32 nodes on six workloads (0.96–1.03 at 1–16). Section 153 has the breakdown. These runs used chare rollback; per-LP rollback (section 152) came after them.
 
+> **Default change, 2026-10-29 (main 9d08fbd):** per-LP rollback inside a chare (`--rollback-unit=1`, section 152) is the default. A straggler rolls back only its own LP, not every later event of the chare's LPs: 3.5–15× fewer events rolled back at W 400, throughput unchanged (−1.6% to +2.2%). Every table above and below used chare rollback (`--rollback-unit=0`). Full test matrix 13,345/13,345 on the Mac.
+
 **Charades and Devastator on long runs, 1 / 4 / 16 nodes, all eight workloads** (jobs 3650921 and 3652595, sections 124 and 130; end time 2,048,000, lookahead 10: 512,000; median of 3; each engine at its best setting: Charades over PP 512 and PP 2,048 (uniform: WPs 512 and PP 512; lookahead 10 σ 2,000: also WPs 512) × W 250/400/600 (lookahead 10: 50/100/200) and the controller; Devastator over W 500/1,000 (2,000 at 16 nodes; lookahead 10: 100/200/400), CLCG4; current launch):
 
 | workload | Charades, 16 nodes (M ev/s) | Devastator, 16 nodes (M ev/s) | Charades ÷ Devastator, 1 / 4 / 16 nodes (higher is better) | efficiency 4→16, Charades / Devastator (1.0 is perfect) |
@@ -5946,7 +5948,7 @@ Rollbacks caused by anti-messages are 0–0.2% of rollback calls at W 400 and 12
 
 ### Per-LP rollback inside a chare, results: 1 LP per chare's rollbacks at no cost; the held deadline is a new best at σ 2,000 but loses elsewhere, and a late GVT update costs as much as at W 400 (2026-10-29; skx-dev batch job 3658328, 16 nodes)
 
-> **Status: current.** Design and predictions in section 151.
+> **Status: current.** Design and predictions in section 151. Per-LP rollback became the default on these results (main 9d08fbd, 2026-10-29; full test matrix 13,345/13,345 on the Mac).
 > - **Allocation:** 16 nodes, 8 min, gate 48/48 (including the three per-LP configs on 2 nodes). The skx copy (3658329) was cancelled before it started.
 > - **Build:** `charades-lprb`, a worktree at df75cd2; the first build failed on a parallel-make race (`scheduler.decl.h` not yet generated) and was rebuilt serially.
 > - **Runs:** 58, all ok. Every workload committed the same events in every run.
