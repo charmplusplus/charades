@@ -301,6 +301,7 @@ Sections 1–128 were re-read before planning sections 129 onward.
 | 155 | 2026-10-29 | 3660089 | Job E16 (16 nodes): no reduction stretch at 16 nodes; σ 2,000's 0.4 s start-up ramp is user-space PE work (kernel ~1%); a 1.5–2.0 s dip tied to process age; no receive overflow; one external congestion episode; job E gains tree 8 and a σ 2,000 start delay | current |
 | 156 | 2026-10-29 | — | σ 2,000's start-up ramp at 16 nodes: start delay, htram mode (PP, WPs, direct), σ 4,000, and a perf profile of process 0 split by time; job R16 design | design |
 | 157 | 2026-10-29 | 3660206 | Job R16: σ 2,000's 0.36 s start-up ramp is htram PP's (WPs 0.05 s, direct 0.01 s; start delay leaves 0.30 s); PEs wait, not work (idle-loop functions 4–7× per unit simulated time); one random PE per wave ~500 µs late; WPs 512 1.03× PP 512 overall | current |
+| 158 | 2026-10-29 | — | Does PP's start-up ramp follow glibc's handling of PP's ~1.2 MB per-send shared buffers? TLB shootdowns sampled; fixed mmap threshold and no-trim as perturbations; job A16 design | design |
 
 ## Stampede3 runs, in order
 
@@ -6265,6 +6266,32 @@ Waves 10–95%, medians over waves (µs; lower is better):
   - the first sends to each destination process.
 
   The per-PE records (`--gvt-trace=4`) with htram's flush and the GVT-result step timed per wave would split it. That is a small change, worth making only if PP stays the setting at σ ≥ 2,000 after job E.
+
+### Does PP's start-up ramp follow glibc's handling of PP's per-send buffers? TLB shootdowns and two malloc settings (design, 2026-10-29; written before any runs)
+
+> **Status: design.**
+> - **Build:** Charades `episode-diag` (this commit adds TLB-shootdown, function-call and rescheduling interrupts from `/proc/interrupts` to `hfi_sampler.py`; the binary is unchanged).
+> - **Job A16:** `$WORK/charades-runs/alloc58.slurm` (16 nodes, skx-dev, `-x c455-081`).
+
+**Why.** Section 157 found that one random PE per wave is about 400 µs late in PP's first 0.75 s, with few page faults. One thing PP does that WPs does not: after every send of a process's shared buffer toward a destination process, the sending PE allocates a new one at htram's largest size. That is `BUFSIZE + LOCAL_BUFSIZE` = 16,400 items of about 72 B, about 1.2 MB, to carry about 3 KB (49 events a message at σ 2,000). At 16 nodes that is roughly 10 GB/s of allocation per process.
+- How glibc serves this changes as a run starts. Blocks over the mmap threshold (128 KB at first) are mapped and unmapped each time, until a free raises the threshold; arena heaps then grow, and are trimmed when the top's free space passes the trim threshold.
+- Unmapping or trimming touched memory interrupts every core running the process with a TLB shootdown. That would show as kernel time spread over all PEs with few faults, which is what E16 measured at the start: 5.8 against 1.7 µs of kernel time per PE per wave, about 3 ms per wave over 736 PEs.
+- Sections 80 and 92 already found PP sensitive to allocation size (1.07–1.14×) and to trimming (1.055–1.083×), unexplained.
+
+**Runs** (σ 2,000, W 400, end time 2,048,000, untraced, 3 reps interleaved, the sampler on every node):
+- PP 512 (as now);
+- WPs 512;
+- PP 512 with `GLIBC_TUNABLES=glibc.malloc.mmap_threshold=33554432` (1.2 MB blocks come from the heap from the start; the threshold no longer moves);
+- PP 512 with no trimming (`glibc.malloc.trim_threshold=1073741824:glibc.malloc.top_pad=67108864`; this also pins the mmap threshold at 128 KB, so every 1.2 MB block is mapped and unmapped).
+
+This is a diagnosis; neither setting is a candidate for the paper's launch (section 140: glibc settings stay out of launches).
+
+**Predictions:**
+- A1. If allocator churn causes the ramp, TLB shootdowns per second over all nodes in PP 512's first 0.75 s are at least 3× its rate at 2–5 s, and at least 3× WPs 512's in the same window.
+- A2. Then at least one of the two settings cuts PP's time lost in the first 2 s from about 0.36 s to at most 0.15 s, and its start-up TLB-shootdown rate falls with it.
+- A3. If shootdowns do not rise at PP's start and neither setting moves the ramp, the allocator is not the cause, and the next step is section 157's per-wave timing of htram's flushes and the GVT-result step.
+
+**What follows:** if A1 and A2 hold, the fix is in htram, not in the launch. PP would allocate each new shared buffer at its current limit (512 + 16 items, 38 KB) instead of htram's largest size, or reuse buffers, so no run depends on glibc's thresholds.
 
 ## Baseline verification on the Mac
 
