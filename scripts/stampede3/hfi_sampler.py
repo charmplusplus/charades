@@ -52,6 +52,7 @@ def value(fd):
 
 def dump_all(tag):
     with open(os.path.join(out, '%s_all_%s.txt' % (host, tag)), 'w') as f:
+        f.write('# CPUs this sampler may run on: %s\n' % sorted(os.sched_getaffinity(0)))
         for d in (port, devc):
             for n in sorted(os.listdir(d)):
                 try:
