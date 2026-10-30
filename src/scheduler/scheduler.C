@@ -12,6 +12,8 @@
 #include "trigger.h"
 #include "util.h"
 
+#include <chrono>
+
 CkGroupID scheduler_id;
 CpvDeclare(SchedulerPtr, g_scheduler);
 
@@ -64,7 +66,11 @@ void Scheduler::groups_created() {
 
 void Scheduler::start_simulation() {
   if (CkMyPe() == 0) {
-    CkPrintf("Simulation Starting: %.2f MB\n", CmiMemoryUsage()/(1024.0*1024.0));
+    // The Unix time lets per-node samplers be lined up with the run
+    CkPrintf("Simulation Starting: %.2f MB, Unix time %.3f\n",
+        CmiMemoryUsage()/(1024.0*1024.0),
+        std::chrono::duration<double>(
+            std::chrono::system_clock::now().time_since_epoch()).count());
   }
   start_time = CmiWallTimer();
   running = true;
@@ -161,7 +167,8 @@ void Scheduler::print_progress(Time ts) {
   double mb = CmiMemoryUsage()/(1024.0*1024.0);
   int gvt_num = cumulative_stats->total_gvts;
   if (cumulative_stats != stats) gvt_num += stats->total_gvts;
-  CkPrintf("GVT %6i: %10i (%6.2f%%), %.2f MB\n", gvt_num, time, percent, mb);
+  CkPrintf("GVT %6i: %10i (%6.2f%%), %.2f MB, %.4f s\n", gvt_num, time, percent, mb,
+      running ? CmiWallTimer() - start_time : 0.0);
 }
 
 /** Attempt to execute the next LPs next event, returning false if it fails */

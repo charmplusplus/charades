@@ -49,6 +49,7 @@ unsigned g_tw_gvt_node_waves;
 unsigned g_tw_gvt_wave_allreduce;
 unsigned g_tw_gvt_wave_tree;
 unsigned g_tw_warmup_pings;
+unsigned g_tw_start_delay_ms;
 unsigned g_tw_diag_gvt_spin_ns;
 unsigned g_tw_diag_window_lag_ns;
 unsigned g_tw_wave_batch;
@@ -153,6 +154,7 @@ void clear_globals() {
   g_tw_gvt_wave_allreduce = 0;
   g_tw_gvt_wave_tree = 0;
   g_tw_warmup_pings = 0;
+  g_tw_start_delay_ms = 0;
   g_tw_diag_gvt_spin_ns = 0;
   g_tw_diag_window_lag_ns = 0;
   g_tw_wave_batch = 0;

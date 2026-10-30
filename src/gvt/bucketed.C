@@ -12,6 +12,7 @@
 #include <dlfcn.h>
 #include <algorithm>
 #ifdef __linux__
+#include <sys/resource.h>
 #include <sys/syscall.h>
 #include <unistd.h>
 #endif
@@ -710,7 +711,8 @@ void BucketGVT::poll() {
 }
 
 NodeWaves::NodeWaves()
-    : t_combined(0), t_result(0), slots(CkMyNodeSize()), arrived(0), slot_t(CkMyNodeSize()), gen(0), flight(false),
+    : t_combined(0), t_result(0), slots(CkMyNodeSize()), arrived(0), slot_t(CkMyNodeSize()),
+      slot_use(CkMyNodeSize()), prev_use(CkMyNodeSize()), gen(0), flight(false),
       rounds(0), ar_wave(0), ar_round(0), ar_active(false), tree_parent(-1),
       tree_wave(0), tree_in(0), tree_lock(CmiCreateLock()) {
   while ((1 << rounds) < CkNumNodes()) rounds++;
@@ -736,7 +738,17 @@ void NodeWaves::contribute_from(int rank, const std::vector<CmiInt8>& v) {
   slots[rank].assign(v.begin(), v.end());
   // Each PE stamps its own slot; its increment releases the stamp, and the
   // last PE's increment acquires them all
-  if (g_tw_gvt_trace >= 2) slot_t[rank] = CmiWallTimer();
+  if (g_tw_gvt_trace >= 2) {
+    slot_t[rank] = CmiWallTimer();
+#ifdef RUSAGE_THREAD
+    struct rusage u;
+    if (getrusage(RUSAGE_THREAD, &u) == 0) {
+      slot_use[rank] = {u.ru_minflt, u.ru_nivcsw,
+          u.ru_utime.tv_sec * 1e6 + u.ru_utime.tv_usec,
+          u.ru_stime.tv_sec * 1e6 + u.ru_stime.tv_usec};
+    }
+#endif
+  }
   if (arrived.fetch_add(1, std::memory_order_acq_rel) + 1 < CkMyNodeSize()) {
     return;
   }
@@ -748,7 +760,19 @@ void NodeWaves::contribute_from(int rank, const std::vector<CmiInt8>& v) {
   if (g_tw_gvt_trace >= 2) {
     double first = slot_t[0];
     for (int r = 1; r < CkMyNodeSize(); r++) first = std::min(first, slot_t[r]);
-    proc_waves.push_back({first, slot_t[rank], 0.0, rank, 0.0});
+    ProcWave w;
+    w.first = first; w.last = slot_t[rank]; w.result = 0.0; w.last_rank = rank; w.handled = 0.0;
+    for (int r = 0; r < CkMyNodeSize(); r++) {
+      const Usage &now = slot_use[r], &was = prev_use[r];
+      const double st = now.stime_us - was.stime_us;
+      w.minflt += now.minflt - was.minflt;
+      w.nivcsw += now.nivcsw - was.nivcsw;
+      w.utime_us += now.utime_us - was.utime_us;
+      w.stime_us += st;
+      if (st > w.stime_max_us || w.stime_max_rank < 0) { w.stime_max_us = st; w.stime_max_rank = r; }
+    }
+    prev_use = slot_use;
+    proc_waves.push_back(w);
   }
   // The last PE in: every slot is written, and none is written again before
   // this wave's result is out
@@ -784,10 +808,13 @@ struct NodeGvtTimer {
 void NodeWaves::write_proc_waves() const {
   std::ofstream t(std::string(g_output_dir) + "gvt_waves_" +
                   std::to_string(CkMyNode()) + ".csv");
-  t << "first_s,last_s,result_s,last_rank,handled_s\n" << std::fixed << std::setprecision(7);
+  t << "first_s,last_s,result_s,last_rank,handled_s,minflt,nivcsw,utime_us,stime_us,stime_max_us,stime_max_rank\n"
+    << std::fixed;
   for (const ProcWave& w : proc_waves) {
-    t << w.first << "," << w.last << "," << w.result << "," << w.last_rank
-      << "," << w.handled << "\n";
+    t << std::setprecision(7) << w.first << "," << w.last << "," << w.result
+      << "," << w.last_rank << "," << w.handled << "," << w.minflt << ","
+      << w.nivcsw << std::setprecision(0) << "," << w.utime_us << ","
+      << w.stime_us << "," << w.stime_max_us << "," << w.stime_max_rank << "\n";
   }
   if (g_tw_gvt_wave_tree) {
     std::ofstream h(std::string(g_output_dir) + "gvt_hops_" +
