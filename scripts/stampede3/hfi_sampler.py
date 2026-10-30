@@ -5,8 +5,9 @@ Every PERIOD seconds (default 0.1) records the Unix time and a set of hfi1
 counters: the port's transmit wait and flow-stall ticks (back-pressure from
 the switch), packets and words in and out, and the driver's receive-overflow
 counters (eager buffers or header queue full, receive overflow, per-context
-header-queue overflows summed). Run one per node, pinned to a core no PE
-uses. Writes OUTDIR/<host>.csv on SIGTERM or SIGINT (and every 60 s), plus
+header-queue overflows summed), and the node's TLB-shootdown, function-call
+and rescheduling interrupts from /proc/interrupts, summed over CPUs. Run one
+per node. Writes OUTDIR/<host>.csv on SIGTERM or SIGINT (and every 60 s), plus
 OUTDIR/<host>_all_{start,end}.txt with every counter of the port and device.
 
 Usage: hfi_sampler.py OUTDIR [PERIOD_S]
@@ -41,6 +42,19 @@ fds = [opened(d + n) for d, n in NAMES]
 ovr = [opened(port + f) for f in sorted(os.listdir(port)) if f.startswith('RcvHdrOvr')]
 
 
+def irqs():
+    """TLB shootdowns, function-call and rescheduling interrupts, summed over CPUs"""
+    out = {'TLB:': -1, 'CAL:': -1, 'RES:': -1}
+    try:
+        for line in open('/proc/interrupts'):
+            f = line.split()
+            if f and f[0] in out:
+                out[f[0]] = sum(int(x) for x in f[1:] if x.isdigit())
+    except OSError:
+        pass
+    return [out['TLB:'], out['CAL:'], out['RES:']]
+
+
 def value(fd):
     if fd < 0:
         return -1
@@ -63,7 +77,7 @@ def dump_all(tag):
 
 rows = []
 csv = os.path.join(out, host + '.csv')
-header = 'unix_s,' + ','.join(n.split(',')[0] for _, n in NAMES) + ',RcvHdrOvr_sum\n'
+header = 'unix_s,' + ','.join(n.split(',')[0] for _, n in NAMES) + ',RcvHdrOvr_sum,TLB,CAL,RES\n'
 
 
 def flush():
@@ -81,7 +95,7 @@ nxt = time.time()
 while not stop:
     now = time.time()
     v = [value(fd) for fd in fds]
-    rows.append('%.3f,%s,%d\n' % (now, ','.join(map(str, v)), sum(value(fd) for fd in ovr)))
+    rows.append('%.3f,%s,%d,%s\n' % (now, ','.join(map(str, v)), sum(value(fd) for fd in ovr), ','.join(map(str, irqs()))))
     if now - last_flush > 60:
         flush()
         last_flush = now
