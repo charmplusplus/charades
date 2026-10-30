@@ -238,13 +238,22 @@ void charm_init(int argc, char** argv) {
 void charm_exit() {
   CharmLibExit();
 }
+static void start_all(void*, double) {
+  CProxy_Scheduler(scheduler_id).start_simulation();
+}
+
 void charm_run() {
   // Broadcast from PE 0 rather than calling the local branch: in SMP interop
   // main runs only on rank 0 of each process, so a local call left the other
   // ranks' schedulers unstarted until a remote event happened to wake them
   // (a deterministic hang with one LP chare per PE).
   if (CkMyPe() == 0) {
-    CProxy_Scheduler(scheduler_id).start_simulation();
+    if (g_tw_start_delay_ms) {
+      CkPrintf("Start delay: the clock starts %u ms after setup\n", g_tw_start_delay_ms);
+      CcdCallFnAfter(start_all, NULL, g_tw_start_delay_ms);
+    } else {
+      start_all(NULL, 0);
+    }
   }
   StartCharmScheduler();
 }

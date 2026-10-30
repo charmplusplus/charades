@@ -92,7 +92,17 @@ class NodeWaves : public CBase_NodeWaves {
      * clock -- when its first and last PE contributed, the last PE's rank, and
      * when the result was published here. Written by rank 0 at the end.
      */
-    struct ProcWave { double first, last, result; int last_rank; double handled; };
+    struct ProcWave {
+      double first, last, result; int last_rank; double handled;
+      /**
+       * Linux: its PEs' thread usage since their previous contribution --
+       * minor page faults and involuntary context switches summed, user and
+       * kernel time summed (µs), and the largest kernel time and its rank
+       */
+      long minflt = 0, nivcsw = 0;
+      double utime_us = 0, stime_us = 0, stime_max_us = 0;
+      int stime_max_rank = -1;
+    };
     std::vector<ProcWave> proc_waves;
     /** --gvt-trace=3: every rank's contribution, µs after the previous result here */
     std::vector<float> rank_delays;
@@ -127,6 +137,9 @@ class NodeWaves : public CBase_NodeWaves {
     std::vector<std::vector<CmiInt8>> slots;
     std::atomic<int> arrived;
     std::vector<double> slot_t;  ///< --gvt-trace=2: when each rank contributed
+    /** --gvt-trace=2 (Linux): each rank's thread usage when it contributed, and at its previous contribution */
+    struct Usage { long minflt = 0, nivcsw = 0; double utime_us = 0, stime_us = 0; };
+    std::vector<Usage> slot_use, prev_use;
     std::vector<CmiInt8> combined;
     std::vector<CmiInt8> res;
     std::atomic<uint64_t> gen;

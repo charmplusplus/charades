@@ -184,6 +184,10 @@ Aggregator::Aggregator(CkGroupID tram_gid, CkGroupID wps_gid) : advances(0) {
   // One setting per process, the same on every PE; read only by flushes
   if (g_tw_agg_flush_order > 2) CkAbort("--agg-flush-order must be 0, 1 or 2\n");
   htram_flush_order = (int)g_tw_agg_flush_order;
+  if (g_tw_agg_pp_alloc > 1) CkAbort("--agg-pp-alloc must be 0 or 1\n");
+  htram_pp_alloc_limit = (int)g_tw_agg_pp_alloc;
+  if (!g_tw_agg_pp_alloc && g_tw_agg_mode == 2 && CkMyPe() == 0)
+    CkPrintf("Aggregation: PP shared buffers are allocated at htram's largest size (--agg-pp-alloc=0)\n");
   if (g_tw_agg_flush_order && CkMyPe() == 0)
     CkPrintf("Aggregation: htram flush passes visit destinations %s\n",
              g_tw_agg_flush_order == 1 ? "by index, starting one later each pass" : "earliest timestamp first");

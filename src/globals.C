@@ -49,6 +49,7 @@ unsigned g_tw_gvt_node_waves;
 unsigned g_tw_gvt_wave_allreduce;
 unsigned g_tw_gvt_wave_tree;
 unsigned g_tw_warmup_pings;
+unsigned g_tw_start_delay_ms;
 unsigned g_tw_diag_gvt_spin_ns;
 unsigned g_tw_diag_window_lag_ns;
 unsigned g_tw_wave_batch;
@@ -80,6 +81,7 @@ unsigned g_tw_agg_auto_buffer;
 unsigned g_tw_agg_pp_limit;
 unsigned g_tw_map_rotate;
 unsigned g_tw_agg_flush_order;
+unsigned g_tw_agg_pp_alloc;
 unsigned g_tw_agg_input_buffer_mode;
 unsigned g_tw_agg_auto_wps;
 unsigned g_tw_ctl;
@@ -153,6 +155,7 @@ void clear_globals() {
   g_tw_gvt_wave_allreduce = 0;
   g_tw_gvt_wave_tree = 0;
   g_tw_warmup_pings = 0;
+  g_tw_start_delay_ms = 0;
   g_tw_diag_gvt_spin_ns = 0;
   g_tw_diag_window_lag_ns = 0;
   g_tw_wave_batch = 0;
@@ -185,6 +188,7 @@ void clear_globals() {
   g_tw_agg_pp_limit       = 0;
   g_tw_map_rotate         = 0;
   g_tw_agg_flush_order    = 0;
+  g_tw_agg_pp_alloc       = 1;
   g_tw_agg_input_buffer_mode     = 2;
   g_tw_ctl                = 0;
   g_tw_ctl_epsilon        = -1;   // set in tw_init from --ctl-cost

@@ -297,6 +297,14 @@ Sections 1–128 were re-read before planning sections 129 onward.
 | 151 | 2026-10-29 | 3658328 | Per-LP rollback inside a chare (`--rollback-unit=1`): implementation, a bug found on the Mac (rollback inside a forward handler), job P design | design |
 | 152 | 2026-10-29 | 3658328 | Job P results: per-LP rollback gives 1 LP per chare's rollbacks (3.5–15× fewer at W 400) at no cost; held deadline 1.09× at σ 2,000 (new best) but 0.89–0.92× σ 100, 0.68–0.70× uniform; GVT delay not absorbed at W 800 | current |
 | 153 | 2026-10-29 | 3657016 | A2r, 32 nodes: Charades leads in 6 of 8 (44 of 48 cells at 1–32) but loses more per node 16→32 than Devastator everywhere (0.72–0.87 against 0.80–0.98); start-up transient at σ 100, per-wave work on uniform, controller at W ~300 | current |
+| 154 | 2026-10-29 | — | Section 153's start-up transient is a slow cross-process reduction (300–410 µs a wave against 110), in episodes of seconds that also occur mid-run; job E design (counters, thread usage, start delay, tree hops) | design |
+| 155 | 2026-10-29 | 3660089 | Job E16 (16 nodes): no reduction stretch at 16 nodes; σ 2,000's 0.4 s start-up ramp is user-space PE work (kernel ~1%); a 1.5–2.0 s dip tied to process age; no receive overflow; one external congestion episode; job E gains tree 8 and a σ 2,000 start delay | current |
+| 156 | 2026-10-29 | — | σ 2,000's start-up ramp at 16 nodes: start delay, htram mode (PP, WPs, direct), σ 4,000, and a perf profile of process 0 split by time; job R16 design | design |
+| 157 | 2026-10-29 | 3660206 | Job R16: σ 2,000's 0.36 s start-up ramp is htram PP's (WPs 0.05 s, direct 0.01 s; start delay leaves 0.30 s); PEs wait, not work (idle-loop functions 4–7× per unit simulated time); one random PE per wave ~500 µs late; WPs 512 1.03× PP 512 overall | current |
+| 158 | 2026-10-29 | — | Does PP's start-up ramp follow glibc's handling of PP's ~1.2 MB per-send shared buffers? TLB shootdowns sampled; fixed mmap threshold and no-trim as perturbations; job A16 design | design |
+| 159 | 2026-10-29 | 3660356 | Job A16: PP's ramp is not the allocator (TLB shootdowns not raised; fixed mmap threshold 0.37 s, no-trim 0.26 s lost); no-trim 1.074× PP in steady state; WPs 512 1.047× PP 512 at σ 2,000, 16 nodes | current |
+| 160 | 2026-10-29 | — | `--agg-pp-alloc=1` (PP's shared buffers at their own limit, not ~1.2 MB) and WPs 512 against PP on σ 100/1,000/2,000/4,000 at 16 nodes; job P16 design | design |
+| 161 | 2026-10-30 | 3660590 | Job P16: `--agg-pp-alloc=1` removes most of PP's start-up ramp (σ 2,000 0.40 → 0.14 s) and gains 1.050× (σ 2,000), 1.015× (σ 4,000), level at σ 100/1,000; with it PP leads WPs 512 on all four; to become the default | current |
 
 ## Stampede3 runs, in order
 
@@ -6003,6 +6011,7 @@ Events rolled back per rollback call at W 400: 3.7–4.0 (16, chare), 1.5–2.0 
 > - **Runs:** Charades 90 (plus 30 controller runs at the end of each block, `_qlast`), Devastator 72, ROSS 48, all ok. Every cell has the same committed events in all three engines.
 > - **Traced block:** six runs, at 16 nodes (the first 16 of the allocation) and 32.
 > - **Data:** `~/charades-data/scale32/scale32/n32_j3657016/`, with `combined_1_32.txt` (`combine_a2r.py`: A1a + A1b + A2r) and `trace_summary.txt` (`trace32_summary.py`).
+> - **Corrected in section 154:** the traced block's "response" included the cross-process reduction (`handled_s` is when a process sent its counts). That inflates T3 and the uniform "+261 µs" line. The start-up transient is in the reduction, not in the processes' work.
 
 **All eight workloads, 1–32 nodes:** the table at the top of Current numbers (from `combine_a2r.py`).
 
@@ -6040,6 +6049,327 @@ Events rolled back per rollback call at W 400: 3.7–4.0 (16, chare), 1.5–2.0 
   - **On uniform, every process's work per wave grows** (median response +261 µs, 1.75×) as each process serves twice the destinations with thinner messages. Sections 125–132 found this from 4 to 16 nodes. The traced uniform run is too erratic for more detail.
   - **The controller stays near W 300** while W 400 is better at 32 nodes: it is 3–7% below W 400 on the lookahead-100 workloads, against within ±4% at 1–16 nodes. Per-LP rollback (section 152) makes wider W cheaper, so the κ bound can be revisited.
 - **Next:** find the start-up transient (it is the largest part at σ 100 and a cost that grows with node count), and measure per-LP rollback with the controller at 32 nodes.
+
+### Section 153's start-up transient is a slow cross-process reduction, in episodes of seconds; a diagnostic job (analysis of existing traces and design, 2026-10-29; written before any runs)
+
+> **Status: design.**
+> - **Analysis:** no new runs; A2r's six traced runs (job 3657016). Scripts `turn.py`, `epis.py`, `valid.py`, `steady.py`, `shape2.py` in `~/charades-data/scale32/episodes/`.
+> - **Job E:** Charades `episode-diag` (this commit; per-LP rollback, now the default), htram, Reconverse and the launch as in A2r; `$WORK/charades-runs/episode54.slurm` (32 nodes, skx, `-x c455-081`).
+> - **Job E16:** the same blocks at 16 nodes on skx-dev, without block C (`episode54.slurm n16`). It was added while job E waited for 32 skx nodes, to get the instruments' first data sooner; the predictions below are for 32 nodes.
+
+**A correction to section 153.** In `gvt_waves_<p>.csv`, `handled_s` is when the process sent its combined counts (the first hop of the Charm++ path), not when it handled the previous result. Section 153's "response" (last PE in − the previous `handled_s`) therefore included the whole cross-process reduction. That inflates T3 ("the median process's response grows about as much as the wave") and the uniform "+261 µs" line. Measured properly:
+- a process's **turnaround** is its counts sent − the previous result's arrival there;
+- the **reduction** is the result's arrival − the counts sent, taken at the process that sent last (the smallest such gap).
+
+Waves 10–95%, medians over waves (µs; lower is better):
+
+| run | wave period, 16 / 32 nodes | slowest process's turnaround | reduction after the last process |
+|---|---|---|---|
+| σ 100 | 142 / 162 | 69 / 37 | **68 / 109** |
+| σ 2,000 | 199 / 208 | 107 / 89 | 77 / 104 |
+| uniform | 286 / 389 | 220 / 268 | 62 / 93 |
+
+- **At σ 100 on 32 nodes the reduction is two thirds of a wave,** and it grows 68 → 109 µs from 16 nodes. The slowest process turns a wave around in 37 µs, and the median one in 23 µs. Most PEs are blocked at the window edge and contribute at once, so the reduction is on the critical path here. Section 120 found it was not at σ 2,000 on 16 nodes, where the late PE contributes only after its 128th event.
+- **On uniform both parts grow:** the slowest turnaround by 1.22× (220 → 268 µs), not section 153's 1.75×, and the reduction by 31 µs.
+
+**The start-up "transient" is the reduction, in episodes.** σ 100, 32 nodes, per 0.25 s of wall time from the first wave (µs; lower is better):
+
+| wall time | waves | period | slowest turnaround | median turnaround | reduction after the last process |
+|---|---|---|---|---|---|
+| 0–0.25 s | 362 | 693 | 447 | 25 | 199 |
+| 0.25–1.5 s (5 bins) | 442–515 each | 485–566 | 75–227 | 22–23 | 292–411 |
+| 1.5–1.75 s | 260 | 973 | 529 | 23 | 390 |
+| 1.75–2.0 s | 745 | 332 | 165 | 23 | 147 |
+| 2.0–4.5 s (10 bins) | 1,156–1,511 each | 166–216 | 42–75 | 23–24 | 107–138 |
+
+- **What it shows:**
+  - Every process picks the result up within 10–15 µs, the median process contributes 22–25 µs later, and no process is consistently the last. That holds during the slow stretch as after it.
+  - Inside the stretch nearly every wave is about 320 µs longer: the period's mode is 440–520 µs against 120–200 µs afterwards. It is not a mix of normal waves and stalled ones.
+  - The stretch ends within 0.1 s, at 1.9 s of wall time. The 16-node run's slower patches also end by 2.0 s, though at a different wave count and simulated time.
+- **Closure.** The waves' time above the steady median is 1.83 s on 32 nodes (1.40 s of it in the first 2 s) against 1.08 s on 16 nodes (0.61 s). The difference, 0.75 s, matches the 0.70 s by which the 32-node run is longer. So **the stretch is all of σ 100's 16→32-node loss in this pair.**
+- **Not only at start-up.** The other traced runs show the same signature, a reduction of 300 µs to 9 ms while turnarounds stay normal, at other times:
+  - σ 2,000 on 16 nodes: about 1,000 µs for the first 3.5 s, about 450 µs to 5 s, and about 400 µs from 6.5 to 8.5 s (the run's whole excess is 6.1 s);
+  - uniform on 32 nodes: 6.6–8.9 ms from 3.0 to 5.0 s, mid-run (one wave took 269 ms);
+  - steady state between episodes: 80–130 µs.
+- **The untraced runs.** At 32 nodes the three untraced σ 100 W 400 runs took 4.74–5.05 s. That is consistent with the traced run's 5.78 s divided by the usual 1.135 tracing cost (5.09 s), so they probably had the stretch too; without it they would take about 3.9 s. They cannot show it, because they record no time course.
+
+**Why a slow wave costs throughput in proportion.** A wave completes the buckets that every PE had passed at the previous wave and whose counts match; by construction that is about a third of the passed buckets (section 58). In the σ 100 32-node stretch every PE had passed 34–35 buckets beyond GVT, and PE 0 sat at the window edge (its lead was 400). Yet each wave completed 11.6 buckets, as in steady state (10.1–10.5). So GVT moves about 93 time units per wave however long the wave takes, and throughput falls with the wave period. Asking about every passed bucket (section 60) raised completion only to 8.4–8.9 per wave, because events were still in transit. A wider window does not absorb a slow wave either: at W 800 completion per wave rose only from 8.8 to 9.8 buckets (job P, 16 nodes).
+
+**What could make the reduction slow for seconds.** Four candidates, and how job E tells them apart:
+- **H1, kernel work on the PEs that must run the hops.** For example, first-touch page faults in the runtime's pools as traffic first reaches them (transparent huge pages are `always`). It would show as kernel time and minor faults in the stretched waves.
+- **H2, something tied to process age.** Driver, OS or psm2 timers; automatic NUMA balancing, for instance, starts scanning a process 1 s after it starts. Starting the clock later would remove it.
+- **H3, the fabric.** Back-pressure from other traffic, or receive-queue overflow and resends. It would show in the hfi1 counters.
+- **H4, something specific to the Charm++ nodegroup reduction or to Reconverse's broadcast.** It would be absent with Charades' own process tree, `--gvt-wave-tree=4`; section 118 found that tree's hops stand for the Charm++ ones in steady state. The tree also records every hop, which locates the slow ones.
+
+**New, for diagnosis only (branch `episode-diag`):**
+- **Time-stamped progress lines.** They carry the wall time since the clock started, and "Simulation Starting" prints the Unix time. Untraced runs now show their own time course every 64 GVT advances, at no cost.
+- **`--start-delay-ms=N`.** PE 0 starts the clock N ms after setup (`CcdCallFnAfter`); every PE sits in its scheduler meanwhile.
+- **Thread usage per wave.** With `--gvt-trace=2` on Linux, each process's wave record adds its PEs' thread usage since their previous contribution, read with `getrusage(RUSAGE_THREAD)` once per PE per wave: minor faults and involuntary context switches (summed), user and kernel time (summed), and the largest kernel time with its rank.
+- **`scripts/stampede3/hfi_sampler.py`.** One per node, on core 1, which no PE uses. Every 100 ms it records the Unix time and the hfi1 counters, plus a full dump of every counter at the start and end:
+  - transmit wait and flow-stall ticks (back-pressure from the switch);
+  - packets and words in and out;
+  - the driver's receive-overflow counters (`DRIVER_EgrBufFull`, `DRIVER_EgrHdrFull`, `RcvOverflow`, `SeqDrop0`, and the per-context `RcvHdrOvr` summed).
+
+  A login node read all 115 counter files in about 0.4 ms per sample.
+- **Mac:** change tier 54/54, with a new config `agg_deadline_bucket_pp_diag` (start delay and `--gvt-trace=2`) next to its base and `bucket_window`; committed counts equal.
+
+**Runs** (W 400, end time 2,048,000, 32 nodes unless stated, the sampler on unless stated; reps interleaved; a warm-up launch first):
+- **A. Untraced, 3 reps:**
+  - σ 100 (PP 2,048) four ways: with the Charm++ reduction (the default), with `--gvt-wave-tree=4`, with `--start-delay-ms=5000`, and with `--wave-batch=4`;
+  - σ 2,000 (PP 512) and uniform (WPs 512), with the default reduction.
+- **B. Traced (`--gvt-trace=2 --pe-stats=1`):**
+  - σ 100 with the Charm++ reduction and with the tree, 2 reps each;
+  - σ 2,000 and uniform with the tree, 1 rep each.
+- **C. 16 nodes (the allocation's first 16):** σ 100, untraced (2 reps) and traced (1).
+- **D. Devastator at W 1,000:** σ 100 and uniform, 2 reps.
+- **E. Sampler off:** σ 100, untraced, 2 reps.
+
+**Predictions:**
+- E1. **Systematic at start-up.** At 32 nodes, σ 100 with the Charm++ reduction, the first 2 s of wall time run at least 2× slower per GVT advance than the rest, in all 3 untraced reps (from the progress lines). At 16 nodes it is at most 1.4×.
+- E2. **In the reduction.** In the traced Charm++ runs, during the stretch the reduction after the last process is at least 2× its steady median, and the slowest turnaround at most 1.5× its own.
+- E3. **The path (H4).** Either the tree has no stretch (at most 1.3×) and runs at least 1.1× the Charm++ reduction at σ 100, or its hop records put the excess somewhere specific:
+  - on hops into at most 2 processes for at least 70% of each stretched wave's excess (a slow receiver);
+  - or on most hops (the network, or every receiver).
+- E4. **Kernel (H1).** If kernel work causes it, then during the stretch:
+  - the critical-path process's kernel time per wave is at least 3× steady, and its rise is at least half the wave's excess;
+  - minor faults per wave are at least 3× steady.
+- E5. **Fabric (H3).** If the fabric causes it, transmit wait or a receive-overflow counter rises during the stretches on at least one node and is flat between them.
+- E6. **Process age (H2).** With a 5 s start delay, the first 2 s run at most 1.3× the rest if the stretch is tied to process age, and are unchanged (at least 2×) if it is tied to the simulation's own start.
+- E7. **`--wave-batch=4`** is at least 1.05× the default at 32 nodes σ 100. Here the reduction, not a PE's 128th event, is on the critical path (unlike σ 2,000 at 16 nodes, section 120).
+- E8. **Sampler cost:** σ 100 without the sampler is within ±2% of the runs with it.
+
+**What follows from the results:**
+- **H1:** touch the pools before the clock starts, or when they are allocated; a start-up fix in Charades or Reconverse.
+- **H2:** find the timer, and warm up that mechanism before the clock.
+- **H3:** the fabric is not ours to fix. Make GVT tolerate a slow reduction instead: fewer sequential hops on the critical path, or count waves that overlap.
+- **H4:** make the tree the default, or fix the Charm++ path.
+- **E7 right:** the reduction latency at 32 nodes is worth attacking in steady state too: shorter passes while a wave is in flight at large node counts, or section 118's free-core poller.
+
+### Job E16, 16 nodes, results: no reduction stretch at 16 nodes; σ 2,000's start-up ramp is in the PEs' user-space work, not the kernel; a dip tied to process age; one external congestion episode, no receive overflow (2026-10-29; skx-dev batch job 3660089, 16 nodes); and two arms added to job E (design, written before job E's runs)
+
+> **Status: current** (E16); **design** (the job E additions at the end).
+> - **E16:** design and predictions in section 154.
+>   - Allocation: c454-081 to c454-104 (12 nodes) and c455-024, c455-031 to c455-033 (4 nodes, another rack); 21:24–21:30.
+>   - Runs: gate 24/24. All 44 Charades runs ok, and committed counts equal within each workload. Devastator 4 of 4 ok.
+>   - Data: `~/charades-data/scale32/episodes/n16_j3660089/`, with `summary.txt` (`epi_summary.py`).
+> - **The sampler failed to start in the job.** The step's cgroup holds only the one CPU Slurm gives it, so `taskset -c 1` was refused. It was attached from the login node instead (`srun -p skx-dev -t … --jobid --overlap`) and ran from the last run of block A's rep 1 to the end of block D. So rep 1's σ 100 arms have no counters.
+> - **Job E is resubmitted** with the sampler on its step's own CPU (now logged in the sampler's start dump) and the two arms below; the first submission, 3660078, was cancelled before it started.
+
+**Untraced, 16 nodes** (median of 3 reps; M ev/s, higher is better; "lost" is the time the first 2 s of wall time lose against the rest of the run's rate):
+
+| arm | M ev/s | ÷ σ 100 default (higher is better) | rest ÷ first 2 s | lost in the first 2 s (s) |
+|---|---|---|---|---|
+| σ 100, Charm++ reduction (default) | 666.6 | 1.000 | 1.02 | 0.05 |
+| σ 100, `--gvt-wave-tree=4` | 683.2 | 1.025 | 1.05 | 0.10 |
+| σ 100, `--start-delay-ms=5000` | 680.4 | 1.021 | 0.99 | −0.03 |
+| σ 100, `--wave-batch=4` | 618.1 | 0.927 | 1.04 | 0.08 |
+| σ 2,000 | 492.8 | — | 1.25 | **0.40** (0.36–0.42 in all 3 reps) |
+| uniform | 336.2 | — | 1.07 | 0.12 |
+
+**Simulated time per wall second, in 0.25 s bins from the clock start** (thousands; higher is faster; one rep each, the others alike):
+
+| run | 0 | 0.25 | 0.5 | 0.75 | 1.0 | 1.25 | **1.5** | **1.75** | 2.0 | 2.25 | 2.5 |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| σ 100, default | 435 | 497 | 505 | 500 | 505 | 496 | **421** | **376** | 464 | 477 | 479 |
+| σ 100, 5 s start delay | 486 | 500 | 487 | 491 | 490 | 495 | 471 | 462 | 493 | 475 | 473 |
+| σ 2,000 | **152** | **255** | 334 | 363 | 370 | 345 | **310** | **286** | 360 | 367 | 362 |
+| uniform | 204 | 250 | 251 | 248 | 249 | 244 | **211** | **202** | 247 | 248 | 249 |
+
+- **A dip tied to process age.** Every run without the start delay slows 15–25% from 1.5 to 2.0 s after the clock starts, which is about 3.5–4 s after launch (setup takes about 2 s). Of the delayed runs, two show no dip and the third dips at 2.25–2.75 s instead. In the traced runs the dip is in the slowest process's turnaround (126–132 against about 95 µs), not in the reduction, and not in the kernel. It costs about 0.1 s a run, 2% at 16 nodes.
+- **No reduction stretch at 16 nodes.** In all four traced σ 100 runs (Charm++ reduction and tree) the reduction after the last process is 34–72 µs from the first bin on. Section 153's stretch, a reduction of 300–410 µs, was at 32 nodes; at 16 nodes A2r showed only 116–149 µs in its first 1.5 s.
+- **σ 2,000's start-up ramp** (0.4 s a run, about 7% at 16 nodes) is in the slowest process's turnaround: 526 µs in the first 0.25 s and 263 µs in the next, against 135–150 µs steady, with the reduction steady at 56–67 µs.
+  - **The kernel is not the cause (H1 out at 16 nodes).** Kernel time is about 1% of PE time throughout (5.8 µs per PE per 587 µs wave at the start, 1.7 per 200 µs steady). Minor faults per PE per wave fall from 0.38 to 0.02; at about 1 µs each they are negligible.
+  - Caveat: Linux accounts thread CPU time by ticks, so only these averages are meaningful; the largest single-PE kernel time per wave in the trace is a tick and means nothing.
+  - So the extra time is user-space PE work, as section 121 found from 4 to 16 nodes. That points at the runtime loop (network progress inside psm2 and LCI, allocation), or at the model's and htram's own start.
+- **Hops (tree, fan-out 4):** up hops wait 12–17 µs beyond their pair's fastest (35 µs on uniform), and down hops 4–7 µs, with no change over the run. This is as section 118 found.
+- **hfi1 counters:**
+  - **No receive overflow in any run.** Eager buffers full, header queue full, receive overflow, `SeqDrop0` and every context's `RcvHdrOvr` stay at 0.
+  - **Transmit wait appears only with uniform's traffic:** 1–6 M ticks/s across the nodes at 61–64 GB/s sent (about 3.8 GB/s per node, 30% of a link).
+  - **One external congestion episode.** In uniform's rep 3, transmit wait rose about 100× for 4 s (0.35–0.88 × 10⁹ ticks/s; the most on c455-024, in the other rack) while our send rate fell from 62 to 47–54 GB/s. That was the slowest uniform rep (320.5 against 346.4 and 336.2 M ev/s).
+- **Devastator:**
+  - σ 100 rep 1 took 33.5 s (86.5 M ev/s) against 4.8 s (608.6) for rep 2. For about 30 s of rep 1 the nodes sent almost nothing (0.06 GB/s in all), so this was a stall inside Devastator, not the fabric. A2r also had single slow Devastator reps.
+  - Uniform: 181.0–181.7 M ev/s.
+- **Sampler cost.** The arms run without the sampler (block A's rep 1) are within the rep spread of the same arms with it: σ 100 667.9 against 666.6 and 653.7 M ev/s; tree 685.1 against 663.3 and 683.2. The two runs of block E (sampler off) ran last, at 637 M ev/s; that is a different time, not the sampler.
+- **Predictions (16-node counterparts):**
+  - E1 right: no stretch at 16 nodes (rest ÷ first 2 s: 1.02).
+  - E3: the tree is level (1.025×).
+  - E4 right: kernel work is not the cause.
+  - E5: no receive overflow; back-pressure seen once, from outside.
+  - E6: the start delay removes the 1.5–2.0 s dip.
+  - E7 wrong at 16 nodes (`--wave-batch=4`: 0.927×), as in section 120.
+  - E8 right.
+
+**Added to job E (32 nodes), design, written before its runs:**
+- **`--gvt-wave-tree=8`** (two levels below process 0 instead of three), 3 reps at σ 100. Section 118's flat tree lost to the root's serial sends at 16 nodes. Fan-out 8 halves the levels at 32 nodes, with 8 serial sends a level.
+- **σ 2,000 with `--start-delay-ms=5000`,** 3 reps.
+- **Predictions:**
+  - E9. If the hop count sets the steady reduction at 32 nodes (about 109 µs over 6–7 hops), dropping two levels shortens it by about 30 µs, and fan-out 8 is at least 1.08× the Charm++ reduction at σ 100. If the serial sends cost more, it is at most 1.0×.
+  - E10. If σ 2,000's start-up ramp comes from the simulation's own start (the model, htram's buffers, the runtime's pools filling), the 5 s delay leaves it unchanged (at least 0.3 s lost in the first 2 s). If it comes from process age, it disappears.
+
+### σ 2,000's start-up ramp at 16 nodes: start delay, htram mode, and a profile split by time (design, 2026-10-29; written before any runs)
+
+> **Status: design.**
+> - **Build:** Charades `episode-diag` (efff74e; the binary built from e6c5efc, as in E16), htram, Reconverse and the launch as in A2r.
+> - **Job R16:** `$WORK/charades-runs/ramp56.slurm` (16 nodes, skx-dev, `-x c455-081`). It runs while job E (3660196) waits for 32 skx nodes.
+
+**Why.** Section 155: at 16 nodes σ 2,000 loses 0.36–0.42 s in its first 2 s in every rep. The throughput ramps from 150 to 365 thousand simulated time units per wall second over the first 0.75 s. That is about 7% of a run, and section 122 found σ 4,000's whole 4→16-node loss was start-up. The ramp is in the slowest process's user-space work, not in the kernel and not in the reduction. Warm-up pings did not remove it (section 122).
+
+**Runs** (W 400, end time 2,048,000, untraced, progress lines time-stamped; 3 reps, interleaved):
+- **A.** σ 2,000 four ways: PP 512 (the setting in use); PP 512 with `--start-delay-ms=5000`; WPs 512; direct sends. Plus σ 4,000 with PP 512.
+- **B.** σ 2,000 with PP 512 under `perf record -e cycles:u -F 1999` on process 0, every thread, 2 reps. `perf script` keeps each sample's time, thread and symbol. The clock start is taken as the first sample in an event handler.
+
+**Predictions:**
+- R1. **Start delay (E10 at 16 nodes).** If the ramp comes from the simulation's own start, the 5 s delay leaves it: at least 0.3 s lost in the first 2 s. If it comes from process age, at most 0.1 s.
+- R2. **htram mode.** If PP's own start (its shared buffers and their allocation) causes the ramp, WPs 512 and direct sends lose at most half of PP 512's time in the first 2 s. If all three ramp alike, the cause is the runtime's message path or the model.
+- R3. **σ 4,000** loses at least as much as σ 2,000 in its first 2 s.
+- R4. **Profile, closure.** In process 0, compare the first 0.75 s after the clock start with 2–5 s, per unit of simulated time. The functions whose samples per unit of simulated time at least double hold at least 60% of the start's extra samples, and they are outside the model's event handlers.
+- R5. **perf costs at most 5%** against the untraced PP 512 runs.
+
+**What follows:**
+- R1 says process age → the dip and the ramp are one mechanism; find the timer.
+- R2 points at htram → pre-size or pre-touch PP's buffers.
+- R4 names the functions. If they are the runtime's (LCI, psm2, Reconverse's pools), the fix is a warm-up of that path before the clock, or a change to it.
+
+### Job R16 results: σ 2,000's start-up ramp is htram PP's; the start delay, WPs and direct sends tell it apart; the PEs wait rather than work (2026-10-29; skx-dev batch job 3660206, 16 nodes)
+
+> **Status: current.** Design and predictions in section 156.
+> - **Allocation:** c454-002 to c455-043 (16 nodes); 21:57–22:04. Gate 12/12; all 32 runs ok.
+> - **Data:** `~/charades-data/scale32/episodes/r16_j3660206/` (`summary.txt` from `epi_summary.py`; profiles `perf/*.sym.gz` from `r16_perf.py`).
+> - **Caveat:** the job's own `perf script` printed no symbols (`sym` needs `ip`), so the scripts were regenerated on a login node from the raw files.
+
+**σ 2,000 (and σ 4,000), 16 nodes, W 400** (median of 3 reps; M ev/s, higher is better):
+
+| arm | M ev/s | lost in the first 2 s (s; lower is better) | rest ÷ first 2 s |
+|---|---|---|---|
+| σ 2,000, PP 512 (the setting in use) | 484.4 | **0.36** (0.35–0.39) | 1.22 |
+| σ 2,000, PP 512, 5 s start delay | 495.7 | 0.30 (0.29–0.33) | 1.18 |
+| σ 2,000, WPs 512 | **500.1** | **0.05** (−0.01–0.10) | 1.03 |
+| σ 2,000, direct sends | 200.6 | 0.01 | 1.01 |
+| σ 4,000, PP 512 | 451.6 | 0.29 | 1.17 |
+| σ 2,000, PP 512 under perf | 474.6 (0.98×) | 0.35 | 1.21 |
+
+- **R1 right: the ramp comes from the simulation's start, not process age.** The 5 s delay leaves 0.30 of its 0.36 s (the 0.06 s difference is about the process-age dip of section 155).
+- **R2 right: the ramp is PP's.** WPs 512 and direct sends lose 0.05 and 0.01 s. Without the ramp, PP 512 runs about 2% faster than WPs 512 here (5.62 against 5.74 s of steady running), but with it PP is 3% slower overall. Removing PP's ramp would make it the best setting by about 5%.
+- **R3 wrong:** σ 4,000 loses 0.29 s, a little less than σ 2,000.
+- **R5 right:** perf costs 2%.
+- **R4 right in form, and it says the PEs wait.** Process 0, first 0.75 s after the clock start against 2–5 s, per unit of simulated time (both reps agree):
+  - The start costs 32–33% more samples per unit of simulated time.
+  - 94–95% of the excess is in functions whose cost at least doubles. Every one of them is what a PE runs when it has nothing to execute: htram's idle and deadline flush (`HTram::flushOrder` 5.5–5.9×, `flushDue` 4.9–5.6×, `agg_flush_idle` 5.7–6.8×); the scheduler loop (`OptimisticScheduler::execute`, `process_cancel_q`, `pollConverseThreadQueue`); network polling (`ips_ptl_poll`, `__psm2_mq_ipeek`, LCI progress); and locks.
+  - The event handlers and event bookkeeping (`PHoldLP::forward`, `LPChare::execute_me`, `fp_push`, `remote_event_delete`) cost the same per unit of simulated time.
+  - The excess is the same on all 23 threads (480–493 samples each).
+  - So process 0's PEs do no more work at the start; they wait longer for each GVT advance.
+- **What they wait for (E16's traced σ 2,000 run):**
+  - At the start each wave completes as many buckets as later (11.0 against 8.7), and every PE has passed 33 buckets with PE 0 at the window edge (lead 386–399). But a wave takes 590 µs against 200.
+  - The late process is a different one in nearly every wave (no process over 6% in the first 0.5 s), and inside it the gap from its first to its last PE's contribution is 484–503 µs, against 118 µs at 2–3 s.
+  - That late PE is not faulting. The slowest process takes a median of 4 minor faults per wave at the start, and the 410 of 425 slow waves with fewer than 100 faults are as slow (484 µs) as the rest.
+  - Section 121's per-PE records (job 3649213) put such a PE's extra time outside `execute()`, the htram receive handlers and the GVT handlers.
+  - Packets sent at the start are about 15% smaller (2,600–2,700 against 3,000–3,150 bytes; hfi1 counters), not enough to explain 2.5× slower waves.
+- **Not yet known:** what one PE per wave does for about 400 extra µs, only with PP and only in the first 0.75 s. Candidates within PP:
+  - the shared per-process buffers being sent by whichever PE takes them at a GVT update, while every PE of the process tries at once (all PEs leave the window edge together at the start);
+  - the first sends to each destination process.
+
+  The per-PE records (`--gvt-trace=4`) with htram's flush and the GVT-result step timed per wave would split it. That is a small change, worth making only if PP stays the setting at σ ≥ 2,000 after job E.
+
+### Does PP's start-up ramp follow glibc's handling of PP's per-send buffers? TLB shootdowns and two malloc settings (design, 2026-10-29; written before any runs)
+
+> **Status: design.**
+> - **Build:** Charades `episode-diag` (this commit adds TLB-shootdown, function-call and rescheduling interrupts from `/proc/interrupts` to `hfi_sampler.py`; the binary is unchanged).
+> - **Job A16:** `$WORK/charades-runs/alloc58.slurm` (16 nodes, skx-dev, `-x c455-081`).
+
+**Why.** Section 157 found that one random PE per wave is about 400 µs late in PP's first 0.75 s, with few page faults. One thing PP does that WPs does not: after every send of a process's shared buffer toward a destination process, the sending PE allocates a new one at htram's largest size. That is `BUFSIZE + LOCAL_BUFSIZE` = 16,400 items of about 72 B, about 1.2 MB, to carry about 3 KB (49 events a message at σ 2,000). At 16 nodes that is roughly 10 GB/s of allocation per process.
+- How glibc serves this changes as a run starts. Blocks over the mmap threshold (128 KB at first) are mapped and unmapped each time, until a free raises the threshold; arena heaps then grow, and are trimmed when the top's free space passes the trim threshold.
+- Unmapping or trimming touched memory interrupts every core running the process with a TLB shootdown. That would show as kernel time spread over all PEs with few faults, which is what E16 measured at the start: 5.8 against 1.7 µs of kernel time per PE per wave, about 3 ms per wave over 736 PEs.
+- Sections 80 and 92 already found PP sensitive to allocation size (1.07–1.14×) and to trimming (1.055–1.083×), unexplained.
+
+**Runs** (σ 2,000, W 400, end time 2,048,000, untraced, 3 reps interleaved, the sampler on every node):
+- PP 512 (as now);
+- WPs 512;
+- PP 512 with `GLIBC_TUNABLES=glibc.malloc.mmap_threshold=33554432` (1.2 MB blocks come from the heap from the start; the threshold no longer moves);
+- PP 512 with no trimming (`glibc.malloc.trim_threshold=1073741824:glibc.malloc.top_pad=67108864`; this also pins the mmap threshold at 128 KB, so every 1.2 MB block is mapped and unmapped).
+
+This is a diagnosis; neither setting is a candidate for the paper's launch (section 140: glibc settings stay out of launches).
+
+**Predictions:**
+- A1. If allocator churn causes the ramp, TLB shootdowns per second over all nodes in PP 512's first 0.75 s are at least 3× its rate at 2–5 s, and at least 3× WPs 512's in the same window.
+- A2. Then at least one of the two settings cuts PP's time lost in the first 2 s from about 0.36 s to at most 0.15 s, and its start-up TLB-shootdown rate falls with it.
+- A3. If shootdowns do not rise at PP's start and neither setting moves the ramp, the allocator is not the cause, and the next step is section 157's per-wave timing of htram's flushes and the GVT-result step.
+
+**What follows:** if A1 and A2 hold, the fix is in htram, not in the launch. PP would allocate each new shared buffer at its current limit (512 + 16 items, 38 KB) instead of htram's largest size, or reuse buffers, so no run depends on glibc's thresholds.
+
+### Job A16 results: PP's start-up ramp is not the allocator (no TLB-shootdown rise, neither malloc setting removes it); no trimming makes PP 1.074× faster in steady state; WPs 512 is 1.047× PP 512 at 16 nodes (2026-10-29; skx-dev batch job 3660356, 16 nodes)
+
+> **Status: current.** Design and predictions in section 158.
+> - **Allocation:** c454-002 to c455-103 (16 nodes); 23:25–23:30. All 12 runs ok, with equal committed counts.
+> - **Data:** `~/charades-data/scale32/episodes/a16_j3660356/` (`summary.txt` from `a16_summary.py`).
+> - **Sampler gap:** the sampler's final flush was lost when its step was stopped, so the counters cover rep 1 and part of rep 2 (written every 60 s). The sampler should write more often; fixed for the next job.
+
+**σ 2,000, W 400, 16 nodes** (median of 3 reps; M ev/s and ÷ PP 512, higher is better; lost time and interrupt rates, lower is better; interrupts summed over all 16 nodes, from rep 1 and the reps with data):
+
+| arm | M ev/s | ÷ PP 512 | lost in the first 2 s (s) | TLB shootdowns/s, first 0.75 s / 2–5 s | function-call interrupts/s, same windows |
+|---|---|---|---|---|---|
+| PP 512 | 482.9 | 1.000 | 0.31 (0.30–0.33) | 9,100 / 20,100–21,000 | 10,000–10,600 / 21,000–22,200 |
+| WPs 512 | 505.7 | **1.047** | **0.06** | 9,000 / 19,800–20,200 | 9,900–10,400 / 20,900–21,300 |
+| PP 512, mmap threshold fixed at 32 MB | 488.1 | 1.011 | 0.37 | 7,700–7,800 / 24,400–25,100 | 8,700 / 25,600–26,000 |
+| PP 512, no trimming | **518.6** | **1.074** | 0.26 | 8,700 / 23,600 | 10,300 / 24,500 |
+
+- **A1 wrong.** TLB shootdowns per second at PP's start are lower than in its steady state (0.45×), and the same as WPs' (9,100 against 9,000). PP's 1.2 MB allocations cause no extra shootdowns.
+- **A2 wrong.**
+  - With the mmap threshold fixed, PP still loses 0.37 s.
+  - With no trimming it loses 0.26 s, a little less than 0.31 s, but nowhere near the 0.15 s that would make the allocator the cause.
+- **A3 right: the allocator is not the cause of the ramp.** Sections 155–158 leave one random PE per wave late by about 400 µs, in user space, only with PP, only in the first 0.75 s; why is still open.
+- **Steady state, two findings for the settings:**
+  - **No trimming makes PP 1.074× faster** (section 92 found 1.055–1.083× at 4 nodes). It is not shootdowns (the same rates), and fixing the mmap threshold gives only 1.011×. glibc settings stay out of the launch (section 140), but an htram change that makes PP's allocations cheaper could capture the same gain. `--agg-pp-alloc=1` (htram branch `pp-alloc-limit`, Charades `episode-diag`: shared buffers allocated at their own limit, about 38 KB instead of about 1.2 MB; Mac change tier with 10 repeats 720/720) is a candidate. Section 80 found larger PP allocations faster, so only a measurement can tell.
+  - **WPs 512 is 1.047× PP 512** at σ 2,000 on 16 nodes (1.03× in job R16). PP was chosen for σ ≥ 2,000 in section 140; at 16 nodes WPs is now ahead and has no ramp. The choice must be checked at 32 nodes, where WPs' per-PE buffers fill more slowly.
+
+### PP's shared buffers at their own limit (`--agg-pp-alloc=1`), and PP against WPs, on the four PP workloads at 16 nodes (design, 2026-10-29; written before any runs)
+
+> **Status: design.**
+> - **Build:** Charades `episode-diag` 02f2b91 (with `--agg-pp-alloc`), htram `pp-alloc-limit` 42d347f (`pdes` plus the option), Reconverse and the launch as in A2r. A new tree `$WORK/charades-alloc` built against `$WORK/htram-alloc`; `charades-lprb`, which job E uses, is unchanged.
+> - **Job P16:** `$WORK/charades-runs/pp60.slurm` (16 nodes, skx-dev, `-x c455-081`).
+
+**Why.**
+- Section 159 found no trimming makes PP 512 1.074× faster at σ 2,000, with no rise in TLB shootdowns. One allocation pattern is PP's alone: a new shared buffer at htram's largest size, about 1.2 MB, at every send, for about 3 KB of events.
+- `--agg-pp-alloc=1` allocates it at its own limit instead: 528 items, 38 KB, for PP 512; 2,064 items, 149 KB, for PP 2,048. Without glibc settings, it would remove whatever that pattern costs.
+- Section 80 found larger PP allocations faster (147 KB against 37 KB, 1.07–1.14×), so the direction is not known in advance.
+- WPs 512 was 1.03–1.047× PP 512 at σ 2,000 (sections 157 and 159). That needs checking on the other PP workloads.
+
+**Runs** (16 nodes, W 400, end time 2,048,000, untraced, 3 reps interleaved). σ 100 and σ 1,000 with PP 2,048, and σ 2,000 and σ 4,000 with PP 512 (the settings in use), each three ways: PP as now; PP with `--agg-pp-alloc=1`; WPs 512.
+
+**Predictions:**
+- P1. If PP's steady-state cost comes from glibc's handling of its 1.2 MB per-send buffers, `--agg-pp-alloc=1` is at least 1.04× PP at σ 2,000 and σ 4,000. If section 80's "larger allocations are faster" holds instead, it is at most 0.97×.
+- P2. The start-up ramp does not change with it (section 159: not the allocator): σ 2,000 still loses at least 0.25 s in its first 2 s.
+- P3. WPs 512 is at least 1.0× PP 512 at σ 2,000 and σ 4,000, and PP 2,048 stays ahead of WPs 512 at σ 100 and σ 1,000 (section 140).
+
+**What follows:**
+- If P1's gain holds, `--agg-pp-alloc=1` becomes the default and is checked at 32 nodes.
+- If WPs leads at σ ≥ 2,000 at 32 nodes too, the paper's setting for those workloads changes. Every workload's setting stays the same at every node count.
+
+### Job P16 results: allocating PP's shared buffers at their own limit removes most of PP's start-up ramp and gains 1.05× at σ 2,000; PP with it leads WPs 512 on all four PP workloads (2026-10-29 to 30; skx-dev batch job 3660590, 16 nodes)
+
+> **Status: current.** Design and predictions in section 160. 16 nodes, 23:59 (2026-10-29) to 00:06. Gate 18/18 (the new configs and the PP base, on 2 nodes, psm2). All 36 runs ok, with committed counts equal across the three arms of each workload. Data `~/charades-data/scale32/episodes/p16_j3660590/` (`summary.txt` from `p16_summary.py`).
+
+**16 nodes, W 400** (median of 3 reps; M ev/s and ÷ PP, higher is better; time lost in the first 2 s, lower is better):
+
+| workload (PP setting) | PP | PP, `--agg-pp-alloc=1` | ÷ PP | WPs 512 | ÷ PP | lost in the first 2 s (s): PP / alloc / WPs |
+|---|---|---|---|---|---|---|
+| σ 100 (PP 2,048) | 671.5 | 665.9 | 0.992 | 646.7 | 0.963 | 0.07 / 0.06 / 0.06 |
+| σ 1,000 (PP 2,048) | 565.7 | 570.1 | 1.008 | 555.6 | 0.982 | 0.11 / 0.13 / 0.09 |
+| σ 2,000 (PP 512) | 490.4 | **514.8** | **1.050** | 506.8 | 1.033 | **0.40 / 0.14** / 0.09 |
+| σ 4,000 (PP 512) | 463.5 | 470.2 | 1.015 | 450.6 | 0.972 | **0.33 / 0.13** / 0.09 |
+
+(σ 100 with the option: reps 633.9, 669.1, 665.9; the first is the outlier.)
+
+- **P1 right at σ 2,000 (1.050×), wrong at σ 4,000 (1.015×, predicted at least 1.04).** At σ 100 and σ 1,000 (PP 2,048, where the buffer drops from 1.2 MB to 149 KB) the change is within the reps' spread.
+- **P2 wrong, usefully: the ramp mostly goes.** σ 2,000 loses 0.14 s instead of 0.40 s, and σ 4,000 0.13 s instead of 0.33 s, near WPs' 0.09 s.
+  - So PP's per-send 1.2 MB buffers do cause the ramp, although neither glibc setting removed it and TLB shootdowns did not rise (section 159).
+  - What in the kernel or allocator makes many large buffers costly only in the first 0.75 s is not identified. One candidate is the per-thread heaps growing while every PE allocates at once (heap growth takes the process's memory-map lock).
+  - The perturbation moved the cost by the amount it had to: 0.26 of σ 2,000's 0.31 s excess over WPs.
+- **P3 half right.** WPs 512 is 1.033× PP 512 at σ 2,000 but 0.972× at σ 4,000. PP 2,048 stays ahead of WPs at σ 100 and σ 1,000. **With `--agg-pp-alloc=1`, PP is ahead of WPs on all four workloads** (σ 2,000: 514.8 against 506.8). So the settings in use stay, with the option on.
+
+**What follows.** `--agg-pp-alloc=1` becomes the default:
+- it is 1.050× and 1.015× where PP 512 is used, level where PP 2,048 is used, and removes most of the ramp;
+- it needs htram `pp-alloc-limit` merged into `pdes`;
+- it gets checked at 32 nodes in the next 32-node job.
 
 ## Baseline verification on the Mac
 

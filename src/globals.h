@@ -78,6 +78,7 @@ extern unsigned g_tw_wave_batch_when;    ///< 0 = once this process's sums are s
 extern unsigned g_tw_diag_gvt_spin_ns;   ///< diagnostic: busy-wait this long each time a PE applies a GVT result
 extern unsigned g_tw_diag_window_lag_ns; ///< diagnostic: for this long after a PE learns a new GVT, its window stays at the previous GVT
 extern unsigned g_tw_warmup_pings;       ///< before the clock starts, messages each PE sends every PE (diagnostic)
+extern unsigned g_tw_start_delay_ms;     ///< PE 0 starts the clock this long after setup ends (diagnostic)
 extern unsigned g_tw_gvt_wave_tree;      ///< bucketed gvt, node waves: fan-out of Charades' own process tree, 0 = Charm++ reduction
 extern Time     g_tw_optimism_window; ///< execute no event past GVT + this (0: off)
 extern unsigned g_tw_comm_stats;      ///< time remote sends and send->receive latency
@@ -113,6 +114,7 @@ extern unsigned g_tw_agg_auto_buffer; ///< --agg-auto: the large PP buffer
 extern unsigned g_tw_agg_pp_limit;    ///< diagnostic: PP shared buffers capped here, allocated at --agg-buffer
 extern unsigned g_tw_map_rotate;      ///< diagnostic: rotate each process's LP blocks by this many PEs
 extern unsigned g_tw_agg_flush_order; ///< htram flush pass order: 0 by index, 1 rotating start, 2 earliest timestamp
+extern unsigned g_tw_agg_pp_alloc;     ///< htram PP shared buffers allocated at 0: htram's largest size, 1: their own limit (default)
 extern unsigned g_tw_agg_input_buffer_mode;  ///< htram input buffer: 0 mutex, 1 mutex on its own cache lines, 2 lock-free rings
 extern unsigned g_tw_agg_auto_wps;    ///< --agg-auto: may also choose WPs (makes a second htram instance)
 ///@}
