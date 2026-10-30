@@ -36,6 +36,8 @@ Every number from every run: Stampede3 runs in order (each design, written befor
 
 Charades is faster than Devastator in 44 of 48 cells and 2.4–5.3× faster than ROSS everywhere. At 32 nodes it leads in 6 of 8 workloads (1.04–1.66×), trails at σ 100 (0.89) and is level at lookahead 10 σ 500 (0.99). **But from 16 to 32 nodes Charades loses more per node than Devastator in every workload** (0.72–0.87 against 0.80–0.98), so it scales best from 1 to 32 nodes in only 4 of 8 workloads (6 of 8 from 1 to 16). Its controller is 0.93–0.97 of its best fixed W at 32 nodes on six workloads (0.96–1.03 at 1–16). Section 153 has the breakdown. These runs used chare rollback; per-LP rollback (section 152) came after them.
 
+> **Launch change, 2026-10-30:** every Stampede3 run now goes through `numactl --localalloc` (`ctl_sweep.sh`'s `NUMA_WRAP`), so the kernel's automatic NUMA balancing skips our processes (section 164). At 16 nodes it gains 1.024–1.049× and removes a dip 1.5–2.0 s after the clock starts. At 32 nodes the start delay alone gained 1.128× (section 162). Every table above used the default (balancing on), and so did Devastator and ROSS. The paper-grade rerun gives all three engines the same launch.
+
 > **Default change, 2026-10-29 (main 9d08fbd):** per-LP rollback inside a chare (`--rollback-unit=1`, section 152) is the default. A straggler rolls back only its own LP, not every later event of the chare's LPs: 3.5–15× fewer events rolled back at W 400, throughput unchanged (−1.6% to +2.2%). Every table above and below used chare rollback (`--rollback-unit=0`). Full test matrix 13,345/13,345 on the Mac.
 
 > **Default change, 2026-10-30 (main d909989; needs htram `pdes` 42d347f):** htram PP's shared buffers are allocated at their own limit (`--agg-pp-alloc=1`, section 161), not at htram's largest size (about 1.2 MB per send). At 16 nodes that is 1.050× at σ 2,000 and 1.015× at σ 4,000 (PP 512), level at σ 100 and σ 1,000 (PP 2,048), and it removes most of PP's start-up ramp. Every table above and below used the old allocation. Mac engine tier 2,058/2,058.
@@ -309,6 +311,8 @@ Sections 1–128 were re-read before planning sections 129 onward.
 | 161 | 2026-10-30 | 3660590 | Job P16: `--agg-pp-alloc=1` removes most of PP's start-up ramp (σ 2,000 0.40 → 0.14 s) and gains 1.050× (σ 2,000), 1.015× (σ 4,000), level at σ 100/1,000; with it PP leads WPs 512 on all four; to become the default | current |
 | 162 | 2026-10-30 | 3660196 | Job E (32 nodes): no start-up stretch this time (A2r's was an episode); TLB-shootdown bursts at a fixed time after setup (1.5–2.25 s, 3.0, 5.0 s; about 25×) hold 36–82% of σ 100's lost time; a 5 s start delay moves them before the clock: 1.128× paired; tree 4 0.894×, tree 8 0.856×, wave batch 0.952×; stretched waves are one slow hop each; no transmit wait or overflow at σ 100; σ 2,000 stalls (old PP allocation) | current |
 | 163 | 2026-10-30 | — | Are the TLB-shootdown bursts automatic NUMA balancing? `/proc/vmstat` sampled; `numactl --localalloc` against the default and the start delay at σ 100, σ 2,000 and uniform, 16 nodes; job N16 design | design |
+| 164 | 2026-10-30 | 3662319 | Job N16 (16 nodes): the TLB-shootdown bursts are automatic NUMA balancing (it scans all run: 2–5 M page-table changes/s summed); `numactl --localalloc` stops it, removes the bursts and the dip, and gains 1.034× (σ 100), 1.049× (σ 2,000), 1.024× (uniform); no misplaced memory (hinting faults 100% local; bound level with it); now the Stampede3 launch | current |
+| 165 | 2026-10-30 | — | `numactl --localalloc` at 32 nodes for Charades and Devastator, the controller with per-LP rollback, 16→32 efficiency, the slow-run state; job N32 design | design |
 
 ## Stampede3 runs, in order
 
@@ -6493,7 +6497,7 @@ This is a diagnosis; neither setting is a candidate for the paper's launch (sect
 
 ### Are the TLB-shootdown bursts automatic NUMA balancing, and does turning it off for our processes remove the dip? (design, 2026-10-30; written before any runs)
 
-> **Status: design.**
+> **Status: design; results in section 164.**
 > - **Job N16:** Charades `main` a035fbc (`--agg-pp-alloc=1` and per-LP rollback are the defaults) with htram `pdes` 42d347f, Reconverse and the launch as in job E.
 > - **Sampler:** it now also reads `/proc/vmstat`'s counters for:
 >   - NUMA balancing (`numa_pte_updates`, `numa_huge_pte_updates`, `numa_hint_faults`, `numa_hint_faults_local`, `numa_pages_migrated`);
@@ -6535,6 +6539,90 @@ This is a diagnosis; neither setting is a candidate for the paper's launch (sect
   - the controller with per-LP rollback;
   - Devastator under the same launch.
 - **N1 wrong:** follow whichever `/proc/vmstat` counter moves with the burst.
+
+### Job N16 results: the TLB-shootdown bursts are automatic NUMA balancing; keeping it away from our processes (`numactl --localalloc`) removes the bursts and the dip and gains 1.024–1.049× at 16 nodes; no memory was misplaced (2026-10-30; skx-dev batch job 3662319, 16 nodes)
+
+> **Status: current.** Design and predictions in section 163.
+> - **Allocation:** c454-003 to c455-104 (16 nodes, 2 racks), 13:59–14:07. Gate 30/30.
+> - **Runs:** all 30 runs ok; committed counts equal within each workload.
+> - **Kernel settings, on all 16 nodes:** `kernel.numa_balancing = 1`, transparent huge pages `always`.
+> - **Data:** `~/charades-data/scale32/numa/j3662319/`, with `summary.txt` (`numa_summary.py`).
+
+**16 nodes, W 400** (M ev/s, higher is better; "paired" is each rep's arm ÷ the default run of the same rep; "dip" is simulated time per second at 1.5–2.0 s ÷ at 1.0–1.5 s, 1.0 means no dip):
+
+| arm | M ev/s, median (reps) | ÷ default, paired median (per rep) | lost in the first 2 s (s) | dip |
+|---|---|---|---|---|
+| σ 100, default | 679.9 (679.9, 679.9, 670.6) | 1.000 | 0.06 | 0.82–0.85 |
+| σ 100, `numactl --localalloc` | 694.6 (708.0, 694.6, 693.6) | **1.034** (1.041, 1.022, 1.034) | −0.05 | 0.96–1.01 |
+| σ 100, bound to its socket | 698.3 (707.4, 698.3, 695.5) | **1.037** (1.041, 1.027, 1.037) | −0.02 | 0.99–1.00 |
+| σ 100, 5 s start delay | 695.3 (696.1, 674.8, 695.3) | 1.024 (1.024, 0.993, 1.037) | −0.03 | 0.99–1.01 |
+| σ 2,000, default | 516.0 (514.0, 516.0, 518.9) | 1.000 | 0.13 | 0.75–0.84 |
+| σ 2,000, `numactl --localalloc` | 542.2 (544.3, 541.3, 542.2) | **1.049** (1.059, 1.049, 1.045) | 0.01 | 0.96–1.02 |
+| σ 2,000, bound | 542.8 (542.8, 545.3, 542.3) | **1.056** (1.056, 1.057, 1.045) | 0.00 | 0.96–0.99 |
+| uniform, default | 347.4 (347.4, 352.4, 342.9) | 1.000 | 0.07 | 0.85–0.88 |
+| uniform, `numactl --localalloc` | 356.7 (355.6, 358.0, 356.7) | **1.024** (1.024, 1.016, 1.040) | 0.01 | 1.00–1.02 |
+| uniform, bound | 355.5 (353.2, 355.5, 356.3) | 1.017 (1.017, 1.009, 1.039) | 0.00 | 0.99–1.01 |
+
+**Automatic NUMA balancing, summed over the 16 nodes** (`/proc/vmstat`; per second):
+
+| | default runs | `--localalloc` and bound runs |
+|---|---|---|
+| page-table entries made inaccessible to sample use (`numa_pte_updates`), whole run | 2.1–4.5 M | 0 (at most 1.4) |
+| the same, 1.5–2.25 s ÷ 0.75–1.5 s | 2.1–3.6× | — |
+| NUMA hinting faults, steady state, per node | 3,800–7,600 | 0 |
+| TLB shootdowns, 1.5–2.25 s ÷ 0.75–1.5 s | 11–17× (σ 100, σ 2,000); 4–7× (uniform) | 0.0–2.0× of near zero |
+| TLB shootdowns, steady state, per node | 340–770 | 5–11 (σ 100, σ 2,000); 173 (uniform) |
+| hinting faults that were local | 100.0% in every run | — |
+| pages migrated, whole run | 1–518 | 0–20 |
+
+- **The scan runs throughout, and its first pass over the whole heap lines up with the burst.** In default runs the balancer changes 2–5 M page-table entries a second (summed over 16 nodes) for the whole run. It starts at the clock start (13–16 M/s in the first 0.25 s) and is 2–4× higher in the 1.5–2.25 s window.
+  - Each change interrupts the process's other 22 CPUs to flush their TLBs.
+  - Each later touch of a changed page takes a hinting fault.
+  - With the balancer kept away, TLB shootdowns fall to 5–11 per node per second for σ 100 and σ 2,000. The remainder on uniform (173) is its own.
+- **Nothing was misplaced.** Every default run's hinting faults were 100.0% local, and at most 518 pages moved. The bound arm, which also places the main thread's early allocations, is level with `--localalloc` (paired, bound ÷ `--localalloc`: σ 100 1.003, σ 2,000 1.000, uniform 0.993). So the cost is the balancer's own work, not remote memory.
+- **The gain is larger than the dip.** The dip costs about 2% at 16 nodes, but `--localalloc` gains 3.4% at σ 100 and 4.9% at σ 2,000. The balancer's steady scanning (100–180 k entries and 4–8 k hinting faults per node per second) costs throughput all run. The start delay removes only the first bursts: 1.024× against 1.034× at σ 100.
+- **Uniform's burst at the clock start is not the balancer.** It stays under `--localalloc` (0.83 M/s summed in the first 0.25 s, against 0.80 M/s by default). It comes from WPs' own allocations at the start.
+- **σ 2,000 with the new PP allocation:** the largest gap between progress lines is 0.016–0.043 s, so no stalls at 16 nodes.
+
+**Predictions:**
+- **N1: the cause right; the threshold wrong.** The balancer's counters rise only 2.1–3.6× in the burst (predicted ≥ 10×), because it scans all run. The perturbation settles the cause.
+- **N2 right.** Under `--localalloc`, `numa_pte_updates` is 0 in every run, the 1.5–2.25 s TLB burst is gone (at most 2× of a near-zero rate), and the dip is gone (0.96–1.02) in all 9 runs.
+- **N3 right.** σ 100 1.034× (≥ 1.01), 0.010 above the start delay; σ 2,000 1.049× (≥ 1.01).
+- **N4 right.** Uniform's clock-start burst is unchanged.
+- **N5 right.** σ 2,000 has no gap over 0.2 s.
+- **N6 second branch right.** 100% of hinting faults were local, and bound and `--localalloc` are level (within ±1%).
+
+**What follows:**
+- **`numactl --localalloc` is the Stampede3 launch from now on**, for every engine.
+  - In `ctl_sweep.sh` it is the default (`NUMA_WRAP`; `NUMA_WRAP=` runs without).
+  - Devastator's `run_phold.sh` gets the same wrapper, and so will ROSS's launch. A launch setting must be the same for all three engines.
+  - It needs no change to Charades, and allocation is unchanged.
+- **Next, at 32 nodes (section 165):** where the start delay alone gave 1.128×; with Devastator under the same launch; and the controller with per-LP rollback.
+
+### Job N32: `numactl --localalloc` at 32 nodes for Charades and Devastator, the controller with per-LP rollback, and the slow-run state (design, 2026-10-30; written before any runs)
+
+> **Status: design.**
+> - **Charades:** `main` (per-LP rollback, `--agg-pp-alloc=1`, and the `numactl --localalloc` launch from `ctl_sweep.sh`), htram `pdes` 42d347f, Reconverse and the launch as in job E.
+> - **Devastator:** as in A2r; `run_phold.sh` now runs it through `BIN_WRAP` when set.
+> - **Script:** `$WORK/charades-runs/numa165.slurm`, 32 nodes on skx (`-x c455-081`). The sampler runs throughout.
+
+**Runs** (32 nodes, end time 2,048,000, untraced; reps interleaved; a warm-up launch first):
+- **A. Charades, W 400, 3 reps.** For each of σ 100 (PP 2,048), σ 2,000 (PP 512) and uniform (WPs 512): `--localalloc` (the new launch) and without (`NUMA_WRAP=`), back to back.
+- **B. Charades' controller** (ε 0.001), `--localalloc`, 3 reps: σ 100 and σ 2,000.
+- **C. Devastator, W 1,000, 2 reps:** σ 100 and uniform, with and without `numactl --localalloc`.
+- **D. 16 nodes (the allocation's first 16):** σ 100 W 400 with `--localalloc`, 2 reps.
+
+**Predictions:**
+- **M1.** Charades `--localalloc` ÷ without, paired median: σ 100 ≥ 1.10, σ 2,000 ≥ 1.05, uniform ≥ 1.02.
+  - At 32 nodes the start delay alone gave 1.128×. At 16 nodes `--localalloc` beat the delay by 0.010, and gained 1.049× at σ 2,000 and 1.024× on uniform.
+- **M2.** Under `--localalloc`, no 1.5–2.25 s TLB burst and no dip (≥ 0.95) in any run.
+- **M3. The slow-run state.** If the balancer also caused it, the three σ 100 `--localalloc` reps are within 1.08× of each other (max ÷ min); job E's default reps were 1.25× apart. If they stay at least 1.15× apart, it is something else.
+- **M4.** Devastator gains too, at least 1.03× at σ 100: its 23 worker threads per process are as exposed. Charades ÷ Devastator is reported with both engines under the same launch.
+- **M5.** Per-node efficiency from 16 to 32 nodes at σ 100 under `--localalloc` is at least 0.93 (A2r, with chare rollback and the balancer: 0.82).
+- **M6.** The controller with per-LP rollback is at least 0.95 of W 400 at σ 100 and σ 2,000 (A2r, chare rollback: 0.93–0.94).
+- **M7.** σ 2,000 with the new PP allocation has no gap over 0.2 s between progress lines at 32 nodes (job E, old allocation: 3 of 6 runs).
+
+**What follows:** if M1, M4 and M5 hold, rerun the paper-grade 1–32-node table (all eight workloads, three engines) with the new defaults and launch.
 
 ## Baseline verification on the Mac
 
