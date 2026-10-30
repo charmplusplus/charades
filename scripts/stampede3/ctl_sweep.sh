@@ -54,6 +54,9 @@
 #     (the current launch, RESULTS.md sections 95 and 114; appended to every run;
 #     the pemap puts each process's PEs on its own socket),
 #   BIN_WRAP (a command srun runs the binary through, e.g. a perf wrapper),
+#   NUMA_WRAP="numactl --localalloc" (the binary runs under it, after
+#     BIN_WRAP: a non-default memory policy, so automatic NUMA balancing skips
+#     the process; RESULTS.md section 164; NUMA_WRAP= runs it without),
 #   CPT=24 (cores per task for srun -c), SRUN_ARGS
 #     (extra srun options, e.g. --cpu-bind=none with a +pemap in EXTRA_ARGS).
 # One CSV row per run; a run that hits CAP is cancelled with scancel (never
@@ -68,6 +71,7 @@ WORKLOADS=${WORKLOADS:-"steady:10:200:0.5 steady:100:1000:0.5 phases:10:200:100:
 ARMS=${ARMS:-"w:25 w:50 w:100 w:250 w:500 q:0.02 q:0.05 q:0.1 hill:250"}
 AGG=${AGG:-pp:512} BUCKETS=${BUCKETS:-8} MARGINS=${MARGINS:-8}
 EXTRA_ARGS=${EXTRA_ARGS-"+lci_ndevices 23 +pemap 2-46:2,3-47:2 +mempool_remote_free"}
+NUMA_WRAP=${NUMA_WRAP-numactl --localalloc}
 C=$WORK/$TREE
 out=${RUNS:-$WORK/charades-runs}/ctl_sweep; mkdir -p $out/logs; cd $out
 csv=${2:-$out/sweep_$(date +%Y%m%d_%H%M%S).csv}
@@ -117,7 +121,7 @@ run_one() {  # nodes procs pes cfg arm label
   fi
   extra+=(${EXTRA_ARGS:-})
   srun --mpi=pmi2 --kill-on-bad-exit=1 --wait=30 -N $N -n $n -c ${CPT:-$((pe / n))} ${SRUN_ARGS:-} -J cs_$label \
-      ${BIN_WRAP:-} $bin +pe $pe $cfg $C/tests/test_configs/$gvtcfg "${extra[@]}" \
+      ${BIN_WRAP:-} ${NUMA_WRAP:-} $bin +pe $pe $cfg $C/tests/test_configs/$gvtcfg "${extra[@]}" \
       > $f 2>&1 &
   local sp=$! t0=$(date +%s.%N) status=ok
   while kill -0 $sp 2>/dev/null; do
