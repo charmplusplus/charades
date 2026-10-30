@@ -7,7 +7,7 @@ the switch), packets and words in and out, and the driver's receive-overflow
 counters (eager buffers or header queue full, receive overflow, per-context
 header-queue overflows summed), and the node's TLB-shootdown, function-call
 and rescheduling interrupts from /proc/interrupts, summed over CPUs. Run one
-per node. Writes OUTDIR/<host>.csv on SIGTERM or SIGINT (and every 60 s), plus
+per node. Writes OUTDIR/<host>.csv on SIGTERM or SIGINT (and every 5 s), plus
 OUTDIR/<host>_all_{start,end}.txt with every counter of the port and device.
 
 Usage: hfi_sampler.py OUTDIR [PERIOD_S]
@@ -96,7 +96,7 @@ while not stop:
     now = time.time()
     v = [value(fd) for fd in fds]
     rows.append('%.3f,%s,%d,%s\n' % (now, ','.join(map(str, v)), sum(value(fd) for fd in ovr), ','.join(map(str, irqs()))))
-    if now - last_flush > 60:
+    if now - last_flush > 5:
         flush()
         last_flush = now
     nxt += period
