@@ -6048,6 +6048,7 @@ Events rolled back per rollback call at W 400: 3.7–4.0 (16, chare), 1.5–2.0 
 > **Status: design.**
 > - **Analysis:** no new runs; A2r's six traced runs (job 3657016). Scripts `turn.py`, `epis.py`, `valid.py`, `steady.py`, `shape2.py` in `~/charades-data/scale32/episodes/`.
 > - **Job E:** Charades `episode-diag` (this commit; per-LP rollback, now the default), htram, Reconverse and the launch as in A2r; `$WORK/charades-runs/episode54.slurm` (32 nodes, skx, `-x c455-081`).
+> - **Job E16:** the same blocks at 16 nodes on skx-dev, without block C (`episode54.slurm n16`). It was added while job E waited for 32 skx nodes, to get the instruments' first data sooner; the predictions below are for 32 nodes.
 
 **A correction to section 153.** In `gvt_waves_<p>.csv`, `handled_s` is when the process sent its combined counts (the first hop of the Charm++ path), not when it handled the previous result. Section 153's "response" (last PE in − the previous `handled_s`) therefore included the whole cross-process reduction. That inflates T3 ("the median process's response grows about as much as the wave") and the uniform "+261 µs" line. Measured properly:
 - a process's **turnaround** is its counts sent − the previous result's arrival there;
