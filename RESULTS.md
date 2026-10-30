@@ -303,6 +303,7 @@ Sections 1–128 were re-read before planning sections 129 onward.
 | 157 | 2026-10-29 | 3660206 | Job R16: σ 2,000's 0.36 s start-up ramp is htram PP's (WPs 0.05 s, direct 0.01 s; start delay leaves 0.30 s); PEs wait, not work (idle-loop functions 4–7× per unit simulated time); one random PE per wave ~500 µs late; WPs 512 1.03× PP 512 overall | current |
 | 158 | 2026-10-29 | — | Does PP's start-up ramp follow glibc's handling of PP's ~1.2 MB per-send shared buffers? TLB shootdowns sampled; fixed mmap threshold and no-trim as perturbations; job A16 design | design |
 | 159 | 2026-10-29 | 3660356 | Job A16: PP's ramp is not the allocator (TLB shootdowns not raised; fixed mmap threshold 0.37 s, no-trim 0.26 s lost); no-trim 1.074× PP in steady state; WPs 512 1.047× PP 512 at σ 2,000, 16 nodes | current |
+| 160 | 2026-10-29 | — | `--agg-pp-alloc=1` (PP's shared buffers at their own limit, not ~1.2 MB) and WPs 512 against PP on σ 100/1,000/2,000/4,000 at 16 nodes; job P16 design | design |
 
 ## Stampede3 runs, in order
 
@@ -6318,6 +6319,29 @@ This is a diagnosis; neither setting is a candidate for the paper's launch (sect
 - **Steady state, two findings for the settings:**
   - **No trimming makes PP 1.074× faster** (section 92 found 1.055–1.083× at 4 nodes). It is not shootdowns (the same rates), and fixing the mmap threshold gives only 1.011×. glibc settings stay out of the launch (section 140), but an htram change that makes PP's allocations cheaper could capture the same gain. `--agg-pp-alloc=1` (htram branch `pp-alloc-limit`, Charades `episode-diag`: shared buffers allocated at their own limit, about 38 KB instead of about 1.2 MB; Mac change tier with 10 repeats 720/720) is a candidate. Section 80 found larger PP allocations faster, so only a measurement can tell.
   - **WPs 512 is 1.047× PP 512** at σ 2,000 on 16 nodes (1.03× in job R16). PP was chosen for σ ≥ 2,000 in section 140; at 16 nodes WPs is now ahead and has no ramp. The choice must be checked at 32 nodes, where WPs' per-PE buffers fill more slowly.
+
+### PP's shared buffers at their own limit (`--agg-pp-alloc=1`), and PP against WPs, on the four PP workloads at 16 nodes (design, 2026-10-29; written before any runs)
+
+> **Status: design.**
+> - **Build:** Charades `episode-diag` 02f2b91 (with `--agg-pp-alloc`), htram `pp-alloc-limit` 42d347f (`pdes` plus the option), Reconverse and the launch as in A2r. A new tree `$WORK/charades-alloc` built against `$WORK/htram-alloc`; `charades-lprb`, which job E uses, is unchanged.
+> - **Job P16:** `$WORK/charades-runs/pp60.slurm` (16 nodes, skx-dev, `-x c455-081`).
+
+**Why.**
+- Section 159 found no trimming makes PP 512 1.074× faster at σ 2,000, with no rise in TLB shootdowns. One allocation pattern is PP's alone: a new shared buffer at htram's largest size, about 1.2 MB, at every send, for about 3 KB of events.
+- `--agg-pp-alloc=1` allocates it at its own limit instead: 528 items, 38 KB, for PP 512; 2,064 items, 149 KB, for PP 2,048. Without glibc settings, it would remove whatever that pattern costs.
+- Section 80 found larger PP allocations faster (147 KB against 37 KB, 1.07–1.14×), so the direction is not known in advance.
+- WPs 512 was 1.03–1.047× PP 512 at σ 2,000 (sections 157 and 159). That needs checking on the other PP workloads.
+
+**Runs** (16 nodes, W 400, end time 2,048,000, untraced, 3 reps interleaved). σ 100 and σ 1,000 with PP 2,048, and σ 2,000 and σ 4,000 with PP 512 (the settings in use), each three ways: PP as now; PP with `--agg-pp-alloc=1`; WPs 512.
+
+**Predictions:**
+- P1. If PP's steady-state cost comes from glibc's handling of its 1.2 MB per-send buffers, `--agg-pp-alloc=1` is at least 1.04× PP at σ 2,000 and σ 4,000. If section 80's "larger allocations are faster" holds instead, it is at most 0.97×.
+- P2. The start-up ramp does not change with it (section 159: not the allocator): σ 2,000 still loses at least 0.25 s in its first 2 s.
+- P3. WPs 512 is at least 1.0× PP 512 at σ 2,000 and σ 4,000, and PP 2,048 stays ahead of WPs 512 at σ 100 and σ 1,000 (section 140).
+
+**What follows:**
+- If P1's gain holds, `--agg-pp-alloc=1` becomes the default and is checked at 32 nodes.
+- If WPs leads at σ ≥ 2,000 at 32 nodes too, the paper's setting for those workloads changes. Every workload's setting stays the same at every node count.
 
 ## Baseline verification on the Mac
 
