@@ -65,6 +65,7 @@ unsigned g_tw_agg_scope;
 unsigned g_tw_agg_input_buffer;
 unsigned g_tw_local_fast_path;
 unsigned g_tw_event_index;
+unsigned g_tw_rollback_unit;
 unsigned g_tw_msg_pool;
 unsigned g_tw_agg_gvt_flush;
 unsigned g_tw_agg_policy;
@@ -168,6 +169,7 @@ void clear_globals() {
   g_tw_agg_input_buffer          = 1;
   g_tw_local_fast_path    = 1;
   g_tw_event_index        = 1;
+  g_tw_rollback_unit      = 1;
   g_tw_msg_pool           = 1;
   g_tw_agg_gvt_flush      = 2;
   g_tw_agg_policy         = 0;

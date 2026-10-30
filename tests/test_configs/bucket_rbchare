@@ -1,0 +1,5 @@
+# Chare rollback (--rollback-unit=0, not the default): Optimistic w/Bucketed GVT
+sync=3
+gvt=4
+buffer-size=655360
+rollback-unit=0

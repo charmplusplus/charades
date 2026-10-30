@@ -307,9 +307,10 @@ void LPChare::recv_remote_event(RemoteEvent* event) {
     }
   }
 
-  if (g_tw_comm_stats && isOptimistic) comm_record_slack(e->ts, get_current_time());
+  const Time judged = straggler_time(lp_structs[g_lp_mapper->get_local_id(e->dest_lp)]);
+  if (g_tw_comm_stats && isOptimistic) comm_record_slack(e->ts, judged);
   // A straggler the window could not have caused: it arrived late
-  if (isOptimistic && e->ts <= get_current_time()) {
+  if (isOptimistic && e->ts <= judged) {
     if (event->far) PE_STATS(late_stragglers)++;
     if (event->far || event->held) PE_STATS(held_stragglers)++;
     if (event->held) count_held_straggler(scheduler->stats, e->ts);
@@ -329,9 +330,10 @@ void LPChare::recv_fast_event(RemoteEvent* event) {
   e->state.remote = 1;
   // An anti-message finds the event through its message: nothing is indexed
   event->fp_event = e;
-  if (g_tw_comm_stats) comm_record_slack(e->ts, get_current_time());
+  const Time judged = straggler_time(lp_structs[g_lp_mapper->get_local_id(e->dest_lp)]);
+  if (g_tw_comm_stats) comm_record_slack(e->ts, judged);
   // Never held in a buffer, so only a late one counts as held too
-  if (e->ts <= get_current_time() && event->far) {
+  if (e->ts <= judged && event->far) {
     PE_STATS(late_stragglers)++;
     PE_STATS(held_stragglers)++;
   }
@@ -372,8 +374,12 @@ void LPChare::recv_local_event(Event* e) {
    * \todo Locally sent events can't cause violations so this should be moved
    * to the remote handler.
    */
-  if(isOptimistic && e->ts <= get_current_time()) {
-    BRACKET_TRACE(rollback_me(e->ts);,USER_EVENT_RB)
+  if(isOptimistic && e->ts <= straggler_time(e->owner)) {
+    if (g_tw_rollback_unit) {
+      BRACKET_TRACE(rollback_lp(e->owner, e->ts);,USER_EVENT_RB)
+    } else {
+      BRACKET_TRACE(rollback_me(e->ts);,USER_EVENT_RB)
+    }
   }
 
   /**
@@ -443,6 +449,7 @@ int LPChare::execute_me() {
     // --ctl-cost=1: time every 16th forward, for what a rolled-back event's
     // forward work cost (two timer reads per 16 events)
     static thread_local unsigned fwd_sample = 0;
+    in_forward = true;
     if (g_tw_ctl && g_tw_ctl_cost && (++fwd_sample & 15) == 0) {
       double t0 = CmiWallTimer();
       BRACKET_TRACE(lp->forward(e);, USER_EVENT_FWD)
@@ -451,6 +458,7 @@ int LPChare::execute_me() {
     } else {
       BRACKET_TRACE(lp->forward(e);, USER_EVENT_FWD)
     }
+    in_forward = false;
 
     /**
      * Move the event to the processed queue if we are optimistic, otherwise
@@ -458,6 +466,7 @@ int LPChare::execute_me() {
      */
     if (isOptimistic) {
       processed_events.push_front(e);
+      if (g_tw_rollback_unit) lp_chain_push(lp, e);
     } else {
       tw_event_free(e,true);
       committed_events++;
@@ -499,6 +508,38 @@ void LPChare::rollback_me(Time ts) {
   if (g_tw_gvt_trace >= 3) g_wave_timers.rollback += CmiWallTimer() - t0;
 }
 
+/**
+ * --rollback-unit=1: roll back only lp's processed events at or after ts.
+ * The chare's other LPs keep theirs: LPs share no state, and an event one of
+ * them sent to lp is cancelled through its causality chain as usual. lp's
+ * events leave the chare's processed queue from the middle, so that queue
+ * stays in execution order but no longer in time order; each LP's chain is
+ * in time order, which is what rollbacks and commits need.
+ */
+void LPChare::rollback_lp(LPBase* lp, Time ts) {
+  double t0 = (g_tw_ctl && g_tw_ctl_cost) || g_tw_gvt_trace >= 3 ? CmiWallTimer() : 0;
+  PE_STATS(total_rollback_calls)++;
+  PE_STATS(ts_rollback_calls)++;
+  // A send to an LP of this chare is delivered at once (tw_event_send), so
+  // this can run inside another LP's forward handler: that LP may be behind
+  // the one rolled back. Reversing sets the current event, and the handler's
+  // later sends take their time and causal parent from it, so restore it
+  // (in_forward); otherwise, as for a chare rollback, the newest processed.
+  Event* const running = current_event;
+  while (lp->lp_head && lp->lp_head->ts >= ts) {
+    Event* e = lp->lp_head;
+    lp_chain_unlink(lp, e);
+    processed_events.erase(e);
+    tw_event_rollback(e);
+    rolled_back_events++;
+    events.push(e);
+  }
+  scheduler->update_next(&next_token, events.min());
+  set_current_event(in_forward ? running : processed_events.front());
+  if (g_tw_ctl && g_tw_ctl_cost) PE_STATS(rollback_ns) += (uint64_t)((CmiWallTimer() - t0) * 1e9);
+  if (g_tw_gvt_trace >= 3) g_wave_timers.rollback += CmiWallTimer() - t0;
+}
+
 void LPChare::rollback_me(Event* event) {
   double t0 = (g_tw_ctl && g_tw_ctl_cost) || g_tw_gvt_trace >= 3 ? CmiWallTimer() : 0;
   PE_STATS(total_rollback_calls)++;
@@ -507,14 +548,32 @@ void LPChare::rollback_me(Event* event) {
   /**
    * Pop events from our processed queue until we pop an event matching the
    * event passed in. For all events that don't match, we roll them back and
-   * push them back onto the pending heap.
+   * push them back onto the pending heap. With --rollback-unit=1, only the
+   * events of the cancelled event's LP, newest first.
    */
-  Event* e = processed_events.pop_front();
-  while (e != event) {
-    tw_event_rollback(e);
-    rolled_back_events++;
-    events.push(e);
+  Event* e;
+  Event* const running = current_event;  // --rollback-unit=1, see rollback_lp
+  if (g_tw_rollback_unit) {
+    LPBase* lp = event->owner;
+    e = lp->lp_head;
+    lp_chain_unlink(lp, e);
+    processed_events.erase(e);
+    while (e != event) {
+      tw_event_rollback(e);
+      rolled_back_events++;
+      events.push(e);
+      e = lp->lp_head;
+      lp_chain_unlink(lp, e);
+      processed_events.erase(e);
+    }
+  } else {
     e = processed_events.pop_front();
+    while (e != event) {
+      tw_event_rollback(e);
+      rolled_back_events++;
+      events.push(e);
+      e = processed_events.pop_front();
+    }
   }
 
   /**
@@ -532,7 +591,7 @@ void LPChare::rollback_me(Event* event) {
    * any processed events.
    */
   scheduler->update_next(&next_token, events.min());
-  set_current_event(processed_events.front());
+  set_current_event(g_tw_rollback_unit && in_forward ? running : processed_events.front());
   if (g_tw_ctl && g_tw_ctl_cost) PE_STATS(rollback_ns) += (uint64_t)((CmiWallTimer() - t0) * 1e9);
   if (g_tw_gvt_trace >= 3) g_wave_timers.rollback += CmiWallTimer() - t0;
 }
@@ -544,6 +603,26 @@ void LPChare::fossil_me(Time gvt) {
    * to the passed in GVT.
    */
   Event* e;
+  if (g_tw_rollback_unit) {
+    // The processed queue is in execution order, not time order: commit each
+    // LP's events below GVT from the old end of its chain (time order)
+    for (LPBase* lp : lp_structs) {
+      while (lp->lp_tail != NULL && lp->lp_tail->ts < gvt) {
+        e = lp->lp_tail;
+        TW_ASSERT(!e->state.cancel_q,
+            "[%d] chare %d: committing event ts %llu that is in the cancel queue "
+            "(gvt %llu, chare min_cancel_q %llu)\n", CkMyPe(), thisIndex,
+            (unsigned long long)e->ts, (unsigned long long)gvt,
+            (unsigned long long)min_cancel_q);
+        lp_chain_unlink(lp, e);
+        processed_events.erase(e);
+        tw_event_free(e,true);
+        committed_events++;
+        committed_time = e->ts;
+      }
+    }
+    return;
+  }
   while (processed_events.back() != NULL && processed_events.back()->ts < gvt) {
     /** min_cancel_time keeps GVT at or below every queued cancellation */
     TW_ASSERT(!processed_events.back()->state.cancel_q,
@@ -639,6 +718,33 @@ void LPChare::process_cancel_q() {
       }
       curr = next;
     }
+  }
+}
+
+Time LPChare::straggler_time(const LPBase* lp) const {
+  if (!g_tw_rollback_unit) return current_time;
+  return lp->lp_head ? lp->lp_head->ts : PE_VALUE(g_last_gvt);
+}
+
+void LPChare::lp_chain_push(LPBase* lp, Event* e) {
+  e->lp_prev = NULL;
+  e->lp_next = lp->lp_head;
+  if (lp->lp_head) lp->lp_head->lp_prev = e;
+  lp->lp_head = e;
+  if (lp->lp_tail == NULL) lp->lp_tail = e;
+}
+
+void LPChare::lp_chain_unlink(LPBase* lp, Event* e) {
+  if (e->lp_prev) e->lp_prev->lp_next = e->lp_next; else lp->lp_head = e->lp_next;
+  if (e->lp_next) e->lp_next->lp_prev = e->lp_prev; else lp->lp_tail = e->lp_prev;
+  e->lp_prev = e->lp_next = NULL;
+}
+
+void LPChare::lp_chain_rebuild() {
+  for (LPBase* lp : lp_structs) lp->lp_head = lp->lp_tail = NULL;
+  // Oldest first, so each push leaves the newest at the head
+  for (Event* e = processed_events.back(); e != NULL; e = e->prev) {
+    lp_chain_push(e->owner, e);
   }
 }
 
