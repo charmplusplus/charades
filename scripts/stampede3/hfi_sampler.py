@@ -5,14 +5,15 @@ Every PERIOD seconds (default 0.1) records the Unix time and a set of hfi1
 counters: the port's transmit wait and flow-stall ticks (back-pressure from
 the switch), packets and words in and out, and the driver's receive-overflow
 counters (eager buffers or header queue full, receive overflow, per-context
-header-queue overflows summed), and the node's TLB-shootdown, function-call
-and rescheduling interrupts from /proc/interrupts, summed over CPUs. Run one
-per node. Writes OUTDIR/<host>.csv on SIGTERM or SIGINT (and every 5 s), plus
+header-queue overflows summed), the node's TLB-shootdown, function-call
+and rescheduling interrupts from /proc/interrupts, summed over CPUs, and
+/proc/vmstat's counters for automatic NUMA balancing, page migration,
+transparent huge pages and compaction (section 163). Run one per node. Writes OUTDIR/<host>.csv on SIGTERM or SIGINT (and every 5 s), plus
 OUTDIR/<host>_all_{start,end}.txt with every counter of the port and device.
 
 Usage: hfi_sampler.py OUTDIR [PERIOD_S]
 """
-import os, signal, socket, sys, time
+import glob, os, signal, socket, sys, time
 
 out = sys.argv[1]
 period = float(sys.argv[2]) if len(sys.argv) > 2 else 0.1
@@ -28,6 +29,10 @@ NAMES = [
     (devc, 'PioWait'), (devc, 'SendSched'), (devc, 'TidWait'), (devc, 'KmemWait'),
     (devc, 'RcvLimit'), (devc, 'Intr'), (devc, 'DRIVER_KernIntr'),
 ]
+VMSTAT = ['numa_pte_updates', 'numa_huge_pte_updates', 'numa_hint_faults', 'numa_hint_faults_local',
+          'numa_pages_migrated', 'pgmigrate_success', 'pgmigrate_fail', 'thp_fault_alloc',
+          'thp_collapse_alloc', 'thp_split_pmd', 'thp_migration_success', 'compact_stall',
+          'compact_migrate_scanned', 'nr_tlb_remote_flush', 'nr_tlb_remote_flush_received', 'pgfault']
 os.makedirs(out, exist_ok=True)
 
 
@@ -55,6 +60,19 @@ def irqs():
     return [out['TLB:'], out['CAL:'], out['RES:']]
 
 
+def vmstat():
+    """the VMSTAT counters, -1 where the kernel has none"""
+    v = dict.fromkeys(VMSTAT, -1)
+    try:
+        for line in open('/proc/vmstat'):
+            k, _, x = line.partition(' ')
+            if k in v:
+                v[k] = int(x)
+    except (OSError, ValueError):
+        pass
+    return [v[k] for k in VMSTAT]
+
+
 def value(fd):
     if fd < 0:
         return -1
@@ -67,6 +85,12 @@ def value(fd):
 def dump_all(tag):
     with open(os.path.join(out, '%s_all_%s.txt' % (host, tag)), 'w') as f:
         f.write('# CPUs this sampler may run on: %s\n' % sorted(os.sched_getaffinity(0)))
+        for k in sorted(glob.glob('/proc/sys/kernel/numa_balancing*')) + sorted(glob.glob('/sys/kernel/mm/transparent_hugepage/*')) \
+                + sorted(glob.glob('/sys/kernel/mm/transparent_hugepage/khugepaged/*')):
+            try:
+                f.write('# %s %s\n' % (k, open(k).read().strip()))
+            except OSError:
+                pass
         for d in (port, devc):
             for n in sorted(os.listdir(d)):
                 try:
@@ -77,7 +101,7 @@ def dump_all(tag):
 
 rows = []
 csv = os.path.join(out, host + '.csv')
-header = 'unix_s,' + ','.join(n.split(',')[0] for _, n in NAMES) + ',RcvHdrOvr_sum,TLB,CAL,RES\n'
+header = 'unix_s,' + ','.join(n.split(',')[0] for _, n in NAMES) + ',RcvHdrOvr_sum,TLB,CAL,RES,' + ','.join(VMSTAT) + '\n'
 
 
 def flush():
@@ -95,7 +119,7 @@ nxt = time.time()
 while not stop:
     now = time.time()
     v = [value(fd) for fd in fds]
-    rows.append('%.3f,%s,%d,%s\n' % (now, ','.join(map(str, v)), sum(value(fd) for fd in ovr), ','.join(map(str, irqs()))))
+    rows.append('%.3f,%s,%d,%s,%s\n' % (now, ','.join(map(str, v)), sum(value(fd) for fd in ovr), ','.join(map(str, irqs())), ','.join(map(str, vmstat()))))
     if now - last_flush > 5:
         flush()
         last_flush = now
