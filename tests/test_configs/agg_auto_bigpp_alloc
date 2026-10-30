@@ -1,0 +1,14 @@
+# PP shared buffers allocated at their own limit (--agg-pp-alloc=1), while PP grows live: Optimistic w/Bucketed GVT, htram PP 16 -> PP 64 after 4 GVT advances (--agg-auto, forced)
+sync=3
+gvt=4
+buffer-size=655360
+optimism-window=2000
+aggregation=1
+agg-mode=2
+agg-buffer=16
+agg-policy=1
+agg-auto=1
+agg-auto-advances=4
+agg-auto-share=1.0
+agg-auto-buffer=64
+agg-pp-alloc=1
