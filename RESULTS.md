@@ -298,6 +298,7 @@ Sections 1–128 were re-read before planning sections 129 onward.
 | 152 | 2026-10-29 | 3658328 | Job P results: per-LP rollback gives 1 LP per chare's rollbacks (3.5–15× fewer at W 400) at no cost; held deadline 1.09× at σ 2,000 (new best) but 0.89–0.92× σ 100, 0.68–0.70× uniform; GVT delay not absorbed at W 800 | current |
 | 153 | 2026-10-29 | 3657016 | A2r, 32 nodes: Charades leads in 6 of 8 (44 of 48 cells at 1–32) but loses more per node 16→32 than Devastator everywhere (0.72–0.87 against 0.80–0.98); start-up transient at σ 100, per-wave work on uniform, controller at W ~300 | current |
 | 154 | 2026-10-29 | — | Section 153's start-up transient is a slow cross-process reduction (300–410 µs a wave against 110), in episodes of seconds that also occur mid-run; job E design (counters, thread usage, start delay, tree hops) | design |
+| 155 | 2026-10-29 | 3660089 | Job E16 (16 nodes): no reduction stretch at 16 nodes; σ 2,000's 0.4 s start-up ramp is user-space PE work (kernel ~1%); a 1.5–2.0 s dip tied to process age; no receive overflow; one external congestion episode; job E gains tree 8 and a σ 2,000 start delay | current |
 
 ## Stampede3 runs, in order
 
@@ -6137,6 +6138,67 @@ Waves 10–95%, medians over waves (µs; lower is better):
 - **H3:** the fabric is not ours to fix. Make GVT tolerate a slow reduction instead: fewer sequential hops on the critical path, or count waves that overlap.
 - **H4:** make the tree the default, or fix the Charm++ path.
 - **E7 right:** the reduction latency at 32 nodes is worth attacking in steady state too: shorter passes while a wave is in flight at large node counts, or section 118's free-core poller.
+
+### Job E16, 16 nodes, results: no reduction stretch at 16 nodes; σ 2,000's start-up ramp is in the PEs' user-space work, not the kernel; a dip tied to process age; one external congestion episode, no receive overflow (2026-10-29; skx-dev batch job 3660089, 16 nodes); and two arms added to job E (design, written before job E's runs)
+
+> **Status: current** (E16); **design** (the job E additions at the end).
+> - **E16:** design and predictions in section 154.
+>   - Allocation: c454-081 to c454-104 (12 nodes) and c455-024, c455-031 to c455-033 (4 nodes, another rack); 21:24–21:30.
+>   - Runs: gate 24/24. All 44 Charades runs ok, and committed counts equal within each workload. Devastator 4 of 4 ok.
+>   - Data: `~/charades-data/scale32/episodes/n16_j3660089/`, with `summary.txt` (`epi_summary.py`).
+> - **The sampler failed to start in the job.** The step's cgroup holds only the one CPU Slurm gives it, so `taskset -c 1` was refused. It was attached from the login node instead (`srun -p skx-dev -t … --jobid --overlap`) and ran from the last run of block A's rep 1 to the end of block D. So rep 1's σ 100 arms have no counters.
+> - **Job E is resubmitted** with the sampler on its step's own CPU (now logged in the sampler's start dump) and the two arms below; the first submission, 3660078, was cancelled before it started.
+
+**Untraced, 16 nodes** (median of 3 reps; M ev/s, higher is better; "lost" is the time the first 2 s of wall time lose against the rest of the run's rate):
+
+| arm | M ev/s | ÷ σ 100 default (higher is better) | rest ÷ first 2 s | lost in the first 2 s (s) |
+|---|---|---|---|---|
+| σ 100, Charm++ reduction (default) | 666.6 | 1.000 | 1.02 | 0.05 |
+| σ 100, `--gvt-wave-tree=4` | 683.2 | 1.025 | 1.05 | 0.10 |
+| σ 100, `--start-delay-ms=5000` | 680.4 | 1.021 | 0.99 | −0.03 |
+| σ 100, `--wave-batch=4` | 618.1 | 0.927 | 1.04 | 0.08 |
+| σ 2,000 | 492.8 | — | 1.25 | **0.40** (0.36–0.42 in all 3 reps) |
+| uniform | 336.2 | — | 1.07 | 0.12 |
+
+**Simulated time per wall second, in 0.25 s bins from the clock start** (thousands; higher is faster; one rep each, the others alike):
+
+| run | 0 | 0.25 | 0.5 | 0.75 | 1.0 | 1.25 | **1.5** | **1.75** | 2.0 | 2.25 | 2.5 |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| σ 100, default | 435 | 497 | 505 | 500 | 505 | 496 | **421** | **376** | 464 | 477 | 479 |
+| σ 100, 5 s start delay | 486 | 500 | 487 | 491 | 490 | 495 | 471 | 462 | 493 | 475 | 473 |
+| σ 2,000 | **152** | **255** | 334 | 363 | 370 | 345 | **310** | **286** | 360 | 367 | 362 |
+| uniform | 204 | 250 | 251 | 248 | 249 | 244 | **211** | **202** | 247 | 248 | 249 |
+
+- **A dip tied to process age.** Every run without the start delay slows 15–25% from 1.5 to 2.0 s after the clock starts, which is about 3.5–4 s after launch (setup takes about 2 s). Of the delayed runs, two show no dip and the third dips at 2.25–2.75 s instead. In the traced runs the dip is in the slowest process's turnaround (126–132 against about 95 µs), not in the reduction, and not in the kernel. It costs about 0.1 s a run, 2% at 16 nodes.
+- **No reduction stretch at 16 nodes.** In all four traced σ 100 runs (Charm++ reduction and tree) the reduction after the last process is 34–72 µs from the first bin on. Section 153's stretch, a reduction of 300–410 µs, was at 32 nodes; at 16 nodes A2r showed only 116–149 µs in its first 1.5 s.
+- **σ 2,000's start-up ramp** (0.4 s a run, about 7% at 16 nodes) is in the slowest process's turnaround: 526 µs in the first 0.25 s and 263 µs in the next, against 135–150 µs steady, with the reduction steady at 56–67 µs.
+  - **The kernel is not the cause (H1 out at 16 nodes).** Kernel time is about 1% of PE time throughout (5.8 µs per PE per 587 µs wave at the start, 1.7 per 200 µs steady). Minor faults per PE per wave fall from 0.38 to 0.02; at about 1 µs each they are negligible.
+  - Caveat: Linux accounts thread CPU time by ticks, so only these averages are meaningful; the largest single-PE kernel time per wave in the trace is a tick and means nothing.
+  - So the extra time is user-space PE work, as section 121 found from 4 to 16 nodes. That points at the runtime loop (network progress inside psm2 and LCI, allocation), or at the model's and htram's own start.
+- **Hops (tree, fan-out 4):** up hops wait 12–17 µs beyond their pair's fastest (35 µs on uniform), and down hops 4–7 µs, with no change over the run. This is as section 118 found.
+- **hfi1 counters:**
+  - **No receive overflow in any run.** Eager buffers full, header queue full, receive overflow, `SeqDrop0` and every context's `RcvHdrOvr` stay at 0.
+  - **Transmit wait appears only with uniform's traffic:** 1–6 M ticks/s across the nodes at 61–64 GB/s sent (about 3.8 GB/s per node, 30% of a link).
+  - **One external congestion episode.** In uniform's rep 3, transmit wait rose about 100× for 4 s (0.35–0.88 × 10⁹ ticks/s; the most on c455-024, in the other rack) while our send rate fell from 62 to 47–54 GB/s. That was the slowest uniform rep (320.5 against 346.4 and 336.2 M ev/s).
+- **Devastator:**
+  - σ 100 rep 1 took 33.5 s (86.5 M ev/s) against 4.8 s (608.6) for rep 2. For about 30 s of rep 1 the nodes sent almost nothing (0.06 GB/s in all), so this was a stall inside Devastator, not the fabric. A2r also had single slow Devastator reps.
+  - Uniform: 181.0–181.7 M ev/s.
+- **Sampler cost.** The arms run without the sampler (block A's rep 1) are within the rep spread of the same arms with it: σ 100 667.9 against 666.6 and 653.7 M ev/s; tree 685.1 against 663.3 and 683.2. The two runs of block E (sampler off) ran last, at 637 M ev/s; that is a different time, not the sampler.
+- **Predictions (16-node counterparts):**
+  - E1 right: no stretch at 16 nodes (rest ÷ first 2 s: 1.02).
+  - E3: the tree is level (1.025×).
+  - E4 right: kernel work is not the cause.
+  - E5: no receive overflow; back-pressure seen once, from outside.
+  - E6: the start delay removes the 1.5–2.0 s dip.
+  - E7 wrong at 16 nodes (`--wave-batch=4`: 0.927×), as in section 120.
+  - E8 right.
+
+**Added to job E (32 nodes), design, written before its runs:**
+- **`--gvt-wave-tree=8`** (two levels below process 0 instead of three), 3 reps at σ 100. Section 118's flat tree lost to the root's serial sends at 16 nodes. Fan-out 8 halves the levels at 32 nodes, with 8 serial sends a level.
+- **σ 2,000 with `--start-delay-ms=5000`,** 3 reps.
+- **Predictions:**
+  - E9. If the hop count sets the steady reduction at 32 nodes (about 109 µs over 6–7 hops), dropping two levels shortens it by about 30 µs, and fan-out 8 is at least 1.08× the Charm++ reduction at σ 100. If the serial sends cost more, it is at most 1.0×.
+  - E10. If σ 2,000's start-up ramp comes from the simulation's own start (the model, htram's buffers, the runtime's pools filling), the 5 s delay leaves it unchanged (at least 0.3 s lost in the first 2 s). If it comes from process age, it disappears.
 
 ## Baseline verification on the Mac
 
