@@ -299,6 +299,7 @@ Sections 1–128 were re-read before planning sections 129 onward.
 | 153 | 2026-10-29 | 3657016 | A2r, 32 nodes: Charades leads in 6 of 8 (44 of 48 cells at 1–32) but loses more per node 16→32 than Devastator everywhere (0.72–0.87 against 0.80–0.98); start-up transient at σ 100, per-wave work on uniform, controller at W ~300 | current |
 | 154 | 2026-10-29 | — | Section 153's start-up transient is a slow cross-process reduction (300–410 µs a wave against 110), in episodes of seconds that also occur mid-run; job E design (counters, thread usage, start delay, tree hops) | design |
 | 155 | 2026-10-29 | 3660089 | Job E16 (16 nodes): no reduction stretch at 16 nodes; σ 2,000's 0.4 s start-up ramp is user-space PE work (kernel ~1%); a 1.5–2.0 s dip tied to process age; no receive overflow; one external congestion episode; job E gains tree 8 and a σ 2,000 start delay | current |
+| 156 | 2026-10-29 | — | σ 2,000's start-up ramp at 16 nodes: start delay, htram mode (PP, WPs, direct), σ 4,000, and a perf profile of process 0 split by time; job R16 design | design |
 
 ## Stampede3 runs, in order
 
@@ -6199,6 +6200,30 @@ Waves 10–95%, medians over waves (µs; lower is better):
 - **Predictions:**
   - E9. If the hop count sets the steady reduction at 32 nodes (about 109 µs over 6–7 hops), dropping two levels shortens it by about 30 µs, and fan-out 8 is at least 1.08× the Charm++ reduction at σ 100. If the serial sends cost more, it is at most 1.0×.
   - E10. If σ 2,000's start-up ramp comes from the simulation's own start (the model, htram's buffers, the runtime's pools filling), the 5 s delay leaves it unchanged (at least 0.3 s lost in the first 2 s). If it comes from process age, it disappears.
+
+### σ 2,000's start-up ramp at 16 nodes: start delay, htram mode, and a profile split by time (design, 2026-10-29; written before any runs)
+
+> **Status: design.**
+> - **Build:** Charades `episode-diag` (efff74e; the binary built from e6c5efc, as in E16), htram, Reconverse and the launch as in A2r.
+> - **Job R16:** `$WORK/charades-runs/ramp56.slurm` (16 nodes, skx-dev, `-x c455-081`). It runs while job E (3660196) waits for 32 skx nodes.
+
+**Why.** Section 155: at 16 nodes σ 2,000 loses 0.36–0.42 s in its first 2 s in every rep. The throughput ramps from 150 to 365 thousand simulated time units per wall second over the first 0.75 s. That is about 7% of a run, and section 122 found σ 4,000's whole 4→16-node loss was start-up. The ramp is in the slowest process's user-space work, not in the kernel and not in the reduction. Warm-up pings did not remove it (section 122).
+
+**Runs** (W 400, end time 2,048,000, untraced, progress lines time-stamped; 3 reps, interleaved):
+- **A.** σ 2,000 four ways: PP 512 (the setting in use); PP 512 with `--start-delay-ms=5000`; WPs 512; direct sends. Plus σ 4,000 with PP 512.
+- **B.** σ 2,000 with PP 512 under `perf record -e cycles:u -F 1999` on process 0, every thread, 2 reps. `perf script` keeps each sample's time, thread and symbol. The clock start is taken as the first sample in an event handler.
+
+**Predictions:**
+- R1. **Start delay (E10 at 16 nodes).** If the ramp comes from the simulation's own start, the 5 s delay leaves it: at least 0.3 s lost in the first 2 s. If it comes from process age, at most 0.1 s.
+- R2. **htram mode.** If PP's own start (its shared buffers and their allocation) causes the ramp, WPs 512 and direct sends lose at most half of PP 512's time in the first 2 s. If all three ramp alike, the cause is the runtime's message path or the model.
+- R3. **σ 4,000** loses at least as much as σ 2,000 in its first 2 s.
+- R4. **Profile, closure.** In process 0, compare the first 0.75 s after the clock start with 2–5 s, per unit of simulated time. The functions whose samples per unit of simulated time at least double hold at least 60% of the start's extra samples, and they are outside the model's event handlers.
+- R5. **perf costs at most 5%** against the untraced PP 512 runs.
+
+**What follows:**
+- R1 says process age → the dip and the ramp are one mechanism; find the timer.
+- R2 points at htram → pre-size or pre-touch PP's buffers.
+- R4 names the functions. If they are the runtime's (LCI, psm2, Reconverse's pools), the fix is a warm-up of that path before the clock, or a change to it.
 
 ## Baseline verification on the Mac
 
