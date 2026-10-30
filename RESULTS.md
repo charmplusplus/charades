@@ -6503,14 +6503,18 @@ This is a diagnosis; neither setting is a candidate for the paper's launch (sect
 >
 >   Its start dump records `kernel.numa_balancing` and the transparent-huge-page settings.
 > - **Script:** `$WORK/charades-runs/numa63.slurm`, 16 nodes on skx-dev, with an skx copy; the loser is cancelled.
+> - **Amended before any runs:** the first submission (3662305 and 3662306) was cancelled while pending, to add the binding arm (`scripts/stampede3/numabind.sh`) and N6.
 
 **Why 16 nodes.** The burst and the dip appear at 16 nodes at the same clock time and per-node rate (job A16), and skx-dev starts within hours, where 32 skx nodes took 15 h. The dip costs only about 2% at 16 nodes, so the decision rests on the counters and the time course, not on throughput. The 32-node measurement follows if the mechanism is confirmed.
 
 **Runs** (16 nodes, W 400, end time 2,048,000, untraced, the sampler on, 3 reps interleaved, a warm-up launch first):
-- σ 100 (PP 2,048): the default; under `numactl --localalloc`; with `--start-delay-ms=5000`.
-- σ 2,000 (PP 512): the default; under `numactl --localalloc`.
-- Uniform (WPs 512): the default; under `numactl --localalloc`.
-- The job logs `numactl --show` from one task under the same srun options.
+- σ 100 (PP 2,048): the default; under `numactl --localalloc`; bound; with `--start-delay-ms=5000`.
+- σ 2,000 (PP 512) and uniform (WPs 512): the default; under `numactl --localalloc`; bound.
+- **Bound** (`numabind.sh`): `numactl --cpunodebind=L --membind=L`, with L the process's rank on its node.
+  - Process 0's PEs are on socket 0's even cores and process 1's on socket 1's odd ones, so every allocation comes from the process's own socket.
+  - That includes the main thread's allocations before the PEs are pinned. Without binding, the main thread may start on either socket.
+  - NUMA balancing skips this policy too. So bound against `--localalloc` separates misplaced memory from NUMA balancing's own work.
+- The job logs `numactl --show` from one task under the same srun options, `numactl --hardware`, and the policy each bound process gets.
 
 **Predictions:**
 - **N1. Mechanism.** In the default runs, `numa_pte_updates` and `numa_hint_faults`, summed over nodes, rise at least 10× during the 1.5–2.25 s TLB burst against 0.75–1.5 s. If instead `thp_collapse_alloc`, `compact_*` or `pgmigrate_*` rise with the burst and the NUMA counters do not, the cause is huge-page collapse or compaction, and N2 should fail.
@@ -6521,6 +6525,9 @@ This is a diagnosis; neither setting is a candidate for the paper's launch (sect
 - **N3. Throughput at 16 nodes.** At σ 100 `numactl --localalloc` is at least 1.01× the default (paired median) and within 0.02 of the start delay's ratio. At σ 2,000 it is at least 1.01×.
 - **N4. Uniform's burst at the clock start** (2 M/s at 32 nodes) is unchanged by `numactl`, because it comes from the simulation's own allocations.
 - **N5. σ 2,000 with the new PP allocation** has no stretch where 64 GVT advances take more than 0.2 s.
+- **N6. Misplaced memory.**
+  - If some memory starts on the wrong socket, then in the default runs at least 25% of NUMA hinting faults are remote (`numa_hint_faults` − `numa_hint_faults_local`), and `numa_pages_migrated` rises in the burst. The bound arm is then at least 1.01× `--localalloc` at σ 100 (paired median).
+  - If the hinting faults are at least 95% local, nothing is misplaced, and bound and `--localalloc` are level (within ±1%).
 
 **What follows:**
 - **N1 and N2 right:** add `numactl --localalloc` to the Stampede3 launch for Charades, Devastator and ROSS. Measure it at 32 nodes in the next skx job (prediction: at least 1.08× paired at σ 100, against the start delay's 1.128×), together with the checks already queued there:
