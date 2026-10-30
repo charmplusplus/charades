@@ -302,6 +302,7 @@ Sections 1–128 were re-read before planning sections 129 onward.
 | 156 | 2026-10-29 | — | σ 2,000's start-up ramp at 16 nodes: start delay, htram mode (PP, WPs, direct), σ 4,000, and a perf profile of process 0 split by time; job R16 design | design |
 | 157 | 2026-10-29 | 3660206 | Job R16: σ 2,000's 0.36 s start-up ramp is htram PP's (WPs 0.05 s, direct 0.01 s; start delay leaves 0.30 s); PEs wait, not work (idle-loop functions 4–7× per unit simulated time); one random PE per wave ~500 µs late; WPs 512 1.03× PP 512 overall | current |
 | 158 | 2026-10-29 | — | Does PP's start-up ramp follow glibc's handling of PP's ~1.2 MB per-send shared buffers? TLB shootdowns sampled; fixed mmap threshold and no-trim as perturbations; job A16 design | design |
+| 159 | 2026-10-29 | 3660356 | Job A16: PP's ramp is not the allocator (TLB shootdowns not raised; fixed mmap threshold 0.37 s, no-trim 0.26 s lost); no-trim 1.074× PP in steady state; WPs 512 1.047× PP 512 at σ 2,000, 16 nodes | current |
 
 ## Stampede3 runs, in order
 
@@ -6292,6 +6293,31 @@ This is a diagnosis; neither setting is a candidate for the paper's launch (sect
 - A3. If shootdowns do not rise at PP's start and neither setting moves the ramp, the allocator is not the cause, and the next step is section 157's per-wave timing of htram's flushes and the GVT-result step.
 
 **What follows:** if A1 and A2 hold, the fix is in htram, not in the launch. PP would allocate each new shared buffer at its current limit (512 + 16 items, 38 KB) instead of htram's largest size, or reuse buffers, so no run depends on glibc's thresholds.
+
+### Job A16 results: PP's start-up ramp is not the allocator (no TLB-shootdown rise, neither malloc setting removes it); no trimming makes PP 1.074× faster in steady state; WPs 512 is 1.047× PP 512 at 16 nodes (2026-10-29; skx-dev batch job 3660356, 16 nodes)
+
+> **Status: current.** Design and predictions in section 158.
+> - **Allocation:** c454-002 to c455-103 (16 nodes); 23:25–23:30. All 12 runs ok, with equal committed counts.
+> - **Data:** `~/charades-data/scale32/episodes/a16_j3660356/` (`summary.txt` from `a16_summary.py`).
+> - **Sampler gap:** the sampler's final flush was lost when its step was stopped, so the counters cover rep 1 and part of rep 2 (written every 60 s). The sampler should write more often; fixed for the next job.
+
+**σ 2,000, W 400, 16 nodes** (median of 3 reps; M ev/s and ÷ PP 512, higher is better; lost time and interrupt rates, lower is better; interrupts summed over all 16 nodes, from rep 1 and the reps with data):
+
+| arm | M ev/s | ÷ PP 512 | lost in the first 2 s (s) | TLB shootdowns/s, first 0.75 s / 2–5 s | function-call interrupts/s, same windows |
+|---|---|---|---|---|---|
+| PP 512 | 482.9 | 1.000 | 0.31 (0.30–0.33) | 9,100 / 20,100–21,000 | 10,000–10,600 / 21,000–22,200 |
+| WPs 512 | 505.7 | **1.047** | **0.06** | 9,000 / 19,800–20,200 | 9,900–10,400 / 20,900–21,300 |
+| PP 512, mmap threshold fixed at 32 MB | 488.1 | 1.011 | 0.37 | 7,700–7,800 / 24,400–25,100 | 8,700 / 25,600–26,000 |
+| PP 512, no trimming | **518.6** | **1.074** | 0.26 | 8,700 / 23,600 | 10,300 / 24,500 |
+
+- **A1 wrong.** TLB shootdowns per second at PP's start are lower than in its steady state (0.45×), and the same as WPs' (9,100 against 9,000). PP's 1.2 MB allocations cause no extra shootdowns.
+- **A2 wrong.**
+  - With the mmap threshold fixed, PP still loses 0.37 s.
+  - With no trimming it loses 0.26 s, a little less than 0.31 s, but nowhere near the 0.15 s that would make the allocator the cause.
+- **A3 right: the allocator is not the cause of the ramp.** Sections 155–158 leave one random PE per wave late by about 400 µs, in user space, only with PP, only in the first 0.75 s; why is still open.
+- **Steady state, two findings for the settings:**
+  - **No trimming makes PP 1.074× faster** (section 92 found 1.055–1.083× at 4 nodes). It is not shootdowns (the same rates), and fixing the mmap threshold gives only 1.011×. glibc settings stay out of the launch (section 140), but an htram change that makes PP's allocations cheaper could capture the same gain. `--agg-pp-alloc=1` (htram branch `pp-alloc-limit`, Charades `episode-diag`: shared buffers allocated at their own limit, about 38 KB instead of about 1.2 MB; Mac change tier with 10 repeats 720/720) is a candidate. Section 80 found larger PP allocations faster, so only a measurement can tell.
+  - **WPs 512 is 1.047× PP 512** at σ 2,000 on 16 nodes (1.03× in job R16). PP was chosen for σ ≥ 2,000 in section 140; at 16 nodes WPs is now ahead and has no ramp. The choice must be checked at 32 nodes, where WPs' per-PE buffers fill more slowly.
 
 ## Baseline verification on the Mac
 
