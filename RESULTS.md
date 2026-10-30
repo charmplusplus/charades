@@ -297,6 +297,7 @@ Sections 1–128 were re-read before planning sections 129 onward.
 | 151 | 2026-10-29 | 3658328 | Per-LP rollback inside a chare (`--rollback-unit=1`): implementation, a bug found on the Mac (rollback inside a forward handler), job P design | design |
 | 152 | 2026-10-29 | 3658328 | Job P results: per-LP rollback gives 1 LP per chare's rollbacks (3.5–15× fewer at W 400) at no cost; held deadline 1.09× at σ 2,000 (new best) but 0.89–0.92× σ 100, 0.68–0.70× uniform; GVT delay not absorbed at W 800 | current |
 | 153 | 2026-10-29 | 3657016 | A2r, 32 nodes: Charades leads in 6 of 8 (44 of 48 cells at 1–32) but loses more per node 16→32 than Devastator everywhere (0.72–0.87 against 0.80–0.98); start-up transient at σ 100, per-wave work on uniform, controller at W ~300 | current |
+| 154 | 2026-10-29 | — | Section 153's start-up transient is a slow cross-process reduction (300–410 µs a wave against 110), in episodes of seconds that also occur mid-run; job E design (counters, thread usage, start delay, tree hops) | design |
 
 ## Stampede3 runs, in order
 
@@ -6003,6 +6004,7 @@ Events rolled back per rollback call at W 400: 3.7–4.0 (16, chare), 1.5–2.0 
 > - **Runs:** Charades 90 (plus 30 controller runs at the end of each block, `_qlast`), Devastator 72, ROSS 48, all ok. Every cell has the same committed events in all three engines.
 > - **Traced block:** six runs, at 16 nodes (the first 16 of the allocation) and 32.
 > - **Data:** `~/charades-data/scale32/scale32/n32_j3657016/`, with `combined_1_32.txt` (`combine_a2r.py`: A1a + A1b + A2r) and `trace_summary.txt` (`trace32_summary.py`).
+> - **Corrected in section 154:** the traced block's "response" included the cross-process reduction (`handled_s` is when a process sent its counts). That inflates T3 and the uniform "+261 µs" line. The start-up transient is in the reduction, not in the processes' work.
 
 **All eight workloads, 1–32 nodes:** the table at the top of Current numbers (from `combine_a2r.py`).
 
@@ -6040,6 +6042,100 @@ Events rolled back per rollback call at W 400: 3.7–4.0 (16, chare), 1.5–2.0 
   - **On uniform, every process's work per wave grows** (median response +261 µs, 1.75×) as each process serves twice the destinations with thinner messages. Sections 125–132 found this from 4 to 16 nodes. The traced uniform run is too erratic for more detail.
   - **The controller stays near W 300** while W 400 is better at 32 nodes: it is 3–7% below W 400 on the lookahead-100 workloads, against within ±4% at 1–16 nodes. Per-LP rollback (section 152) makes wider W cheaper, so the κ bound can be revisited.
 - **Next:** find the start-up transient (it is the largest part at σ 100 and a cost that grows with node count), and measure per-LP rollback with the controller at 32 nodes.
+
+### Section 153's start-up transient is a slow cross-process reduction, in episodes of seconds; a diagnostic job (analysis of existing traces and design, 2026-10-29; written before any runs)
+
+> **Status: design.**
+> - **Analysis:** no new runs; A2r's six traced runs (job 3657016). Scripts `turn.py`, `epis.py`, `valid.py`, `steady.py`, `shape2.py` in `~/charades-data/scale32/episodes/`.
+> - **Job E:** Charades `episode-diag` (this commit; per-LP rollback, now the default), htram, Reconverse and the launch as in A2r; `$WORK/charades-runs/episode54.slurm` (32 nodes, skx, `-x c455-081`).
+
+**A correction to section 153.** In `gvt_waves_<p>.csv`, `handled_s` is when the process sent its combined counts (the first hop of the Charm++ path), not when it handled the previous result. Section 153's "response" (last PE in − the previous `handled_s`) therefore included the whole cross-process reduction. That inflates T3 ("the median process's response grows about as much as the wave") and the uniform "+261 µs" line. Measured properly:
+- a process's **turnaround** is its counts sent − the previous result's arrival there;
+- the **reduction** is the result's arrival − the counts sent, taken at the process that sent last (the smallest such gap).
+
+Waves 10–95%, medians over waves (µs; lower is better):
+
+| run | wave period, 16 / 32 nodes | slowest process's turnaround | reduction after the last process |
+|---|---|---|---|
+| σ 100 | 142 / 162 | 69 / 37 | **68 / 109** |
+| σ 2,000 | 199 / 208 | 107 / 89 | 77 / 104 |
+| uniform | 286 / 389 | 220 / 268 | 62 / 93 |
+
+- **At σ 100 on 32 nodes the reduction is two thirds of a wave,** and it grows 68 → 109 µs from 16 nodes. The slowest process turns a wave around in 37 µs, and the median one in 23 µs. Most PEs are blocked at the window edge and contribute at once, so the reduction is on the critical path here. Section 120 found it was not at σ 2,000 on 16 nodes, where the late PE contributes only after its 128th event.
+- **On uniform both parts grow:** the slowest turnaround by 1.22× (220 → 268 µs), not section 153's 1.75×, and the reduction by 31 µs.
+
+**The start-up "transient" is the reduction, in episodes.** σ 100, 32 nodes, per 0.25 s of wall time from the first wave (µs; lower is better):
+
+| wall time | waves | period | slowest turnaround | median turnaround | reduction after the last process |
+|---|---|---|---|---|---|
+| 0–0.25 s | 362 | 693 | 447 | 25 | 199 |
+| 0.25–1.5 s (5 bins) | 442–515 each | 485–566 | 75–227 | 22–23 | 292–411 |
+| 1.5–1.75 s | 260 | 973 | 529 | 23 | 390 |
+| 1.75–2.0 s | 745 | 332 | 165 | 23 | 147 |
+| 2.0–4.5 s (10 bins) | 1,156–1,511 each | 166–216 | 42–75 | 23–24 | 107–138 |
+
+- **What it shows:**
+  - Every process picks the result up within 10–15 µs, the median process contributes 22–25 µs later, and no process is consistently the last. That holds during the slow stretch as after it.
+  - Inside the stretch nearly every wave is about 320 µs longer: the period's mode is 440–520 µs against 120–200 µs afterwards. It is not a mix of normal waves and stalled ones.
+  - The stretch ends within 0.1 s, at 1.9 s of wall time. The 16-node run's slower patches also end by 2.0 s, though at a different wave count and simulated time.
+- **Closure.** The waves' time above the steady median is 1.83 s on 32 nodes (1.40 s of it in the first 2 s) against 1.08 s on 16 nodes (0.61 s). The difference, 0.75 s, matches the 0.70 s by which the 32-node run is longer. So **the stretch is all of σ 100's 16→32-node loss in this pair.**
+- **Not only at start-up.** The other traced runs show the same signature, a reduction of 300 µs to 9 ms while turnarounds stay normal, at other times:
+  - σ 2,000 on 16 nodes: about 1,000 µs for the first 3.5 s, about 450 µs to 5 s, and about 400 µs from 6.5 to 8.5 s (the run's whole excess is 6.1 s);
+  - uniform on 32 nodes: 6.6–8.9 ms from 3.0 to 5.0 s, mid-run (one wave took 269 ms);
+  - steady state between episodes: 80–130 µs.
+- **The untraced runs.** At 32 nodes the three untraced σ 100 W 400 runs took 4.74–5.05 s. That is consistent with the traced run's 5.78 s divided by the usual 1.135 tracing cost (5.09 s), so they probably had the stretch too; without it they would take about 3.9 s. They cannot show it, because they record no time course.
+
+**Why a slow wave costs throughput in proportion.** A wave completes the buckets that every PE had passed at the previous wave and whose counts match; by construction that is about a third of the passed buckets (section 58). In the σ 100 32-node stretch every PE had passed 34–35 buckets beyond GVT, and PE 0 sat at the window edge (its lead was 400). Yet each wave completed 11.6 buckets, as in steady state (10.1–10.5). So GVT moves about 93 time units per wave however long the wave takes, and throughput falls with the wave period. Asking about every passed bucket (section 60) raised completion only to 8.4–8.9 per wave, because events were still in transit. A wider window does not absorb a slow wave either: at W 800 completion per wave rose only from 8.8 to 9.8 buckets (job P, 16 nodes).
+
+**What could make the reduction slow for seconds.** Four candidates, and how job E tells them apart:
+- **H1, kernel work on the PEs that must run the hops.** For example, first-touch page faults in the runtime's pools as traffic first reaches them (transparent huge pages are `always`). It would show as kernel time and minor faults in the stretched waves.
+- **H2, something tied to process age.** Driver, OS or psm2 timers; automatic NUMA balancing, for instance, starts scanning a process 1 s after it starts. Starting the clock later would remove it.
+- **H3, the fabric.** Back-pressure from other traffic, or receive-queue overflow and resends. It would show in the hfi1 counters.
+- **H4, something specific to the Charm++ nodegroup reduction or to Reconverse's broadcast.** It would be absent with Charades' own process tree, `--gvt-wave-tree=4`; section 118 found that tree's hops stand for the Charm++ ones in steady state. The tree also records every hop, which locates the slow ones.
+
+**New, for diagnosis only (branch `episode-diag`):**
+- **Time-stamped progress lines.** They carry the wall time since the clock started, and "Simulation Starting" prints the Unix time. Untraced runs now show their own time course every 64 GVT advances, at no cost.
+- **`--start-delay-ms=N`.** PE 0 starts the clock N ms after setup (`CcdCallFnAfter`); every PE sits in its scheduler meanwhile.
+- **Thread usage per wave.** With `--gvt-trace=2` on Linux, each process's wave record adds its PEs' thread usage since their previous contribution, read with `getrusage(RUSAGE_THREAD)` once per PE per wave: minor faults and involuntary context switches (summed), user and kernel time (summed), and the largest kernel time with its rank.
+- **`scripts/stampede3/hfi_sampler.py`.** One per node, on core 1, which no PE uses. Every 100 ms it records the Unix time and the hfi1 counters, plus a full dump of every counter at the start and end:
+  - transmit wait and flow-stall ticks (back-pressure from the switch);
+  - packets and words in and out;
+  - the driver's receive-overflow counters (`DRIVER_EgrBufFull`, `DRIVER_EgrHdrFull`, `RcvOverflow`, `SeqDrop0`, and the per-context `RcvHdrOvr` summed).
+
+  A login node read all 115 counter files in about 0.4 ms per sample.
+- **Mac:** change tier 54/54, with a new config `agg_deadline_bucket_pp_diag` (start delay and `--gvt-trace=2`) next to its base and `bucket_window`; committed counts equal.
+
+**Runs** (W 400, end time 2,048,000, 32 nodes unless stated, the sampler on unless stated; reps interleaved; a warm-up launch first):
+- **A. Untraced, 3 reps:**
+  - σ 100 (PP 2,048) four ways: with the Charm++ reduction (the default), with `--gvt-wave-tree=4`, with `--start-delay-ms=5000`, and with `--wave-batch=4`;
+  - σ 2,000 (PP 512) and uniform (WPs 512), with the default reduction.
+- **B. Traced (`--gvt-trace=2 --pe-stats=1`):**
+  - σ 100 with the Charm++ reduction and with the tree, 2 reps each;
+  - σ 2,000 and uniform with the tree, 1 rep each.
+- **C. 16 nodes (the allocation's first 16):** σ 100, untraced (2 reps) and traced (1).
+- **D. Devastator at W 1,000:** σ 100 and uniform, 2 reps.
+- **E. Sampler off:** σ 100, untraced, 2 reps.
+
+**Predictions:**
+- E1. **Systematic at start-up.** At 32 nodes, σ 100 with the Charm++ reduction, the first 2 s of wall time run at least 2× slower per GVT advance than the rest, in all 3 untraced reps (from the progress lines). At 16 nodes it is at most 1.4×.
+- E2. **In the reduction.** In the traced Charm++ runs, during the stretch the reduction after the last process is at least 2× its steady median, and the slowest turnaround at most 1.5× its own.
+- E3. **The path (H4).** Either the tree has no stretch (at most 1.3×) and runs at least 1.1× the Charm++ reduction at σ 100, or its hop records put the excess somewhere specific:
+  - on hops into at most 2 processes for at least 70% of each stretched wave's excess (a slow receiver);
+  - or on most hops (the network, or every receiver).
+- E4. **Kernel (H1).** If kernel work causes it, then during the stretch:
+  - the critical-path process's kernel time per wave is at least 3× steady, and its rise is at least half the wave's excess;
+  - minor faults per wave are at least 3× steady.
+- E5. **Fabric (H3).** If the fabric causes it, transmit wait or a receive-overflow counter rises during the stretches on at least one node and is flat between them.
+- E6. **Process age (H2).** With a 5 s start delay, the first 2 s run at most 1.3× the rest if the stretch is tied to process age, and are unchanged (at least 2×) if it is tied to the simulation's own start.
+- E7. **`--wave-batch=4`** is at least 1.05× the default at 32 nodes σ 100. Here the reduction, not a PE's 128th event, is on the critical path (unlike σ 2,000 at 16 nodes, section 120).
+- E8. **Sampler cost:** σ 100 without the sampler is within ±2% of the runs with it.
+
+**What follows from the results:**
+- **H1:** touch the pools before the clock starts, or when they are allocated; a start-up fix in Charades or Reconverse.
+- **H2:** find the timer, and warm up that mechanism before the clock.
+- **H3:** the fabric is not ours to fix. Make GVT tolerate a slow reduction instead: fewer sequential hops on the critical path, or count waves that overlap.
+- **H4:** make the tree the default, or fix the Charm++ path.
+- **E7 right:** the reduction latency at 32 nodes is worth attacking in steady state too: shorter passes while a wave is in flight at large node counts, or section 118's free-core poller.
 
 ## Baseline verification on the Mac
 
