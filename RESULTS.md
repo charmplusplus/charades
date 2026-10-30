@@ -304,6 +304,7 @@ Sections 1–128 were re-read before planning sections 129 onward.
 | 158 | 2026-10-29 | — | Does PP's start-up ramp follow glibc's handling of PP's ~1.2 MB per-send shared buffers? TLB shootdowns sampled; fixed mmap threshold and no-trim as perturbations; job A16 design | design |
 | 159 | 2026-10-29 | 3660356 | Job A16: PP's ramp is not the allocator (TLB shootdowns not raised; fixed mmap threshold 0.37 s, no-trim 0.26 s lost); no-trim 1.074× PP in steady state; WPs 512 1.047× PP 512 at σ 2,000, 16 nodes | current |
 | 160 | 2026-10-29 | — | `--agg-pp-alloc=1` (PP's shared buffers at their own limit, not ~1.2 MB) and WPs 512 against PP on σ 100/1,000/2,000/4,000 at 16 nodes; job P16 design | design |
+| 161 | 2026-10-30 | 3660590 | Job P16: `--agg-pp-alloc=1` removes most of PP's start-up ramp (σ 2,000 0.40 → 0.14 s) and gains 1.050× (σ 2,000), 1.015× (σ 4,000), level at σ 100/1,000; with it PP leads WPs 512 on all four; to become the default | current |
 
 ## Stampede3 runs, in order
 
@@ -6342,6 +6343,33 @@ This is a diagnosis; neither setting is a candidate for the paper's launch (sect
 **What follows:**
 - If P1's gain holds, `--agg-pp-alloc=1` becomes the default and is checked at 32 nodes.
 - If WPs leads at σ ≥ 2,000 at 32 nodes too, the paper's setting for those workloads changes. Every workload's setting stays the same at every node count.
+
+### Job P16 results: allocating PP's shared buffers at their own limit removes most of PP's start-up ramp and gains 1.05× at σ 2,000; PP with it leads WPs 512 on all four PP workloads (2026-10-29 to 30; skx-dev batch job 3660590, 16 nodes)
+
+> **Status: current.** Design and predictions in section 160. 16 nodes, 23:59 (2026-10-29) to 00:06. Gate 18/18 (the new configs and the PP base, on 2 nodes, psm2). All 36 runs ok, with committed counts equal across the three arms of each workload. Data `~/charades-data/scale32/episodes/p16_j3660590/` (`summary.txt` from `p16_summary.py`).
+
+**16 nodes, W 400** (median of 3 reps; M ev/s and ÷ PP, higher is better; time lost in the first 2 s, lower is better):
+
+| workload (PP setting) | PP | PP, `--agg-pp-alloc=1` | ÷ PP | WPs 512 | ÷ PP | lost in the first 2 s (s): PP / alloc / WPs |
+|---|---|---|---|---|---|---|
+| σ 100 (PP 2,048) | 671.5 | 665.9 | 0.992 | 646.7 | 0.963 | 0.07 / 0.06 / 0.06 |
+| σ 1,000 (PP 2,048) | 565.7 | 570.1 | 1.008 | 555.6 | 0.982 | 0.11 / 0.13 / 0.09 |
+| σ 2,000 (PP 512) | 490.4 | **514.8** | **1.050** | 506.8 | 1.033 | **0.40 / 0.14** / 0.09 |
+| σ 4,000 (PP 512) | 463.5 | 470.2 | 1.015 | 450.6 | 0.972 | **0.33 / 0.13** / 0.09 |
+
+(σ 100 with the option: reps 633.9, 669.1, 665.9; the first is the outlier.)
+
+- **P1 right at σ 2,000 (1.050×), wrong at σ 4,000 (1.015×, predicted at least 1.04).** At σ 100 and σ 1,000 (PP 2,048, where the buffer drops from 1.2 MB to 149 KB) the change is within the reps' spread.
+- **P2 wrong, usefully: the ramp mostly goes.** σ 2,000 loses 0.14 s instead of 0.40 s, and σ 4,000 0.13 s instead of 0.33 s, near WPs' 0.09 s.
+  - So PP's per-send 1.2 MB buffers do cause the ramp, although neither glibc setting removed it and TLB shootdowns did not rise (section 159).
+  - What in the kernel or allocator makes many large buffers costly only in the first 0.75 s is not identified. One candidate is the per-thread heaps growing while every PE allocates at once (heap growth takes the process's memory-map lock).
+  - The perturbation moved the cost by the amount it had to: 0.26 of σ 2,000's 0.31 s excess over WPs.
+- **P3 half right.** WPs 512 is 1.033× PP 512 at σ 2,000 but 0.972× at σ 4,000. PP 2,048 stays ahead of WPs at σ 100 and σ 1,000. **With `--agg-pp-alloc=1`, PP is ahead of WPs on all four workloads** (σ 2,000: 514.8 against 506.8). So the settings in use stay, with the option on.
+
+**What follows.** `--agg-pp-alloc=1` becomes the default:
+- it is 1.050× and 1.015× where PP 512 is used, level where PP 2,048 is used, and removes most of the ramp;
+- it needs htram `pp-alloc-limit` merged into `pdes`;
+- it gets checked at 32 nodes in the next 32-node job.
 
 ## Baseline verification on the Mac
 
