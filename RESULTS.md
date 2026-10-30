@@ -300,6 +300,7 @@ Sections 1–128 were re-read before planning sections 129 onward.
 | 154 | 2026-10-29 | — | Section 153's start-up transient is a slow cross-process reduction (300–410 µs a wave against 110), in episodes of seconds that also occur mid-run; job E design (counters, thread usage, start delay, tree hops) | design |
 | 155 | 2026-10-29 | 3660089 | Job E16 (16 nodes): no reduction stretch at 16 nodes; σ 2,000's 0.4 s start-up ramp is user-space PE work (kernel ~1%); a 1.5–2.0 s dip tied to process age; no receive overflow; one external congestion episode; job E gains tree 8 and a σ 2,000 start delay | current |
 | 156 | 2026-10-29 | — | σ 2,000's start-up ramp at 16 nodes: start delay, htram mode (PP, WPs, direct), σ 4,000, and a perf profile of process 0 split by time; job R16 design | design |
+| 157 | 2026-10-29 | 3660206 | Job R16: σ 2,000's 0.36 s start-up ramp is htram PP's (WPs 0.05 s, direct 0.01 s; start delay leaves 0.30 s); PEs wait, not work (idle-loop functions 4–7× per unit simulated time); one random PE per wave ~500 µs late; WPs 512 1.03× PP 512 overall | current |
 
 ## Stampede3 runs, in order
 
@@ -6224,6 +6225,46 @@ Waves 10–95%, medians over waves (µs; lower is better):
 - R1 says process age → the dip and the ramp are one mechanism; find the timer.
 - R2 points at htram → pre-size or pre-touch PP's buffers.
 - R4 names the functions. If they are the runtime's (LCI, psm2, Reconverse's pools), the fix is a warm-up of that path before the clock, or a change to it.
+
+### Job R16 results: σ 2,000's start-up ramp is htram PP's; the start delay, WPs and direct sends tell it apart; the PEs wait rather than work (2026-10-29; skx-dev batch job 3660206, 16 nodes)
+
+> **Status: current.** Design and predictions in section 156.
+> - **Allocation:** c454-002 to c455-043 (16 nodes); 21:57–22:04. Gate 12/12; all 32 runs ok.
+> - **Data:** `~/charades-data/scale32/episodes/r16_j3660206/` (`summary.txt` from `epi_summary.py`; profiles `perf/*.sym.gz` from `r16_perf.py`).
+> - **Caveat:** the job's own `perf script` printed no symbols (`sym` needs `ip`), so the scripts were regenerated on a login node from the raw files.
+
+**σ 2,000 (and σ 4,000), 16 nodes, W 400** (median of 3 reps; M ev/s, higher is better):
+
+| arm | M ev/s | lost in the first 2 s (s; lower is better) | rest ÷ first 2 s |
+|---|---|---|---|
+| σ 2,000, PP 512 (the setting in use) | 484.4 | **0.36** (0.35–0.39) | 1.22 |
+| σ 2,000, PP 512, 5 s start delay | 495.7 | 0.30 (0.29–0.33) | 1.18 |
+| σ 2,000, WPs 512 | **500.1** | **0.05** (−0.01–0.10) | 1.03 |
+| σ 2,000, direct sends | 200.6 | 0.01 | 1.01 |
+| σ 4,000, PP 512 | 451.6 | 0.29 | 1.17 |
+| σ 2,000, PP 512 under perf | 474.6 (0.98×) | 0.35 | 1.21 |
+
+- **R1 right: the ramp comes from the simulation's start, not process age.** The 5 s delay leaves 0.30 of its 0.36 s (the 0.06 s difference is about the process-age dip of section 155).
+- **R2 right: the ramp is PP's.** WPs 512 and direct sends lose 0.05 and 0.01 s. Without the ramp, PP 512 runs about 2% faster than WPs 512 here (5.62 against 5.74 s of steady running), but with it PP is 3% slower overall. Removing PP's ramp would make it the best setting by about 5%.
+- **R3 wrong:** σ 4,000 loses 0.29 s, a little less than σ 2,000.
+- **R5 right:** perf costs 2%.
+- **R4 right in form, and it says the PEs wait.** Process 0, first 0.75 s after the clock start against 2–5 s, per unit of simulated time (both reps agree):
+  - The start costs 32–33% more samples per unit of simulated time.
+  - 94–95% of the excess is in functions whose cost at least doubles. Every one of them is what a PE runs when it has nothing to execute: htram's idle and deadline flush (`HTram::flushOrder` 5.5–5.9×, `flushDue` 4.9–5.6×, `agg_flush_idle` 5.7–6.8×); the scheduler loop (`OptimisticScheduler::execute`, `process_cancel_q`, `pollConverseThreadQueue`); network polling (`ips_ptl_poll`, `__psm2_mq_ipeek`, LCI progress); and locks.
+  - The event handlers and event bookkeeping (`PHoldLP::forward`, `LPChare::execute_me`, `fp_push`, `remote_event_delete`) cost the same per unit of simulated time.
+  - The excess is the same on all 23 threads (480–493 samples each).
+  - So process 0's PEs do no more work at the start; they wait longer for each GVT advance.
+- **What they wait for (E16's traced σ 2,000 run):**
+  - At the start each wave completes as many buckets as later (11.0 against 8.7), and every PE has passed 33 buckets with PE 0 at the window edge (lead 386–399). But a wave takes 590 µs against 200.
+  - The late process is a different one in nearly every wave (no process over 6% in the first 0.5 s), and inside it the gap from its first to its last PE's contribution is 484–503 µs, against 118 µs at 2–3 s.
+  - That late PE is not faulting. The slowest process takes a median of 4 minor faults per wave at the start, and the 410 of 425 slow waves with fewer than 100 faults are as slow (484 µs) as the rest.
+  - Section 121's per-PE records (job 3649213) put such a PE's extra time outside `execute()`, the htram receive handlers and the GVT handlers.
+  - Packets sent at the start are about 15% smaller (2,600–2,700 against 3,000–3,150 bytes; hfi1 counters), not enough to explain 2.5× slower waves.
+- **Not yet known:** what one PE per wave does for about 400 extra µs, only with PP and only in the first 0.75 s. Candidates within PP:
+  - the shared per-process buffers being sent by whichever PE takes them at a GVT update, while every PE of the process tries at once (all PEs leave the window edge together at the start);
+  - the first sends to each destination process.
+
+  The per-PE records (`--gvt-trace=4`) with htram's flush and the GVT-result step timed per wave would split it. That is a small change, worth making only if PP stays the setting at σ ≥ 2,000 after job E.
 
 ## Baseline verification on the Mac
 
