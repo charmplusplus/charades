@@ -322,6 +322,7 @@ Sections 1–128 were re-read before planning sections 129 onward.
 | 172 | 2026-11-01 | — (Mac) | Phase B step 2d: Devastator port of dragonfly matches Charades exactly on all four configs (2 and 4 ranks) and in every statistic; traffic and dragonfly now commit the same events in all three engines | current |
 | 173 | 2026-11-01 | 3668027 | Job K (16 and 32 nodes): only σ 100 at 32 nodes wants a wider window (W 400–600 beat W 300 in every rep, 1.05–1.29×; σ 2,000 best at W 300 at both counts); κ holds every workload at W ≈ 300 and counts same-process sends (r 0.94 at σ 100, 0.027 through htram); a wider window's cost is memory, not messages (σ 100 and σ 2,000 both +11% PE time W 300→600 at 16 nodes); lag = 3.0 waves of GVT advance everywhere; K2 wrong | current |
 | 174 | 2026-11-01 | — | What a wider window buys: `--blocked-time` (PE time stopped at the window's edge; also fixes the end-of-run statistics reduction's starting point); jobs L16 (4 and 16 nodes) and L32 (16 and 32) design: W 250–600 and the controller on σ 100, σ 2,000, uniform | design |
+| 175 | 2026-11-01 | — | Phase B step 3: dragonfly shapes for 1–32 nodes at 14.0–15.9 routers per PE (h even, p = 4); routers placed in blocks with the first R mod n ranks holding one more, in all three engines (Mac: ROSS 16/16, Devastator 24/24, Charades 18/18 equal counts); traffic 64 × 46·N; job C design (Devastator builds, Charades calibration at 1 node, counts on 2 nodes) | design |
 
 ## Stampede3 runs, in order
 
@@ -6987,6 +6988,63 @@ At W 300, 16 → 32 nodes: µs per count wave σ 100 151 → 193, σ 2,000 190 �
 **What follows:**
 - **L3 right:** the controller sets W to hold the blocked share at the band's level, with the memory and rollback costs as upper bounds. κ either goes, or counts only events sent through htram.
 - **L3 wrong:** the controller perturbs W and compares busy plus blocked PE time per committed event, which it can sum on its count waves at no extra cost. That is a gradient rule on a measured cost, not a target.
+
+### Phase B, step 3: weak-scaling sizes, a partition that need not divide, and a calibration job (design, 2026-11-01; written before any runs)
+
+> **Status: design.**
+> - **Ports:** the ROSS and Devastator dragonfly ports no longer need the router count to divide by the ranks. Patches are in `~/pdes-baselines` (`ross-dragonfly.patch`, `devastator-dragonfly.patch`, regenerated). Charades is unchanged.
+> - **Stampede3:** ROSS traffic and dragonfly are built with mvapich/3.0 (`$WORK/ROSS`, the same configuration as `phold-gauss`). Devastator's `build_stampede3.sh` takes `BENCHES` (e.g. `"traffic dragonfly"`). Charades builds from a separate worktree, `$WORK/charades-phaseb` (main f1c2f80), so job L32 keeps `charades-alloc`. `ctl_sweep.sh` (f1c2f80) adds `dragonfly:<a>:<h>:<p>:<traffic>:<arrive rate>:<gen-time>` and an optional trip radius on `traffic`.
+
+**The partition.** A dragonfly has R = a·(a·h + 1) routers, and with 46 PEs per node R must divide by 46·N. That forces lopsided shapes: at 32 nodes the only shape near 15 routers per PE is a = 23, h = 25. So all three engines now place routers the same way, in blocks where the first R mod n ranks hold one router more:
+- **Charades:** this is Charm++'s default block map of its LP chares at one router per chare (`--routers-per-chare=1`, the default). Charades looks up each chare's home PE, so nothing changed.
+- **ROSS and Devastator ports:** rank k holds routers [k·q + min(k, r), (k+1)·q + min(k+1, r)), where q = ⌊R/n⌋ and r = R mod n, with their terminals and processes.
+
+**Mac check of the new partition** (committed events; each must equal Charades'):
+- ROSS at 5 and 7 ranks, conservative and optimistic, all four dragonfly configs: 16 of 16 equal.
+- Devastator threads world at 4, 5 and 7 ranks, all four configs, 2 runs each: 24 of 24 equal, deterministic.
+- Charades at 1 × 5, 1 × 7 and 5 × 1 PEs (36 routers do not divide), `bucket_window` and `agg_deadline_bucket_pp`, base, congested and gentime: 18 of 18 pass.
+
+**Dragonfly shapes** (Charades needs h even; p = 4 terminals per router at every size; the most-loaded PE ÷ the mean is the imbalance the partition leaves; lower is better):
+
+| nodes | ranks | a | h | groups | routers | routers per PE | most-loaded PE ÷ mean | LPs (R + 2·4R) |
+|---|---|---|---|---|---|---|---|---|
+| 1 | 46 | 13 | 4 | 53 | 689 | 15.0 | 1.001 | 6,201 |
+| 2 | 92 | 15 | 6 | 91 | 1,365 | 14.8 | 1.011 | 12,285 |
+| 4 | 184 | 16 | 10 | 161 | 2,576 | 14.0 | 1.000 | 23,184 |
+| 8 | 368 | 22 | 12 | 265 | 5,830 | 15.8 | 1.010 | 52,470 |
+| 16 | 736 | 28 | 14 | 393 | 11,004 | 15.0 | 1.003 | 99,036 |
+| 32 | 1,472 | 36 | 18 | 649 | 23,364 | 15.9 | 1.008 | 210,276 |
+
+- Routers per PE stay within 14.0–15.9 (±6.5%). Run tables will report each run's LP count.
+- h/a lies between 0.31 and 0.63 (the balanced dragonfly has 0.5).
+- Traffic is uniform random (`traffic=1`) with minimal routing.
+- 512 B messages at 5.25 GB/s per terminal take about 100 ns to inject, so an arrival interval of 500–1,000 ns is a 10–20% load. Where h = p (1 node), global links carry about the terminals' load; the global links of the larger shapes carry less.
+- The largest shape has 210,276 LPs, below the 2^20 at which the ROSS tie priority stops being exact.
+
+**Traffic sizes:** a 64 × 46·N torus, so each PE holds one row of 64 intersections in every engine. 16 cars per intersection, trip radius 3, lookahead 100, mean 1,000.
+- A car moving up or down leaves its PE: about half the moves.
+- Moves between rows 23k − 1 and 23k leave the process: about 1 in 23 of the vertical moves.
+
+**Job C (calibration and builds; skx-dev, 2 nodes):**
+1. **Devastator builds on node 1:** traffic and dragonfly, GASNet ofi-psm2, layouts p2w23, p4w23, p8w23, p16w23, p32w23 and p64w23 (1–32 nodes), plus p2w2 and p2w3 for the count checks.
+2. **Meanwhile on node 2, Charades at 1 node,** 1 rep:
+   - dragonfly at arrival intervals of 500 and 1,000 ns, generating for 50,000 ns; WPs 512; W 10,000, 50,000 and 200,000 ps and the controller; GVT buckets of 1,000 ps.
+   - traffic to end time 500,000; PP 2,048; W 250, 1,000 and the controller.
+3. **Counts on 2 nodes,** every engine against Charades' expected counts:
+   - Charades: `test.py` change tier, Dragonfly and Traffic, `bucket_window` and `agg_deadline_bucket_pp`.
+   - ROSS: optimistic, 5 ranks (dragonfly) and 4 (traffic).
+   - Devastator: p2w3 (dragonfly) and p2w2 (traffic).
+
+**Predictions:**
+- **C1.** Every count equals Charades' on Stampede3, as on the Mac.
+- **C2.** Dragonfly's mean packet latency at 1,000 ns is within 1.2× of its latency at 500 ns: the network is lightly loaded at both.
+- **C3.** Charades runs dragonfly at 1 node at 5–20 M committed events/s and traffic at 10–40 M. These rates set the generation window and end time that give runs of about 10 s at every size.
+- **C4.** All 16 Devastator binaries build.
+
+**What follows:** the generation window and end time for 10 s runs; then the A1/A2-shaped runs at 1–32 nodes with all three engines. Each engine uses its own best setting:
+- Charades: its controller and the better htram mode;
+- Devastator: its best of three W;
+- ROSS: the better of optimistic and conservative.
 
 ## Baseline verification on the Mac
 
