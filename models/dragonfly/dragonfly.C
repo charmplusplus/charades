@@ -10,6 +10,9 @@ uint32_t g_routing = MINIMAL;
 uint32_t g_traffic = NEAREST_NEIGHBOR;
 // arrival rate (ns)
 double   g_mean_interval = 200.0;
+// --gen-time (ns): generate until this virtual time instead of a fixed count
+double   g_gen_time = 0.0;
+Time     g_gen_end = 0;
 
 // virtual channel sizes (chunks)
 uint32_t g_local_vc_size = 32768;
@@ -48,6 +51,7 @@ int main(int argc, char** argv) {
   args.register_argument("traffic", "UNIFORM RANDOM=1, WORST CASE=2, TRANSPOSE=3, NEAREST NEIGHBOR=4, BISECTION=5, NEAREST ROUTER=6", g_traffic);
   args.register_argument("routing", "MINIMAL=0, NON_MINIMAL=1, ADAPTIVE=2 (not implemented: routes as MINIMAL)", g_routing);
   args.register_argument("arrive-rate", "Mean packet inter-arrival time (ns); each process sends 3000 / this messages", g_mean_interval);
+  args.register_argument("gen-time", "Generate messages at the arrive rate until this virtual time (ns), instead of 3000 / arrive-rate per process; for weak scaling, the load per process stays fixed as the network grows (0: off, the default)", g_gen_time);
   args.register_argument("local-vc-size", "Local channel buffer (chunks)", g_local_vc_size);
   args.register_argument("global-vc-size", "Global channel buffer (chunks)", g_global_vc_size);
   args.register_argument("terminal-vc-size", "Terminal channel buffer (chunks)", g_terminal_vc_size);
@@ -65,6 +69,11 @@ int main(int argc, char** argv) {
     CkAbort("Dragonfly: unknown traffic pattern\n");
   }
   if (g_mean_interval <= 0) CkAbort("Dragonfly: --arrive-rate must be positive\n");
+  // Packets carry their generation time in 32 bits of ps (travel_start)
+  if (g_gen_time < 0 || g_gen_time * TIME_PER_NS >= (double)UINT32_MAX) {
+    CkAbort("Dragonfly: --gen-time must be in [0, 4.29e6) ns\n");
+  }
+  g_gen_end = (Time)llround(g_gen_time * TIME_PER_NS);
   if (g_tw_lookahead > MIN_DELAY) {
     CkAbort("Dragonfly: lookahead must be at most 100 (0.1 ns, the smallest delay)\n");
   }
@@ -116,7 +125,12 @@ int main(int argc, char** argv) {
     printf("   Terminals..............%u (%u per router)\n", g_total_terminals, g_terminals_per_router);
     printf("   Routing................%u\n", g_routing);
     printf("   Traffic................%u\n", g_traffic);
-    printf("   Arrive rate............%lf ns (%d messages per process)\n", g_mean_interval, g_max_packets);
+    if (g_gen_end) {
+      printf("   Arrive rate............%lf ns, generating until %.0f ns (about %.0f messages per process)\n",
+             g_mean_interval, g_gen_time, g_gen_time / g_mean_interval);
+    } else {
+      printf("   Arrive rate............%lf ns (%d messages per process)\n", g_mean_interval, g_max_packets);
+    }
     printf("   VC sizes...............local %u, global %u, terminal %u chunks\n",
            g_local_vc_size, g_global_vc_size, g_terminal_vc_size);
     printf("   Routers per chare......%u\n", g_routers_per_chare);

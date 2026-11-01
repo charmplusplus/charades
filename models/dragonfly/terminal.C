@@ -216,8 +216,11 @@ void ProcLP::forward(ProcSendMsg* msg, tw_bf* bf) {
   int64_t G = g_num_groups;
   int64_t offset = p * a - 1;
   int64_t dst_lp = -1;
+  Time now = get_current_time();
 
-  if (message_counter >= g_max_packets) {
+  // --gen-time: stop at a virtual time, so each process's load does not
+  // depend on the network's size; otherwise after a fixed message count
+  if (g_gen_end ? now >= g_gen_end : message_counter >= g_max_packets) {
     bf->c1 = 1;
     return;
   }
@@ -284,7 +287,6 @@ void ProcLP::forward(ProcSendMsg* msg, tw_bf* bf) {
 
   /* Generate packets of PACKET_SIZE. One MPI message can be much larger than
    * the packet size; in that case break the MPI message into packets */
-  Time now = get_current_time();
   if (now > UINT32_MAX) {
     CkAbort("Dragonfly: packet generated after 2^32 ps (travel_start is 32 bits)\n");
   }

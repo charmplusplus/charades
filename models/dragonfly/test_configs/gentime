@@ -1,0 +1,16 @@
+# base with --gen-time: each process generates at the arrive rate (200 ns)
+# until 10 us of virtual time (about 50 one-packet messages, against base's
+# 15), the form used for weak scaling, where the load per process must not
+# depend on the network's size. The network drains by about 14 us.
+routers-per-group=4
+global-channels=2
+terminals-per-router=2
+traffic=1
+routing=0
+arrive-rate=200
+gen-time=10000
+end-time=30000000
+lookahead=100
+gvt-bucket-size=1000
+buffer-size=65536
+expected-events=738837

@@ -122,6 +122,7 @@ extern uint32_t g_terminals_per_router;// p (NUM_TERMINALS)
 extern uint32_t g_routing;
 extern uint32_t g_traffic;
 extern double   g_mean_interval;       // ns (MEAN_INTERVAL, --arrive-rate)
+extern double   g_gen_time;            // ns (--gen-time; 0: a fixed message count)
 extern uint32_t g_local_vc_size;       // chunks (LOCAL_VC_SIZE)
 extern uint32_t g_global_vc_size;      // chunks (GLOBAL_VC_SIZE)
 extern uint32_t g_terminal_vc_size;    // chunks (TERMINAL_VC_SIZE)
@@ -137,6 +138,7 @@ extern uint32_t g_radix;
 extern int g_num_packets;
 extern int g_num_chunks;
 extern int g_max_packets;
+extern Time g_gen_end;                 // --gen-time in ps (0: off)
 //@}
 
 /**
@@ -146,7 +148,7 @@ extern int g_max_packets;
  * travel_start is the packet's generation time; it is 32 bits (ps, so up to
  * 4.29 ms of virtual time; checked when packets are generated): the MPI
  * processes stop after INJECTION_INTERVAL / arrive-rate messages, so packets
- * are generated within a few microseconds.
+ * are generated within a few microseconds, or at --gen-time (below 4.29 ms).
  *///@{
 
 /** MPI process -> its terminal: generate a packet (T_GENERATE) */
