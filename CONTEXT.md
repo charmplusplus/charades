@@ -57,6 +57,10 @@ scalar efficiency, joint with aggregation, adapted online rather than from an
 offline cutoff, with several PEs per process — and winning the remote-heavy
 regime where Devastator loses.
 
+**Framing decided 2026-11-01 (user):** aggregation is the performance
+contribution; the controller is the robustness contribution (near the best
+hand-tuned window across regimes without tuning). See `PAPER.md`.
+
 **Baselines (same engine, policy differs):** no aggregation; opportunistic
 aggregation (ship whatever is queued each scheduler pass, as Devastator does);
 best fixed (size, timeout) under a fair tuning budget; PADS'98-style local-rate
@@ -250,28 +254,8 @@ node takes the job's `SLURM_*` variables from idev's environment file so
 - The races fixed so far failed in 0.5–20% of runs, which one pass usually misses. Repeats find them; breadth doesn't. So name the configs you touched, e.g. `python3 tests/test.py bucket` for a GVT change.
 - `python3 tests/test.py --help` lists the rest (`--quick`, `--launch`, `--all`, `--no-build`, `--timeout`). Output goes to `tests/test_output/`.
 
-## Next steps, in order (revised 2026-10-23)
+## Next steps
 
-Results behind each step are in `RESULTS.md` ("Current numbers" at the top). The list as of 2026-10-21 is kept there as "Plan history".
-
-1. **Controller.** Done in part (job 3633379). With htram, a wider window costs aggregation before rollbacks. The new default bound on remote sends inside the window (`--ctl-agg-kappa=0.20`), sparse controller waves and the histogram every 32nd wave raise the worst case from 0.84 to 0.94 of the best fixed W, with no workload worse (`RESULTS.md`). Still open:
-   - κ is one constant. Long delays want about 0.17 and short ones about 0.22; a κ that adapts would close the last 6% at lookahead 100.
-   - The start: α from 1 holds W low for the first rounds; starting it lower hurt traffic.
-   - Test κ on dragonfly, a model it was not fitted to.
-2. **Paper-grade 4-node comparison, one allocation:**
-   - Devastator with `--rng=clcg4`;
-   - ROSS on full nodes, tuned (batch × GVT interval; it has not been rerun since the Debug-runtime days);
-   - Charades with the step 1 controller;
-   - runs of 10 s or more, since 1.9 s runs understate every adaptive arm.
-3. **Dragonfly on Stampede3** (`--gvt-bucket-size=1000`): aggregation, the controller and fixed W, on uniform, worst-case and phase-changing traffic. Charades only, since Devastator and ROSS have no dragonfly.
-4. **Scale to 16–32 nodes** on skx-normal, all engines, as batch jobs after a short interactive check.
-5. **In-Charades baselines:**
-   - the PADS'19 static hold (open issue 1: pick its cutoff per model first);
-   - PADS'98 local-rate aggregation;
-   - opportunistic aggregation.
-6. **Housekeeping:**
-   - SSSP parity check on htram `pdes`;
-   - retest open issue 7 with PR #214's fair-share cap;
-   - the Reconverse TLS PR;
-   - bump Reconverse's LCI pin once #214 merges.
-7. **User decision, open since 2026-10-21: the paper's framing.** Option (a), the controller ported into Devastator, is still open; see "Plan history".
+Since 2026-11-01 the paper's claims, figures and the ordered list of work
+left are in `PAPER.md`; this file no longer keeps its own list. Results behind
+each step are in `RESULTS.md`.

@@ -1,6 +1,6 @@
 # Charades results: every measurement toward PADS 2027
 
-Every number from every run: Stampede3 runs in order (each design, written before its runs, followed by its results), then baseline checks on the Mac and the LCI transport work. Raw CSVs and logs stay where each section says (`$WORK/charades-runs/` on Stampede3; copies of recent ones in `~/charades-data/`). Goals, build notes, open issues and next steps are in `CONTEXT.md`.
+Every number from every run: Stampede3 runs in order (each design, written before its runs, followed by its results), then baseline checks on the Mac and the LCI transport work. Raw CSVs and logs stay where each section says (`$WORK/charades-runs/` on Stampede3; copies of recent ones in `~/charades-data/`). Goals, build notes and open issues are in `CONTEXT.md`; the paper's claims, figures and the work left are in `PAPER.md`.
 
 **How to read it.**
 - Rates are M committed events/s (millions per second), medians of the reps stated; higher is better.
