@@ -320,6 +320,7 @@ Sections 1–128 were re-read before planning sections 129 onward.
 | 170 | 2026-11-01 | — (Mac) | Phase B step 2b: Devastator port of traffic matches Charades exactly (base 14,789, trips 61,559) at 2 and 4 ranks, through subtime(); traffic now commits the same events in all three engines | current |
 | 171 | 2026-11-01 | — (Mac) | Phase B step 2c: ROSS port of dragonfly matches Charades exactly on base, congested, nonminimal and gentime under every ROSS scheduler (up to 1.16 M rolled back), and in every model statistic; a logical-state checkpointer for ROSS's rollback check (works around a ROSS buffer-sizing bug) | current |
 | 172 | 2026-11-01 | — (Mac) | Phase B step 2d: Devastator port of dragonfly matches Charades exactly on all four configs (2 and 4 ranks) and in every statistic; traffic and dragonfly now commit the same events in all three engines | current |
+| 173 | 2026-11-01 | 3668027 | Job K (16 and 32 nodes): the κ bound counts same-process sends (r 0.94 at σ 100, where 0.027 go through htram), so it holds σ 100 at W ≈ 310 while W 400–600 beat W 300 in every rep at 32 nodes (1.05–1.29×); at σ 2,000 the bound is right (W 300 best; 27–32 µs per added message); the lag is 3.0 waves of GVT advance everywhere (bookkeeping, not node count); K2 wrong | current |
 
 ## Stampede3 runs, in order
 
@@ -6702,7 +6703,7 @@ This allocation was also faster without numactl: σ 100 W 400 1,303.5, against 1
 
 ### Why the controller falls short at 32 nodes: where the best window lies at 16 and 32 nodes, and how far GVT trails the slowest PE (design, 2026-11-01; written before any runs)
 
-> **Status: design.**
+> **Status: design; results in section 173.**
 > - **Job K:** Charades `main` (this commit adds a statistic), the `--localalloc` launch, htram `pdes` 42d347f, Reconverse as in job N32. `$WORK/charades-runs/wsweep167.slurm`, 32 nodes on skx (`-x c455-081`); its 16-node runs use the allocation's first 16 nodes.
 > - **New statistic:** at the end of a bucketed-GVT run, "Slowest PE's lead over GVT, mean over count waves" (time units): the buckets every PE had passed when each wave completed, times the bucket size. It is computed from values every wave already carries, at no cost. `ctl_sweep.sh` writes it as `gvt_lag`.
 
@@ -6861,6 +6862,94 @@ Committed events (count; must equal Charades'; events rolled back in parentheses
 - Build the ports on Stampede3: ROSS with mvapich, Devastator with GASNet ofi-psm2, one binary per layout.
 - Choose weak-scaling sizes with Charades. The dragonfly network grows in steps (groups = a·h + 1); traffic grows with the grid.
 - Then the A1/A2-shaped runs.
+
+### Job K results: the κ bound counts same-process sends, so it holds σ 100 at W ≈ 310 for an aggregation cost σ 100 does not have; the lag is 3 waves of GVT advance at every W and node count; at σ 2,000 the bound is right (2026-11-01; skx batch job 3668027, 32 nodes)
+
+> **Status: current.** Design and predictions in section 167.
+> - **Job:** 108 measured runs and the warm-up all finished in 22 minutes; gate 24/24.
+> - **Data:** `~/charades-data/scale32/wsweep/j3668027/` (CSVs and per-run logs; the per-PE GVT files stay on `$WORK`). Scripts: `k_summary.py`, `k_logs.py`, `k_gvt_series.py` in `~/charades-data/scale32/wsweep/`.
+> - **Noise:** the spread between reps of one arm (max ÷ min of 3) has a median of 1.09 at 16 nodes and 1.14 at 32, up to 1.34. Below, only comparisons that hold in every rep (paired by rep) are claimed.
+> - **Between allocations:** σ 100 W 400 at 32 nodes ran at 1,382 M ev/s in job N32 and 1,175 here (1.18×).
+
+**Rates by window** (M committed events/s, median of 3 reps; higher is better):
+
+| workload, nodes | W 250 | W 300 | W 400 | W 500 | W 600 | controller (its mean W) | best fixed W | controller ÷ best fixed W, reps 1 / 2 / 3 (higher is better) |
+|---|---|---|---|---|---|---|---|---|
+| σ 100, 16 | 555.7 | 634.9 | 634.9 | 587.3 | 573.3 | 646.3 (314) | 300 and 400 tie | 1.02 / 0.99 / 0.91 (to W 300) |
+| σ 100, 32 | 1,122.2 | 1,028.6 | 1,174.6 | **1,214.0** | 1,128.8 | 1,003.6 (312) | 500 | 0.78 / 1.06 / 0.76 |
+| σ 2,000, 16 | 429.6 | **486.6** | 469.3 | 446.8 | 436.7 | 440.0 (299) | 300 | 0.87 / 1.04 / 1.10 |
+| σ 2,000, 32 | 722.0 | **937.0** | 852.8 | 845.4 | 828.4 | 773.1 (299) | 300 | 0.76 / 0.82 / 1.13 |
+| uniform, 16 | 256.5 | 274.4 | **338.2** | 251.3 | 280.6 | 274.2 (299) | 400 | 0.80 / 0.81 / 1.21 |
+| uniform, 32 | 373.4 | 391.5 | 387.9 | **400.7** | 396.1 | 412.7 (299) | 500 | 0.85 / 1.12 / 1.08 |
+
+**Each arm ÷ W 300, paired by rep** (reps 1 / 2 / 3; higher is better). Only the rows that hold in every rep are shown:
+
+| workload, nodes | W 250 | W 400 | W 500 | W 600 | controller |
+|---|---|---|---|---|---|
+| σ 100, 16 | 0.87 / 0.87 / 0.91 | 1.00 / 0.94 / 1.09 | 0.95 / 0.90 / 0.96 | 0.88 / 0.88 / 0.94 | 1.02 / 0.99 / 0.91 |
+| σ 100, 32 | 1.10 / 0.82 / 1.19 | **1.08 / 1.27 / 1.25** | **1.25 / 1.12 / 1.29** | **1.15 / 1.05 / 1.20** | 0.98 / 1.18 / 0.97 |
+| σ 2,000, 32 | **0.74 / 0.77 / 0.94** | 0.82 / 0.91 / 1.11 | 0.91 / 0.89 / 1.10 | 0.89 / 0.88 / 1.07 | 0.76 / 0.82 / 1.13 |
+
+(σ 2,000's rep 3 had a slow W 300 run at both node counts. Uniform's arms do not separate from the spread at either node count.)
+
+**Where the events go** (per executed event; the same in every arm):
+
+| workload | sends to other chares (what κ counts as r) | sent through htram (other processes) | sent by pointer (same process, `--local-fast-path`) |
+|---|---|---|---|
+| σ 100 | 0.936 | 0.027 | 0.909 |
+| σ 2,000 | 0.996 | 0.499 | 0.497 |
+| uniform | 0.999 | 0.968 (16 nodes), 0.984 (32) | 0.03, 0.015 |
+
+**htram messages per 1,000 committed events** (lower is better), W 250 / 300 / 400 / 500 / 600:
+
+| workload | 16 nodes | 32 nodes |
+|---|---|---|
+| σ 100 | 0.68 / 0.71 / 0.82 / 1.07 / 1.33 | 0.69 / 0.73 / 0.78 / 0.92 / 1.19 |
+| σ 2,000 | 6.6 / 7.1 / 8.9 / 12.5 / 13.4 | 6.8 / 7.1 / 8.9 / 11.7 / 13.5 |
+| uniform | 74.0 / 76.1 / 77.7 / 86.9 / 92.1 | 115.3 / 117.5 / 122.9 / 129.7 / 137.7 |
+
+**GVT lag** (the new statistic: the slowest PE's mean lead over GVT, time units), W 250 / 300 / 400 / 500 / 600:
+
+| workload | 16 nodes | 32 nodes | lag ÷ GVT advance per count wave |
+|---|---|---|---|
+| σ 100 | 181 / 203 / 232 / 238 / 215 | 182 / 214 / 254 / 263 / 269 | 3.00–3.06 in every arm |
+| σ 2,000 | 180 / 205 / 225 / 233 / 224 | 181 / 206 / 255 / 255 / 226 | 3.01–3.06 |
+| uniform | 192 / 220 / 222 / 245 / 234 | 196 / 230 / 289 / 276 / 274 | 3.0–4.3 (16), 3.4–4.9 (32) |
+
+At W 300, 16 → 32 nodes: µs per count wave σ 100 151 → 193, σ 2,000 190 → 206, uniform 288 → 374; GVT advance per wave (time units) 67 → 70, 68 → 68, 56 → 47. At W 400 and above σ 100's advance per wave levels off at about 78 (16 nodes) and 88 (32).
+
+**What it says:**
+- **The κ bound counts sends that never enter htram.** It bounds r·F(W) with r = sends to other chares per executed event, 0.94 at σ 100. But a send to a chare in the same process goes by pointer: at σ 100 only 0.027 per executed event go through htram, where early-due flushes cost aggregation. So κ holds σ 100 at W ≈ 310 for a cost it barely has: from W 300 to 500, htram messages rise by 0.2 per 1,000 events at 32 nodes. That is the controller's whole shortfall at σ 100 on 32 nodes. W 400–600 beat W 300 in every rep (1.05–1.29×), and the controller runs at W 300's rate (0.97–1.18 of it).
+- **At σ 2,000 the bound is right, and the window's cost is messages.**
+  - From W 300 to 600, htram messages rise by 6.4 per 1,000 events and PE time per committed event by 0.17 µs (16 nodes) and 0.21 µs (32): 27–32 µs per added message, as measured at the go/no-go (25–34 µs per remote message).
+  - W 300 is the best fixed W at both node counts, and the controller sits there (mean W 299).
+  - At 32 nodes W 250 loses in every rep (0.74–0.94), against 0.85–0.86 in two of three reps at 16 nodes. The penalty for too small a window grows with node count.
+  - The controller's 0.76 and 0.82 in reps 1 and 2 at 32 nodes are below W 300 at the same mean W. One rep had a 1.4 s stall; the run-level spread covers the rest.
+- **At σ 100 a wide window costs something else, which the controller does not measure.** From W 300 to 600 at 16 nodes:
+  - PE time per event rises 0.125 µs while messages rise by only 0.6 per 1,000 events; at 30 µs a message, that is 0.02 µs.
+  - The rollback rule cannot see this cost. Rollbacks stay at 0.06% at W 600, and held stragglers are excluded from its calibration.
+  - Dropping κ for σ 100 alone would therefore leave W unbounded: the calibration sits at its floor, so q = 0.99 and W ≈ 4,700.
+- **The lag is the bucketed GVT's bookkeeping and follows W, not node count.**
+  - At Gaussian σ, GVT trails the slowest PE by 3.0 waves of GVT advance in every run. Section 58 found the same: completed = valid ÷ 3 when a wave asks only about the buckets left open.
+  - At W ≤ 300 the lag is within 5% between 16 and 32 nodes.
+  - What node count changes at a fixed W is the wave period, and with it the advance per wave at which progress levels off.
+- **Uniform's 16 → 32 loss is aggregation thinning,** as before: 76 → 117 htram messages per 1,000 events at W 300. No window separates from the spread.
+
+**Predictions (section 167):**
+- **K1 partly right.**
+  - σ 100: the best W moves from 300–400 (16 nodes) to 400–500 (32), at 1.12–1.29× W 300 per rep.
+  - σ 2,000: it stays at 300 at both node counts.
+  - Uniform: no best W separates from the spread.
+- **K2 wrong.** The lag is 3 waves of advance at every W. It levels off only with the advance per wave, and at the best W the room past it is not the same at 16 and 32 nodes for σ 100: 97–168 against 146–237. `--ctl-lag-room` is not built.
+- **K3 right at 32 nodes for σ 100 and σ 2,000** (0.78 and 0.82 of the best, median by rep; 1.08 on uniform). At 16 nodes it is right for σ 100 (0.99) and σ 2,000 (1.04), but uniform reached only 0.81 (0.80, 0.81, 1.21 by rep).
+- **K4 wrong for σ 2,000 and for σ 100 at 16 nodes.** Events per htram message from W 250 to 400:
+  - σ 100: −17% at 16 nodes, −12% at 32;
+  - σ 2,000: −25% and −24%;
+  - uniform: −5% and −7%.
+
+**What follows** (design in the next section, written before its runs):
+- The aggregation bound should count only events sent through htram.
+- A second bound is needed on its own, for the cost of a wide window at σ 100, which is neither messages nor rollbacks.
 
 ## Baseline verification on the Mac
 
