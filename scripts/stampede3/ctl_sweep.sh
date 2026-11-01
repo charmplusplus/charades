@@ -16,10 +16,17 @@
 #     steady:<lookahead>:<mean>:<remote>
 #     phases:<lookahead>:<mean>:<alt lookahead>:<alt mean>:<remote>:<length>
 #     gauss:<lookahead>:<mean>:<sigma> (Gaussian destinations, sigma in LP ids)
-#     traffic:<lookahead>:<mean>:<num-x>:<cars per intersection>:<share>:<size>
+#     traffic:<lookahead>:<mean>:<num-x>:<cars per intersection>:<share>:<size>[:<radius>]
 #       the traffic model on a num-x by (LPs / num-x) grid; with share > 0,
 #       that share of cars starts in a size x size block at the top-left
-#       corner and ends in one at the bottom-right (congestion)
+#       corner and ends in one at the bottom-right (congestion); with
+#       radius > 0 (share 0), cars keep driving to destinations within radius
+#       (--trip-radius, the weak-scaling form)
+#     dragonfly:<a>:<h>:<p>:<traffic>:<arrive rate ns>:<gen-time ns>
+#       the dragonfly model (a routers per group, h global channels per
+#       router, p terminals per router; one router per chare), generating
+#       until gen-time; END is in ps; LPS_PER_PE and LPC are not used. Set
+#       BUCKETS in ps too (the test configs use 1000)
 #   ARMS="w:25 w:50 w:100 w:250 w:500 q:0.02 q:0.05 q:0.1 hill:250"
 #     w:<W> a fixed window; q:<epsilon> the quantile rule (calibrated: the
 #     share of events rolled back; from the smallest window); qb:<epsilon>
@@ -150,7 +157,7 @@ for rep in $(seq $reps); do
   for N in $NODES; do
     n=$((N * PPN)); pe=$((n * PEPP)); lps=$((pe * LPS_PER_PE))
     for wl in $WORKLOADS; do
-      IFS=: read -r kind a b c d e f <<< "$wl"
+      IFS=: read -r kind a b c d e f g <<< "$wl"
       cfg=$out/${wl//:/_}_${lps}_${START}_${END}
       printf '%s\n' "num-lps=$lps" "lps-per-chare=$LPC" "end-time=$END" \
           "start-events=$START" > $cfg
@@ -164,6 +171,12 @@ for rep in $(seq $reps); do
           printf '%s\n' "percent-start=$e" "start-size=$f" "start-x=0" "start-y=0" \
               "percent-end=$e" "end-size=$f" "end-x=$((c - f))" "end-y=$((ny - f))" >> $cfg
         fi
+        [ -n "$g" ] && [ "$g" != 0 ] && echo "trip-radius=$g" >> $cfg
+      elif [ $kind = dragonfly ]; then
+        bin=$C/models/dragonfly/dragonfly
+        printf '%s\n' "routers-per-group=$a" "global-channels=$b" "terminals-per-router=$c" \
+            "traffic=$d" "routing=0" "arrive-rate=$e" "gen-time=$f" "end-time=$END" \
+            "lookahead=100" > $cfg
       elif [ $kind = steady ]; then
         printf '%s\n' "lookahead=$a" "mean=$b" "remote=$c" >> $cfg
       elif [ $kind = gauss ]; then
