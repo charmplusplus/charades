@@ -231,6 +231,8 @@ class BucketGVT : public CBase_BucketGVT {
 
     int start_reductions;
     int count_reductions;
+    /** Buckets every PE had passed, summed over count waves: the slowest PE's lead over GVT */
+    long long lead_buckets_sum;
 
     /**
      * --gvt-wave-events: a count wave this PE has not contributed to yet

@@ -53,6 +53,7 @@ void BucketGVT::init() {
   prev_valid = 0;
   start_reductions = 0;
   count_reductions = 0;
+  lead_buckets_sum = 0;
   pending_wave = -1;
   executed_at_wave = 0;
   last_starved = true;
@@ -189,7 +190,10 @@ void BucketGVT::finalize() {
     std::cout << "==== BUCKET GVT REDUCTION STATISTICS ========" << std::endl;
     std::cout << "Start Reductions : " << start_reductions << std::endl;
     std::cout << "Count Reductions : " << count_reductions << std::endl;
-    std::cout << "Total Reductions : " << start_reductions + count_reductions;
+    std::cout << "Total Reductions : " << start_reductions + count_reductions << std::endl;
+    // How far GVT trails the slowest PE when a wave completes (time units)
+    std::cout << "Slowest PE's lead over GVT, mean over count waves : "
+              << (count_reductions ? (double)lead_buckets_sum / count_reductions * bucket_size : 0.0);
   }
 
   std::ofstream outfile;
@@ -480,6 +484,7 @@ void BucketGVT::check_counts(CkReductionMsg* msg) {
 void BucketGVT::wave_done(const int* counts, int num_buckets,
     int valid_buckets, const uint64_t* ctl, const uint64_t* hist, int nhist) {
   count_reductions++;
+  lead_buckets_sum += valid_buckets;
 
   /**
    * A bucket is complete when every PE had passed it at the PREVIOUS wave and
