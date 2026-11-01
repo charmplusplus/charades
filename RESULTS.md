@@ -327,6 +327,7 @@ Sections 1–128 were re-read before planning sections 129 onward.
 | 177 | 2026-11-01 | 3668971 | Job C (2 nodes): 16 Devastator binaries built; counts equal in all three engines on Stampede3 (Charades 30/30, ROSS 5/5, Devastator 5/5); 1-node rates dragonfly 38.5 M ev/s (W 10,000 ps), traffic 59; the controller reaches only 0.29–0.41 of W 10,000 on dragonfly, still climbing (mean W 1,571–1,900, final 6,474–7,009); sizes for 10 s runs | current |
 | 178 | 2026-11-01 | — | The controller on dragonfly, start-up or rollback target: job D design (W 2,500–20,000 ps; controller at ε 0.001/0.01/0.03 and from α 0.005; PP and direct at W 10,000; 1 and 4 nodes, long runs) | design |
 | 179 | 2026-11-01 | 3669044 | Job D (1 and 4 nodes, dragonfly): both controller bounds misfire: the rollback rule chases dragonfly's ~3% rollback level that no window removes (W ≈ 1,000 ps, 0.33–0.40), κ caps W at the median delay (≈ 5,900 ps, 0.78–0.87); start-up is not it; best W 10,000 (1 node), 10,000–20,000 (4); aggregation 1.06–1.10× | current |
+| 180 | 2026-11-01 | — | The window by measured cost (`--ctl=3`, main 0e158d5): the delay histogram gives the scale (start at the median delay, range 0.01–0.99 quantiles), PE time per committed event over alternating periods picks W; job M design (7 workloads, 4 and 16 nodes, against the quantile rule and fixed windows) | design |
 
 ## Stampede3 runs, in order
 
@@ -7279,6 +7280,45 @@ At W 300, 16 → 32 nodes: µs per count wave σ 100 151 → 193, σ 2,000 190 �
 - that every send to another chare can be aggregated.
 
 On the first application, both are wrong. A rule that suits every model has to use measured cost instead. Section 176 found that busy plus blocked PE time per committed event has its minimum at the best W, and summing both on the count waves costs nothing. The design choice is the user's (next section).
+
+### The window by measured cost (`--ctl=3`), and job M: the controllers against fixed windows on seven workloads at 4 and 16 nodes (design, 2026-11-01; written before any runs)
+
+> **Status: design.** PAPER.md work item 1 (and the start of F4).
+> - **User decision, 2026-11-01:** of four options (hybrid, measured cost only, patching the two bounds, freezing), the hybrid.
+> - **Code:** Charades main 0e158d5; Mac change tier 120/120 with three new configs (`agg_ctl_measured_bucket_pp`, `ctl_measured_bucket`, `agg_ctl_measured_fast_bucket_pp`) on every model.
+> - **Job M:** `$WORK/charades-runs/mctl180.slurm`; Stampede3 tree `charades-phaseb` at 0e158d5.
+
+**The rule (`--ctl=3`).** Section 179: both of the quantile rule's bounds encode PHOLD facts. Its rollback target sits below dragonfly's rollback level at any W, and κ counts sends that never enter htram. The new rule keeps the delay histogram for the scale and lets measured cost choose the point:
+- **Start and range:** after the first histogram, W starts at the median delay and stays between the 0.01 and 0.99 quantiles.
+- **The cost:** PE time per committed event, the summed elapsed time of every PE over the events committed. Section 176 found it lowest at the best W; it counts rollbacks, smaller htram messages and blocked time alike.
+- **Periods:** they alternate between a base (the W in force) and a trial (W times or over a step). Each period leaves out its first 2 rounds (`--ctl-settle`) and measures the next 8 (`--ctl-period`); a round is 8 count waves.
+- **A cheaper trial** is kept, becomes the next base, and the step grows from 1.5× up to 2×.
+- **A dearer one** sends W back to the base, which is measured again, and flips the direction. Two rejected trials in a row halve the step (in log), down to 1.05×.
+- **Only adjacent periods are compared,** so the rule follows phase changes, and every PE computes the same W.
+
+**Runs** (16 nodes, then the allocation's first 4; 2 reps, arm order reversed in rep 2):
+
+| workload | htram | end time | arms |
+|---|---|---|---|
+| PHOLD σ 100, lookahead 100 / mean 1,000 | PP 2,048 | 2,048,000 | W 300, quantile rule, measured |
+| PHOLD σ 2,000 | PP 512 | 2,048,000 | W 100, W 300, quantile, measured |
+| PHOLD uniform | WPs 512 | 2,048,000 | W 300, quantile, measured |
+| PHOLD σ 500, lookahead 10 / mean 200 | PP 512 | 512,000 | W 50, 100, 200, 300, quantile, measured |
+| phase-changing PHOLD (10 / 200 and 100 / 1,000 every 8,000; remote 0.5) | PP 512 | 1,024,000 | W 100, 250, 500, quantile, measured |
+| traffic (64 × 46·N, 16 cars per intersection, trip radius 3) | PP 2,048 | 6,000,000 | W 250, 1,000, quantile, measured |
+| dragonfly (a = 28, h = 14 at 16 nodes; 16 / 10 at 4; arrival 500 ns, generating 150,000 ns) | WPs 512 | 160,000,000 ps | W 10,000, 20,000, quantile, measured |
+
+**Predictions:**
+- **M1 (the gate).** The measured rule reaches at least 0.9 of the best fixed W in this job for every workload at both node counts, dragonfly included.
+- **M2.** On the three lookahead-100 PHOLD workloads it is within 0.05 of the quantile rule, which is already 0.96–1.03 of W 300 there (section 176).
+- **M3. No single W fits every workload:**
+  - W 300 is at most 0.8 of the best at lookahead 10;
+  - W 100 is at most 0.8 of W 300 at σ 2,000, lookahead 100.
+- **M4.** On phase-changing PHOLD the measured rule is at least 0.95 of the best fixed W.
+
+**What follows:**
+- **M1 right:** `--ctl=3` becomes the default, and the robustness figure (F4) is built on it. L32's 32-node question is then asked of it in the paper-grade runs.
+- **M1 wrong:** read the `CTL` logs to see where W went. One more change at most, then freeze, per PAPER.md.
 
 ## Baseline verification on the Mac
 
