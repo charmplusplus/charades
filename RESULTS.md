@@ -319,6 +319,7 @@ Sections 1–128 were re-read before planning sections 129 onward.
 | 169 | 2026-11-01 | — (Mac) | Phase B step 2a: ROSS port of traffic matches Charades exactly (base 14,789, trips 61,559) under every ROSS scheduler; equal-timestamp order matched through ROSS's user priority (Devastator: subtime) | current |
 | 170 | 2026-11-01 | — (Mac) | Phase B step 2b: Devastator port of traffic matches Charades exactly (base 14,789, trips 61,559) at 2 and 4 ranks, through subtime(); traffic now commits the same events in all three engines | current |
 | 171 | 2026-11-01 | — (Mac) | Phase B step 2c: ROSS port of dragonfly matches Charades exactly on base, congested, nonminimal and gentime under every ROSS scheduler (up to 1.16 M rolled back), and in every model statistic; a logical-state checkpointer for ROSS's rollback check (works around a ROSS buffer-sizing bug) | current |
+| 172 | 2026-11-01 | — (Mac) | Phase B step 2d: Devastator port of dragonfly matches Charades exactly on all four configs (2 and 4 ranks) and in every statistic; traffic and dragonfly now commit the same events in all three engines | current |
 
 ## Stampede3 runs, in order
 
@@ -6826,6 +6827,40 @@ Committed events (count; must equal Charades'; events rolled back in parentheses
 - **ROSS's linear mapping rolls back 4.9–6.7× more events** than the grouped mapping at 4 ranks (base: 392,318 against 80,403). The grouped mapping is the fair setting for timing.
 
 **Next:** dragonfly for Devastator, storing in each event's reverse object only what its handler overwrites, the values Charades keeps in `saved_*` fields, rather than copying a whole router per event.
+
+### Phase B, step 2d: Devastator reproduces Charades' dragonfly; both Phase B models now match in all three engines (2026-11-01, Mac)
+
+> **Status: current.**
+> - **Port:** `~/pdes-baselines/devastator/bench/dragonfly.cxx` (intent-to-add; patch `~/pdes-baselines/devastator-dragonfly.patch`).
+> - **Binaries:** threads world, `~/pdes-baselines/deva-mac/dragonfly-threads-r{2,4}`.
+
+**How it is written:**
+- **Undo is state saving,** Devastator's own approach. Each event's reverse object keeps the LP's clcg4 state and creation count from before the event, plus only the fields its handler overwrites: the values Charades keeps in its messages' `saved_*` fields. Copying a whole router (its per-port arrays and waiting list) per event would handicap Devastator in the timing runs.
+- **The router waiting list** is released as in Charades: a credit marks the entry it serves, and the credit's commit retires it.
+- **Ranks hold whole routers** with their terminals and processes, as in Charades and the ROSS port.
+- **Tie order** through `subtime()` (section 169).
+- **`pdes::register_state` is not used.** Its snapshot, which only rewinding a drain needs, requires a trivially destructible state, and a router holds vectors and a deque.
+
+**Committed events** (count; must equal Charades'; events rolled back in parentheses):
+
+| config | Charades | Devastator, 2 ranks | Devastator, 4 ranks |
+|---|---|---|---|
+| base | 226,944 | 226,944 (13,690) | 226,944 (48,062) |
+| congested | 178,850 | 178,850 (13,140) | 178,850 (39,418) |
+| nonminimal | 311,214 | 311,214 (45,647) | 311,214 (44,558) |
+| gentime | 738,837 | 738,837 (46,827) | 738,837 (146,687) |
+
+- Devastator's determinism flag is 1 in every run.
+- The statistics equal Charades' and ROSS's (section 171) at 4 ranks:
+  - congested: 1,080 messages, 409 packets finished, 630,020,050 ps total latency, 1,520 hops, 10,466 chunks dropped, 6,548 that waited;
+  - gentime: 3,519 packets, 1,054,724,896 ps, 11,652 hops.
+
+**Phase B ports done on the Mac:** traffic and dragonfly, in their weak-scalable forms, commit the same events in Charades, ROSS and Devastator under every scheduler tried.
+
+**Next in Phase B:**
+- Build the ports on Stampede3: ROSS with mvapich, Devastator with GASNet ofi-psm2, one binary per layout.
+- Choose weak-scaling sizes with Charades. The dragonfly network grows in steps (groups = a·h + 1); traffic grows with the grid.
+- Then the A1/A2-shaped runs.
 
 ## Baseline verification on the Mac
 
