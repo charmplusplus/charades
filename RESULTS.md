@@ -321,6 +321,7 @@ Sections 1–128 were re-read before planning sections 129 onward.
 | 171 | 2026-11-01 | — (Mac) | Phase B step 2c: ROSS port of dragonfly matches Charades exactly on base, congested, nonminimal and gentime under every ROSS scheduler (up to 1.16 M rolled back), and in every model statistic; a logical-state checkpointer for ROSS's rollback check (works around a ROSS buffer-sizing bug) | current |
 | 172 | 2026-11-01 | — (Mac) | Phase B step 2d: Devastator port of dragonfly matches Charades exactly on all four configs (2 and 4 ranks) and in every statistic; traffic and dragonfly now commit the same events in all three engines | current |
 | 173 | 2026-11-01 | 3668027 | Job K (16 and 32 nodes): only σ 100 at 32 nodes wants a wider window (W 400–600 beat W 300 in every rep, 1.05–1.29×; σ 2,000 best at W 300 at both counts); κ holds every workload at W ≈ 300 and counts same-process sends (r 0.94 at σ 100, 0.027 through htram); a wider window's cost is memory, not messages (σ 100 and σ 2,000 both +11% PE time W 300→600 at 16 nodes); lag = 3.0 waves of GVT advance everywhere; K2 wrong | current |
+| 174 | 2026-11-01 | — | What a wider window buys: `--blocked-time` (PE time stopped at the window's edge; also fixes the end-of-run statistics reduction's starting point); jobs L16 (4 and 16 nodes) and L32 (16 and 32) design: W 250–600 and the controller on σ 100, σ 2,000, uniform | design |
 
 ## Stampede3 runs, in order
 
@@ -6953,6 +6954,39 @@ At W 300, 16 → 32 nodes: µs per count wave σ 100 151 → 193, σ 2,000 190 �
 - Measure what the window buys: PE time blocked at the window edge, for each W, at 16 and 32 nodes.
 - Then replace κ with a rule built on that measurement. Whatever replaces κ must still bound the window, by memory or rollbacks.
 - Separately, the aggregation bound should count only events sent through htram.
+
+### What a wider window buys: PE time blocked at the window's edge, by W, at 4, 16 and 32 nodes (design, 2026-11-01; written before any runs)
+
+> **Status: design.**
+> - **Code:** Charades `main` 1b472ef adds `--blocked-time=1`. Each PE times its spells at the window's edge: a spell starts when a pass stops at the window and ends when the PE next executes an event. That is one timer read at each end of a spell and none on the blocked passes in between; off by default.
+> - **Printed:** "Time Blocked at Window %" (mean over PEs, and the least and most PE), "Blocked Spells" and "Blocked Spell Mean us".
+> - **Also fixed:** the end-of-run statistics reduction started from a zeroed `Statistics` and leaked it; it now starts from the first contribution, so the least-PE value is a minimum over PEs. No other statistic changes: the others are sums, maxima, or the same on every PE.
+> - **Mac:** change tier, 144/144: `bucket_window_blocked` and `agg_deadline_bucket_pp_blocked` (new configs) plus `blocking`, `bucket`, `bucket_window` and `agg_ctl_sparse_bucket_pp` on every model; committed counts unchanged.
+> - **`ctl_sweep.sh`** writes blocked_pct, blocked_min_pct, blocked_max_pct, spell_us, max_events, htram_events and htram_msgs.
+
+**Why.** Section 173: only σ 100 at 32 nodes wants a window wider than about 300, and the controller has no measure of what a wider window buys. The cost of width is visible: busy PE time per event rises with W through memory, as it did at σ 100 and σ 2,000 alike at 16 nodes. The benefit, less time with PEs stopped at the window's edge, was never measured. So split each run's PE time into blocked and busy:
+- blocked = the blocked share × PEs × run time;
+- busy per committed event = (1 − blocked share) × PEs ÷ the rate.
+
+**Runs** (the job K setup: `--localalloc` launch, end time 2,048,000, 3 reps, the arm order rotating by rep; `--blocked-time=1` on every arm):
+- σ 100 (PP 2,048), σ 2,000 (PP 512) and uniform (WPs 512).
+- W 250, 300, 400, 500, 600 and the controller.
+- **Job L16** (skx-dev, or skx if it starts first, 16 nodes): 16 nodes, then the first 4.
+- **Job L32** (skx, 32 nodes): 32 nodes, then the first 16.
+- 108 runs per job, about 25 minutes each. 16 nodes appears in both jobs, so the two allocations can be compared.
+
+**Predictions:**
+- **L1. Blocked time is what σ 100 loses at 32 nodes.**
+  - At W 300, σ 100's blocked share is at least 12 points higher at 32 nodes than at 16. PE time per event went from 1.16 to 1.43 µs (section 173).
+  - σ 2,000's is at most 6 points higher (1.51 to 1.57 µs).
+  - At W 500, σ 100's blocked share at 32 nodes is within 6 points of its 16-node W 300 share.
+- **L2. Busy time per committed event rises with W** at every workload and node count: W 600 is at least 1.06× W 300. This is the cost of width that the rollback rule does not see.
+- **L3. At the best fixed W, the blocked share lies in a narrow band:** within 10 points across the three workloads and three node counts. If so, a blocked-share target can set W.
+- **L4.** At 4 nodes the blocked share at W 300 is below the 16-node share for every workload.
+
+**What follows:**
+- **L3 right:** the controller sets W to hold the blocked share at the band's level, with the memory and rollback costs as upper bounds. κ either goes, or counts only events sent through htram.
+- **L3 wrong:** the controller perturbs W and compares busy plus blocked PE time per committed event, which it can sum on its count waves at no extra cost. That is a gradient rule on a measured cost, not a target.
 
 ## Baseline verification on the Mac
 
