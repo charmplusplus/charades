@@ -323,6 +323,7 @@ Sections 1–128 were re-read before planning sections 129 onward.
 | 173 | 2026-11-01 | 3668027 | Job K (16 and 32 nodes): only σ 100 at 32 nodes wants a wider window (W 400–600 beat W 300 in every rep, 1.05–1.29×; σ 2,000 best at W 300 at both counts); κ holds every workload at W ≈ 300 and counts same-process sends (r 0.94 at σ 100, 0.027 through htram); a wider window's cost is memory, not messages (σ 100 and σ 2,000 both +11% PE time W 300→600 at 16 nodes); lag = 3.0 waves of GVT advance everywhere; K2 wrong | current |
 | 174 | 2026-11-01 | — | What a wider window buys: `--blocked-time` (PE time stopped at the window's edge; also fixes the end-of-run statistics reduction's starting point); jobs L16 (4 and 16 nodes) and L32 (16 and 32) design: W 250–600 and the controller on σ 100, σ 2,000, uniform | design |
 | 175 | 2026-11-01 | — | Phase B step 3: dragonfly shapes for 1–32 nodes at 14.0–15.9 routers per PE (h even, p = 4); routers placed in blocks with the first R mod n ranks holding one more, in all three engines (Mac: ROSS 16/16, Devastator 24/24, Charades 18/18 equal counts); traffic 64 × 46·N; job C design (Devastator builds, Charades calibration at 1 node, counts on 2 nodes) | design |
+| 176 | 2026-11-01 | 3668911 | Job L16 (4 and 16 nodes): above W 300 a wider window costs blocked time, not busy time (63–100% of the extra PE time; busy 1.00–1.07×), because GVT advance per wave levels off at W 300 while waves lengthen 15–27%; the blocked share is lowest at the best W in every cell; controller 0.96–1.03 of W 300; corrects section 173's memory reading; L2, L3 wrong, L4 right | current |
 
 ## Stampede3 runs, in order
 
@@ -6867,7 +6868,7 @@ Committed events (count; must equal Charades'; events rolled back in parentheses
 
 ### Job K results: only σ 100 at 32 nodes wants a wider window (W 400–600 beat W 300 in every rep); the κ bound holds every workload at W ≈ 300 and counts same-process sends; the lag is 3 waves of GVT advance at every W and node count (2026-11-01; skx batch job 3668027, 32 nodes)
 
-> **Status: current.** Design and predictions in section 167.
+> **Status: current; its reading of a wider window's cost as memory is wrong (section 176: busy time hardly moves; the cost is blocked time, from slower GVT waves).** Design and predictions in section 167.
 > - **Job:** 108 measured runs and the warm-up all finished in 22 minutes; gate 24/24.
 > - **Data:** `~/charades-data/scale32/wsweep/j3668027/` (CSVs and per-run logs; the per-PE GVT files stay on `$WORK`). Scripts: `k_summary.py`, `k_logs.py`, `k_gvt_series.py` in `~/charades-data/scale32/wsweep/`.
 > - **Noise:** the spread between reps of one arm (max ÷ min of 3) has a median of 1.09 at 16 nodes and 1.14 at 32, up to 1.34. Below, only comparisons that hold in every rep (paired by rep) are claimed.
@@ -7045,6 +7046,86 @@ At W 300, 16 → 32 nodes: µs per count wave σ 100 151 → 193, σ 2,000 190 �
 - Charades: its controller and the better htram mode;
 - Devastator: its best of three W;
 - ROSS: the better of optimistic and conservative.
+
+### Job L16 results: above W 300 a wider window costs blocked time, not busy time; GVT advance per wave levels off at W 300 while waves keep lengthening; the blocked share is lowest at the best W (2026-11-01; skx-dev batch job 3668911, 16 nodes)
+
+> **Status: current for 4 and 16 nodes; job L32 (32 and 16 nodes) pending.** Design and predictions in section 174.
+> - **Job:** 108 runs, all finished; gate 24/24.
+> - **Data:** `~/charades-data/scale32/blocked/j3668911/`; script `~/charades-data/scale32/blocked/l_summary.py`.
+> - **Noise:** low. Per-rep ratios to W 300 agree within about ±3% (the 32-node spread in section 173 was ±14%).
+
+**Rate, blocked share and PE time per committed event** (median of 3 reps):
+- M ev/s: higher is better.
+- Blocked %: the mean over PEs of the share of run time stopped at the window's edge; lower is better.
+- Busy and blocked µs: PE time per committed event, (1 − blocked share) × PEs ÷ rate and blocked share × PEs ÷ rate; lower is better.
+
+| workload, nodes | W | M ev/s | blocked % (least / most PE) | blocked spell (µs) | busy µs per event | blocked µs per event | ÷ W 300, reps 1 / 2 / 3 |
+|---|---|---|---|---|---|---|---|
+| σ 100, 4 | 250 | 181.0 | 18.9 (14.4 / 22.9) | 28.4 | 0.832 | 0.191 | 1.00 / 0.98 / 0.99 |
+| | **300** | **181.9** | **17.7** (12.2 / 24.3) | 29.3 | 0.834 | 0.179 | 1 |
+| | 400 | 172.7 | 20.6 (9.9 / 25.2) | 34.5 | 0.846 | 0.219 | 0.96 / 0.95 / 0.94 |
+| | 600 | 151.1 | 29.8 (17.1 / 33.6) | 51.3 | 0.861 | 0.363 | 0.83 / 0.82 / 0.83 |
+| | controller (314) | 178.7 | 18.4 | 30.6 | 0.840 | 0.190 | 1.00 / 0.98 / 0.98 |
+| σ 100, 16 | 250 | 687.7 | 23.8 (18.1 / 29.2) | 31.5 | 0.813 | 0.255 | 0.97 / 0.99 / 0.95 |
+| | **300** | **716.7** | **20.1** (12.5 / 24.9) | 30.8 | 0.823 | 0.207 | 1 |
+| | 400 | 692.7 | 21.9 (10.8 / 28.4) | 35.3 | 0.830 | 0.232 | 0.97 / 0.99 / 0.96 |
+| | 600 | 600.7 | 30.8 (22.2 / 34.3) | 52.1 | 0.848 | 0.377 | 0.84 / 0.86 / 0.84 |
+| | controller (314) | 704.5 | 20.7 | 33.0 | 0.828 | 0.217 | 1.00 / 1.01 / 0.96 |
+| σ 2,000, 4 | 250 | 137.9 | 26.7 | 48.8 | 0.979 | 0.356 | 0.98 / 0.98 / 0.99 |
+| | **300** | **141.1** | **23.1** | 49.5 | 1.004 | 0.301 | 1 |
+| | 600 | 116.2 | 34.9 | 70.5 | 1.031 | 0.553 | 0.82 / 0.82 / 0.83 |
+| | controller (299) | 137.6 | 24.4 | 51.7 | 1.011 | 0.326 | 0.96 / 0.99 / 0.99 |
+| σ 2,000, 16 | 250 | 530.3 | 32.8 | 55.7 | 0.935 | 0.454 | 0.99 / 1.00 / 0.96 |
+| | 300 | 536.2 | 29.8 | 60.7 | 0.968 | 0.410 | 1 |
+| | 400 | 534.2 | **27.1** | 60.8 | 1.005 | 0.373 | 0.99 / 1.02 / 0.97 |
+| | 600 | 471.6 | 33.6 | 77.8 | 1.035 | 0.523 | 0.88 / 0.90 / 0.86 |
+| | controller (299) | **540.2** | 28.6 | 57.0 | 0.972 | 0.390 | 1.02 / 1.03 / 0.98 |
+| uniform, 4 | 250 | 119.4 | 27.8 | 60.0 | 1.109 | 0.428 | 0.97 / 0.99 / 0.98 |
+| | **300** | **122.3** | **24.2** | 62.8 | 1.138 | 0.364 | 1 |
+| | 600 | 97.0 | 39.7 | 91.3 | 1.138 | 0.753 | 0.79 / 0.80 / 0.79 |
+| | controller (299) | 120.6 | 25.0 | 64.2 | 1.143 | 0.382 | 0.98 / 0.97 / 1.00 |
+| uniform, 16 | 250 | 353.1 | 36.6 | 92.8 | 1.319 | 0.763 | 0.97 / 0.96 / 0.96 |
+| | **300** | **367.4** | **32.0** | 94.5 | 1.363 | 0.640 | 1 |
+| | 600 | 313.0 | 42.0 | 126.7 | 1.372 | 0.989 | 0.85 / 0.85 / 0.84 |
+| | controller (299) | 357.0 | 33.1 | 99.0 | 1.377 | 0.685 | 0.96 / 0.97 / 0.98 |
+
+(W 400 and 500 for the rows not shown fall between their neighbours; all arms are in `l_summary.py`'s output.)
+
+**GVT per count wave**, W 250 / 300 / 400 / 500 / 600:
+
+| workload, nodes | µs per wave (lower is better) | GVT advance per wave, time units (higher is better) |
+|---|---|---|
+| σ 100, 4 | 117 / 128 / 138 / 153 / 162 | 59.9 / 65.9 / 67.5 / 67.9 / 69.2 |
+| σ 100, 16 | 123 / 132 / 139 / 152 / 161 | 59.8 / 66.8 / 68.4 / 68.6 / 68.5 |
+| σ 2,000, 4 | 154 / 167 / 177 / 192 / 205 | 60.1 / 66.5 / 67.4 / 68.4 / 67.4 |
+| σ 2,000, 16 | 159 / 177 / 185 / 200 / 210 | 59.8 / 67.1 / 70.2 / 69.6 / 70.2 |
+| uniform, 4 | 178 / 193 / 211 / 224 / 244 | 60.0 / 67.0 / 66.9 / 66.8 / 66.9 |
+| uniform, 16 | 240 / 264 / 276 / 285 / 304 | 60.0 / 68.7 / 69.1 / 67.4 / 67.2 |
+
+**What it says:**
+- **Above W 300, a wider window costs blocked time, not busy time.** From W 300 to 600, the extra PE time per committed event is 63–100% blocked time:
+  - σ 100: +0.025 µs busy against +0.170 blocked at 16 nodes;
+  - σ 2,000: +0.067 against +0.113;
+  - uniform: +0.009 against +0.349.
+  
+  Busy time per event at W 600 is 1.00–1.03× W 300 in five cells and 1.07× in one. **This corrects section 173,** which read the cost of width as memory: the most events held on a PE does rise 38%, but busy time hardly moves.
+- **Why blocked time grows: GVT advance per wave levels off at W 300 while waves keep lengthening.**
+  - From W 300 to 600, advance per wave rises at most 5% (to 67–70 time units, about a third of the buckets every PE has passed, as in section 58).
+  - Over the same range, µs per wave rise 15–27%.
+  - So GVT moves more slowly through virtual time, and every PE waits longer at the edge: blocked spells grow from 31 to 52 µs at σ 100, 16 nodes.
+  - **Hypothesis, not tested:** waves are paced by 128 events per PE (`--gvt-wave-events`). In a narrow window PEs reach the edge and contribute early; in a wide one each PE works through its 128 events first.
+- **The blocked share is lowest at the best fixed W in every cell.** At W 300 in five cells; at W 400 at σ 2,000, 16 nodes, where W 300, W 400 and the controller tie (0.98–1.03 per rep). Busy time is nearly flat in W, so the rate follows the blocked time.
+- **At 4 and 16 nodes the controller is where it should be:** 0.96–1.03 of W 300 per rep, at a mean W of 299–314. The question that remains is 32 nodes (section 173: σ 100 wanted W 400–500 there), which job L32 measures.
+
+**Predictions (section 174):**
+- **L1:** pending (L32).
+- **L2 wrong.** Busy time at W 600 is 1.00–1.07× W 300, not ≥ 1.06× (only σ 2,000 at 16 nodes reaches it).
+- **L3 wrong.** The blocked share at the best W spans 17.7–32.0%, 14 points, so no single target fits. But its minimum marks the best W everywhere.
+- **L4 right.** At W 300 the 4-node share is below the 16-node share for every workload: 17.7 vs 20.1, 23.1 vs 29.8, 24.2 vs 32.0.
+
+**What follows:** per section 174, "L3 wrong" points to a rule that moves W toward the lowest measured blocked time, by perturbing W, rather than to a target. Whether to build it waits for L32:
+- if at 32 nodes the lowest blocked share again marks the best W, and the controller misses it, one test of that rule;
+- otherwise the controller stays as it is.
 
 ## Baseline verification on the Mac
 
