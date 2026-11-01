@@ -30,6 +30,8 @@ private:
   uint32_t initial_cars, total_cars_arrived, total_cars_finished;
   uint32_t in_lane[4], out_lane[4];
   uint64_t neighbors[4];
+  /** --trip-radius: a destination near (x, y), in one random draw */
+  void near_destination(uint32_t x, uint32_t y, Car* car);
 public:
   IntersectionLP(uint32_t cars);
 

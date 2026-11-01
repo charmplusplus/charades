@@ -56,12 +56,14 @@ KNOWN_BROKEN = {'cd', 'phased'}
 # equal-timestamp events; it found the non-strict comparator). The others
 # differ mostly in size and end time. Dragonfly base and congested: three LP
 # types, nine message types, a custom mapper, and (congested) the routers'
-# waiting lists, whose reverse computation leans on commit handlers.
+# waiting lists, whose reverse computation leans on commit handlers;
+# gentime, the generation window used for weak scaling (--gen-time). Traffic
+# trips: cars keep driving (--trip-radius), its form for weak scaling.
 CORE_MODEL_CFGS = {
   'Simple PHOLD': ['base', 'phases'],
   'Imbalanced PHOLD': ['combo'],
-  'Traffic': ['base'],
-  'Dragonfly': ['base', 'congested'],
+  'Traffic': ['base', 'trips'],
+  'Dragonfly': ['base', 'congested', 'gentime'],
 }
 # The engine tier's repeat pass looks for races, which need concurrency and
 # depend on timing more than on the model: multi-PE shapes only, on PHOLD

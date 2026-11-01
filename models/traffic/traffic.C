@@ -22,6 +22,9 @@ uint32_t g_end_size = 1;
 uint32_t g_end_x = 0;
 uint32_t g_end_y = 0;
 
+// Cars keep driving between destinations within this distance (0: off)
+uint32_t g_trip_radius = 0;
+
 int main(int argc, char * argv[]) {
   ArgumentSet args("TRAFFIC Model");
   args.register_argument("mean", "Exponential distribution mean for timestamps", mean);
@@ -36,6 +39,7 @@ int main(int argc, char * argv[]) {
   args.register_argument("end-size", "Size of end cluster block. X by X block", g_end_size);
   args.register_argument("end-x", "X coord of upper left corner of end cluster", g_end_x);
   args.register_argument("end-y", "Y coord of upper left corner of end cluster", g_end_y);
+  args.register_argument("trip-radius", "Cars keep driving: each destination is within this many intersections of the car in x and y (on the torus, never its own intersection), and a car that reaches one picks the next; trips and cars per intersection then do not change with the grid's size, for weak scaling (0: the original model, destinations anywhere, and a car stops at its destination)", g_trip_radius);
   tw_add_arguments(&args);
 
   tw_init(argc, argv);
@@ -43,6 +47,12 @@ int main(int argc, char * argv[]) {
     CkAbort("Lookahead must be less than mean\n");
   }
   mean = mean - g_tw_lookahead;
+  if (g_trip_radius && (2 * g_trip_radius >= g_num_x || 2 * g_trip_radius >= g_num_y)) {
+    CkAbort("Traffic: --trip-radius must be less than half the grid's width and height\n");
+  }
+  if (g_trip_radius && g_percent_end > 0) {
+    CkAbort("Traffic: --trip-radius does not combine with an end cluster (--percent-end)\n");
+  }
 
   register_msg_type<ArrivalMsg>();
   register_msg_type<DepartureMsg>();
@@ -69,6 +79,9 @@ int main(int argc, char * argv[]) {
     printf("End Region Percent.....%lf\n", g_percent_end);
     printf("End Region Location....%u,%u\n", g_end_x, g_end_y);
     printf("End Region Size......%u x %u\n", g_end_size, g_end_size);
+    if (g_trip_radius) {
+      printf("Trips..................cars keep driving, destinations within %u\n", g_trip_radius);
+    }
     printf("========================================\n\n");
   }
 

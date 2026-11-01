@@ -1,0 +1,12 @@
+# base with --trip-radius: cars keep driving, each trip to a destination
+# within 3 intersections in x and y (on the torus), the form used for weak
+# scaling. 60,000 time units is several trips per car, so the next-trip path
+# (new destination drawn on arrival, and its reverse) runs often.
+num-x=8
+num-y=8
+lps-per-chare=4
+total-cars=1024
+trip-radius=3
+end-time=60000
+lookahead=100
+expected-events=61559

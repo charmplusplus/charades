@@ -28,4 +28,8 @@ extern uint32_t g_end_size;
 extern uint32_t g_end_x;
 extern uint32_t g_end_y;
 
+// --trip-radius: cars keep driving, each destination within this many
+// intersections in x and y (0: the original model)
+extern uint32_t g_trip_radius;
+
 #endif
