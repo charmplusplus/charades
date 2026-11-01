@@ -326,6 +326,7 @@ Sections 1–128 were re-read before planning sections 129 onward.
 | 176 | 2026-11-01 | 3668911 | Job L16 (4 and 16 nodes): above W 300 a wider window costs blocked time, not busy time (63–100% of the extra PE time; busy 1.00–1.07×), because GVT advance per wave levels off at W 300 while waves lengthen 15–27%; the blocked share is lowest at the best W in every cell; controller 0.96–1.03 of W 300; corrects section 173's memory reading; L2, L3 wrong, L4 right | current |
 | 177 | 2026-11-01 | 3668971 | Job C (2 nodes): 16 Devastator binaries built; counts equal in all three engines on Stampede3 (Charades 30/30, ROSS 5/5, Devastator 5/5); 1-node rates dragonfly 38.5 M ev/s (W 10,000 ps), traffic 59; the controller reaches only 0.29–0.41 of W 10,000 on dragonfly, still climbing (mean W 1,571–1,900, final 6,474–7,009); sizes for 10 s runs | current |
 | 178 | 2026-11-01 | — | The controller on dragonfly, start-up or rollback target: job D design (W 2,500–20,000 ps; controller at ε 0.001/0.01/0.03 and from α 0.005; PP and direct at W 10,000; 1 and 4 nodes, long runs) | design |
+| 179 | 2026-11-01 | 3669044 | Job D (1 and 4 nodes, dragonfly): both controller bounds misfire: the rollback rule chases dragonfly's ~3% rollback level that no window removes (W ≈ 1,000 ps, 0.33–0.40), κ caps W at the median delay (≈ 5,900 ps, 0.78–0.87); start-up is not it; best W 10,000 (1 node), 10,000–20,000 (4); aggregation 1.06–1.10× | current |
 
 ## Stampede3 runs, in order
 
@@ -7215,6 +7216,69 @@ At W 300, 16 → 32 nodes: µs per count wave σ 100 151 → 193, σ 2,000 190 �
 **What follows:**
 - **D1 and D2 right:** an event-share target does not carry across models. A looser ε would cost PHOLD, whose best W runs near 0.1% rolled back. So the fix is a rule that does not depend on the model's rollback level: W toward the lowest blocked time, as section 176 suggests, or ε set from each model's own rollback cost. That is one code change and one job, joined with job L32's question.
 - **D1 wrong (start-up):** start the calibration from the delay histogram (the first round's quantile) instead of α = 1, check that this does not hurt traffic (section 40 saw that), and keep ε.
+
+### Job D results: on dragonfly both of the controller's bounds misfire; the rollback rule chases a rollback level no window removes, and κ caps W at the median delay; start-up is not the problem (2026-11-01; skx-dev batch job 3669044, 4 nodes)
+
+> **Status: current.** Design and predictions in section 178.
+> - **Job:** 52 runs, all finished in 22 minutes; gate 18/18.
+> - **Data:** `~/charades-data/phaseb/j3669044/`; script `~/charades-data/phaseb/d_summary.py`.
+> - **Noise:** per-rep ratios agree within ±3%.
+
+**Dragonfly, long runs** (1 node: 389 M events, 4 nodes: 1,488 M; median of 3 reps; ratios to the best fixed W are per rep; higher is better):
+
+| nodes | arm | M ev/s | efficiency (%) | blocked share (%) | controller's mean W (ps) | ÷ best fixed W |
+|---|---|---|---|---|---|---|
+| 1 | W 2,500 | 19.5 | 98.4 | 71.5 | | 0.51 / 0.52 / 0.53 |
+| | W 5,000 | 32.6 | 98.5 | 47.3 | | 0.85 / 0.88 / 0.88 |
+| | **W 10,000** | **37.4** | 98.0 | 33.7 | | 1 |
+| | W 20,000 | 36.4 | 87.8 | 25.3 | | 0.96 / 0.97 / 0.95 |
+| | controller ε 0.001 | 14.9 | 98.3 | 76.4 | 1,854 | 0.39 / 0.40 / 0.40 |
+| | controller ε 0.001, started at α 0.005 | 14.8 | 98.3 | 76.6 | 1,856 | 0.39 / 0.40 / 0.40 |
+| | controller ε 0.01 | 32.0 | 98.5 | 47.6 | 5,958 | 0.83 / 0.86 / 0.87 |
+| | controller ε 0.03 | 32.1 | 98.5 | 47.3 | 5,963 | 0.84 / 0.85 / 0.87 |
+| | PP 512, W 10,000 (rep 1) | 34.3 | 97.7 | 33.2 | | 0.90 |
+| | direct sends, W 10,000 (rep 1) | 35.4 | 98.8 | 34.4 | | 0.93 |
+| 4 | W 2,500 | 47.5 | 97.3 | 79.6 | | 0.43 / 0.43 / 0.43 |
+| | W 5,000 | 88.9 | 97.6 | 59.8 | | 0.81 / 0.81 / 0.80 |
+| | W 10,000 | 109.4 | 97.2 | 41.5 | | 0.99 / 0.99 / 0.99 |
+| | **W 20,000** | **110.4** | 92.7 | 35.4 | | 1 |
+| | controller ε 0.001 | 36.2 | 97.2 | 82.9 | 1,700 | 0.33 / 0.33 / 0.33 |
+| | controller ε 0.001, started at α 0.005 | 36.2 | 97.2 | 83.1 | 1,696 | 0.33 / 0.33 / 0.32 |
+| | controller ε 0.01 | 86.7 | 97.6 | 59.3 | 5,846 | 0.79 / 0.78 / 0.79 |
+| | controller ε 0.03 | 86.4 | 97.6 | 59.6 | 5,850 | 0.80 / 0.78 / 0.78 |
+| | PP 512, W 10,000 (rep 1) | 97.4 | 97.0 | 38.6 | | 0.89 |
+| | direct sends, W 10,000 (rep 1) | 99.0 | 98.6 | 43.5 | | 0.90 |
+
+**What it says:**
+- **Start-up is not the problem.**
+  - Over the last 20% of rounds, the controller at ε 0.001 holds W at a median of 1,015–1,017 ps in every run.
+  - Starting from α 0.005 gives the same W and rate.
+  - Section 177's "final window" of about 7,000 was the drain after generation ends, when nothing rolls back.
+- **The rollback rule chases a rollback level the window cannot remove.**
+  - About 3% of events roll back at every W tested, including at ε 0.001's W of about 1,000 (42.5 M of 1,488 M at 4 nodes). Efficiency is 97–98.5% from W 2,500 to 10,000.
+  - 86–91% of stragglers were held by htram and are left out of the calibration. The rest still roll back more than 0.1% of events, so the rule keeps narrowing W toward its floor.
+  - PHOLD's best W runs at about 0.1% rolled back; dragonfly's at 2–3%. An event-share target fitted on one does not suit the other.
+- **κ caps W at the median delay.**
+  - With ε 0.01 or 0.03, κ set W in 99.8–99.9% of updates, and both land on the same W, about 5,850–5,960 ps.
+  - It counts r = 0.39 sends to other chares per executed event, while only 0.125 go through htram (section 173's defect). κ ÷ r = 0.51 puts W at the median delay, where a chunk's 6.1 ns serialization delay sits.
+  - Result: 0.78–0.87 of the best W.
+- **The best fixed W:** 10,000 ps at 1 node, and 10,000 to 20,000 (level) at 4.
+  - At W 20,000, efficiency falls to 88–93%, and the blocked share keeps falling (25–35%). So the lowest blocked share alone would pick W 20,000, 0.96 of the best at 1 node.
+  - The rate follows busy plus blocked PE time, not blocked time alone, once rollbacks grow.
+- **Aggregation gains little on dragonfly at these sizes.** WPs 512 ÷ direct is 1.06 (1 node) and 1.10 (4 nodes); PP 512 is 0.89–0.92 of WPs.
+
+**Predictions (section 178):**
+- **D1 right:** the target, not start-up.
+- **D2 wrong:** looser targets reach only 0.78–0.87, because κ then caps W.
+- **D3 right:** the best W is 10,000 at 1 node and 10,000–20,000 at 4.
+- **D4 right at 4 nodes, wrong at 1:** the blocked share is lowest at W 20,000 at both node counts, which is the best W only at 4.
+- **D5 half right:** WPs 512 is 1.10× direct at 4 nodes, but PP 512 is 0.89×, not within 5%.
+
+**What follows:** both of the controller's bounds encode PHOLD facts:
+- the rollback level its best window runs at;
+- that every send to another chare can be aggregated.
+
+On the first application, both are wrong. A rule that suits every model has to use measured cost instead. Section 176 found that busy plus blocked PE time per committed event has its minimum at the best W, and summing both on the count waves costs nothing. The design choice is the user's (next section).
 
 ## Baseline verification on the Mac
 
