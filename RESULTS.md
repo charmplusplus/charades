@@ -318,6 +318,7 @@ Sections 1–128 were re-read before planning sections 129 onward.
 | 168 | 2026-11-01 | — (Mac) | Phase B step 1: dragonfly `--gen-time` (generate until a virtual time) and traffic `--trip-radius` (cars keep driving between nearby destinations), the weak-scalable forms; test configs gentime (738,837 events) and trips (61,559); Mac change tier 84/84 and 56/56 | current |
 | 169 | 2026-11-01 | — (Mac) | Phase B step 2a: ROSS port of traffic matches Charades exactly (base 14,789, trips 61,559) under every ROSS scheduler; equal-timestamp order matched through ROSS's user priority (Devastator: subtime) | current |
 | 170 | 2026-11-01 | — (Mac) | Phase B step 2b: Devastator port of traffic matches Charades exactly (base 14,789, trips 61,559) at 2 and 4 ranks, through subtime(); traffic now commits the same events in all three engines | current |
+| 171 | 2026-11-01 | — (Mac) | Phase B step 2c: ROSS port of dragonfly matches Charades exactly on base, congested, nonminimal and gentime under every ROSS scheduler (up to 1.16 M rolled back), and in every model statistic; a logical-state checkpointer for ROSS's rollback check (works around a ROSS buffer-sizing bug) | current |
 
 ## Stampede3 runs, in order
 
@@ -6797,6 +6798,34 @@ Committed events (count; must equal Charades'; events rolled back in parentheses
 - Devastator's own determinism flag (no equal (time, subtime) pairs) is 1 in every run.
 - Traffic now commits the same events in all three engines.
 - **Next:** dragonfly for ROSS and Devastator, then the GASNet build of both Devastator models on Stampede3.
+
+### Phase B, step 2c: ROSS reproduces Charades' dragonfly, all four configs (2026-11-01, Mac)
+
+> **Status: current.**
+> - **Port:** `~/pdes-baselines/ROSS/models/dragonfly/dragonfly.main.c` (staged; patch `~/pdes-baselines/ross-dragonfly.patch`). It follows Charades' `models/dragonfly` draw for draw, including `--gen-time` (section 168), integer-picosecond time, the router waiting list released on commit, and the same statistics.
+> - **Tie order:** ROSS's user priority, as for traffic (section 169).
+> - **Mapping:** by default each rank holds R / ranks consecutive routers with their terminals and MPI processes, as Charades' mapper groups a router with its terminals and processes on one chare (ROSS custom mapping). `--mapping=0` is ROSS's linear mapping.
+
+**ROSS's rollback check (`--synch=6`) needed a checkpointer, and showed a ROSS bug.**
+- A router's arrays live outside the state struct, so the default byte comparison checked only their pointers. A custom checkpointer now compares the logical state: scalars, the per-port arrays, and the waiting entries in order.
+- ROSS's rollback-check scheduler allocates its checkpoint buffers before it reads the checkpointer's `sz_storage`, so a checkpoint larger than the LP state overruns them. The checkpoint is therefore a state-sized struct holding deep copies.
+- ROSS also checks after the event, its reverse, the event again and its commit. Commit handlers change state here on purpose, as in Charades: the print-once drop flags, and a committed credit retires the waiting entry it released. Those changes are excluded from the second comparison.
+
+**Committed events** (count; must equal Charades'; events rolled back in parentheses):
+
+| config | Charades | ROSS sequential | rollback check | conservative, 2 ranks | optimistic, 2 ranks | optimistic, 4 ranks | optimistic, 4 ranks, `--batch=4 --gvt-interval=256 --nkp=4` | optimistic, 4 ranks, linear mapping |
+|---|---|---|---|---|---|---|---|---|
+| base | 226,944 | 226,944 | 226,944 | 226,944 | 226,944 (20,591) | 226,944 (80,403) | 226,944 (195,643) | 226,944 (392,318) |
+| congested | 178,850 | 178,850 | 178,850 | 178,850 | 178,850 (16,770) | 178,850 (55,372) | 178,850 (84,170) | 178,850 (337,568) |
+| nonminimal | 311,214 | 311,214 | 311,214 | 311,214 | 311,214 (22,437) | 311,214 (88,824) | 311,214 (248,196) | 311,214 (500,620) |
+| gentime | 738,837 | 738,837 | 738,837 | 738,837 | 738,837 (54,725) | 738,837 (172,436) | 738,837 (399,528) | 738,837 (1,162,307) |
+
+- **The model statistics agree too.** For example congested at 4 ranks against Charades sequential:
+  - messages 1,080; packets finished 409; total latency 630,020,050 ps; hops 1,520; chunks dropped 10,466; chunks that waited 6,548;
+  - gentime: 3,519 packets, 1,054,724,896 ps, 11,652 hops, both engines.
+- **ROSS's linear mapping rolls back 2–7× more events** than the grouped mapping (base at 4 ranks: 392,318 against 80,403). The grouped mapping is the fair setting for timing.
+
+**Next:** dragonfly for Devastator, storing in each event's reverse object only what its handler overwrites, the values Charades keeps in `saved_*` fields, rather than copying a whole router per event.
 
 ## Baseline verification on the Mac
 
