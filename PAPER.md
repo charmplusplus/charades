@@ -74,7 +74,11 @@ Status:
 Each item is a job or a code change. Nothing outside this list gets Stampede3
 time without a reason written here first.
 
-1. **Controller start-up for dragonfly** (code, Mac).
+1. **Controller on dragonfly.**
+   - **Status, 2026-11-01:** job D (RESULTS.md 179) found that start-up is not the cause: both of the quantile rule's bounds misfire on dragonfly (0.33–0.40 and 0.78–0.87 of the best W).
+   - The user chose the hybrid rule: `--ctl=3` (main 0e158d5), where the delay histogram gives the scale and measured PE time per committed event picks W.
+   - Job M (RESULTS.md 180; 3669193 skx-dev / 3669194 skx) tests it on seven workloads at 4 and 16 nodes. The gate below applies to it.
+   - The original plan for this item, kept for the record:
    - Start W from the delay histogram's quantile instead of the smallest window, or let W grow faster in the first updates.
    - Then a dragonfly W sweep at 1 and 4 nodes on long runs: W 2,500–20,000 ps and the controller. One skx-dev job.
    - **Gate:** the controller reaches at least 0.9 of the best W.
