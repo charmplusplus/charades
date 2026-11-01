@@ -6823,7 +6823,7 @@ Committed events (count; must equal Charades'; events rolled back in parentheses
 - **The model statistics agree too.** For example congested at 4 ranks against Charades sequential:
   - messages 1,080; packets finished 409; total latency 630,020,050 ps; hops 1,520; chunks dropped 10,466; chunks that waited 6,548;
   - gentime: 3,519 packets, 1,054,724,896 ps, 11,652 hops, both engines.
-- **ROSS's linear mapping rolls back 2–7× more events** than the grouped mapping (base at 4 ranks: 392,318 against 80,403). The grouped mapping is the fair setting for timing.
+- **ROSS's linear mapping rolls back 4.9–6.7× more events** than the grouped mapping at 4 ranks (base: 392,318 against 80,403). The grouped mapping is the fair setting for timing.
 
 **Next:** dragonfly for Devastator, storing in each event's reverse object only what its handler overwrites, the values Charades keeps in `saved_*` fields, rather than copying a whole router per event.
 
