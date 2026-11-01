@@ -316,6 +316,7 @@ Sections 1–128 were re-read before planning sections 129 onward.
 | 166 | 2026-10-31 | 3662671 | Job N32 (32 nodes): `--localalloc` 1.060× (σ 100), 1.124× (σ 2,000), 1.028× (uniform), no dip; σ 100 W 400 1,382 M ev/s, 16→32 per-node efficiency 1.02; σ 2,000 1,063 with no stalls; Devastator no gain (keeps its launch); Charades ÷ Devastator 1.65 (σ 100), 2.46 (uniform); controller 0.939/0.952 of W 400 (κ bound); slow episodes remain (no TLB, no transmit wait) | current |
 | 167 | 2026-11-01 | — | Why the controller falls short at 32 nodes: its W (292–314) is set by κ at every node count, while the best fixed W moves from 250 (1–16 nodes) to 400 (32); GVT trails the slowest PE by ~3 waves of advance; job K design (W 250–600 and the controller at 16 and 32 nodes, a GVT-lag statistic) | design |
 | 168 | 2026-11-01 | — (Mac) | Phase B step 1: dragonfly `--gen-time` (generate until a virtual time) and traffic `--trip-radius` (cars keep driving between nearby destinations), the weak-scalable forms; test configs gentime (738,837 events) and trips (61,559); Mac change tier 84/84 and 56/56 | current |
+| 169 | 2026-11-01 | — (Mac) | Phase B step 2a: ROSS port of traffic matches Charades exactly (base 14,789, trips 61,559) under every ROSS scheduler; equal-timestamp order matched through ROSS's user priority (Devastator: subtime) | current |
 
 ## Stampede3 runs, in order
 
@@ -6752,6 +6753,30 @@ Section 140 found that neither model could be weak-scaled as written. This step 
   - ROSS uses reverse computation like Charades.
   - Devastator saves state in each event's reverse object, as its PHOLD port does.
 - Then size each model on Stampede3 with Charades (LPs per PE; the dragonfly topology grows in steps: groups = a·h + 1), and run the A1/A2 shape.
+
+### Phase B, step 2a: ROSS reproduces Charades' traffic, base and trips (2026-11-01, Mac)
+
+> **Status: current.**
+> - **Port:** `~/pdes-baselines/ROSS/models/traffic/traffic.main.c` (staged in the ROSS checkout, as phold-gauss is; patch `~/pdes-baselines/ross-traffic.patch`). It follows Charades' `models/traffic` draw for draw, including `--trip-radius` (section 168).
+> - **Not ported:** the start cluster (`--percent-start`), which no config uses. ROSS matches option names by prefix, so Charades' `--end-size/-x/-y` are `--dest-size/-x/-y` here: as "end-…" they captured `--end`.
+
+**Equal timestamps.** Traffic's events carry their cars, so the order of equal-timestamp events at one intersection decides which car gets which random draws (open issue 8). The three engines break such ties differently:
+- **Charades:** sending LP, then the order the sender created them (`event_id`, numbered per chare, so in creation order for each LP).
+- **ROSS:** a user priority in [0, 1], then a random tiebreaker drawn from the sender's stream.
+- **Devastator:** a 64-bit `subtime` the model may supply.
+
+The port sets ROSS's priority to (sender gid × 2³² + the sender's send count) / 2⁵². That is the same order as Charades, and exact below 2²⁰ LPs (checked). The Devastator port will use `subtime` the same way. Neither engine's core changes.
+
+**Committed events** (count; must equal Charades'):
+
+| config | Charades | ROSS sequential | ROSS rollback check (`--synch=6`) | ROSS conservative, 2 ranks | ROSS optimistic, 2 ranks | optimistic, 4 ranks | optimistic, 4 ranks, `--batch=4 --gvt-interval=256 --nkp=4` |
+|---|---|---|---|---|---|---|---|
+| base (8 × 8, 1,024 cars, end 20,000) | 14,789 | 14,789 | 14,789 | 14,789 | 14,789 (127 rolled back) | 14,789 (3,753) | 14,789 (6,202) |
+| trips (base with `--trip-radius=3`, end 60,000) | 61,559 | 61,559 | 61,559 | 61,559 | 61,559 (1,140) | 61,559 (2,741) | 61,559 (4,066) |
+
+Every column matches, with up to 6,202 rolled-back events, so the reverse handlers and the tie order are right.
+
+**Next:** traffic for Devastator; then dragonfly for both engines.
 
 ## Baseline verification on the Mac
 
