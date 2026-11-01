@@ -317,6 +317,7 @@ Sections 1–128 were re-read before planning sections 129 onward.
 | 167 | 2026-11-01 | — | Why the controller falls short at 32 nodes: its W (292–314) is set by κ at every node count, while the best fixed W moves from 250 (1–16 nodes) to 400 (32); GVT trails the slowest PE by ~3 waves of advance; job K design (W 250–600 and the controller at 16 and 32 nodes, a GVT-lag statistic) | design |
 | 168 | 2026-11-01 | — (Mac) | Phase B step 1: dragonfly `--gen-time` (generate until a virtual time) and traffic `--trip-radius` (cars keep driving between nearby destinations), the weak-scalable forms; test configs gentime (738,837 events) and trips (61,559); Mac change tier 84/84 and 56/56 | current |
 | 169 | 2026-11-01 | — (Mac) | Phase B step 2a: ROSS port of traffic matches Charades exactly (base 14,789, trips 61,559) under every ROSS scheduler; equal-timestamp order matched through ROSS's user priority (Devastator: subtime) | current |
+| 170 | 2026-11-01 | — (Mac) | Phase B step 2b: Devastator port of traffic matches Charades exactly (base 14,789, trips 61,559) at 2 and 4 ranks, through subtime(); traffic now commits the same events in all three engines | current |
 
 ## Stampede3 runs, in order
 
@@ -6777,6 +6778,25 @@ The port sets ROSS's priority to (sender gid × 2³² + the sender's send count)
 Every column matches, with up to 6,202 rolled-back events, so the reverse handlers and the tie order are right.
 
 **Next:** traffic for Devastator; then dragonfly for both engines.
+
+### Phase B, step 2b: Devastator reproduces Charades' traffic, base and trips (2026-11-01, Mac)
+
+> **Status: current.**
+> - **Port:** `~/pdes-baselines/devastator/bench/traffic.cxx` (intent-to-add, as phold-gauss; patch `~/pdes-baselines/devastator-traffic.patch`).
+> - **Binaries:** threads world, `~/pdes-baselines/deva-mac/traffic-threads-r{2,4}`.
+> - It follows Charades draw for draw on Charades' clcg4 streams, with state saving (each event's reverse object keeps its LP's state, as in phold-gauss).
+> - **Equal timestamps:** each event's `subtime()` is sender gid × 2³² + the sender's send count, which Devastator compares after the time (section 169).
+
+Committed events (count; must equal Charades'; events rolled back in parentheses):
+
+| config | Charades | Devastator, 2 ranks | Devastator, 4 ranks |
+|---|---|---|---|
+| base (8 × 8, 1,024 cars, end 20,000) | 14,789 | 14,789 (101) | 14,789 (3,151) |
+| trips (`--trip-radius=3`, end 60,000) | 61,559 | 61,559 (4,486) | 61,559 (7,850) |
+
+- Devastator's own determinism flag (no equal (time, subtime) pairs) is 1 in every run.
+- Traffic now commits the same events in all three engines.
+- **Next:** dragonfly for ROSS and Devastator, then the GASNet build of both Devastator models on Stampede3.
 
 ## Baseline verification on the Mac
 
