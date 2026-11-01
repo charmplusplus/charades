@@ -36,7 +36,7 @@ Every number from every run: Stampede3 runs in order (each design, written befor
 
 Charades is faster than Devastator in 44 of 48 cells and 2.4–5.3× faster than ROSS everywhere. At 32 nodes it leads in 6 of 8 workloads (1.04–1.66×), trails at σ 100 (0.89) and is level at lookahead 10 σ 500 (0.99). **But from 16 to 32 nodes Charades loses more per node than Devastator in every workload** (0.72–0.87 against 0.80–0.98), so it scales best from 1 to 32 nodes in only 4 of 8 workloads (6 of 8 from 1 to 16). Its controller is 0.93–0.97 of its best fixed W at 32 nodes on six workloads (0.96–1.03 at 1–16). Section 153 has the breakdown. These runs used chare rollback; per-LP rollback (section 152) came after them.
 
-> **Launch change, 2026-10-30:** every Stampede3 run now goes through `numactl --localalloc` (`ctl_sweep.sh`'s `NUMA_WRAP`), so the kernel's automatic NUMA balancing skips our processes (section 164). At 16 nodes it gains 1.024–1.049× and removes a dip 1.5–2.0 s after the clock starts. At 32 nodes the start delay alone gained 1.128× (section 162). Every table above used the default (balancing on), and so did Devastator and ROSS. The paper-grade rerun gives all three engines the same launch.
+> **Launch change, 2026-10-30:** every Stampede3 run now goes through `numactl --localalloc` (`ctl_sweep.sh`'s `NUMA_WRAP`), so the kernel's automatic NUMA balancing skips our processes (section 164). At 16 nodes it gains 1.024–1.049×, and at 32 nodes 1.060× (σ 100), 1.124× (σ 2,000) and 1.028× (uniform), removing a dip 1.5–2.0 s after the clock starts (sections 164 and 166). Every table above used the default (balancing on), and so did Devastator and ROSS. Devastator does not gain from it (section 166), so each engine keeps its better launch in the paper-grade rerun.
 
 > **Default change, 2026-10-29 (main 9d08fbd):** per-LP rollback inside a chare (`--rollback-unit=1`, section 152) is the default. A straggler rolls back only its own LP, not every later event of the chare's LPs: 3.5–15× fewer events rolled back at W 400, throughput unchanged (−1.6% to +2.2%). Every table above and below used chare rollback (`--rollback-unit=0`). Full test matrix 13,345/13,345 on the Mac.
 
@@ -313,6 +313,7 @@ Sections 1–128 were re-read before planning sections 129 onward.
 | 163 | 2026-10-30 | — | Are the TLB-shootdown bursts automatic NUMA balancing? `/proc/vmstat` sampled; `numactl --localalloc` against the default and the start delay at σ 100, σ 2,000 and uniform, 16 nodes; job N16 design | design |
 | 164 | 2026-10-30 | 3662319 | Job N16 (16 nodes): the TLB-shootdown bursts are automatic NUMA balancing (it scans all run: 2–5 M page-table changes/s summed); `numactl --localalloc` stops it, removes the bursts and the dip, and gains 1.034× (σ 100), 1.049× (σ 2,000), 1.024× (uniform); no misplaced memory (hinting faults 100% local; bound level with it); now the Stampede3 launch | current |
 | 165 | 2026-10-30 | — | `numactl --localalloc` at 32 nodes for Charades and Devastator, the controller with per-LP rollback, 16→32 efficiency, the slow-run state; job N32 design | design |
+| 166 | 2026-10-31 | 3662671 | Job N32 (32 nodes): `--localalloc` 1.060× (σ 100), 1.124× (σ 2,000), 1.028× (uniform), no dip; σ 100 W 400 1,382 M ev/s, 16→32 per-node efficiency 1.02; σ 2,000 1,063 with no stalls; Devastator no gain (keeps its launch); Charades ÷ Devastator 1.65 (σ 100), 2.46 (uniform); controller 0.939/0.952 of W 400 (κ bound); slow episodes remain (no TLB, no transmit wait) | current |
 
 ## Stampede3 runs, in order
 
@@ -6601,7 +6602,7 @@ This is a diagnosis; neither setting is a candidate for the paper's launch (sect
 
 ### Job N32: `numactl --localalloc` at 32 nodes for Charades and Devastator, the controller with per-LP rollback, and the slow-run state (design, 2026-10-30; written before any runs)
 
-> **Status: design.**
+> **Status: design; results in section 166.**
 > - **Charades:** `main` (per-LP rollback, `--agg-pp-alloc=1`, and the `numactl --localalloc` launch from `ctl_sweep.sh`), htram `pdes` 42d347f, Reconverse and the launch as in job E.
 > - **Devastator:** as in A2r; `run_phold.sh` now runs it through `BIN_WRAP` when set.
 > - **Script:** `$WORK/charades-runs/numa165.slurm`, 32 nodes on skx (`-x c455-081`). The sampler runs throughout.
@@ -6623,6 +6624,75 @@ This is a diagnosis; neither setting is a candidate for the paper's launch (sect
 - **M7.** σ 2,000 with the new PP allocation has no gap over 0.2 s between progress lines at 32 nodes (job E, old allocation: 3 of 6 runs).
 
 **What follows:** if M1, M4 and M5 hold, rerun the paper-grade 1–32-node table (all eight workloads, three engines) with the new defaults and launch.
+
+### Job N32 results: at 32 nodes keeping NUMA balancing away gains 1.060× (σ 100), 1.124× (σ 2,000) and 1.028× (uniform) and removes the dip; σ 100 now keeps its per-node rate from 16 to 32 nodes; Devastator does not gain; slow episodes remain (2026-10-31; skx batch job 3662671, 32 nodes)
+
+> **Status: current.** Design and predictions in section 165.
+> - **Allocation:** 32 nodes in 6 racks (c483-022 to c505-003), 21:44–21:54 on 2026-10-31. Gate 30/30.
+> - **Runs:** all 27 Charades runs and 8 Devastator runs ok. Committed counts are equal within each workload and node count, and equal to Devastator's.
+> - **Kernel:** `kernel.numa_balancing = 1` on all 32 nodes.
+> - **Data:** `~/charades-data/scale32/numa/j3662671/`, with `summary.txt` (`numa32_summary.py`).
+
+**Charades, 32 nodes** (M ev/s, higher is better; "paired" is each rep's arm ÷ the run without numactl of the same rep, which ran next to it; "spread" is the fastest rep ÷ the slowest; "dip" is simulated time per second at 1.5–2.0 s ÷ at 1.0–1.5 s, 1.0 means no dip):
+
+| workload | arm | M ev/s, median (reps) | spread | ÷ without numactl, paired median (per rep) | dip |
+|---|---|---|---|---|---|
+| σ 100 (PP 2,048) | W 400, `--localalloc` | **1,382.1** (1,398.1, 1,135.2, 1,382.1) | 1.23 | **1.060** (1.066, 0.909, 1.060) | 0.98–0.99 |
+| | W 400, without | 1,303.5 (1,311.2, 1,248.2, 1,303.5) | 1.05 | 1.000 | 0.70–0.74 |
+| | controller, `--localalloc` | 1,297.3 (1,261.1, 1,297.7, 1,297.3) | 1.03 | 0.995 | 0.98–1.04 |
+| σ 2,000 (PP 512) | W 400, `--localalloc` | **1,062.7** (1,061.2, 1,062.9, 1,062.7) | 1.00 | **1.124** (1.124, 1.126, 1.112) | 0.93–1.01 |
+| | W 400, without | 944.1 (944.1, 944.0, 955.5) | 1.01 | 1.000 | 0.63–0.67 |
+| | controller, `--localalloc` | 1,011.4 (1,011.4, 1,007.3, 1,013.0) | 1.01 | 1.067 | 0.96–0.99 |
+| uniform (WPs 512) | W 400, `--localalloc` | **580.2** (589.3, 580.2, 579.9) | 1.02 | **1.028** (1.028, 1.036, 1.027) | 0.95–1.01 |
+| | W 400, without | 564.4 (573.4, 559.8, 564.4) | 1.02 | 1.000 | 0.71–0.72 |
+
+- **The bursts and the dip are gone.** Without numactl, TLB shootdowns rise 14–16× at 1.5–2.25 s (uniform 4.8–4.9×), and the dip is 0.63–0.74. Under `--localalloc` TLB shootdowns stay at 0–3 k/s summed over 32 nodes in every run, and the dip is 0.93–1.04.
+- **σ 2,000 gains most** (1.124×, every rep within 1.112–1.126). Its runs also have no stalls: the largest gap between progress lines is 0.019–0.062 s against 0.39–0.83 s in job E. Job E used the old PP allocation; this job has the new one (`--agg-pp-alloc=1`) as well as the new launch.
+- **Slow episodes remain, and they are not the balancer.** σ 100 `--localalloc` rep 2 ran at 164–297 thousand simulated time per second for 1.75 s (2.0–3.75 s), against about 500 otherwise. The 16-node rep 2 ran at 113–168 for 2.5 s (0.5–3.0 s), against about 480.
+  - Neither shows any TLB shootdowns.
+  - Transmit wait was 0 on every node throughout, so there was no back-pressure at our ports. Our sent words fall with the throughput.
+  - These are the same kind of episode as job E's slow runs. They are now the largest remaining source of run-to-run spread at σ 100.
+
+**Against the paper-grade table** (A2r, job 3657016: chare rollback, the old PP allocation, balancer on, a different allocation). M ev/s at 32 nodes, higher is better:
+
+| workload | A2r, controller | A2r, W 400 | this job, controller | this job, W 400 `--localalloc` |
+|---|---|---|---|---|
+| σ 100 | 1,107.2 | 1,171.9 | 1,297.3 | 1,382.1 |
+| σ 2,000 | 857.9 | — | 1,011.4 | 1,062.7 |
+| uniform | 508.7 | — | — | 580.2 |
+
+This allocation was also faster without numactl: σ 100 W 400 1,303.5, against 1,171.9 in A2r. So these columns mix the launch, the defaults (per-LP rollback, `--agg-pp-alloc=1`) and the allocation. The rerun of the table separates them.
+
+**Devastator, W 1,000** (M ev/s):
+
+| workload | with `--localalloc` | without | paired, with ÷ without |
+|---|---|---|---|
+| σ 100 | 751.7, 810.5 | 838.4, 835.3 | 0.897, 0.970 |
+| uniform | 237.2, 235.0 | 234.9, 233.2 | 1.010, 1.008 |
+
+- **Devastator does not gain from `--localalloc`**, and at σ 100 both of its runs with it were slower. Two reps; its launch stays as it was.
+- **Charades ÷ Devastator in this allocation**, each engine with its better launch (higher is better): σ 100 1.65 (1,382.1 against 836.9), uniform 2.46 (580.2 against 236.1). With both engines without numactl: 1.56 and 2.41. Devastator's best W was not swept here; in A2r it was W 1,000 for both workloads.
+
+**16 → 32 nodes at σ 100** (both under `--localalloc`): the 16-node reps were 676.5 and 488.2 M ev/s, and the second had one of the slow episodes. Against the first, the per-node efficiency is 1,382.1 ÷ (2 × 676.5) = **1.02**; against job N16's 16-node median under `--localalloc` (694.6, another allocation) it is 0.995. A2r had 0.82 (Charades) and 0.96 (Devastator).
+
+**Predictions:**
+- **M1 right for σ 2,000 and uniform, wrong for σ 100.**
+  - σ 2,000 1.124 (≥ 1.05) and uniform 1.028 (≥ 1.02).
+  - σ 100 1.060, not ≥ 1.10. The rep with the slow episode gives 0.909; the other two give 1.060–1.066.
+  - Job E's start-delay gain of 1.128× was in an allocation where the default ran at 1,098 M ev/s against 1,304 here, and part of it was its own slow runs.
+- **M2 right.** No burst and no dip under `--localalloc` in any run.
+- **M3 wrong.** The σ 100 `--localalloc` reps are 1.23× apart because of one slow episode. The slow-run state is not the balancer.
+- **M4 wrong.** Devastator 0.897–0.970× at σ 100 and 1.008–1.010× on uniform.
+- **M5 right**, with one usable 16-node rep: 1.02 (≥ 0.93).
+- **M6 right at σ 2,000, wrong at σ 100.** The controller is 0.952 of W 400 at σ 2,000 and 0.939 at σ 100 (≥ 0.95 predicted).
+  - It holds W at 313–329, the κ bound. With per-LP rollback, W 400 is better at 32 nodes.
+- **M7 right.** σ 2,000 has no gap over 0.062 s.
+
+**What follows:**
+- **Launch.** `numactl --localalloc` stays the Charades launch. Devastator keeps its own, since each engine runs with its better launch.
+- **The controller's κ bound at 32 nodes.** It costs 5–6% against W 400 now. Test a larger κ, or a κ that follows the measured cost of a rollback (cheaper with per-LP rollback), at 16 and 32 nodes before the rerun.
+- **The slow episodes** (1.75–2.5 s at a third of the rate, no TLB shootdowns, no transmit wait). They are the largest remaining noise at σ 100. They need a traced run that catches one, to see whether it is one slow hop, as in job E, or every process.
+- **Then rerun the paper-grade 1–32-node table** with the new defaults and launch (Charades), Devastator's best W, and ROSS.
 
 ## Baseline verification on the Mac
 
