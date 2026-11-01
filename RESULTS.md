@@ -325,6 +325,7 @@ Sections 1–128 were re-read before planning sections 129 onward.
 | 175 | 2026-11-01 | — | Phase B step 3: dragonfly shapes for 1–32 nodes at 14.0–15.9 routers per PE (h even, p = 4); routers placed in blocks with the first R mod n ranks holding one more, in all three engines (Mac: ROSS 16/16, Devastator 24/24, Charades 18/18 equal counts); traffic 64 × 46·N; job C design (Devastator builds, Charades calibration at 1 node, counts on 2 nodes) | design |
 | 176 | 2026-11-01 | 3668911 | Job L16 (4 and 16 nodes): above W 300 a wider window costs blocked time, not busy time (63–100% of the extra PE time; busy 1.00–1.07×), because GVT advance per wave levels off at W 300 while waves lengthen 15–27%; the blocked share is lowest at the best W in every cell; controller 0.96–1.03 of W 300; corrects section 173's memory reading; L2, L3 wrong, L4 right | current |
 | 177 | 2026-11-01 | 3668971 | Job C (2 nodes): 16 Devastator binaries built; counts equal in all three engines on Stampede3 (Charades 30/30, ROSS 5/5, Devastator 5/5); 1-node rates dragonfly 38.5 M ev/s (W 10,000 ps), traffic 59; the controller reaches only 0.29–0.41 of W 10,000 on dragonfly, still climbing (mean W 1,571–1,900, final 6,474–7,009); sizes for 10 s runs | current |
+| 178 | 2026-11-01 | — | The controller on dragonfly, start-up or rollback target: job D design (W 2,500–20,000 ps; controller at ε 0.001/0.01/0.03 and from α 0.005; PP and direct at W 10,000; 1 and 4 nodes, long runs) | design |
 
 ## Stampede3 runs, in order
 
@@ -7182,6 +7183,38 @@ At W 300, 16 → 32 nodes: µs per count wave σ 100 151 → 193, σ 2,000 190 �
 **Next:**
 - A dragonfly W sweep on long runs at 1 and 4 nodes, with W 2,500–20,000 ps and the controller, to find the best W and see whether the controller converges.
 - Then the A1/A2-shaped runs.
+
+### The controller on dragonfly: start-up or its rollback target? Long runs at 1 and 4 nodes (job D design, 2026-11-01; written before any runs)
+
+> **Status: design.** PAPER.md work item 1.
+> - **Job D:** `$WORK/charades-runs/dfctl178.slurm`, skx-dev, 4 nodes. Charades `charades-phaseb` (main f1c2f80); no code change.
+
+**Why.** Section 177: the controller reached 0.29–0.41 of W 10,000 ps on dragonfly in 1–4 s runs. Two explanations fit:
+- **Start-up:** W was still rising at the end (final 6,474–7,009 ps, mean 1,571–1,900). The calibration starts at α = 1 and moves at most 1.25× per update; the final α was 0.004–0.005.
+- **The target:** ε = 0.001 aims at 0.1% of events rolled back. Dragonfly's best fixed W ran at 2–4% rolled back (efficiency 96–98%), against at most about 0.1% for PHOLD's best W. An event-share target fitted on PHOLD may hold dragonfly's window low however long the run.
+
+**Runs.**
+- Dragonfly, uniform traffic, arrival 500 ns, generating 300,000 ns (about 10 s at the 1-node best rate), end 310,000,000 ps.
+- 4 nodes (a = 16, h = 10) then 1 node (a = 13, h = 4); p = 4; WPs 512; GVT buckets of 1,000 ps; 3 reps.
+- **Fixed W:** 2,500, 5,000, 10,000 and 20,000 ps.
+- **Controller:**
+  - ε 0.001 (default), 0.01 and 0.03, all with `--ctl-log` (W every round);
+  - ε 0.001 started from α = 0.005 (`--ctl-alpha-init`), section 177's final value.
+- **Rep 1 only:** PP 512 and direct sends at W 10,000.
+- `--blocked-time=1` on every arm.
+
+**Predictions:**
+- **D1. The target, not start-up.**
+  - At ε 0.001 the controller's W in the last 20% of rounds stays at or below 7,500 ps at both node counts.
+  - Starting from α = 0.005 does not lift its rate above 0.6 of the best fixed W.
+- **D2.** ε 0.01 or 0.03 reaches at least 0.9 of the best fixed W at both node counts.
+- **D3.** The best fixed W is 5,000–10,000 ps at 1 node and 5,000–20,000 at 4.
+- **D4.** As at PHOLD (section 176), the blocked share is lowest at the best fixed W.
+- **D5.** WPs 512 is at least 1.0× direct sends at 4 nodes; PP 512 is within 5% of WPs 512.
+
+**What follows:**
+- **D1 and D2 right:** an event-share target does not carry across models. A looser ε would cost PHOLD, whose best W runs near 0.1% rolled back. So the fix is a rule that does not depend on the model's rollback level: W toward the lowest blocked time, as section 176 suggests, or ε set from each model's own rollback cost. That is one code change and one job, joined with job L32's question.
+- **D1 wrong (start-up):** start the calibration from the delay histogram (the first round's quantile) instead of α = 1, check that this does not hurt traffic (section 40 saw that), and keep ε.
 
 ## Baseline verification on the Mac
 
