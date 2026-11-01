@@ -324,6 +324,7 @@ Sections 1–128 were re-read before planning sections 129 onward.
 | 174 | 2026-11-01 | — | What a wider window buys: `--blocked-time` (PE time stopped at the window's edge; also fixes the end-of-run statistics reduction's starting point); jobs L16 (4 and 16 nodes) and L32 (16 and 32) design: W 250–600 and the controller on σ 100, σ 2,000, uniform | design |
 | 175 | 2026-11-01 | — | Phase B step 3: dragonfly shapes for 1–32 nodes at 14.0–15.9 routers per PE (h even, p = 4); routers placed in blocks with the first R mod n ranks holding one more, in all three engines (Mac: ROSS 16/16, Devastator 24/24, Charades 18/18 equal counts); traffic 64 × 46·N; job C design (Devastator builds, Charades calibration at 1 node, counts on 2 nodes) | design |
 | 176 | 2026-11-01 | 3668911 | Job L16 (4 and 16 nodes): above W 300 a wider window costs blocked time, not busy time (63–100% of the extra PE time; busy 1.00–1.07×), because GVT advance per wave levels off at W 300 while waves lengthen 15–27%; the blocked share is lowest at the best W in every cell; controller 0.96–1.03 of W 300; corrects section 173's memory reading; L2, L3 wrong, L4 right | current |
+| 177 | 2026-11-01 | 3668971 | Job C (2 nodes): 16 Devastator binaries built; counts equal in all three engines on Stampede3 (Charades 30/30, ROSS 5/5, Devastator 5/5); 1-node rates dragonfly 38.5 M ev/s (W 10,000 ps), traffic 59; the controller reaches only 0.29–0.41 of W 10,000 on dragonfly, still climbing (mean W 1,571–1,900, final 6,474–7,009); sizes for 10 s runs | current |
 
 ## Stampede3 runs, in order
 
@@ -7126,6 +7127,61 @@ At W 300, 16 → 32 nodes: µs per count wave σ 100 151 → 193, σ 2,000 190 �
 **What follows:** per section 174, "L3 wrong" points to a rule that moves W toward the lowest measured blocked time, by perturbing W, rather than to a target. Whether to build it waits for L32:
 - if at 32 nodes the lowest blocked share again marks the best W, and the controller misses it, one test of that rule;
 - otherwise the controller stays as it is.
+
+### Job C results: Phase B builds and counts pass on Stampede3; dragonfly and traffic run faster than predicted; the controller reaches only 0.29–0.41 of the best fixed W on dragonfly, still climbing when the short runs end (2026-11-01; skx-dev batch job 3668971, 2 nodes)
+
+> **Status: current.** Design and predictions in section 175.
+> - **Job:** 7 minutes.
+> - **Data:** `~/charades-data/phaseb/j3668971/`.
+
+**Builds and counts:**
+- **Devastator:** all 16 binaries built (traffic and dragonfly, ofi-psm2, p2w2, p2w3 and p2w23 to p64w23) in `$WORK/devastator/bin/ofi-psm2/`.
+- **Counts on 2 nodes:**
+  - Charades: `test.py` change tier, Dragonfly and Traffic, 30/30.
+  - ROSS (optimistic, 5 and 4 ranks): 5/5 equal to Charades' expected counts.
+  - Devastator (p2w3, p2w2): 5/5 equal.
+
+**Charades at 1 node** (1 rep; short runs of 1–4 s):
+
+| workload | arm | M committed ev/s (higher is better) | efficiency (%) | blocked share (%) |
+|---|---|---|---|---|
+| dragonfly, arrival 500 ns (63.5 M events) | W 10,000 ps | **38.5** | 98.0 | — |
+| | W 50,000 | 27.1 | 71.2 | — |
+| | W 200,000 | 25.4 | 69.7 | — |
+| | controller (mean W 1,900; final 7,009) | 15.9 | 98.4 | 75.3 |
+| dragonfly, arrival 1,000 ns (31.6 M events) | W 10,000 | **29.6** | 96.1 | 48.4 |
+| | W 50,000 | 26.1 | 67.5 | — |
+| | W 200,000 | 22.1 | 62.8 | — |
+| | controller (mean W 1,571; final 6,474) | 8.6 | 98.2 | 87.8 |
+| traffic, end 500,000 (23.6 M events) | W 250 | 56.1 | 100.0 | — |
+| | W 1,000 | 59.0 | 99.3 | — |
+| | controller (mean W 603) | **59.2** | 99.9 | — |
+
+(— : not printed in the arms' logs read here.)
+
+**What it says:**
+- **The controller does not suit dragonfly as it stands:** 0.41 and 0.29 of W 10,000.
+  - Its rollback rule set W in about 90% of updates; κ in 9–13%.
+  - Its W was still rising when the runs ended: final W 6,474–7,009 ps against time-weighted means of 1,571–1,900. It starts from the smallest window and moves at most 1.25× per update, and dragonfly's delays are in ps, so it needs many updates to reach the 10,000 ps range.
+  - The longer runs below will show how much is start-up. The best W itself may lie below 10,000, the smallest W tried.
+  - CONTEXT.md listed "test κ on dragonfly, a model it was not fitted to" as open since 2026-10-23. This is that test.
+- **Dragonfly aggregates poorly at 1 node:** 2.2–3.0 events per htram message.
+- **Traffic's controller is at its best** (W 603, level with W 1,000).
+
+**Predictions (section 175):**
+- **C1 right:** every count is equal.
+- **C2 right:** mean packet latency is 186 ns at 1,000 ns arrivals and 204 ns at 500 ns (1.09×), so the network is lightly loaded at both.
+- **C3 wrong:** both run faster than predicted, dragonfly at 38.5 M ev/s (predicted 5–20) and traffic at 59 M (predicted 10–40).
+- **C4 right:** all 16 binaries built.
+
+**Sizes for runs of about 10 s,** assuming each node keeps its 1-node rate:
+- **Dragonfly:** arrival 500 ns, generating 300,000 ns (about 380 M events per node).
+- **Traffic:** end time 12,000,000 (about 570 M events per node).
+- ROSS runs will take 2–5× as long.
+
+**Next:**
+- A dragonfly W sweep on long runs at 1 and 4 nodes, with W 2,500–20,000 ps and the controller, to find the best W and see whether the controller converges.
+- Then the A1/A2-shaped runs.
 
 ## Baseline verification on the Mac
 
