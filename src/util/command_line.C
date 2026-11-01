@@ -72,7 +72,9 @@ void parse_command_line(int argc, char** argv) {
   kernel.register_argument("agg-horizon-margin",   "Deadline policy with agg-horizon 0: the horizon is the window plus this", g_tw_agg_horizon_margin);
   kernel.register_argument("agg-flush-ahead",      "Deadline policy: send buffers holding an event the next GVT will make due (GVT + the largest of the last 8 GVT steps) when a PE adds its counts to a GVT wave (1), and also when it has nothing it may execute (2) - 0 = off (default)", g_tw_agg_flush_ahead);
   kernel.register_argument("optimism-window",      "Optimistic: execute no event later than GVT + this (0 = unbounded); with --ctl, the starting window", g_tw_optimism_window);
-  kernel.register_argument("ctl",                  "Set the optimism window online - NO=0, DELAY QUANTILE=1, HILL CLIMB (Devastator)=2", g_tw_ctl);
+  kernel.register_argument("ctl",                  "Set the optimism window online - NO=0, DELAY QUANTILE=1, HILL CLIMB (Devastator)=2, MEASURED COST=3", g_tw_ctl);
+  kernel.register_argument("ctl-period",           "--ctl=3: controller rounds per measured period (default 8)", g_tw_ctl_period);
+  kernel.register_argument("ctl-settle",           "--ctl=3: rounds left out of the measurement after each change of the window (default 2)", g_tw_ctl_settle);
   kernel.register_argument("ctl-epsilon",          "Delay quantile rule: target share of executed events rolled back (default 0.001); with --ctl-cost=1 the share of PE time lost to rollbacks (default 0.01); uncalibrated, primary stragglers per executed event", g_tw_ctl_epsilon);
   kernel.register_argument("ctl-cost",             "Delay quantile rule: epsilon is a share of - EVENTS ROLLED BACK=0 (default), PE TIME LOST TO ROLLBACKS=1 (experimental: misses the indirect cost of rollbacks)", g_tw_ctl_cost);
   kernel.register_argument("ctl-calibrate",        "Delay quantile rule: scale the straggler bound by the events seen rolled back - NO=0, YES=1", g_tw_ctl_calibrate);

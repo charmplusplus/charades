@@ -20,6 +20,14 @@
  * when sent): they became due while buffered or in flight. The default is
  * --ctl-floor=2 with epsilon 0.001.
  *
+ * --ctl=3, measured cost. The delay histogram gives the scale: W starts at
+ * the median delay and stays between its Q_MIN and Q_MAX quantiles. Within
+ * that range W moves toward lower PE time per committed event, measured over
+ * alternating periods (see measured_window). That cost includes whatever the
+ * window causes, in any model: rollbacks, smaller htram messages and time
+ * blocked at the window's edge. The quantile rule's two bounds encode PHOLD
+ * facts that did not hold on dragonfly (RESULTS.md section 179).
+ *
  * --ctl=2, the hill climb of Devastator (Bachan et al., PADS'24), as a
  * baseline in the same loop: from the efficiency (committed / executed)
  * over the last 16 rounds, quarter W below 33%, halve it below 66%, double it
@@ -141,6 +149,24 @@ class Controller : public CBase_Controller {
     std::vector<double> eff_executed, eff_committed;  ///< last 16 rounds
     double last_rate;            ///< committed in the previous round
     double efficiency;
+
+    /** --ctl=3 state */
+    int m_phase;                 ///< 0: no histogram yet, 1: measuring a base, 2: a trial
+    unsigned m_round;            ///< rounds into the current period, settling included
+    double m_elapsed, m_committed;  ///< summed over the measured rounds
+    double m_base_cost;          ///< PE ns per committed event at m_base_window
+    Time m_base_window;
+    double m_log_step;           ///< ln of the multiplicative step
+    int m_dir;                   ///< +1 wider, -1 narrower
+    int m_rejects;               ///< trials rejected in a row
+    int m_trials, m_kept;
+    double m_last_cost;
+
+    /** Fold a round's delays into the decayed histogram; true if it did */
+    bool fold(const uint64_t* sum);
+    Time measured_window(const uint64_t* sum);
+    /** clamp_window, and within the histogram's [Q_MIN, Q_MAX] quantiles */
+    Time measured_clamp(double w) const;
 
     /** This PE's counter deltas since its last contribution, into v */
     void read_counters(uint64_t* v);

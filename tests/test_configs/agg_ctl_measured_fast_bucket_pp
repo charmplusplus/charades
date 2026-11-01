@@ -1,0 +1,15 @@
+# agg_ctl_measured_bucket_pp deciding every wave with no settling
+# (--ctl-interval=1 --ctl-period=1 --ctl-settle=0), so the window changes
+# many times even in a short run
+sync=3
+gvt=4
+buffer-size=655360
+optimism-window=2000
+aggregation=1
+agg-mode=2
+agg-buffer=16
+agg-policy=1
+ctl=3
+ctl-interval=1
+ctl-period=1
+ctl-settle=0

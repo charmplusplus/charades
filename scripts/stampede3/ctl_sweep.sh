@@ -35,6 +35,8 @@
 #     hill1:<W0> the same deciding after every GVT update (Devastator's
 #     design, where the counts ride on the GVT reduction); dry:<W> fixed W
 #     with the quantile rule running but not applied (--ctl-dry, its cost).
+#     m:0 the measured-cost rule (--ctl=3): the delay histogram gives the
+#     scale, and W moves toward lower PE time per committed event.
 #     Since 2026-10-22 the q arms calibrate with --ctl-floor=2 (the new
 #     default); runs before used 0 (add --ctl-floor=0 to EXTRA_ARGS to match).
 #     Since 2026-10-21 q, qb, hill, hill1 and dry use the default data path,
@@ -98,6 +100,7 @@ run_one() {  # nodes procs pes cfg arm label
     q)    extra+=(--ctl=1 --ctl-epsilon=$val) ;;
     qb)   extra+=(--ctl=1 --ctl-epsilon=$val --ctl-calibrate=0) ;;
     hill) extra+=(--optimism-window=$val --ctl=2) ;;
+    m)    extra+=(--ctl=3) ;;                         # measured cost; m:0 (the value is unused)
     hill1) extra+=(--optimism-window=$val --ctl=2 --ctl-interval=1) ;;
     dry)  extra+=(--optimism-window=$val --ctl=1 --ctl-dry=1) ;;
     hills) extra+=(--optimism-window=$val --ctl=2 --ctl-reduction=1 --ctl-interval=1) ;;

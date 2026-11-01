@@ -46,6 +46,14 @@ static const double KAPPA_MIN_ROLLED_BACK = 16;
 static const double STORM_SHARE = 0.05;
 /** Devastator's moving average: the last 16 rounds */
 static const size_t HILL_ROUNDS = 16;
+/**
+ * --ctl=3: the first step is 1.5x; a kept trial grows the step 1.5x (in log)
+ * up to 2x, and two rejected trials in a row (one each way) halve it (in log)
+ * down to 1.05x, where comparing periods would mostly see noise
+ */
+static const double M_STEP_START = 1.5;
+static const double M_STEP_MAX = 2.0;
+static const double M_STEP_MIN = 1.05;
 
 CpvStaticDeclare(Controller*, g_controller);
 
@@ -106,7 +114,10 @@ Controller::Controller()
       q(0), rounds(0), folds(0), agg_rounds(0), run_executed(0), run_stragglers(0), run_late(0),
       run_held(0),
       window(g_tw_optimism_window), first_time(0),
-      window_time_sum(0), window_time(0), last_rate(-1), efficiency(0) {
+      window_time_sum(0), window_time(0), last_rate(-1), efficiency(0),
+      m_phase(0), m_round(0), m_elapsed(0), m_committed(0), m_base_cost(0),
+      m_base_window(0), m_log_step(std::log(M_STEP_START)), m_dir(1),
+      m_rejects(0), m_trials(0), m_kept(0), m_last_cost(0) {
   CpvInitialize(Controller*, g_controller);
   CpvAccess(g_controller) = this;
   last_time = CmiWallTimer();
@@ -306,23 +317,11 @@ double Controller::inverse_cdf(double q) const {
 }
 
 /**
- * W = F^-1(min(Q_MAX, epsilon / (r * alpha))) over the decayed histogram.
- *
- * Uncalibrated (--ctl-calibrate=0, alpha = 1) this is the bound itself:
- * primary stragglers per executed event at most epsilon. The bound is loose
- * both ways. Receivers rarely lead senders by the whole window, so it
- * throttles far more than needed (4 PEs, lookahead 10 / mean 200: 0.0001
- * stragglers per event against epsilon 0.05); and a straggler can roll back
- * many events and send anti-messages that roll back more (4 nodes: 0.017
- * stragglers per event, 94% of events rolled back).
- *
- * Calibrated (the default), epsilon is the share of executed events that
- * may be rolled back, and alpha is that share as seen at the current W over
- * r * F(W): the delay distribution gives how waste grows with W, and the
- * waste seen gives the scale, cascades included. alpha moves slowly (see
- * --ctl-alpha-gain): the histogram follows phase changes, alpha only the scale.
+ * Add a round's delays and counters to the pending sums, and once at least
+ * BATCH delays have arrived, fold them into the decayed histogram (halving
+ * it first). Both policies that read the histogram use this.
  */
-Time Controller::quantile_window(const uint64_t* sum) {
+bool Controller::fold(const uint64_t* sum) {
   for (int b = 0; b < BINS; b++) {
     pending[b] += sum[b];
     pending_total += sum[b];
@@ -337,7 +336,7 @@ Time Controller::quantile_window(const uint64_t* sum) {
   pending_fwd_timed += sum[FWD_TIMED];
   pending_late += sum[LATE_STRAGGLERS];
   pending_held += sum[HELD_STRAGGLERS];
-  if (pending_total < BATCH || pending_executed == 0) return window;
+  if (pending_total < BATCH || pending_executed == 0) return false;
 
   folds++;
   dist_total = 0;
@@ -359,6 +358,28 @@ Time Controller::quantile_window(const uint64_t* sum) {
   pending_total = pending_executed = pending_remote = pending_stragglers =
       pending_rolled_back = pending_elapsed_ns = pending_rollback_ns =
       pending_fwd_ns = pending_fwd_timed = pending_late = pending_held = 0;
+  return true;
+}
+
+/**
+ * W = F^-1(min(Q_MAX, epsilon / (r * alpha))) over the decayed histogram.
+ *
+ * Uncalibrated (--ctl-calibrate=0, alpha = 1) this is the bound itself:
+ * primary stragglers per executed event at most epsilon. The bound is loose
+ * both ways. Receivers rarely lead senders by the whole window, so it
+ * throttles far more than needed (4 PEs, lookahead 10 / mean 200: 0.0001
+ * stragglers per event against epsilon 0.05); and a straggler can roll back
+ * many events and send anti-messages that roll back more (4 nodes: 0.017
+ * stragglers per event, 94% of events rolled back).
+ *
+ * Calibrated (the default), epsilon is the share of executed events that
+ * may be rolled back, and alpha is that share as seen at the current W over
+ * r * F(W): the delay distribution gives how waste grows with W, and the
+ * waste seen gives the scale, cascades included. alpha moves slowly (see
+ * --ctl-alpha-gain): the histogram follows phase changes, alpha only the scale.
+ */
+Time Controller::quantile_window(const uint64_t* sum) {
+  if (!fold(sum)) return window;
 
   double r = dist_remote / dist_executed;
   // Below the floor (Q_MIN) the window does not cause the waste seen
@@ -439,6 +460,77 @@ double Controller::window_waste() const {
   return dist_rolled_back * share;
 }
 
+Time Controller::measured_clamp(double w) const {
+  if (dist_total > 0) {
+    w = std::max(w, inverse_cdf(Q_MIN));
+    w = std::min(w, inverse_cdf(Q_MAX));
+  }
+  return clamp_window((Time)std::llround(std::max(1.0, w)));
+}
+
+/**
+ * --ctl=3. Periods alternate between a base, at the W in force, and a trial,
+ * at W times or over the step. Each period leaves out its first --ctl-settle
+ * rounds, while GVT and the htram horizon catch up with the new W, and then
+ * sums --ctl-period rounds of PE time (every PE's elapsed time) and committed
+ * events. A trial that costs less per committed event than the base before
+ * it is kept and becomes the base for the next trial in the same direction,
+ * and the step grows. A dearer one is dropped: W returns to the base, the
+ * direction flips, the base is measured again (so drift between periods does
+ * not decide), and after two such in a row the step shrinks. Only adjacent
+ * periods are compared, so the rule follows phase changes. Every PE makes
+ * the same choice from the same sums.
+ */
+Time Controller::measured_window(const uint64_t* sum) {
+  bool folded = fold(sum);
+  if (m_phase == 0) {
+    if (!folded) return window;
+    // The first histogram gives the scale: start at the median delay
+    m_phase = 1;
+    m_round = 0;
+    m_elapsed = m_committed = 0;
+    return measured_clamp(inverse_cdf(0.5));
+  }
+  if (++m_round <= g_tw_ctl_settle) return window;
+  m_elapsed += sum[ELAPSED_NS];
+  m_committed += sum[COMMITTED];
+  if (m_round < g_tw_ctl_settle + g_tw_ctl_period) return window;
+  double cost = m_committed > 0 ? m_elapsed / m_committed : HUGE_VAL;
+  m_last_cost = cost;
+  m_round = 0;
+  m_elapsed = m_committed = 0;
+
+  if (m_phase == 2) {
+    if (cost < m_base_cost) {
+      // Kept: the trial is the new base; try further the same way
+      m_kept++;
+      m_rejects = 0;
+      m_log_step = std::min(std::log(M_STEP_MAX), m_log_step * 1.5);
+    } else {
+      // Dropped: back to the base, measured afresh, then the other way
+      m_dir = -m_dir;
+      if (++m_rejects >= 2) {
+        m_log_step = std::max(std::log(M_STEP_MIN), m_log_step / 2);
+        m_rejects = 0;
+      }
+      m_phase = 1;
+      return m_base_window;
+    }
+  }
+  // A base (or a kept trial) is measured: try a step from it
+  m_base_cost = cost;
+  m_base_window = window;
+  Time w = measured_clamp(window * std::exp(m_dir * m_log_step));
+  if (w == window) {
+    // At an edge of the range: try the other way
+    m_dir = -m_dir;
+    w = measured_clamp(window * std::exp(m_dir * m_log_step));
+  }
+  m_phase = 2;
+  m_trials++;
+  return w;
+}
+
 /**
  * Devastator's rule (Bachan et al., PADS'24, Sec. 2.1), after every round,
  * on the moving average of committed / executed over the last 16 rounds.
@@ -499,7 +591,8 @@ void Controller::decide(const uint64_t* sum) {
   run_late += sum[LATE_STRAGGLERS];
   run_held += sum[HELD_STRAGGLERS];
 
-  Time w = g_tw_ctl == 2 ? hill_climb_window(sum) : quantile_window(sum);
+  Time w = g_tw_ctl == 2 ? hill_climb_window(sum)
+         : g_tw_ctl == 3 ? measured_window(sum) : quantile_window(sum);
   // The log shows this round's efficiency; the hill climb uses its average
   double round_eff = sum[EXECUTED] ? (double)sum[COMMITTED] / sum[EXECUTED] : 0;
   // --ctl-dry: every round runs and the log shows the window the policy
@@ -527,6 +620,10 @@ void Controller::decide(const uint64_t* sum) {
         (unsigned long long)sum[LATE_STRAGGLERS],
         sum[ELAPSED_NS] / 1e6 / CkNumPes(), q, alpha, kappa,
         g_tw_ctl == 2 ? efficiency : round_eff);
+    if (g_tw_ctl == 3) {
+      CkPrintf("CTL measured phase %d cost %.1f base %.1f step %.3f\n", m_phase,
+          m_last_cost, m_base_cost, std::exp(m_log_step));
+    }
   }
 }
 
@@ -538,6 +635,13 @@ void Controller::finalize() {
   CkPrintf("\n==== WINDOW CONTROLLER ==============\n");
   if (g_tw_ctl == 2) {
     CkPrintf("Policy                         hill climb (Devastator)\n");
+  } else if (g_tw_ctl == 3) {
+    CkPrintf("Policy                         measured cost (PE time per committed event), "
+        "W within the delay histogram's %g-%g quantiles\n", Q_MIN, Q_MAX);
+    CkPrintf("Trials kept                    %d of %d\n", m_kept, m_trials);
+    CkPrintf("Final step                     %.3f\n", std::exp(m_log_step));
+    CkPrintf("Last measured cost             %.1f PE ns per committed event\n",
+        m_last_cost);
   } else {
     CkPrintf("Policy                         delay quantile, epsilon %g "
         "(share of %s), %s\n", g_tw_ctl_epsilon,

@@ -1,0 +1,7 @@
+# Optimistic w/Bucketed GVT, direct sends, the window set by measured cost
+# (--ctl=3)
+sync=3
+gvt=4
+buffer-size=655360
+optimism-window=2000
+ctl=3

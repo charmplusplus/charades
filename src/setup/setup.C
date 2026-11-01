@@ -57,7 +57,8 @@ void tw_init(int argc, char** argv) {
   // through htram. The time share (--ctl-cost=1) is experimental.
   if (g_tw_ctl_epsilon < 0) g_tw_ctl_epsilon = g_tw_ctl_cost ? 0.01 : 0.001;
   if (g_tw_ctl_hist_waves == 0) g_tw_ctl_hist_waves = 1;
-  if (g_tw_ctl == 1 && g_tw_optimism_window == 0) {
+  if (g_tw_ctl_period == 0) g_tw_ctl_period = 1;
+  if ((g_tw_ctl == 1 || g_tw_ctl == 3) && g_tw_optimism_window == 0) {
     g_tw_optimism_window = g_tw_gvt_scheme == 4 ? g_tw_gvt_bucket_size : 1;
   }
   // Same-process events by pointer: on by default, off where it cannot work

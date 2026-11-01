@@ -86,6 +86,8 @@ unsigned g_tw_agg_pp_alloc;
 unsigned g_tw_agg_input_buffer_mode;
 unsigned g_tw_agg_auto_wps;
 unsigned g_tw_ctl;
+unsigned g_tw_ctl_period;
+unsigned g_tw_ctl_settle;
 double   g_tw_ctl_epsilon;
 unsigned g_tw_ctl_cost;
 unsigned g_tw_ctl_calibrate;
@@ -193,6 +195,8 @@ void clear_globals() {
   g_tw_agg_pp_alloc       = 1;
   g_tw_agg_input_buffer_mode     = 2;
   g_tw_ctl                = 0;
+  g_tw_ctl_period         = 8;
+  g_tw_ctl_settle         = 2;
   g_tw_ctl_epsilon        = -1;   // set in tw_init from --ctl-cost
   g_tw_ctl_cost           = 0;
   g_tw_ctl_calibrate      = 1;
