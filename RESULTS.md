@@ -314,6 +314,7 @@ Sections 1–128 were re-read before planning sections 129 onward.
 | 164 | 2026-10-30 | 3662319 | Job N16 (16 nodes): the TLB-shootdown bursts are automatic NUMA balancing (it scans all run: 2–5 M page-table changes/s summed); `numactl --localalloc` stops it, removes the bursts and the dip, and gains 1.034× (σ 100), 1.049× (σ 2,000), 1.024× (uniform); no misplaced memory (hinting faults 100% local; bound level with it); now the Stampede3 launch | current |
 | 165 | 2026-10-30 | — | `numactl --localalloc` at 32 nodes for Charades and Devastator, the controller with per-LP rollback, 16→32 efficiency, the slow-run state; job N32 design | design |
 | 166 | 2026-10-31 | 3662671 | Job N32 (32 nodes): `--localalloc` 1.060× (σ 100), 1.124× (σ 2,000), 1.028× (uniform), no dip; σ 100 W 400 1,382 M ev/s, 16→32 per-node efficiency 1.02; σ 2,000 1,063 with no stalls; Devastator no gain (keeps its launch); Charades ÷ Devastator 1.65 (σ 100), 2.46 (uniform); controller 0.939/0.952 of W 400 (κ bound); slow episodes remain (no TLB, no transmit wait) | current |
+| 167 | 2026-11-01 | — | Why the controller falls short at 32 nodes: its W (292–314) is set by κ at every node count, while the best fixed W moves from 250 (1–16 nodes) to 400 (32); GVT trails the slowest PE by ~3 waves of advance; job K design (W 250–600 and the controller at 16 and 32 nodes, a GVT-lag statistic) | design |
 
 ## Stampede3 runs, in order
 
@@ -6693,6 +6694,39 @@ This allocation was also faster without numactl: σ 100 W 400 1,303.5, against 1
 - **The controller's κ bound at 32 nodes.** It costs 5–6% against W 400 now. Test a larger κ, or a κ that follows the measured cost of a rollback (cheaper with per-LP rollback), at 16 and 32 nodes before the rerun.
 - **The slow episodes** (1.75–2.5 s at a third of the rate, no TLB shootdowns, no transmit wait). They are the largest remaining noise at σ 100. They need a traced run that catches one, to see whether it is one slow hop, as in job E, or every process.
 - **Then rerun the paper-grade 1–32-node table** with the new defaults and launch (Charades), Devastator's best W, and ROSS.
+
+### Why the controller falls short at 32 nodes: where the best window lies at 16 and 32 nodes, and how far GVT trails the slowest PE (design, 2026-11-01; written before any runs)
+
+> **Status: design.**
+> - **Job K:** Charades `main` (this commit adds a statistic), the `--localalloc` launch, htram `pdes` 42d347f, Reconverse as in job N32. `$WORK/charades-runs/wsweep167.slurm`, 32 nodes on skx (`-x c455-081`); its 16-node runs use the allocation's first 16 nodes.
+> - **New statistic:** at the end of a bucketed-GVT run, "Slowest PE's lead over GVT, mean over count waves" (time units): the buckets every PE had passed when each wave completed, times the bucket size. It is computed from values every wave already carries, at no cost. `ctl_sweep.sh` writes it as `gvt_lag`.
+
+**What the paper-grade data already shows** (jobs 3653803, 3654651 and 3657016; balancer on, chare rollback):
+- The controller's W is 292–314 at every node count on the lookahead-100 workloads. It is set by the κ bound: at 32 nodes κ set W in 97% of updates (job N32), while the rollback rule's calibration sat at its floor (efficiency 100%).
+- **At 1–16 nodes W 250 is the best fixed window** on every lookahead-100 workload except σ 2,000 at 16 nodes. The controller there is 0.96–1.03 of the best.
+- **At 32 nodes W 400 is the best on all six,** and the controller is 0.89–0.97 of it.
+- Widening W from 250 to 400 costs htram little at 16–32 nodes: events per message fall 12% at σ 100 (40.0 to 35.0) and 5% on uniform (14.3 to 13.5). The κ bound guards against this cost, which is large only at 1–2 nodes (σ 100 at 1 node: 48.7 to 19.5).
+- **GVT trails the slowest PE by about three waves of GVT advance.** Job E's traces at W 400 show the slowest PE's lead over GVT:
+  - at 16 nodes, a median of 200 time units with 68 per wave;
+  - at 32 nodes, 232–272 with 80–90 per wave.
+
+  A window measured from GVT leaves the PEs only W minus that lag of room past the slowest PE, and the lag grows with node count as waves slow.
+- Job N32: the controller (W 302–329) reached 0.939 (σ 100) and 0.952 (σ 2,000) of W 400. It spent 1.3–1.8× as many scheduler passes blocked at the window edge as W 400.
+
+**Runs** (end time 2,048,000, untraced, the sampler on, 3 reps):
+- Workloads: σ 100 (PP 2,048), σ 2,000 (PP 512), uniform (WPs 512).
+- Per rep and workload, at 32 nodes and then at 16: W 250, 300, 400, 500 and 600, and the controller. The arm order rotates by rep.
+- 108 runs, about 25 minutes.
+
+**Predictions:**
+- **K1. The best fixed W moves up with node count.** At 16 nodes it is 250–400 for each workload. At 32 nodes it is 400–600, and the 32-node best is at least 1.03× the 32-node W 300.
+- **K2. The lag grows with W until it levels off.** Below the best W the slowest PE's lead rises with W; above it, by less than 30% of the increase in W. At the best W, the room left past the lag (best W − lag) is the same at 16 and 32 nodes within ±30% for each workload. If K2 holds, the window should follow the measured lag, W ≥ lag + room, rather than a constant quantile.
+- **K3.** The controller is at least 0.97 of the best fixed W at 16 nodes and at most 0.95 at 32 nodes (as in jobs A2r and N32).
+- **K4.** Events per htram message fall by less than 15% from W 250 to W 400 at both node counts, for every workload.
+
+**What follows:**
+- **K2 right:** the controller keeps its quantile rule but never sets W below the measured lag plus the room K2 finds (`--ctl-lag-room`). Test it at 16 and 32 nodes against the best fixed W.
+- **K2 wrong:** look at what else changes between 16 and 32 nodes at the best W: the wave period, the share of passes blocked at the window edge, and events per message.
 
 ## Baseline verification on the Mac
 
