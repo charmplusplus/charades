@@ -1,0 +1,7 @@
+# bucket_window with --blocked-time=1: each PE times its spells at the
+# window's edge (counts must not change)
+sync=3
+gvt=4
+buffer-size=655360
+optimism-window=2000
+blocked-time=1

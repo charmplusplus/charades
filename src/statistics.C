@@ -24,16 +24,19 @@ void registerStatsReduction() {
  * \returns a single message that is the reduction of the passed in messages
  */
 CkReductionMsg *statsReduction(int nMsg, CkReductionMsg **msgs) {
-  Statistics* s = new Statistics();
+  // Start from the first contribution, not from zeros, so the least-PE
+  // values (blocked_min) are minima over PEs
+  CkAssert(nMsg > 0 && msgs[0]->getSize() == sizeof(Statistics));
+  Statistics s = *(const Statistics*)msgs[0]->getData();
 
-  for (int i = 0; i < nMsg; i++) {
+  for (int i = 1; i < nMsg; i++) {
     CkAssert(msgs[i]->getSize() == sizeof(Statistics));
 
     Statistics* c = (Statistics*)msgs[i]->getData();
-    s->reduce(c);
+    s.reduce(c);
   }
 
-  return CkReductionMsg::buildNew(sizeof(Statistics), s);
+  return CkReductionMsg::buildNew(sizeof(Statistics), &s);
 }
 
 Statistics::Statistics() {
@@ -78,6 +81,8 @@ void Statistics::clear() {
   remote_arrivals = remote_stragglers = 0;
   iter_full = iter_window = iter_empty = 0;
   exec_time = 0.0;
+  blocked_time = blocked_min = blocked_max = 0.0;
+  blocked_spells = 0;
   rollback_ns = fwd_ns = fwd_timed = 0;
   for (int b = 0; b < SLACK_BUCKETS; b++) slack_hist[b] = 0;
   for (int c = 0; c < LAT_CLASSES; c++) {
@@ -168,6 +173,8 @@ void Statistics::reduce(const Statistics* other) {
 
   // GVT stats
   total_gvts = other->total_gvts;
+  blocked_min = fmin(blocked_min, other->blocked_min);
+  blocked_max = fmax(blocked_max, other->blocked_max);
 
   // Memory stats
   max_events_used = fmax(max_events_used, other->max_events_used);
@@ -180,6 +187,8 @@ void Statistics::add_comm(const Statistics* other) {
   iter_window += other->iter_window;
   iter_empty += other->iter_empty;
   exec_time += other->exec_time;
+  blocked_time += other->blocked_time;
+  blocked_spells += other->blocked_spells;
   rollback_ns += other->rollback_ns;
   fwd_ns += other->fwd_ns;
   fwd_timed += other->fwd_timed;
@@ -322,6 +331,13 @@ void Statistics::print() const {
     // exec_time is summed over PEs, total_time is the slowest PE's
     print_double("Time in execute() %", total_time > 0
         ? 100.0 * exec_time / (total_time * CkNumPes()) : 0.0);
+    if (g_tw_blocked_time && total_time > 0) {
+      print_double("Time Blocked at Window %", 100.0 * blocked_time / (total_time * CkNumPes()));
+      print_double("Time Blocked at Window %, least PE", 100.0 * blocked_min / total_time);
+      print_double("Time Blocked at Window %, most PE", 100.0 * blocked_max / total_time);
+      print_int("Blocked Spells", blocked_spells);
+      print_double("Blocked Spell Mean us", blocked_spells ? 1e6 * blocked_time / blocked_spells : 0.0);
+    }
   }
 
   /** \todo Improve these stats to include remote % and also track the sent

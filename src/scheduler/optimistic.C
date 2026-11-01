@@ -80,9 +80,19 @@ void OptimisticScheduler::execute() {
       blocked = true;
       break;
     }
+    // --blocked-time: a spell at the window's edge ends with the next event
+    // this PE executes (one timer read per spell, none on blocked passes)
+    if (g->blocked_since != 0 && next_lps.top() != NULL) {
+      PE_STATS(blocked_time) += CmiWallTimer() - g->blocked_since;
+      PE_STATS(blocked_spells)++;
+      g->blocked_since = 0;
+    }
     if (!schedule_next_lp()) {
       break;
     }
+  }
+  if (blocked && g_tw_blocked_time && g->blocked_since == 0) {
+    g->blocked_since = CmiWallTimer();
   }
   if (t5) {
     g_wave_timers.loop += CmiWallTimer() - tl;

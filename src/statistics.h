@@ -134,6 +134,10 @@ class Statistics {
      *////@{
     uint64_t iter_full, iter_window, iter_empty;
     double exec_time;
+    /** --blocked-time: seconds stopped at the window's edge, and the spells;
+     *  min and max are over PEs (set per PE at the end, then reduced) */
+    double blocked_time, blocked_min, blocked_max;
+    uint64_t blocked_spells;
     ///@}
 
     /** \name Rollback cost (--ctl): nanoseconds inside rollbacks (reverse

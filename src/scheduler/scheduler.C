@@ -101,6 +101,9 @@ void Scheduler::all_ended() {
 
 void Scheduler::finalize_complete() {
   agg_collect_stats(cumulative_stats);
+  // Per PE until reduced (Statistics::reduce keeps the least and the most)
+  cumulative_stats->blocked_min = cumulative_stats->blocked_max =
+      cumulative_stats->blocked_time;
   if (g_tw_pe_stats) {
     const Statistics* s = cumulative_stats;
     double rec[12] = {(double)CkMyPe(), (double)CkMyNode(), (double)CkMyRank(),

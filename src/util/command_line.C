@@ -43,6 +43,7 @@ void parse_command_line(int argc, char** argv) {
   kernel.register_argument("gvt-reserve-threshold","Bucketed GVT: also hold events at offsets whose anti/regular ratio exceeds this", g_tw_reserve_threshold);
   kernel.register_argument("gvt-clear-lag",        "Bucketed GVT: release a held event once GVT has advanced more than this many buckets since it was held", g_tw_clear_lag);
   kernel.register_argument("gvt-clear-buckets",    "Bucketed GVT: buckets from GVT checked for early release on each advance (0 = all; 1 = release only on reaching its bucket)", g_tw_clear_buckets);
+  kernel.register_argument("blocked-time",         "Time each PE spends stopped at the optimism window's edge, from the pass that stops there to the next event it executes - NO=0, YES=1", g_tw_blocked_time);
   kernel.register_argument("comm-stats",           "Time remote send calls and send-to-receive latency - NO=0, YES=1", g_tw_comm_stats);
   kernel.register_argument("aggregation",          "Send remote events through htram (needs HTRAM_DIR in config.mk) - NO=0, YES=1", g_tw_aggregation);
   kernel.register_argument("agg-mode",             "htram aggregation mode - WPs=0, WsP=1, PP=2, WW=3", g_tw_agg_mode);

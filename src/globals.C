@@ -58,6 +58,7 @@ unsigned g_tw_blocked_pause_ns;
 unsigned g_tw_sched_park;
 Time     g_tw_optimism_window;
 unsigned g_tw_comm_stats;
+unsigned g_tw_blocked_time;
 unsigned g_tw_aggregation;
 unsigned g_tw_agg_mode;
 unsigned g_tw_agg_buffer;
@@ -164,6 +165,7 @@ void clear_globals() {
   g_tw_blocked_pause_ns   = 0;
   g_tw_optimism_window    = 0;
   g_tw_comm_stats         = 0;
+  g_tw_blocked_time       = 0;
   g_tw_aggregation        = 0;
   g_tw_agg_mode           = 0;
   g_tw_agg_buffer         = 64;

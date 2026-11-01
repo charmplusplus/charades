@@ -82,6 +82,7 @@ extern unsigned g_tw_start_delay_ms;     ///< PE 0 starts the clock this long af
 extern unsigned g_tw_gvt_wave_tree;      ///< bucketed gvt, node waves: fan-out of Charades' own process tree, 0 = Charm++ reduction
 extern Time     g_tw_optimism_window; ///< execute no event past GVT + this (0: off)
 extern unsigned g_tw_comm_stats;      ///< time remote sends and send->receive latency
+extern unsigned g_tw_blocked_time;    ///< time PEs spend stopped at the optimism window's edge
 extern unsigned g_tw_async_reduction; ///< use asynchronous reductions in GVTs
 extern double   g_tw_reserve_threshold;
 extern uint32_t g_tw_reserve_buckets;
@@ -207,6 +208,7 @@ class Globals {
     double gvt_learned_t;  ///< wall time this PE applied g_last_gvt
     bool last_blocked;     ///< this PE's last pass stopped at the window
     bool blocked_at_learn; ///< ... as it was when g_last_gvt arrived
+    double blocked_since;  ///< --blocked-time: when this PE stopped at the window (0: not stopped)
     /** The last 8 GVT steps (--agg-flush-ahead predicts the next from them) */
     Time gvt_steps[8];
     unsigned gvt_step_i;
@@ -218,7 +220,8 @@ class Globals {
                 window(g_tw_optimism_window),
                 window_gvt(0), window_open_at(0), prev_gvt(0),
                 gvt_learned_t(0), last_blocked(false),
-                blocked_at_learn(false), gvt_steps{}, gvt_step_i(0) {}
+                blocked_at_learn(false), blocked_since(0), gvt_steps{},
+                gvt_step_i(0) {}
 };
 
 void clear_globals();   ///< sets all global variables to default values
