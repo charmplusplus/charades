@@ -320,7 +320,7 @@ Sections 1–128 were re-read before planning sections 129 onward.
 | 170 | 2026-11-01 | — (Mac) | Phase B step 2b: Devastator port of traffic matches Charades exactly (base 14,789, trips 61,559) at 2 and 4 ranks, through subtime(); traffic now commits the same events in all three engines | current |
 | 171 | 2026-11-01 | — (Mac) | Phase B step 2c: ROSS port of dragonfly matches Charades exactly on base, congested, nonminimal and gentime under every ROSS scheduler (up to 1.16 M rolled back), and in every model statistic; a logical-state checkpointer for ROSS's rollback check (works around a ROSS buffer-sizing bug) | current |
 | 172 | 2026-11-01 | — (Mac) | Phase B step 2d: Devastator port of dragonfly matches Charades exactly on all four configs (2 and 4 ranks) and in every statistic; traffic and dragonfly now commit the same events in all three engines | current |
-| 173 | 2026-11-01 | 3668027 | Job K (16 and 32 nodes): the κ bound counts same-process sends (r 0.94 at σ 100, where 0.027 go through htram), so it holds σ 100 at W ≈ 310 while W 400–600 beat W 300 in every rep at 32 nodes (1.05–1.29×); at σ 2,000 the bound is right (W 300 best; 27–32 µs per added message); the lag is 3.0 waves of GVT advance everywhere (bookkeeping, not node count); K2 wrong | current |
+| 173 | 2026-11-01 | 3668027 | Job K (16 and 32 nodes): only σ 100 at 32 nodes wants a wider window (W 400–600 beat W 300 in every rep, 1.05–1.29×; σ 2,000 best at W 300 at both counts); κ holds every workload at W ≈ 300 and counts same-process sends (r 0.94 at σ 100, 0.027 through htram); a wider window's cost is memory, not messages (σ 100 and σ 2,000 both +11% PE time W 300→600 at 16 nodes); lag = 3.0 waves of GVT advance everywhere; K2 wrong | current |
 
 ## Stampede3 runs, in order
 
@@ -6863,7 +6863,7 @@ Committed events (count; must equal Charades'; events rolled back in parentheses
 - Choose weak-scaling sizes with Charades. The dragonfly network grows in steps (groups = a·h + 1); traffic grows with the grid.
 - Then the A1/A2-shaped runs.
 
-### Job K results: the κ bound counts same-process sends, so it holds σ 100 at W ≈ 310 for an aggregation cost σ 100 does not have; the lag is 3 waves of GVT advance at every W and node count; at σ 2,000 the bound is right (2026-11-01; skx batch job 3668027, 32 nodes)
+### Job K results: only σ 100 at 32 nodes wants a wider window (W 400–600 beat W 300 in every rep); the κ bound holds every workload at W ≈ 300 and counts same-process sends; the lag is 3 waves of GVT advance at every W and node count (2026-11-01; skx batch job 3668027, 32 nodes)
 
 > **Status: current.** Design and predictions in section 167.
 > - **Job:** 108 measured runs and the warm-up all finished in 22 minutes; gate 24/24.
@@ -6919,20 +6919,22 @@ Committed events (count; must equal Charades'; events rolled back in parentheses
 At W 300, 16 → 32 nodes: µs per count wave σ 100 151 → 193, σ 2,000 190 → 206, uniform 288 → 374; GVT advance per wave (time units) 67 → 70, 68 → 68, 56 → 47. At W 400 and above σ 100's advance per wave levels off at about 78 (16 nodes) and 88 (32).
 
 **What it says:**
-- **The κ bound counts sends that never enter htram.** It bounds r·F(W) with r = sends to other chares per executed event, 0.94 at σ 100. But a send to a chare in the same process goes by pointer: at σ 100 only 0.027 per executed event go through htram, where early-due flushes cost aggregation. So κ holds σ 100 at W ≈ 310 for a cost it barely has: from W 300 to 500, htram messages rise by 0.2 per 1,000 events at 32 nodes. That is the controller's whole shortfall at σ 100 on 32 nodes. W 400–600 beat W 300 in every rep (1.05–1.29×), and the controller runs at W 300's rate (0.97–1.18 of it).
-- **At σ 2,000 the bound is right, and the window's cost is messages.**
-  - From W 300 to 600, htram messages rise by 6.4 per 1,000 events and PE time per committed event by 0.17 µs (16 nodes) and 0.21 µs (32): 27–32 µs per added message, as measured at the go/no-go (25–34 µs per remote message).
-  - W 300 is the best fixed W at both node counts, and the controller sits there (mean W 299).
-  - At 32 nodes W 250 loses in every rep (0.74–0.94), against 0.85–0.86 in two of three reps at 16 nodes. The penalty for too small a window grows with node count.
-  - The controller's 0.76 and 0.82 in reps 1 and 2 at 32 nodes are below W 300 at the same mean W. One rep had a 1.4 s stall; the run-level spread covers the rest.
-- **At σ 100 a wide window costs something else, which the controller does not measure.** From W 300 to 600 at 16 nodes:
-  - PE time per event rises 0.125 µs while messages rise by only 0.6 per 1,000 events; at 30 µs a message, that is 0.02 µs.
-  - The rollback rule cannot see this cost. Rollbacks stay at 0.06% at W 600, and held stragglers are excluded from its calibration.
-  - Dropping κ for σ 100 alone would therefore leave W unbounded: the calibration sits at its floor, so q = 0.99 and W ≈ 4,700.
-- **The lag is the bucketed GVT's bookkeeping and follows W, not node count.**
+- **Only σ 100 at 32 nodes wants a wider window.** W 400–600 beat W 300 in every rep (1.05–1.29×), and the controller runs at W 300's rate (0.97–1.18 of it).
+  - At W 300, σ 100 keeps 0.81 of its 16-node rate per node; σ 2,000 keeps 0.96. W 500 brings σ 100 back to 0.96 of its 16-node best.
+  - At σ 2,000, W 250 loses in every rep at 32 nodes (0.74–0.94), against 0.85–0.86 in two of three reps at 16 nodes. Too small a window costs more at 32 nodes there too, but W 300 is already enough.
+- **The κ bound holds every workload at W ≈ 300, and it counts sends that never enter htram.** It bounds r·F(W), with r = sends to other chares per executed event: 0.94 at σ 100 and 1.00 at σ 2,000 and uniform. A send to a chare in the same process goes by pointer, so it cannot be flushed early. At σ 100 only 0.027 sends per executed event go through htram, and from W 300 to 500 htram messages rise by 0.2 per 1,000 events at 32 nodes.
+- **A wider window's cost is not mainly messages, at σ 2,000 either.** From W 300 to 600 at 16 nodes:
+  - PE time per committed event rises by the same share at σ 100 (+10.8%) and σ 2,000 (+11.4%), although σ 2,000 adds 6.4 htram messages per 1,000 events and σ 100 only 0.6.
+  - What both add is memory: the most events held on a PE rises from about 3,400 to 4,700 (+38%) in both.
+  - The rollback rule cannot see this cost: rollbacks stay at 0.06–0.12% of committed events at W 600, and held stragglers are excluded from its calibration.
+  - So κ landing on σ 2,000's best W is a coincidence. Counting only htram sends would leave W unbounded at σ 100: the calibration sits at its floor, so q = 0.99 and W ≈ 4,700. It would also move σ 2,000 to W ≈ 560.
+- **The controller has no measure of what a wider window buys.**
+  - **What it buys:** less time with PEs blocked at the window edge. That time grows with node count as waves lengthen. At W 300, from 16 to 32 nodes, µs per wave goes 151 → 193 at σ 100 and 190 → 206 at σ 2,000.
+  - **What it costs:** memory, a few rollbacks, and on some workloads aggregation.
+  - **Hypothesis, not measured:** σ 100 gains most because its PEs spend the least time per unit of virtual time (2.06 µs per GVT time unit at 16 nodes, against 2.70–2.88 for σ 2,000), so they reach the window edge sooner. Blocked time is not recorded.
+- **The lag is the bucketed GVT's bookkeeping, and it follows W, not node count.**
   - At Gaussian σ, GVT trails the slowest PE by 3.0 waves of GVT advance in every run. Section 58 found the same: completed = valid ÷ 3 when a wave asks only about the buckets left open.
   - At W ≤ 300 the lag is within 5% between 16 and 32 nodes.
-  - What node count changes at a fixed W is the wave period, and with it the advance per wave at which progress levels off.
 - **Uniform's 16 → 32 loss is aggregation thinning,** as before: 76 → 117 htram messages per 1,000 events at W 300. No window separates from the spread.
 
 **Predictions (section 167):**
@@ -6948,8 +6950,9 @@ At W 300, 16 → 32 nodes: µs per count wave σ 100 151 → 193, σ 2,000 190 �
   - uniform: −5% and −7%.
 
 **What follows** (design in the next section, written before its runs):
-- The aggregation bound should count only events sent through htram.
-- A second bound is needed on its own, for the cost of a wide window at σ 100, which is neither messages nor rollbacks.
+- Measure what the window buys: PE time blocked at the window edge, for each W, at 16 and 32 nodes.
+- Then replace κ with a rule built on that measurement. Whatever replaces κ must still bound the window, by memory or rollbacks.
+- Separately, the aggregation bound should count only events sent through htram.
 
 ## Baseline verification on the Mac
 
