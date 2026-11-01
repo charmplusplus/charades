@@ -315,6 +315,7 @@ Sections 1–128 were re-read before planning sections 129 onward.
 | 165 | 2026-10-30 | — | `numactl --localalloc` at 32 nodes for Charades and Devastator, the controller with per-LP rollback, 16→32 efficiency, the slow-run state; job N32 design | design |
 | 166 | 2026-10-31 | 3662671 | Job N32 (32 nodes): `--localalloc` 1.060× (σ 100), 1.124× (σ 2,000), 1.028× (uniform), no dip; σ 100 W 400 1,382 M ev/s, 16→32 per-node efficiency 1.02; σ 2,000 1,063 with no stalls; Devastator no gain (keeps its launch); Charades ÷ Devastator 1.65 (σ 100), 2.46 (uniform); controller 0.939/0.952 of W 400 (κ bound); slow episodes remain (no TLB, no transmit wait) | current |
 | 167 | 2026-11-01 | — | Why the controller falls short at 32 nodes: its W (292–314) is set by κ at every node count, while the best fixed W moves from 250 (1–16 nodes) to 400 (32); GVT trails the slowest PE by ~3 waves of advance; job K design (W 250–600 and the controller at 16 and 32 nodes, a GVT-lag statistic) | design |
+| 168 | 2026-11-01 | — (Mac) | Phase B step 1: dragonfly `--gen-time` (generate until a virtual time) and traffic `--trip-radius` (cars keep driving between nearby destinations), the weak-scalable forms; test configs gentime (738,837 events) and trips (61,559); Mac change tier 84/84 and 56/56 | current |
 
 ## Stampede3 runs, in order
 
@@ -6727,6 +6728,30 @@ This allocation was also faster without numactl: σ 100 W 400 1,303.5, against 1
 **What follows:**
 - **K2 right:** the controller keeps its quantile rule but never sets W below the measured lag plus the room K2 finds (`--ctl-lag-room`). Test it at 16 and 32 nodes against the best fixed W.
 - **K2 wrong:** look at what else changes between 16 and 32 nodes at the best W: the wave period, the share of passes blocked at the window edge, and events per message.
+
+### Phase B, step 1: weak-scalable forms of dragonfly and traffic (2026-11-01, Mac)
+
+> **Status: current** (Mac correctness only; no performance runs yet). Plan in section 140, "Phase B". Commits: dragonfly `--gen-time` and traffic `--trip-radius`, both off by default.
+
+Section 140 found that neither model could be weak-scaled as written. This step adds the option each one needed:
+
+| model | as written | new option (off by default) | new test config | committed events (Mac, every engine config and shape) |
+|---|---|---|---|---|
+| dragonfly | each MPI process sends 3,000 / arrive-rate messages (15 at 200 ns), then the network drains in a few µs | `--gen-time=T` (ns): generate at the arrive rate until virtual time T, so a process's load does not depend on the network's size | `gentime`: base topology (9 groups, 72 terminals), uniform traffic, T = 10 µs (about 50 messages per process) | 738,837 |
+| traffic | cars leave at their destination, drawn anywhere on the grid, so routes and the load per intersection change with the grid | `--trip-radius=R`: each destination is within R intersections in x and y (on the torus, never the car's own intersection, one random draw); a car that reaches it picks the next and keeps driving; routing takes the short way around the torus | `trips`: base grid (8 × 8, 1,024 cars), R 3, end time 60,000 (several trips per car) | 61,559 |
+
+- **Defaults unchanged.** Dragonfly base 226,944 and congested 178,850, traffic base 14,789, as before.
+- **Mac change tier, 10 engine configs** (sequential, conservative, blocking, bucketed, bucketed with a window, chare rollback, htram PP with the deadline policy, htram WPs with the input buffer, the sparse controller, the shared controller) **× 1 PE, 4 PEs and 2 × 2:**
+  - dragonfly (base, congested, gentime): 84/84;
+  - traffic (base, trips): 56/56.
+- Both new configs join the change tier's core model configs.
+- `--trip-radius` requires R below half the grid's width and height, and it does not combine with an end cluster. `--gen-time` must be below 4.29 ms, the 32-bit generation time a packet carries.
+
+**Next in Phase B:**
+- Port both models, in these forms, to ROSS and Devastator. Each port is checked for the same committed events as Charades on the Mac.
+  - ROSS uses reverse computation like Charades.
+  - Devastator saves state in each event's reverse object, as its PHOLD port does.
+- Then size each model on Stampede3 with Charades (LPs per PE; the dragonfly topology grows in steps: groups = a·h + 1), and run the A1/A2 shape.
 
 ## Baseline verification on the Mac
 
