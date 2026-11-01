@@ -328,6 +328,7 @@ Sections 1–128 were re-read before planning sections 129 onward.
 | 178 | 2026-11-01 | — | The controller on dragonfly, start-up or rollback target: job D design (W 2,500–20,000 ps; controller at ε 0.001/0.01/0.03 and from α 0.005; PP and direct at W 10,000; 1 and 4 nodes, long runs) | design |
 | 179 | 2026-11-01 | 3669044 | Job D (1 and 4 nodes, dragonfly): both controller bounds misfire: the rollback rule chases dragonfly's ~3% rollback level that no window removes (W ≈ 1,000 ps, 0.33–0.40), κ caps W at the median delay (≈ 5,900 ps, 0.78–0.87); start-up is not it; best W 10,000 (1 node), 10,000–20,000 (4); aggregation 1.06–1.10× | current |
 | 180 | 2026-11-01 | — | The window by measured cost (`--ctl=3`, main 0e158d5): the delay histogram gives the scale (start at the median delay, range 0.01–0.99 quantiles), PE time per committed event over alternating periods picks W; job M design (7 workloads, 4 and 16 nodes, against the quantile rule and fixed windows) | design |
+| 181 | 2026-11-01 | 3669193 | Job M (4 and 16 nodes): the measured rule fixes dragonfly (1.00–1.03 of the best fixed W; quantile rule 0.31–0.34), 0.94–1.00 on steady PHOLD, 1.02–1.07 on traffic (W ≈ 510–610, between the grid points); 0.88–0.94 on phase-changing PHOLD, where W wanders (Mac trace) as trials straddle phases; worst case 0.88 against 0.31 (quantile) and ≤ 0.59 (any single W); M1 wrong narrowly, M2 and M3 right, M4 wrong; one traffic run committed a different count, as did earlier full-node traffic runs (bug, open) | current |
 
 ## Stampede3 runs, in order
 
@@ -7319,6 +7320,74 @@ On the first application, both are wrong. A rule that suits every model has to u
 **What follows:**
 - **M1 right:** `--ctl=3` becomes the default, and the robustness figure (F4) is built on it. L32's 32-node question is then asked of it in the paper-grade runs.
 - **M1 wrong:** read the `CTL` logs to see where W went. One more change at most, then freeze, per PAPER.md.
+
+### Job M results: the measured rule fixes dragonfly (1.00–1.03 of the best fixed W, against the quantile rule's 0.31–0.34) and is 0.94–1.07 elsewhere, but 0.88–0.94 on phase-changing PHOLD, where its W wanders instead of following the phases; one traffic run committed a different count (2026-11-01; skx-dev batch job 3669193, 16 nodes)
+
+> **Status: current.** Design and predictions in section 180.
+> - **Job:** 116 runs, all finished in 24 minutes (skx copy 3669194 cancelled); gate 45/45.
+> - **Data:** `~/charades-data/phaseb/mctl180/j3669193/`; script `~/charades-data/phaseb/mctl180/m_summary.py`.
+> - **No `--ctl-log`** in this job, so the trajectory of W below comes from a Mac run.
+> - **Committed counts:** equal in every workload and node count, except one run (traffic, 4 nodes; see the end of this section).
+
+**Each policy ÷ the best fixed W of the same rep** (2 reps, shown as rep 1 / rep 2; higher is better; the measured rule's time-weighted mean W in parentheses; fixed W in the model's time unit, dragonfly in ps):
+
+| workload | nodes | best fixed W (M ev/s) | measured rule (mean W) | quantile rule | the other fixed W |
+|---|---|---|---|---|---|
+| PHOLD σ 100 | 16 | W 300 (717.6) | 0.97 / 0.95 (354) | 0.95 / 0.98 | |
+| | 4 | W 300 (182.3) | 0.95 / 0.97 (310) | 0.98 / 0.97 | |
+| PHOLD σ 2,000 | 16 | W 300 (553.1) | 0.98 / 0.98 (352) | 0.97 / 0.99 | W 100: 0.59 / 0.61 |
+| | 4 | W 300 (141.9) | 0.94 / 0.97 (314) | 0.97 / 0.99 | W 100: 0.68 / 0.66 |
+| PHOLD uniform | 16 | W 300 (368.6) | 0.98 / 0.97 (352) | 0.98 / 0.99 | |
+| | 4 | W 300 (120.6) | 0.99 / 0.99 (308) | 1.02 / 1.01 | |
+| lookahead 10, σ 500 | 16 | W 50 (565.4) | 1.00 / 1.00 (64) | 1.02 / 1.01 | W 100: 0.92; W 200: 0.64; W 300: 0.55 / 0.54 |
+| | 4 | W 50 (146.2) | 0.98 / 0.97 (58) | 0.99 / 0.99 | W 100: 0.90 / 0.88; W 200: 0.64; W 300: 0.54 |
+| phase-changing PHOLD | 16 | W 100 (349.1) | **0.90 / 0.94** (157) | 0.98 / 0.96 | W 250: 0.89 / 0.91; W 500: 0.50 |
+| | 4 | W 100 (123.0) | **0.88 / 0.89** (144) | 0.91 / 0.87 | W 250: 0.82; W 500: 0.29 / 0.28 |
+| traffic | 16 | W 1,000 (904.1) | 1.02 / 1.07 (609) | 0.90 / 0.96 | W 250: 0.70 / 0.73 |
+| | 4 | W 1,000 (224.9) | 1.05 / 1.06 (568) | 1.02 / 1.05 | W 250: 0.88 / 0.87 |
+| dragonfly | 16 | W 20,000 (375.7) | 1.00 / 1.01 (15,587) | **0.32 / 0.31** | W 10,000: 0.99 / 0.94 |
+| | 4 | W 20,000 (108.7) | 1.02 / 1.03 (14,593) | **0.34 / 0.34** | W 10,000: 0.98 |
+
+**Worst case over the 14 cells** (lowest rep):
+- measured rule: 0.88 (phase-changing PHOLD, 4 nodes);
+- quantile rule: 0.31 (dragonfly); 0.87 without dragonfly;
+- any single PHOLD window: W 300 is 0.54 at lookahead 10, and W 100 is 0.59 at σ 2,000 (and dragonfly needs a W 50–200× larger in its own unit).
+
+**What it says:**
+- **Dragonfly is fixed.** The measured rule settles at a mean W of 14,600–15,600 ps, between the two best fixed windows, and reaches 1.00–1.03 of the best. The quantile rule repeats section 179 (0.31–0.34).
+- **On steady PHOLD it costs 1–6%.** The measured rule is 0.94–1.00 on the four steady PHOLD workloads, within 0.03 of the quantile rule. Half its periods run at a trial W, so a few percent is the price of measuring.
+- **On traffic it beats both grid points** (1.02–1.07), at a W of about 510–610 that the grid (250 and 1,000) did not include. Traffic's ratio cannot be quoted until the grid has W 500 and 750.
+- **On phase-changing PHOLD it misses.** It reaches 0.88–0.94, and W 100 beats it at both node counts. It kept 44% of its trials there against 30–34% elsewhere, and its step ended at its largest, 1.68–2.0×, against 1.05–1.32× on the steady workloads. The cost per committed event changes with the phase. A trial measured in a cheaper phase than its base looks better whatever its W is, so it is kept, and each keep enlarges the step.
+- **Lowest blocked share is not lowest cost here.** On phase-changing PHOLD, W 500 has the lowest blocked share (2.0–4.3%) and is the worst arm (0.28–0.50; efficiency 68–78%). A rule on blocked time alone (PAPER.md item 2) would have to count rollbacks as well. The measured rule's cost already does.
+
+**Mac trace (where W went).** Phase-changing PHOLD on one process of 8 PEs (1,024 LPs, end 512,000, PP 512, `--ctl-log=1`; one run each; Mac timings vary ±5%):
+- **The measured rule reaches 0.91 of W 100 here as well** (9.57 against 10.50 M ev/s).
+- **W does not follow the phases; it wanders.** Its median per phase:
+  - lookahead-10 phases: 82–219;
+  - lookahead-100 phases: 98–976.
+  - The phase kind does not predict whether W is high or low. W reached 488 and 976 in phases 22–23.
+- **Following the phases would gain little on the Mac.** Per-phase rates from fixed-W runs with the controller in dry mode (W 50–300):
+  - the best W is 100 in lookahead-10 phases and 200 in lookahead-100 phases;
+  - the best W in each phase would beat W 100 by only 1.024×.
+- **So on the Mac the loss is the wandering:** trials at bad W, and excursions kept by comparisons across a phase change. It is not that W fails to follow the phases. On Stampede3 the per-phase optima may be further apart (lookahead 10, σ 500 is best at W 50; lookahead 100 at W 300), which this job cannot separate.
+
+**Predictions (section 180):**
+- **M1 wrong, narrowly:** 13 of 14 cells reach 0.9 in both reps. Phase-changing PHOLD at 4 nodes reaches 0.88 / 0.89.
+- **M2 right:** within 0.03 of the quantile rule on the three lookahead-100 PHOLD workloads.
+- **M3 right:** W 300 is 0.54–0.55 of the best at lookahead 10, and W 100 is 0.59–0.68 of W 300 at σ 2,000.
+- **M4 wrong:** 0.88–0.94 on phase-changing PHOLD, not 0.95.
+
+**A committed count that differs (traffic, 4 nodes).** The quantile-rule run of rep 1 committed 1,131,024,789 events; the other seven traffic runs at 4 nodes committed 1,131,043,125 (18,336 more, 0.0016%). All 8 traffic runs at 16 nodes agree, as do all runs of the other six workloads. The run ended normally with no warning.
+- **This is not new.** The full-node traffic runs of 2026-10-22/23 (jobs 3629783 and 3629781, `~/charades-data/full/`) committed more than one count in 5 of 8 traffic groups (workload × direct or htram), with direct sends as well as htram. Congested traffic diverged most: 6–8 of 24 runs differed from the majority count. Uniform traffic over 5,888 × 4 agreed in all 48 runs. One of 51 traffic runs of job 3633379 (`~/charades-data/ctl2/`) differed too.
+  - Those sections reported rates only and did not compare traffic's counts.
+  - The comparator fix of 2026-10-20 (CONTEXT.md, open issue 8) made the pending heap's order total. Something else still lets traffic's events run in an order that changes the result, rarely, on several processes.
+- **What it does not affect:** PHOLD and dragonfly. Every PHOLD and dragonfly run in this job and in every earlier group compared commits one count per configuration.
+- **What it does affect:** table T1 (equal committed events in all three engines) for traffic, and the claim that aggregation commits the same events as direct sends.
+- **Next:** reproduce on the Mac (traffic, 8 PEs, repeated runs; started), then on several processes. Until it is fixed, traffic's counts are reported per run.
+
+**What follows:**
+- Per section 180, M1 wrong means one more change to the measured rule, then freeze. The change has to stop the wandering on phase-changing PHOLD without costing the steady workloads, dragonfly or traffic. The design comes next.
+- The traffic count is a correctness bug, ahead of the controller in priority. It must be fixed before the engine freeze (2026-12-07).
 
 ## Baseline verification on the Mac
 
