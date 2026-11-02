@@ -333,6 +333,7 @@ Sections 1–128 were re-read before planning sections 129 onward.
 | 183 | 2026-11-01 | — (Mac) | Traffic's varying count found and fixed: `PendingHeap::erase` chose up or down by timestamp alone (since 2015), so after erasing a cancelled event two equal-timestamp events could pop in the wrong order and swap cars; found with new `--commit-digest`, `--commit-log-until` and `--trace-lp`; Mac 60/60 runs equal the sequential digest after the fix (6 of 65 differed before) | current |
 | 184 | 2026-11-01 | 3668913 | Job L32 (16 and 32 nodes): the best fixed W at 32 nodes is 400 (σ 100: 1.04–1.09 of W 300; σ 2,000: 1.01–1.21); the lowest blocked share marks the best W in 5 of 6 cells (11 of 12 with L16); the quantile rule (W 313) reaches 0.87–0.96 of W 400 on σ 100; L1 mostly wrong, L2 and L3 wrong; item 2 closes into the measured rule | current |
 | 185 | 2026-11-01 | 3669802 | Job N (4 and 16 nodes): the bracketed measured rule is 0.91–1.03 of the best fixed W in all 14 cells (unbracketed 0.87–1.02); the bracket keeps W in the best band on phase-changing PHOLD (86–88% of rounds), where it is weakest (0.91–0.95: the cost of measuring); traffic best fixed W 500; heap fix holds on Stampede3 (one digest per workload); N1 half right, N2 wrong, N3–N5 right; **controller frozen** (`--ctl=3`, `--ctl-bracket=1`) | current |
+| 186 | 2026-11-02 | 3672846 / 3672847 | The applications at 1–32 nodes in three engines (F5, PAPER.md item 3): the plan (F5a 1–16 nodes, F5b 32 nodes, T1), and a calibration job at 1 and 4 nodes (Charades W grid, controller, direct sends; Devastator W grid and its adaptive window; ROSS conservative and four optimistic settings), with the rules that set the scaling jobs' arms | design |
 
 ## Stampede3 runs, in order
 
@@ -7616,6 +7617,60 @@ The sequential scheduler commits 30,302,829 events. That is the count of every r
   - Devastator's rule in Charades (`--ctl=2`) on the same workloads;
   - Devastator's own adaptive window on the PHOLD workloads;
   - the frozen rule at 32 nodes (F1's runs; section 184's W 400 question).
+
+### The applications at 1–32 nodes in three engines (F5): the plan, and a calibration job at 1 and 4 nodes (design, 2026-11-02; written before any runs)
+
+> **Status: design.** PAPER.md work item 3, moved ahead of the ablation on 2026-11-02 (user decision).
+> - **Calibration job:** `$WORK/charades-runs/f5cal186.slurm` (copy in `~/charades-data/f5/`), 5 nodes; submitted 2026-11-02 as 3672846 (skx-dev) and 3672847 (skx), the later starter to be cancelled.
+> - **Trees:** Charades `charades-phaseb` at e1fbdc4 (the frozen controller and the heap fix; main has only notes since); ROSS and Devastator as in job C (section 177).
+
+**Why now.** Traffic and dragonfly have never run above 16 nodes, and claim 3 rests on them. The aggregation evidence on them so far is mixed: dragonfly gains 1.06–1.10× (section 179), and traffic as laid out sends few events across processes. The runs count as paper-grade: everything they use is already final. A change before the 2026-12-07 freeze that touches those paths reruns the cells it touches.
+
+**What has not been measured.** Charades' best fixed W is known on both applications (dragonfly 10,000–20,000 ps, traffic 500; sections 179, 185). Nobody has swept Devastator's W or ROSS's settings on them. A1 ran three Devastator windows in every cell, chosen from PHOLD. On the applications there is nothing to choose them from, hence this job.
+
+**The calibration job** (1-node and 4-node series side by side on 5 nodes; 2 reps; rep 2 runs the engines and the arms in reverse order):
+- **Sizes:** half the paper-grade runs, as in jobs M and N.
+  - Dragonfly: arrival 500 ns, generating 150,000 ns, end 160,000,000 ps; the section 175 shapes (a = 13, h = 4 at 1 node; 16, 10 at 4).
+  - Traffic: 64 × 46·N, 16 cars per intersection, trip radius 3, end 6,000,000.
+- **Charades** (`--localalloc` launch, `--blocked-time=1`, `--commit-digest=1`):
+  - dragonfly, WPs 512: W 5,000, 10,000, 20,000, 40,000 ps and the frozen controller (`mb`); direct sends at W 10,000 and 20,000;
+  - traffic, PP 2,048: W 250, 500, 1,000, 2,000 and the controller; WPs 512 at W 500; direct sends at W 500 and 1,000.
+- **Devastator** (2 processes × 23 workers per node, CLCG4):
+  - dragonfly: W 5,000, 10,000, 20,000, 40,000, 80,000 ps and its adaptive window;
+  - traffic: W 250, 500, 1,000, 2,000, 4,000 and its adaptive window.
+- **ROSS** (46 ranks per node, `--read-buffer=1`, the grouped mapping on dragonfly): conservative, and optimistic batch / GVT interval 16/64 (A0's best on PHOLD), 16/256, 4/64 and 64/64.
+- **Caps:** Charades 300 s; Devastator and ROSS 240 s. An arm that hits its cap in rep 1 is skipped in rep 2.
+- **Gate:** the change tier on 2 nodes, Dragonfly and Traffic, four configs including the measured controller.
+- **Estimate:** 37 runs per rep and node count, about 35 minutes.
+
+**Predictions:**
+- **K1. Counts.** In each application and node count every run of every engine commits the same events, and all Charades runs share one digest.
+- **K2. Charades' best fixed W:** dragonfly 10,000 or 20,000 ps at both node counts; traffic 500 at 4 nodes and 500 or 1,000 at 1.
+- **K3. The frozen controller** is at least 0.93 of Charades' best fixed W in all four cells (job N: 0.95–1.03 on these two applications).
+- **K4. Aggregation** (best htram ÷ best direct, higher is better): dragonfly 1.03–1.15; traffic 0.95–1.05. On traffic, PP 2,048 and WPs 512 are within 3% of each other.
+- **K5. Devastator's best fixed W is 2–4× Charades'**, as on PHOLD (its 500–2,000 against 250–400): dragonfly 20,000–80,000 ps, traffic 1,000–2,000. Its best is not at a grid edge.
+- **K6. Devastator's adaptive window** is at most 0.8 of its best fixed W on both applications at 4 nodes (PHOLD: 0.70–0.77 at 64 cores, collapsing on full nodes).
+- **K7. ROSS:**
+  - batch 16 / GVT interval 64 is within 5% of its best optimistic setting on both applications;
+  - conservative is at most 0.5 of the best optimistic setting on dragonfly, whose lookahead (100 ps) is tiny against a 500 ns arrival interval;
+  - on traffic (lookahead 100, mean 1,000, like σ 100 PHOLD, where conservative was ROSS's fastest) it is within 0.8–1.25 of it.
+- **K8. Each engine at its best:** Charades ÷ ROSS ≥ 2 on both applications at both node counts; Charades ÷ Devastator ≥ 1.0 on both at 4 nodes.
+
+**Rules for the scaling jobs, fixed now:**
+- **Charades:**
+  - the frozen controller, and the two best fixed W at 4 nodes;
+  - direct sends at the better of the two (aggregation's gain on the applications);
+  - htram mode: WPs 512 on dragonfly, and on traffic the better of PP 2,048 and WPs 512.
+- **Devastator:**
+  - its best fixed W at 4 nodes and the grid points either side (× 0.5 and × 2), moved outward if the best is at a grid edge;
+  - its adaptive window only if it is its best setting in some cell here; otherwise this job is its F4 entry.
+- **ROSS:** its best optimistic setting at 4 nodes, plus conservative unless that is at most 0.5 of it at both node counts.
+- **Sizes:** full (section 177): dragonfly generating 300,000 ns, end 310,000,000 ps; traffic end 12,000,000. About 10 s per Charades run at the 1-node rate.
+
+**The scaling jobs** (predictions written after this job, before they run):
+- **F5a** (skx-dev, 16 nodes): the 8-, 4-, 2- and 1-node series side by side, then 16 nodes; 3 reps; the engines interleaved per rep, as in A1.
+- **F5b** (skx, 32 nodes): 16 nodes on each half side by side, then 32 nodes; 5 reps at 32 (32-node reps vary by ±14%).
+- **T1** from both: counts equal across the three engines in every cell, and one Charades digest per cell.
 
 ## Baseline verification on the Mac
 
