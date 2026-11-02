@@ -335,6 +335,7 @@ Sections 1–128 were re-read before planning sections 129 onward.
 | 185 | 2026-11-01 | 3669802 | Job N (4 and 16 nodes): the bracketed measured rule is 0.91–1.03 of the best fixed W in all 14 cells (unbracketed 0.87–1.02); the bracket keeps W in the best band on phase-changing PHOLD (86–88% of rounds), where it is weakest (0.91–0.95: the cost of measuring); traffic best fixed W 500; heap fix holds on Stampede3 (one digest per workload); N1 half right, N2 wrong, N3–N5 right; **controller frozen** (`--ctl=3`, `--ctl-bracket=1`) | current |
 | 186 | 2026-11-02 | 3672846 / 3672847 | The applications at 1–32 nodes in three engines (F5, PAPER.md item 3): the plan (F5a 1–16 nodes, F5b 32 nodes, T1), and a calibration job at 1 and 4 nodes (Charades W grid, controller, direct sends; Devastator W grid and its adaptive window; ROSS conservative and four optimistic settings), with the rules that set the scaling jobs' arms | current (design) |
 | 187 | 2026-11-02 | 3672846; F5a 3673108 / 3673109, F5b 3673110 | F5 calibration (1 and 4 nodes): one count per cell in all three engines; aggregation 1.36–1.38× on traffic although htram sends only 0.72% of events to other processes (the same-process path, to be separated in F2 with `--agg-scope=1`), 1.06–1.08× on dragonfly; Devastator's best W equals Charades' on dragonfly, 4× on traffic, its adaptive window 0.28–0.33 on traffic at 4 nodes; controller 1.00–1.03 (dragonfly), 0.94–1.00 (traffic, same mode); Charades ÷ Devastator 0.94 / 1.27 (dragonfly 1 / 4 nodes), 1.13–1.14 (traffic); ÷ ROSS 3.9–4.2 / 1.85–2.16; F5a and F5b arms and predictions | current / design |
+| 188 | 2026-11-02 | 3673108; F5b 3673481, F5c 3673482 / 3673483 | F5a, 1–16 nodes, three engines: one count per cell (T1); dragonfly Charades ÷ Devastator 0.94 / 1.04 / 1.29 / 1.51 / 1.80 at 1–16 nodes (per-node efficiency at 16: 0.62 against 0.32), ÷ ROSS 3.7–4.0 (ROSS's grid unsettled: batch 2 ÷ 4 up to 1.88); traffic both scale at 0.94, Charades ahead 1.06–1.11 (controller 1.02–1.05), ÷ ROSS 1.8–2.2; controller 0.93–1.04 (dragonfly), 0.90–1.01 (traffic); F5b amended (ROSS batch 1/2 × GVT 16/64) and F5c (ROSS fill-in) designed | current / design |
 
 ## Stampede3 runs, in order
 
@@ -7675,7 +7676,7 @@ The sequential scheduler commits 30,302,829 events. That is the count of every r
 
 ### F5 calibration results: every engine commits the same events; aggregation gains 1.36–1.38× on traffic through same-process sends; Devastator's best W is Charades' on dragonfly and 4× it on traffic; the scaling jobs' arms and predictions (2026-11-02; skx-dev batch job 3672846, 5 nodes; F5a/F5b design written before their runs)
 
-> **Status: current (calibration) / design (F5a, F5b).** Design and predictions in section 186.
+> **Status: current (calibration) / design (F5a, F5b; F5a results in section 188, where F5b is amended).** Design and predictions in section 186.
 > - **Job:** 30 minutes; gate 60/60; 146 runs (Charades 60, Devastator 48, ROSS 38). Two ROSS runs hit the 240 s cap: dragonfly at 4 nodes, optimistic 16/256 and 64/64. Both were skipped in rep 2.
 > - **Data:** `~/charades-data/f5/j3672846/`; summary `~/charades-data/f5/f5cal_summary.py`.
 
@@ -7813,6 +7814,91 @@ The sequential scheduler commits 30,302,829 events. That is the count of every r
 - **S7. Aggregation:** traffic ≥ 1.3 at every node count; dragonfly 1.05–1.20, rising with the node count.
 
 **What follows:** F5 and T1 come from these two jobs, and claim 3's wording from S2 and S3. If S1 fails anywhere, the runs stop counting until the split is found on the Mac with `--commit-digest`.
+
+### F5a results, 1–16 nodes: every cell commits one count in all three engines; on dragonfly Charades' lead over Devastator grows from 0.94 to 1.80 with node count; on traffic both scale at 0.94 and Charades leads by 1.06–1.11; ROSS's dragonfly grid is extended again before F5b (2026-11-02; skx-dev batch job 3673108, 16 nodes; F5b amendment and F5c design written before their runs)
+
+> **Status: current (F5a) / design (F5b amended, F5c).** Design and predictions in section 187.
+> - **Job:** 61 minutes (skx copy 3673109 cancelled); gate 60/60.
+> - **Runs:** 315, all finished: Charades 150 plus 5 warm-up runs, Devastator 90, ROSS 75. None hit a cap.
+> - **Data:** `~/charades-data/f5/a_j3673108/`; summary `~/charades-data/f5/f5_summary.py`.
+
+**Dragonfly** (M committed ev/s, median of 3 reps, higher is better; "÷" columns are Charades' controller ÷ the other engine at its best setting, higher is better for Charades; the controller column is the controller ÷ the best fixed W in its htram mode, per rep):
+
+| nodes | Charades, controller | Charades, best fixed W | Devastator, best W | ROSS, best (batch / GVT interval) | ÷ Devastator | ÷ ROSS | controller ÷ best fixed W | aggregation (best htram ÷ best direct) |
+|---|---|---|---|---|---|---|---|---|
+| 1 | 38.7 | 38.6 (10,000) | 41.1 (10,000) | 10.2 (2 / 64) | 0.94 | 3.80 | 1.01 / 0.93 / 1.01 | 1.06 |
+| 2 | 66.7 | 63.8 (20,000) | 64.4 (20,000) | 18.1 (4 / 64) | 1.04 | 3.69 | 1.03 / 1.03 / 1.02 | 1.03 |
+| 4 | 112.2 | 110.7 (20,000) | 87.1 (20,000) | 27.8 (2 / 64) | 1.29 | 4.03 | 1.01 / 1.04 / 1.01 | 1.10 |
+| 8 | 209.4 | 206.8 (10,000) | 138.6 (20,000) | 52.2 (2 / 64) | 1.51 | 4.01 | 1.02 / 1.01 / 1.02 | 1.12 |
+| 16 | 384.6 | 374.4 (20,000) | 213.7 (20,000) | 97.5 (2 / 64) | 1.80 | 3.94 | 1.04 / 1.01 / 1.03 | 1.10 |
+
+**Traffic** (as above; Charades' controller runs with PP 2,048, and its column compares it with PP 2,048's best fixed W):
+
+| nodes | Charades, controller | Charades, best fixed | Devastator, best W | ROSS, best | ÷ Devastator | ÷ ROSS | controller ÷ best fixed W | aggregation |
+|---|---|---|---|---|---|---|---|---|
+| 1 | 61.5 | 66.5 (WPs 512, W 500) | 59.7 (2,000) | 36.3 (64 / 64) | 1.03 | 1.70 | 0.90 / 0.98 / 0.95 | 1.34 |
+| 2 | 122.1 | 124.2 (WPs 512, W 500) | 116.6 (1,000) | 61.3 (64 / 64) | 1.05 | 1.99 | 0.95 / 0.99 / 0.95 | 1.29 |
+| 4 | 234.4 | 244.6 (PP 2,048, W 500) | 230.0 (2,000) | 117.6 (64 / 64) | 1.02 | 1.99 | 0.97 / 0.96 / 0.94 | 1.36 |
+| 8 | 462.6 | 482.8 (PP 2,048, W 500) | 444.1 (2,000) | 226.3 (64 / 64) | 1.04 | 2.04 | 0.96 / 1.01 / 0.95 | 1.35 |
+| 16 | 929.0 | 949.5 (PP 2,048, W 500) | 898.7 (2,000) | 438.5 (64 / 64) | 1.03 | 2.12 | 0.98 / 0.97 / 0.98 | 1.35 |
+
+With Charades' best fixed setting instead of its controller, Charades ÷ Devastator on traffic is 1.11, 1.06, 1.06, 1.09 and 1.06.
+
+**Per-node rate ÷ the 1-node rate** (weak-scaling efficiency; each engine at its best, Charades with its controller; higher is better):
+
+| application | engine | 2 nodes | 4 | 8 | 16 |
+|---|---|---|---|---|---|
+| dragonfly | Charades | 0.86 | 0.73 | 0.68 | 0.62 |
+| | Devastator | 0.78 | 0.53 | 0.42 | 0.32 |
+| | ROSS | 0.89 | 0.68 | 0.64 | 0.60 |
+| traffic | Charades | 0.99 | 0.95 | 0.94 | 0.94 |
+| | Devastator | 0.98 | 0.96 | 0.93 | 0.94 |
+| | ROSS | 0.85 | 0.81 | 0.78 | 0.76 |
+
+**What it says:**
+- **T1 holds at 1–16 nodes.** Each of the 10 cells has one committed count across Charades, Devastator and ROSS, and one Charades digest. Devastator reports every run deterministic.
+- **Dragonfly: Charades scales better than Devastator.**
+  - At 1 node Devastator is faster (Charades 0.94). From 2 nodes Charades leads, and the lead grows: 1.04, 1.29, 1.51, 1.80.
+  - Devastator's per-node rate falls to 0.32 of its 1-node rate at 16 nodes, Charades' to 0.62.
+  - On this application the gap is scaling, not per-event cost.
+- **Traffic: both engines scale almost perfectly** (0.94 at 16 nodes).
+  - Charades leads by 1.06–1.11 at its best fixed setting and by 1.02–1.05 with its controller.
+  - Its lead comes from the same-process path that section 187 found (aggregation 1.29–1.36×), and the lead stays level with node count.
+- **The controller:**
+  - On dragonfly it beats every fixed W at 2–16 nodes (1.01–1.04), where the best fixed W moves between 10,000 and 20,000.
+  - On traffic it is 0.90–1.01 of PP 2,048's best W, and 0.92 of WPs 512's at 1 node.
+- **ROSS on dragonfly is not yet at its best.**
+  - Batch 2 ÷ batch 4 (GVT interval 64) is 1.01, 0.95, 1.09, 1.57 and 1.88 at 1, 2, 4, 8 and 16 nodes.
+  - Batch 2 is again the grid's smallest, and its gain grows with node count, so the Charades ÷ ROSS figures on dragonfly above are upper bounds.
+  - On traffic ROSS's grid is settled: batch 128 is 0.56–0.89 of batch 64.
+
+**Predictions (section 187), at 1–16 nodes:**
+- **S1 right.**
+- **S2 right** with Charades' best arm: dragonfly 1.29–1.80 at 4–16 nodes; traffic 1.06–1.11. With the controller, traffic is 1.02–1.05.
+- **S3:**
+  - traffic right: 1.83–2.17 with Charades' best arm;
+  - dragonfly 3.69–4.03 meets ≥ 3.5, but ROSS's grid is unsettled (see above).
+- **S4 half right:**
+  - dragonfly 0.93–1.04;
+  - traffic 0.90 in rep 1 at 1 node, and 0.94–1.01 elsewhere.
+- **S5 right:**
+  - Charades: dragonfly 0.62, traffic 0.94;
+  - Devastator: dragonfly 0.32.
+- **S7 half right:**
+  - traffic: 1.29 at 2 nodes, just below 1.3, and 1.34–1.36 elsewhere;
+  - dragonfly: 1.03–1.12, below 1.05 at 2 nodes and not rising steadily.
+
+**Amendment before F5b runs: ROSS on dragonfly gets batch 1 and GVT interval 16.**
+- **Why:** section 187 extended ROSS's grid at its edge (batch 2 added to batch 4), and the new edge won by up to 1.88×. Applying the same rule again gives batch 2 and 1 × GVT interval 64 and 16. Batch 4 is dropped, since batch 2 is 1.09–1.88× faster at 4–16 nodes.
+- **F5b** (32 nodes) had not started (pending, reason Priority, no start estimate). It is cancelled and resubmitted with ROSS on dragonfly running those four settings. Nothing else changes, and the time limit becomes 2 h 40 min.
+- **F5c** (`f5scale187.slurm rossdf`, skx-dev, 16 nodes) runs ROSS only, on dragonfly, with the same four settings at 1–16 nodes (8-, 4-, 2- and 1-node series side by side, then 16; 3 reps; about 35 minutes).
+- **ROSS's dragonfly entry in each cell** is its best setting over F5a and F5c.
+- **Submitted 2026-11-02:** F5b as 3673481 (skx; 3673110 cancelled while pending); F5c as 3673482 (skx-dev) and 3673483 (skx), the later starter to be cancelled.
+
+**Predictions (F5c and F5b's ROSS runs):**
+- **R1.** Batch 1 is at least 1.1× batch 2 (GVT interval 64) at 8, 16 and 32 nodes.
+- **R2.** At batch 2, GVT interval 16 is within ±10% of GVT interval 64.
+- **R3.** With ROSS at its best of the four, Charades ÷ ROSS on dragonfly stays at least 2.5 at every node count.
 
 ## Baseline verification on the Mac
 
