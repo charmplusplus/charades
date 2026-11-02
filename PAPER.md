@@ -111,6 +111,7 @@ time without a reason written here first.
 4. **Ablation and robustness on the current stack (F2, F3, F4).** 4 and 16 nodes, skx-dev; about 2 jobs.
    - Workloads: lookahead 10 and 100 × σ 100, σ 2,000 and uniform; phase-changing PHOLD; traffic; dragonfly.
    - Arms: direct, eager and deadline aggregation; the PADS'19 hold over a cutoff sweep; a fixed W grid; the controller; Devastator's rule in Charades.
+   - Plus `--agg-scope=1` (htram for other processes only) on traffic and PHOLD. On traffic, aggregation gains 1.36–1.38× while htram sends only 0.72% of events to other processes (RESULTS.md 187). The gain is most likely the same-process path, and the paper cannot call it network aggregation until this arm separates the two.
    - Devastator's own adaptive window, run on the PHOLD workloads.
 5. **Engine freeze, 2026-12-07.**
    - **Defaults already set:** per-LP rollback, `--agg-pp-alloc=1`, ring input buffers, `numactl --localalloc` launch (Charades only), 23 LCI devices, `+mempool_remote_free`.
