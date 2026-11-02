@@ -338,7 +338,8 @@ Sections 1–128 were re-read before planning sections 129 onward.
 | 188 | 2026-11-02 | 3673108; F5b 3673481, F5c 3673482 / 3673483 | F5a, 1–16 nodes, three engines: one count per cell (T1); dragonfly Charades ÷ Devastator 0.94 / 1.04 / 1.29 / 1.51 / 1.80 at 1–16 nodes (per-node efficiency at 16: 0.62 against 0.32), ÷ ROSS 3.7–4.0 (ROSS's grid unsettled: batch 2 ÷ 4 up to 1.88); traffic both scale at 0.94, Charades ahead 1.06–1.11 (controller 1.02–1.05), ÷ ROSS 1.8–2.2; controller 0.93–1.04 (dragonfly), 0.90–1.01 (traffic); F5b amended (ROSS batch 1/2 × GVT 16/64) and F5c (ROSS fill-in) designed | current / design |
 | 189 | 2026-11-02 | 3673482 | F5c (ROSS on dragonfly, 1–16 nodes): batch 2 / GVT interval 64 is ROSS's best (batch 1 0.74–0.77×, GVT interval 16 0.55–0.63×); Charades ÷ ROSS stays 3.69–4.01; GVT interval 256 at batch 2 to join the next skx-dev job | current |
 | 190 | 2026-11-02 | — (Mac) | VLSI workload (user's choice): gate-level simulation of b19 × N, copies of ITC'99's largest circuit (231 k nets, 6.6 k flip-flops) joined in a ring through registered bus XORs; b19 alone has too little work past a few nodes (10 messages per PE per cycle at 32 nodes), so weak scaling at one copy per node; pin changes at even times and evaluations at odd ones make the result independent of tie order; `--span` spreads a copy over nodes (0.2% to 12% of messages cross nodes); Mac change tier 30/30, b19 × 2 sequential and optimistic runs one digest at each padding | design |
-| 191 | 2026-11-02 | 3674282 / 3674283 | VLSI calibration (job V0): b19 × N at 1 and 4 nodes in three engines; Charades W 1,250–20,000 ps, controller, PP/WPs/direct, LPs per chare, bucket size; span 1 against span 4; Devastator W grid and adaptive; ROSS batch 2/8/32; ROSS dragonfly batch 2 / GVT 256; predictions V1–V9 | design |
+| 191 | 2026-11-02 | 3674282 / 3674283 | VLSI calibration (job V0): b19 × N at 1 and 4 nodes in three engines; Charades W 1,250–20,000 ps, controller, PP/WPs/direct, LPs per chare, bucket size; span 1 against span 4; Devastator W grid and adaptive; ROSS batch 2/8/32; ROSS dragonfly batch 2 / GVT 256; predictions V1–V9 | design (results in 192) |
+| 192 | 2026-11-02 | 3674282 | V0 results: one count per cell in all three engines, Devastator's own allocator fine on Linux; but b19's file order puts all flip-flops (28% of events, a clock event each per cycle) on PE 0, 9.83× the mean load, so every engine's rate is one PE's per-event cost (Charades 8.5 / Devastator 5.9 M ev/s at 1 node; blocked at the window 67–70%, per PE 0–99.9%); controller held at W 500 ps (0.85–0.90); htram ÷ direct 1.01–1.05; ROSS ran without its window (`--max-opt-lookahead`); ROSS dragonfly GVT 256 ÷ 64 0.64–0.84; balanced layout (activity-weighted equal-count chunks, 1.03× offline) needed before any VLSI scaling run | current |
 
 ## Stampede3 runs, in order
 
@@ -8021,6 +8022,73 @@ The two ends are the two cases of the advisor's note: a loosely coupled split (e
 - **V9.** ROSS on dragonfly: GVT interval 256 at batch 2 is at most 1.0× of 64, so batch 2 / 64 stays ROSS's best.
 
 **What follows:** the arms of the 1–32-node VLSI runs (a job shaped like F5a and F5b), set by these results in the way section 186 set F5's.
+
+### V0 results: one count in every engine, but the file-order layout puts 9.8× the mean load on one PE, so every engine's VLSI rate is one PE's per-event cost; the layout must be balanced before any VLSI scaling run (2026-11-02; skx-dev batch job 3674282, 6 nodes)
+
+> **Status: current.** Design and predictions in section 191. 47 minutes (skx copy 3674283 cancelled). Gate 30/30. Charades 56 runs and Devastator 30 runs all finished; ROSS 3 of 12 VLSI runs hit the 300 s cap. Summary `~/charades-data/vlsi/vcal_summary.py`; load estimates `imbalance.py`, `imbalance2.py`, `imbalance3.py` (same directory); data `~/charades-data/vlsi/j3674282/` (per-LP digest files left on `$WORK`).
+
+**Rates** (b19 × N, one copy per node, 5,000 cycles; M committed ev/s, median of 2 reps, higher is better; Charades PP 2,048, buckets of 500 ps, 128 LPs per chare):
+
+| W (ps) | Charades, 1 node | Devastator, 1 node | Charades, 4 nodes span 1 | Devastator, 4 nodes span 1 | Charades, 4 nodes span 4 | Devastator, 4 nodes span 4 |
+|---|---|---|---|---|---|---|
+| 1,250 | 7.5 | 5.6 | 30.7 | 26.8 | — | — |
+| 2,500 | **8.5** | 5.9 | **35.8** | 28.1 | **28.8** | 27.5 |
+| 5,000 | 7.9 | 5.8 | 33.4 | 28.9 | 25.7 | 28.1 |
+| 10,000 | 7.9 | 5.8 | 33.4 | 29.2 | 24.9 | **29.5** |
+| 20,000 | 7.9 | **5.9** | 32.8 | **29.5** | — | — |
+| Charades' controller / Devastator's adaptive window | 7.5 | 5.6 | 30.6 | 22.5 | 24.8 | — |
+| Charades ÷ Devastator, each at its best fixed W | 1.44 | | 1.22 | | 0.97 | |
+| Charades' controller ÷ Devastator's best fixed W | 1.27 | | 1.04 | | 0.84 | |
+
+**Charades' variants at W 5,000** (M committed ev/s, higher is better): WPs 512 7.9 / 33.9; direct sends 7.8 / 33.0 / 24.4 (1 node / 4 nodes span 1 / 4 nodes span 4); 512 LPs per chare 7.7 / 27.4; buckets of 2,500 ps 7.9 / 33.5. Best htram ÷ direct sends: 1.01, 1.03, 1.05.
+
+**ROSS** (no optimism window; M committed ev/s, higher is better): batch 8 is its best, 1.6 at 1 node and 2.2 at 4 nodes; batch 2 1.2 and batch 32 0.4 at 1 node; batch 2 and 32 at 4 nodes, and batch 8 at span 4, hit the 300 s cap (below 1.9). ROSS rolls back 1.4–5.5 events per committed event (its efficiency −36% to −454%). Charades ÷ ROSS is 5.3 (1 node) and 16.2 (4 nodes), but **these are not ROSS's best**: ROSS has a fixed optimism window (`--max-opt-lookahead`, `~/pdes-baselines/NOTES.md`) that V0 did not use. Without it, the PEs with little work run far ahead and are rolled back.
+
+**ROSS on dragonfly (V9)** (M committed ev/s, higher is better): batch 2 with GVT interval 64 runs 10.1 (1 node) and 28.5 (4 nodes), with GVT interval 256 8.5 and 18.2. 256 ÷ 64 is 0.84 and 0.64, so batch 2 / 64 stays ROSS's best.
+
+**Why every engine is slow, and flat in W: one PE holds the flip-flops.**
+- Charades is blocked at the window 67–70% of the time (mean over PEs) at every W, even 20,000 ps (8 cycles). Per PE the share ranges from 0.0% to 99.8–99.9% in every run. GVT advances once per clock cycle (5,000–5,008 updates per run).
+- **Cause** (offline, `imbalance.py`: b19 × 1, unit-delay, 200 cycles, file-order blocks over one node's 46 PEs):
+  - The estimate is 23,693 events per cycle; the run measured 25,200 (126.0 M over 5,000 cycles).
+  - b19's `.bench` lists all 6,642 flip-flops first (lines 69–6,710), and every flip-flop takes a clock event each cycle (28% of all events).
+  - So PE 0 holds 5,005 flip-flops and does 9.83× the mean load, 99% of it clock events. The next PEs carry 3.76× and 3.72× (NAND/AND datapath regions).
+- **Closure.** If PE 0 sets the pace it executes 9.83 / 46 = 21% of all events: 1.8 M ev/s at Charades' 8.5, about 0.55 µs per event, and 1.3 M ev/s at Devastator's 5.9, about 0.79 µs per event. Both are plausible single-PE rates.
+- So V0's 1-node Charades ÷ Devastator of 1.44 compares one PE's per-event cost (mostly clock events), not parallel execution. W changes little because nothing else limits the rate.
+
+**Layouts** (offline, one node, 46 PEs; lower is better in both columns):
+
+| layout | busiest PE's load ÷ mean | messages crossing PEs (%) | engines' LP mapping |
+|---|---|---|---|
+| file-order blocks (V0) | 9.83 | 36.6 | unchanged |
+| contiguous, cut at equal static weight (clock + fan-in + fanout) | 4.79 | 40.3 | uneven blocks |
+| chunks of 128 nets dealt round-robin | 1.81 | 71.3 | unchanged |
+| contiguous, cut at equal measured activity | 1.01 | 59.2 | uneven blocks |
+| chunks of 512 nets, heaviest first to the least-loaded PE, equal counts | 1.03 | 65.5 | unchanged |
+| chunks of 128 nets, the same | 1.00 | 70.5 | unchanged |
+| random per net | 1.14 | 98.0 | unchanged |
+
+The equal-count chunk layouts only reorder gids inside `netlist.C`, which all three engines compile, so every engine's block mapping still applies. The weights come from a short deterministic pre-simulation of one copy (the estimate above), so the layout depends only on the circuit and the seed. The estimate balances load summed over cycles, not within each cycle.
+
+**Charades' controller stays at W 500 ps** (one bucket) at every node count and span, which is 0.85–0.90 of the best fixed W. That is below its 0.91–1.03 on the seven earlier workloads. Its rule sets W from the delays of remote sends (ts − the sender's time). Here every such delay is under 32 ps (a gate's delay), all inside the first 500 ps bucket, so the rule gives its smallest W. Whether this still costs 10–15% once the load is balanced is open.
+
+**Predictions (section 191):**
+- **V1 right.**
+  - One count per cell in all three engines: 125,998,590 at 1 node, 574,541,914 at 4 nodes (both spans).
+  - Charades gives one digest per padding. At 1 node 128 and 512 LPs per chare both pad to 231,424 LPs and give one digest; at 4 nodes 925,312 and 925,696 LPs give two.
+  - Devastator built and ran with its own allocator on Linux, deterministic in all 30 runs.
+- **V2 partly right.** The best fixed W is 2,500 (one cycle) at both node counts, and W 1,250 is lower (0.86–0.89). W 20,000 is only 6–9% below the best, not 10% or more.
+- **V3 wrong.** The controller reaches 0.87–0.90 of the best fixed W at 1 node and 0.85–0.86 at 4 nodes, not 0.93.
+- **V4 wrong.** Best htram ÷ direct is 1.01–1.05, not ≥ 1.2. It was measured only at W 5,000, and the busiest PE's event cost, which direct sends do not change, limits the rate.
+- **V5 right, at the bound.** 0.80. Devastator loses nothing from span 1 to span 4 (29.5 at both).
+- **V6 partly right.** Buckets of 2,500 ps: 1.00 at both node counts. 512 LPs per chare: 0.97 at 1 node, but 0.82 at 4 nodes (not explained).
+- **V7 partly right.** At span 1, Charades ÷ Devastator is 1.44 (1 node, above the range) and 1.22 (4 nodes, in range); Charades ÷ ROSS ≥ 2 holds, but against an untuned ROSS. At span 4 the ratio is 0.97, not ≥ 1.2.
+- **V8 wrong.** 8.5 M ev/s, not 20; the busiest PE limits the rate.
+- **V9 right.** 0.84 and 0.64.
+
+**Consequences.** V2–V8 measured the imbalanced layout. The engine ratios and the controller, aggregation and span results need repeating before they mean anything for the paper.
+1. A balanced layout in `netlist.C` before any VLSI scaling run. Chunks of 512 nets, assigned by pre-simulated activity at equal counts, keep every engine's mapping. File order stays as an option for reference.
+2. ROSS gets `--max-opt-lookahead` arms (2,500, 5,000 and 10,000 ps). F5's ROSS grids on traffic and dragonfly had no window arm either (dragonfly efficiency 57–70%); to add when ROSS runs next.
+3. A shortened V0 on the balanced layout (W grid, controller, direct sends, span 1 and 4, Devastator, ROSS with windows), with new predictions, then the 1–32-node VLSI job.
 
 ## Baseline verification on the Mac
 
