@@ -7395,6 +7395,7 @@ On the first application, both are wrong. A rule that suits every model has to u
 ### The measured rule's last change: a trial must beat the base on both sides of it; job N (design, 2026-11-01; written before any runs)
 
 > **Status: design.** PAPER.md work item 1, the one change section 180 allowed after M1 failed. Whatever job N shows, the controller freezes after it.
+> - **Job N:** `$WORK/charades-runs/nctl182.slurm` (copy in `~/charades-data/phaseb/`), submitted 2026-11-01 as 3669802 (skx-dev) and 3669803 (skx); Stampede3 tree `charades-phaseb` at e1fbdc4 (heap fix included).
 
 **The change (`--ctl-bracket=1`, the new default; `0` is section 180's rule).** Section 181: on phase-changing PHOLD the rule kept trials that were measured in a cheaper phase than their base, whatever their W, and each keep enlarged the step. Now a trial is judged against two bases:
 - **Order:** base, trial, base again, each a full period (2 settle rounds, 8 measured).
