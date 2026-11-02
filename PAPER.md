@@ -19,10 +19,15 @@ performance available without tuning the optimism window for each workload.
    as in transit for the bucketed GVT. A deadline policy flushes an event once
    GVT plus the window reaches its timestamp. Anti-messages and GVT traffic
    bypass the buffers. The committed events are identical to direct sends.
-2. **A global-view optimism window that needs no tuning.** It is set from a
-   histogram of remote-send delays carried on the GVT's own count waves.
-   Across regimes it stays near the best hand-tuned window, where any single
-   fixed window, and Devastator's efficiency hill climb, fail somewhere.
+2. **A global-view optimism window that needs no tuning.** Every PE's
+   elapsed time and committed events are summed on the GVT's own count waves.
+   The window moves toward the lowest PE time per committed event, and each
+   trial is judged against measurements before and after it. A histogram of
+   remote-send delays, carried on the same waves, gives the starting window
+   and its range. Across regimes and applications it stays near the best
+   hand-tuned window (0.91–1.03), where any single fixed window, a
+   rollback-target rule (0.31 on dragonfly) and Devastator's efficiency hill
+   climb fail somewhere.
 3. **Evaluation at 1–32 nodes (up to 1,472 cores) against Devastator
    (PADS'24) and ROSS.** The workloads are Gaussian PHOLD and two applications
    (traffic, dragonfly), with the same committed events in all three engines.
@@ -46,7 +51,7 @@ not faster than the best fixed window on those workloads.
 | 1 Introduction | 1 | remote-heavy optimistic PDES; Devastator's open regime; the claims |
 | 2 Background and prior work | 1 | Time Warp, GVT, optimism control (Elastic Time, Ferscha, Mikida & Kale PADS'19 hold, Devastator), aggregation (PADS'98 local rate, TramLib) |
 | 3 Aggregation in Time Warp | 1.5 | in-transit accounting, deadline flush, anti-message bypass, flush rules, correctness |
-| 4 The window controller | 1 | delay histogram on count waves, the quantile rule, its bounds, start-up |
+| 4 The window controller | 1 | sums on count waves; measured cost (busy + blocked PE time per committed event); bracketed trials; the delay histogram for scale and range; why a rollback target fails (dragonfly) |
 | 5 Implementation | 0.75 | Charades on Reconverse, htram modes, fast paths, the scaling fixes (claim 4) |
 | 6 Evaluation | 4 | figures below |
 | 7 Conclusion | 0.25 | |
@@ -64,7 +69,7 @@ Status:
 | F1 | weak scaling 1–32 nodes, Gaussian PHOLD σ 100 to uniform and lookahead 10, three engines (M ev/s, and Charades ÷ each) | 3 | 142–143, 153 (A2r), 166 (N32 launch) | rerun on final defaults; 5 reps at 32 nodes (32-node runs vary ±14% between reps) |
 | F2 | aggregation ablation: direct sends, eager flush (`--agg-policy=0`), deadline flush, by σ; events per message and messages per event | 1 | 12, 28, 36 (4 nodes, older stack) | rerun at 4 and 16 nodes |
 | F3 | the PADS'19 static hold and opportunistic (eager) aggregation as baselines | 1, 2 | open issue 1 (hold cutoff); `bucket_hold` config | missing |
-| F4 | robustness: each policy ÷ the best fixed W per workload (controller, best single fixed W, Devastator's rule in Charades, Devastator's own window), and each policy's worst case | 2 | 32–34, 36, 40 (older stack); 173, 176 (current, steady workloads only); 177 (dragonfly: 0.29–0.41) | missing on the current stack; needs the dragonfly fix |
+| F4 | robustness: each policy ÷ the best fixed W per workload (controller, best single fixed W, Devastator's rule in Charades, Devastator's own window), and each policy's worst case | 2 | 181, 185 (frozen rule, quantile rule, fixed grids; 7 workloads, 4 and 16 nodes) | have for Charades' rules; Devastator's rule in Charades and Devastator's own window still to run (item 3) |
 | F5 | applications: traffic and dragonfly at 1–32 nodes, three engines | 3 | 168–172, 175, 177 (ports, counts, sizes) | missing (all inputs ready) |
 | F6 | where a wider window's cost goes: blocked time and GVT wave period by W | 2, 4 | 176 (4/16 nodes), 184 (16/32 nodes) | have |
 | T2 | what scaling took: each fix and its gain | 4 | 21, 26, 24, 50, 88–90, 111, 161, 164, 152 | have; one table |
@@ -74,15 +79,13 @@ Status:
 Each item is a job or a code change. Nothing outside this list gets Stampede3
 time without a reason written here first.
 
-1. **Controller on dragonfly.**
-   - **Status, 2026-11-01:** job D (RESULTS.md 179) found that start-up is not the cause: both of the quantile rule's bounds misfire on dragonfly (0.33–0.40 and 0.78–0.87 of the best W).
-   - The user chose the hybrid rule: `--ctl=3` (main 0e158d5), where the delay histogram gives the scale and measured PE time per committed event picks W.
-   - Job M (RESULTS.md 181, 3669193): it fixes dragonfly (1.00–1.03 of the best fixed W) and is 0.94–1.07 elsewhere, but 0.88–0.94 on phase-changing PHOLD, where W wanders. Worst case 0.88, against 0.31 for the quantile rule and ≤ 0.59 for any single W.
-   - The one allowed change (RESULTS.md 182): a trial must beat the base measured before and after it (`--ctl-bracket=1`). Job N tests it; the controller freezes after job N whatever it shows.
-   - The original plan for this item, kept for the record:
-   - Start W from the delay histogram's quantile instead of the smallest window, or let W grow faster in the first updates.
-   - Then a dragonfly W sweep at 1 and 4 nodes on long runs: W 2,500–20,000 ps and the controller. One skx-dev job.
-   - **Gate:** the controller reaches at least 0.9 of the best W.
+1. **Controller: DONE, frozen 2026-11-01 (RESULTS.md 185).**
+   - **The rule:** the measured rule, bracketed (`--ctl=3`, `--ctl-bracket=1`, main b67e32d). The delay histogram gives the starting scale and range. W moves toward lower PE time per committed event, and a trial is kept only if it beats the base measured before and after it.
+   - **Jobs M and N, 7 workloads at 4 and 16 nodes:**
+     - the frozen rule is 0.91–1.03 of the best fixed W in every cell;
+     - the quantile rule falls to 0.31 (dragonfly), the unbracketed rule to 0.87, any single PHOLD window to 0.54.
+   - **Weakest workload:** phase-changing PHOLD (0.91–0.95). The rule holds W in the best band there; the loss is the cost of measuring. The paper states it as the limit.
+   - **History:** RESULTS.md 177–185. The quantile rule's bounds encoded PHOLD facts (179). The hybrid was the user's choice (180). The bracket was the one allowed change (182).
 1a. **Traffic's committed count varied between runs: FIXED (RESULTS.md 183).**
    - `PendingHeap::erase` reordered equal-timestamp events (code from 2015); up to 1 multi-process run in 11 differed, with direct sends and htram alike.
    - Fixed and verified on the Mac (60/60 runs equal the sequential run's digest); job N checks it on Stampede3.
@@ -98,7 +101,7 @@ time without a reason written here first.
    - Devastator's own adaptive window, run on the PHOLD workloads.
 4. **Engine freeze, 2026-12-07.**
    - **Defaults already set:** per-LP rollback, `--agg-pp-alloc=1`, ring input buffers, `numactl --localalloc` launch (Charades only), 23 LCI devices, `+mempool_remote_free`.
-   - **Open until the freeze:** the controller (items 1–2).
+   - **Frozen 2026-11-01:** the controller (`--ctl=3`, bracketed; item 1). The pending heap fix (item 1a) is in.
 5. **Paper-grade runs, 2026-12-08 to 2027-01-05.**
    - F1 at 1–32 nodes, three engines; 5 reps at 32.
    - F5 at 1–32 nodes, three engines.
@@ -124,8 +127,8 @@ Ratios: Charades ÷ the other (higher is better for Charades).
   - 44 of 48 cells ahead over 1–32 nodes.
 - **Charades ÷ ROSS:** 2.4–5.3× everywhere.
 - **Aggregation, best htram ÷ best direct** (4 nodes, older stack): 2.27 (σ 100) to 4.01 (uniform).
-- **Controller ÷ best fixed W:**
-  - 0.96–1.03 at 4–16 nodes on PHOLD (section 176);
-  - 1.02–1.11 on phase-changing PHOLD (older stack);
-  - 0.29–0.41 on dragonfly (section 177; to fix).
+- **Controller (frozen rule) ÷ best fixed W, 7 workloads at 4 and 16 nodes (section 185):**
+  - 0.91–1.03 in every cell;
+  - steady PHOLD 0.93–1.03, traffic 0.95–0.97, dragonfly 1.00–1.03, phase-changing PHOLD 0.91–0.95;
+  - worst case 0.91, against 0.31 for the quantile rule and 0.54 for any single PHOLD window.
 - **Devastator's own window ÷ its best fixed W:** 0.06–0.28 at σ ≥ 1,000 (older stack).

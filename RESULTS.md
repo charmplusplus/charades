@@ -329,9 +329,10 @@ Sections 1–128 were re-read before planning sections 129 onward.
 | 179 | 2026-11-01 | 3669044 | Job D (1 and 4 nodes, dragonfly): both controller bounds misfire: the rollback rule chases dragonfly's ~3% rollback level that no window removes (W ≈ 1,000 ps, 0.33–0.40), κ caps W at the median delay (≈ 5,900 ps, 0.78–0.87); start-up is not it; best W 10,000 (1 node), 10,000–20,000 (4); aggregation 1.06–1.10× | current |
 | 180 | 2026-11-01 | — | The window by measured cost (`--ctl=3`, main 0e158d5): the delay histogram gives the scale (start at the median delay, range 0.01–0.99 quantiles), PE time per committed event over alternating periods picks W; job M design (7 workloads, 4 and 16 nodes, against the quantile rule and fixed windows) | design |
 | 181 | 2026-11-01 | 3669193 | Job M (4 and 16 nodes): the measured rule fixes dragonfly (1.00–1.03 of the best fixed W; quantile rule 0.31–0.34), 0.94–1.00 on steady PHOLD, 1.02–1.07 on traffic (W ≈ 510–610, between the grid points); 0.88–0.94 on phase-changing PHOLD, where W wanders (Mac trace) as trials straddle phases; worst case 0.88 against 0.31 (quantile) and ≤ 0.59 (any single W); M1 wrong narrowly, M2 and M3 right, M4 wrong; one traffic run committed a different count, as did earlier full-node traffic runs (bug, fixed in 183) | current |
-| 182 | 2026-11-01 | — | The measured rule's last change: a trial must beat the base measured before and after it (`--ctl-bracket=1`); job N design (phase-changing PHOLD with W 50–250, traffic with W 500–1,000, the other five workloads; bracketed against unbracketed); the controller freezes after job N | design |
+| 182 | 2026-11-01 | 3669802 | The measured rule's last change: a trial must beat the base measured before and after it (`--ctl-bracket=1`); job N design (phase-changing PHOLD with W 50–250, traffic with W 500–1,000, the other five workloads; bracketed against unbracketed); the controller freezes after job N | design |
 | 183 | 2026-11-01 | — (Mac) | Traffic's varying count found and fixed: `PendingHeap::erase` chose up or down by timestamp alone (since 2015), so after erasing a cancelled event two equal-timestamp events could pop in the wrong order and swap cars; found with new `--commit-digest`, `--commit-log-until` and `--trace-lp`; Mac 60/60 runs equal the sequential digest after the fix (6 of 65 differed before) | current |
 | 184 | 2026-11-01 | 3668913 | Job L32 (16 and 32 nodes): the best fixed W at 32 nodes is 400 (σ 100: 1.04–1.09 of W 300; σ 2,000: 1.01–1.21); the lowest blocked share marks the best W in 5 of 6 cells (11 of 12 with L16); the quantile rule (W 313) reaches 0.87–0.96 of W 400 on σ 100; L1 mostly wrong, L2 and L3 wrong; item 2 closes into the measured rule | current |
+| 185 | 2026-11-01 | 3669802 | Job N (4 and 16 nodes): the bracketed measured rule is 0.91–1.03 of the best fixed W in all 14 cells (unbracketed 0.87–1.02); the bracket keeps W in the best band on phase-changing PHOLD (86–88% of rounds), where it is weakest (0.91–0.95: the cost of measuring); traffic best fixed W 500; heap fix holds on Stampede3 (one digest per workload); N1 half right, N2 wrong, N3–N5 right; **controller frozen** (`--ctl=3`, `--ctl-bracket=1`) | current |
 
 ## Stampede3 runs, in order
 
@@ -7394,7 +7395,7 @@ On the first application, both are wrong. A rule that suits every model has to u
 
 ### The measured rule's last change: a trial must beat the base on both sides of it; job N (design, 2026-11-01; written before any runs)
 
-> **Status: design.** PAPER.md work item 1, the one change section 180 allowed after M1 failed. Whatever job N shows, the controller freezes after it.
+> **Status: current (design); results and the freeze in section 185.** PAPER.md work item 1, the one change section 180 allowed after M1 failed. Whatever job N shows, the controller freezes after it.
 > - **Job N:** `$WORK/charades-runs/nctl182.slurm` (copy in `~/charades-data/phaseb/`), submitted 2026-11-01 as 3669802 (skx-dev) and 3669803 (skx); Stampede3 tree `charades-phaseb` at e1fbdc4 (heap fix included).
 
 **The change (`--ctl-bracket=1`, the new default; `0` is section 180's rule).** Section 181: on phase-changing PHOLD the rule kept trials that were measured in a cheaper phase than their base, whatever their W, and each keep enlarged the step. Now a trial is judged against two bases:
@@ -7551,6 +7552,70 @@ The sequential scheduler commits 30,302,829 events. That is the count of every r
 - So no separate blocked-time rule: item 2 is closed into item 1.
 - Section 181 shows why the cost must include busy time. On phase-changing PHOLD the lowest blocked share is at the worst W, where rollbacks dominate.
 - Whether the measured rule finds W 400 on σ 100 at 32 nodes is checked in the paper-grade 32-node runs (F1), which run it as the default.
+
+### Job N results: the bracketed measured rule is 0.91–1.03 of the best fixed W in every cell (worst 0.91, against 0.87 unbracketed), and the controller is frozen on it; phase-changing PHOLD stays its weakest workload; the heap fix holds on Stampede3 (2026-11-01; skx-dev batch job 3669802, 16 nodes)
+
+> **Status: current.** Design and predictions in section 182.
+> - **Job:** 124 runs, all finished in 24 minutes (skx copy 3669803 cancelled); gate 60/60; tree `charades-phaseb` at e1fbdc4.
+> - **Data:** `~/charades-data/phaseb/nctl182/j3669802/` (with `--ctl-log` for every controller arm); script `~/charades-data/phaseb/nctl182/n_summary.py`.
+> - **Copy:** `/work2` hung for about 15 minutes during the copy (a listing stuck in Lustre); the 16-node data arrived once it recovered.
+
+**Each policy ÷ the best fixed W of the same rep** (rep 1 / rep 2; higher is better; `m` = section 180's rule, `mb` = bracketed, the new default; fixed W in the model's time unit):
+
+| workload | nodes | best fixed W (M ev/s) | bracketed | unbracketed | quantile rule | the other fixed W |
+|---|---|---|---|---|---|---|
+| phase-changing PHOLD | 16 | W 100 (348.9) | **0.95 / 0.93** | 0.88 / 0.90 | 0.96 / 0.94 | W 50: 0.90 / 0.91; W 75: 0.98; W 150: 0.97 / 0.95; W 250: 0.92 / 0.90 |
+| | 4 | W 100 (121.5) | **0.91 / 0.92** | 0.91 / 0.87 | 0.86 / 0.90 | W 50: 0.94 / 0.96; W 75: 1.00 / 0.98; W 150: 0.94 / 0.96; W 250: 0.81 / 0.84 |
+| lookahead 10, σ 500 | 16 | W 50 (555.6) | 0.98 / 1.03 | 0.97 / 1.02 | | W 100: 0.92 / 0.95 |
+| | 4 | W 50 (144.7) | 0.95 / 0.95 | 0.95 / 0.97 | | W 100: 0.89 |
+| σ 100 | 16 | W 300 (692.6) | 1.02 / 0.93 | 1.00 / 0.93 | | |
+| | 4 | W 300 (173.0) | 0.98 / 0.98 | 0.98 / 0.99 | | |
+| σ 2,000 | 16 | W 300 (548.9) | 0.98 / 0.97 | 0.95 / 0.94 | | |
+| | 4 | W 300 (141.1) | 0.96 / 0.94 | 0.94 / 0.94 | | |
+| uniform | 16 | W 300 (364.4) | 0.98 / 0.98 | 0.97 / 0.95 | | |
+| | 4 | W 300 (122.8) | 0.95 / 0.93 | 0.95 / 0.95 | | |
+| traffic | 16 | W 500 (957.5) | 0.97 / 0.95 | 0.95 / 0.96 | 0.89 / 0.87 | W 750: 0.98 / 0.97; W 1,000: 0.93 |
+| | 4 | W 500 (243.8) | 0.95 / 0.95 | 0.98 / 0.95 | 0.95 / 0.93 | W 750: 0.99 / 0.95; W 1,000: 0.93 / 0.94 |
+| dragonfly | 16 | W 20,000 (374.3) | 1.02 / 1.00 | 1.01 / 1.00 | | W 10,000: 0.99 |
+| | 4 | W 20,000 (108.7) | 1.01 / 1.03 | 1.00 / 1.00 | | W 10,000: 0.99 / 0.97 |
+
+(A single ratio means both reps gave it. The quantile rule ran on phase-changing PHOLD and traffic only.)
+
+**Worst case over jobs M and N** (lowest rep, 14 cells each):
+- bracketed: 0.91 (phase-changing PHOLD, 4 nodes);
+- unbracketed: 0.87 (the same cell);
+- quantile rule: 0.31 (dragonfly, job M);
+- any single PHOLD window: 0.54 or lower (job M).
+
+**What it says:**
+- **The bracket stops the wandering.** On phase-changing PHOLD, 86–88% of the bracketed rule's rounds sit at W 50–149, against 67–70% unbracketed; 1–2% reach W ≥ 250, against 2–5%.
+- **The remaining loss on that workload is the cost of measuring, not where W sits.**
+  - The best fixed W is flat over 75–100.
+  - The bracketed rule spends most rounds there, yet reaches 0.91–0.95.
+  - Half its periods run at a trial W, and every change of W leaves a transient while GVT and the htram horizon catch up. This job does not separate the two, and the controller is now frozen.
+- **The quantile rule follows the phases but does no better.** On phase-changing PHOLD at 4 nodes it holds W near 66 in lookahead-10 phases and near 306 in lookahead-100 phases, yet reaches 0.86–0.90. The best W does not scale with the delay between these phases, so following them is not what pays (section 182's "considered and not chosen").
+- **Elsewhere the bracket costs nothing.** It is within 0.03 of the unbracketed rule on the other six workloads, and above it in 8 of those 12 cells.
+- **Traffic:** the best fixed W is 500 at both node counts. The bracketed rule reaches 0.95–0.97 (W about 555–606), the quantile rule 0.87–0.95, and W 1,000 0.93. Section 181's "1.02–1.07" was against a grid without W 500.
+- **The heap fix holds on Stampede3.** All 12 traffic runs per node count commit one count with one digest (4 nodes: 1,131,043,125, job M's majority count; 16 nodes: 4,524,190,271). All 8 dragonfly runs per node count also share one digest. Every other workload commits one count per node count.
+
+**Predictions (section 182):**
+- **N1 half right.** Every cell is at least 0.9 (worst 0.91). Phase-changing PHOLD reaches 0.91–0.95, not ≥ 0.95.
+- **N2 wrong.** On phase-changing PHOLD the bracketed rule kept 35–38% of its trials, not ≤ 35%. Its final step was 1.08–2.0, not ≤ 1.35.
+- **N3 right:** within 0.03 of the unbracketed rule on the other six workloads.
+- **N4 right:** traffic's best fixed W on the finer grid is 500, and the measured rules reach 0.95–0.98 of it.
+- **N5 right:** phase-changing PHOLD's best fixed W is 100 (75–100 at 4 nodes).
+
+**Decision (per section 182, N1 not fully right): the controller is frozen** on the rule with the better worst case over jobs M and N:
+- **The rule:** the measured rule, bracketed: `--ctl=3`, with `--ctl-bracket=1`, `--ctl-period=8`, `--ctl-settle=2` and the step constants as in main b67e32d.
+- **The paper's robustness claim (claim 2, figure F4):**
+  - Over 7 workloads at 4 and 16 nodes, the frozen rule is 0.91–1.03 of the best fixed W for each workload.
+  - The quantile rule falls to 0.31 (dragonfly).
+  - Any single fixed W falls to 0.54 (PHOLD alone).
+  - On steady workloads it ties a well-chosen fixed W (0.93–1.03), as PAPER.md already says. Its weakest workload is phase-changing PHOLD (0.91–0.95).
+- **Still to run for F4 (PAPER.md item 3):**
+  - Devastator's rule in Charades (`--ctl=2`) on the same workloads;
+  - Devastator's own adaptive window on the PHOLD workloads;
+  - the frozen rule at 32 nodes (F1's runs; section 184's W 400 question).
 
 ## Baseline verification on the Mac
 
