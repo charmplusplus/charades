@@ -176,7 +176,14 @@ class PendingHeap : public PendingQueue {
         elems[i]->index = i;
         elems[nelems] = NULL;
 
-        if (elems[i]->ts <= victim->ts) {
+        // Decide by the heap's own order, not by timestamp alone: the moved
+        // event may share the victim's timestamp and sort after it, and then
+        // it must go down. Moving it up instead left it above a child that
+        // sorts first, so pop() returned two equal-timestamp events in the
+        // wrong order. Traffic's cars then took each other's random draws,
+        // and up to 1 multi-process run in 11 committed a different count
+        // (RESULTS.md 183).
+        if (comparator(elems[i], victim)) {
           percolate_up(i);
         } else {
           sift_down(i);
