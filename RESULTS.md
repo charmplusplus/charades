@@ -338,6 +338,7 @@ Sections 1–128 were re-read before planning sections 129 onward.
 | 188 | 2026-11-02 | 3673108; F5b 3673481, F5c 3673482 / 3673483 | F5a, 1–16 nodes, three engines: one count per cell (T1); dragonfly Charades ÷ Devastator 0.94 / 1.04 / 1.29 / 1.51 / 1.80 at 1–16 nodes (per-node efficiency at 16: 0.62 against 0.32), ÷ ROSS 3.7–4.0 (ROSS's grid unsettled: batch 2 ÷ 4 up to 1.88); traffic both scale at 0.94, Charades ahead 1.06–1.11 (controller 1.02–1.05), ÷ ROSS 1.8–2.2; controller 0.93–1.04 (dragonfly), 0.90–1.01 (traffic); F5b amended (ROSS batch 1/2 × GVT 16/64) and F5c (ROSS fill-in) designed | current / design |
 | 189 | 2026-11-02 | 3673482 | F5c (ROSS on dragonfly, 1–16 nodes): batch 2 / GVT interval 64 is ROSS's best (batch 1 0.74–0.77×, GVT interval 16 0.55–0.63×); Charades ÷ ROSS stays 3.69–4.01; GVT interval 256 at batch 2 to join the next skx-dev job | current |
 | 190 | 2026-11-02 | — (Mac) | VLSI workload (user's choice): gate-level simulation of b19 × N, copies of ITC'99's largest circuit (231 k nets, 6.6 k flip-flops) joined in a ring through registered bus XORs; b19 alone has too little work past a few nodes (10 messages per PE per cycle at 32 nodes), so weak scaling at one copy per node; pin changes at even times and evaluations at odd ones make the result independent of tie order; `--span` spreads a copy over nodes (0.2% to 12% of messages cross nodes); Mac change tier 30/30, b19 × 2 sequential and optimistic runs one digest at each padding | design |
+| 191 | 2026-11-02 | — | VLSI calibration (job V0): b19 × N at 1 and 4 nodes in three engines; Charades W 1,250–20,000 ps, controller, PP/WPs/direct, LPs per chare, bucket size; span 1 against span 4; Devastator W grid and adaptive; ROSS batch 2/8/32; ROSS dragonfly batch 2 / GVT 256; predictions V1–V9 | design |
 
 ## Stampede3 runs, in order
 
@@ -7988,6 +7989,38 @@ The two ends are the two cases of the advisor's note: a loosely coupled split (e
 2. A calibration job on Stampede3 (1 and 4 nodes, span 1 and 4, LPs per chare, W grid, the controller, direct sends), like section 186's.
 3. b19 × N at 1–32 nodes, then 64–256 (the user's goal once 32 is solid), which needs Devastator builds beyond 32 nodes.
 4. ROSS batch 2 / GVT interval 256 on dragonfly (section 189) joins the calibration job as one extra arm.
+
+### VLSI calibration at 1 and 4 nodes in three engines: window, layout, aggregation, LPs per chare (job V0 design, 2026-11-02; written before any runs)
+
+> **Status: design.** PAPER.md work item 3 (applications; VLSI added 2026-11-02, user decision).
+> - **Job V0:** `$WORK/charades-runs/vcal191.slurm` (copy in `~/charades-data/vlsi/`), 6 nodes.
+> - **Trees:** Charades `charades-vlsi` (main e5e4976 + `ctl_sweep.sh`'s vlsi workload), built on the login node; ROSS `models/vlsi` (`-DVLSI_NETLIST_DIR`); Devastator's vlsi binaries built in the job; I99T cloned to `$WORK/I99T`. F5b keeps `charades-phaseb` untouched.
+
+**Why.** Section 190's model has run only on the Mac. Before the 1–32-node runs, each engine's settings need choosing, as section 186 did for traffic and dragonfly, and three questions about the model need answers: which window suits a clocked circuit, whether a copy spread over nodes (span 4) scales worse than one per node, and whether aggregation helps when most messages stay in the process.
+
+**Runs** (b19 × N, one copy per node, 5,000 clock cycles = 12,500,000 ps; 1-node and 4-node series side by side; 2 reps, rep 2 reversed; caps 300 s):
+- **Node 0** (the batch host), after the gate: Devastator's vlsi binaries for 1–32 nodes (ofi-psm2, 2 × 23 per node), with Charades' `models/vlsi` on the include path and Devastator's own allocator. Devastator's runs wait for it.
+- **Charades** (`--localalloc`, `--blocked-time=1`, `--commit-digest=1`):
+  - span 1, PP 2,048, buckets of 500 ps, 128 LPs per chare: W 1,250, 2,500, 5,000, 10,000 and 20,000 ps (half a cycle to 8 cycles) and the frozen controller;
+  - at W 5,000: WPs 512, direct sends, 512 LPs per chare, buckets of 2,500 ps;
+  - 4 nodes, span 4: W 2,500, 5,000, 10,000, the controller, and direct sends at W 5,000.
+- **Devastator:** span 1, W 1,250 to 20,000 and its adaptive window; span 4, W 2,500 to 10,000.
+- **ROSS:** span 1, batch 2, 8 and 32 with GVT interval 64; span 4, batch 8. Conservative ROSS is left out: the lookahead is 1 ps (the evaluation step), so every GVT epoch would advance 1 ps.
+- **ROSS on dragonfly** (section 189's open edge): batch 2 with GVT interval 64 and 256, half the F5 size.
+- **Gate:** the VLSI change tier (five engine configs) on 2 nodes.
+
+**Predictions:**
+- **V1. Counts.** In each node count and span, all three engines commit one count, and Charades one digest per LPs-per-chare setting. Devastator runs with its own allocator on Linux.
+- **V2. The window.** Charades' best fixed W at span 1 is 2,500 or 5,000 ps (one or two cycles). W 1,250 is lower, since a window shorter than a cycle stops PEs at every clock edge, and W 20,000 is at least 10% below the best.
+- **V3.** The frozen controller reaches at least 0.93 of the best fixed W at span 1 at both node counts.
+- **V4. Aggregation.** At span 1, best htram ÷ direct is at least 1.2 at both node counts: 41% of messages cross PEs, almost all in the process, the same-process path that gave traffic 1.36× (section 187).
+- **V5. Layout.** At 4 nodes, Charades' best at span 4 is at most 0.8 of its best at span 1 (12% of messages cross nodes against 0.2%).
+- **V6.** 512 LPs per chare and buckets of 2,500 ps are each within ±10% of 128 and 500.
+- **V7. Engines at span 1:** Charades ÷ Devastator 1.0–1.3 at both node counts, as on traffic; Charades ÷ ROSS at least 2. At span 4, Charades ÷ Devastator at least 1.2, as dragonfly's cross-node scaling suggests.
+- **V8.** Charades runs b19 at 1 node at 20 M committed ev/s or more.
+- **V9.** ROSS on dragonfly: GVT interval 256 at batch 2 is at most 1.0× of 64, so batch 2 / 64 stays ROSS's best.
+
+**What follows:** the arms of the 1–32-node VLSI runs (a job shaped like F5a and F5b), set by these results in the way section 186 set F5's.
 
 ## Baseline verification on the Mac
 

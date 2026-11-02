@@ -29,8 +29,8 @@ performance available without tuning the optimism window for each workload.
    rollback-target rule (0.31 on dragonfly) and Devastator's efficiency hill
    climb fail somewhere.
 3. **Evaluation at 1–32 nodes (up to 1,472 cores) against Devastator
-   (PADS'24) and ROSS.** The workloads are Gaussian PHOLD and two applications
-   (traffic, dragonfly), with the same committed events in all three engines.
+   (PADS'24) and ROSS.** The workloads are Gaussian PHOLD and three applications
+   (traffic, dragonfly, gate-level VLSI), with the same committed events in all three engines.
    Charades is fastest where communication is remote-heavy, the regime
    Devastator names as its weakness.
 4. (Within the implementation section, not a headline.) What it took to scale
@@ -70,7 +70,7 @@ Status:
 | F2 | aggregation ablation: direct sends, eager flush (`--agg-policy=0`), deadline flush, by σ; events per message and messages per event | 1 | 12, 28, 36 (4 nodes, older stack) | rerun at 4 and 16 nodes |
 | F3 | the PADS'19 static hold and opportunistic (eager) aggregation as baselines | 1, 2 | open issue 1 (hold cutoff); `bucket_hold` config | missing |
 | F4 | robustness: each policy ÷ the best fixed W per workload (controller, best single fixed W, Devastator's rule in Charades, Devastator's own window), and each policy's worst case | 2 | 181, 185 (frozen rule, quantile rule, fixed grids; 7 workloads, 4 and 16 nodes) | have for Charades' rules; Devastator's rule in Charades and Devastator's own window still to run (item 4) |
-| F5 | applications: traffic and dragonfly at 1–32 nodes, three engines | 3 | 168–172, 175, 177 (ports, counts, sizes) | missing; next (item 3) |
+| F5 | applications: traffic, dragonfly and VLSI (b19 × N) at 1–32 nodes, three engines | 3 | 168–172, 175, 177 (ports, counts, sizes) | missing; next (item 3) |
 | F6 | where a wider window's cost goes: blocked time and GVT wave period by W | 2, 4 | 176 (4/16 nodes), 184 (16/32 nodes) | have |
 | T2 | what scaling took: each fix and its gain | 4 | 21, 26, 24, 50, 88–90, 111, 161, 164, 152 | have; one table |
 
@@ -107,6 +107,10 @@ time without a reason written here first.
      - 32 nodes (skx): 16 nodes side by side on the two halves, then 32 nodes; 5 reps at 32.
    - **Arms:** Charades' controller and its best fixed W, and direct sends at that W (aggregation's gain on the applications); Devastator over its W grid; ROSS's better of optimistic and conservative.
    - **Checks:** every Charades run with `--commit-digest`. T1 compares counts across engines and digests within Charades.
+   - **VLSI, added 2026-11-02** (advisor's suggestion; user's choice of gate-level simulation and of b19 × N): copies of ITC'99's b19 (231 k nets) joined in a ring, one copy per node (RESULTS.md 190).
+     - **Why b19 × N:** b19 alone gives 10 messages per PE per cycle at 32 nodes, too little work; one copy per node keeps each PE near 5,000 gates.
+     - **Status:** model and ports in all three engines; calibration job V0 (RESULTS.md 191), then 1–32 nodes.
+     - **Beyond 32 nodes (user's goal):** 64–256 nodes once 32 is solid. That needs Devastator builds past 32 nodes, and dragonfly shapes if the other applications go too.
    - **Sizes** (RESULTS.md 177; about 10 s at the 1-node rate): dragonfly arrival 500 ns, generating 300,000 ns; traffic end 12,000,000. ROSS takes 2–5× as long, which sets the job lengths.
 4. **Ablation and robustness on the current stack (F2, F3, F4).** 4 and 16 nodes, skx-dev; about 2 jobs.
    - Workloads: lookahead 10 and 100 × σ 100, σ 2,000 and uniform; phase-changing PHOLD; traffic; dragonfly.
