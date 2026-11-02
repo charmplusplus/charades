@@ -338,7 +338,7 @@ Sections 1–128 were re-read before planning sections 129 onward.
 | 188 | 2026-11-02 | 3673108; F5b 3673481, F5c 3673482 / 3673483 | F5a, 1–16 nodes, three engines: one count per cell (T1); dragonfly Charades ÷ Devastator 0.94 / 1.04 / 1.29 / 1.51 / 1.80 at 1–16 nodes (per-node efficiency at 16: 0.62 against 0.32), ÷ ROSS 3.7–4.0 (ROSS's grid unsettled: batch 2 ÷ 4 up to 1.88); traffic both scale at 0.94, Charades ahead 1.06–1.11 (controller 1.02–1.05), ÷ ROSS 1.8–2.2; controller 0.93–1.04 (dragonfly), 0.90–1.01 (traffic); F5b amended (ROSS batch 1/2 × GVT 16/64) and F5c (ROSS fill-in) designed | current / design |
 | 189 | 2026-11-02 | 3673482 | F5c (ROSS on dragonfly, 1–16 nodes): batch 2 / GVT interval 64 is ROSS's best (batch 1 0.74–0.77×, GVT interval 16 0.55–0.63×); Charades ÷ ROSS stays 3.69–4.01; GVT interval 256 at batch 2 to join the next skx-dev job | current |
 | 190 | 2026-11-02 | — (Mac) | VLSI workload (user's choice): gate-level simulation of b19 × N, copies of ITC'99's largest circuit (231 k nets, 6.6 k flip-flops) joined in a ring through registered bus XORs; b19 alone has too little work past a few nodes (10 messages per PE per cycle at 32 nodes), so weak scaling at one copy per node; pin changes at even times and evaluations at odd ones make the result independent of tie order; `--span` spreads a copy over nodes (0.2% to 12% of messages cross nodes); Mac change tier 30/30, b19 × 2 sequential and optimistic runs one digest at each padding | design |
-| 191 | 2026-11-02 | — | VLSI calibration (job V0): b19 × N at 1 and 4 nodes in three engines; Charades W 1,250–20,000 ps, controller, PP/WPs/direct, LPs per chare, bucket size; span 1 against span 4; Devastator W grid and adaptive; ROSS batch 2/8/32; ROSS dragonfly batch 2 / GVT 256; predictions V1–V9 | design |
+| 191 | 2026-11-02 | 3674282 / 3674283 | VLSI calibration (job V0): b19 × N at 1 and 4 nodes in three engines; Charades W 1,250–20,000 ps, controller, PP/WPs/direct, LPs per chare, bucket size; span 1 against span 4; Devastator W grid and adaptive; ROSS batch 2/8/32; ROSS dragonfly batch 2 / GVT 256; predictions V1–V9 | design |
 
 ## Stampede3 runs, in order
 
@@ -7993,7 +7993,7 @@ The two ends are the two cases of the advisor's note: a loosely coupled split (e
 ### VLSI calibration at 1 and 4 nodes in three engines: window, layout, aggregation, LPs per chare (job V0 design, 2026-11-02; written before any runs)
 
 > **Status: design.** PAPER.md work item 3 (applications; VLSI added 2026-11-02, user decision).
-> - **Job V0:** `$WORK/charades-runs/vcal191.slurm` (copy in `~/charades-data/vlsi/`), 6 nodes.
+> - **Job V0:** `$WORK/charades-runs/vcal191.slurm` (copy in `~/charades-data/vlsi/`), 6 nodes; submitted 2026-11-02 as 3674282 (skx-dev) and 3674283 (skx), the later starter to be cancelled.
 > - **Trees:** Charades `charades-vlsi` (main e5e4976 + `ctl_sweep.sh`'s vlsi workload), built on the login node; ROSS `models/vlsi` (`-DVLSI_NETLIST_DIR`); Devastator's vlsi binaries built in the job; I99T cloned to `$WORK/I99T`. F5b keeps `charades-phaseb` untouched.
 
 **Why.** Section 190's model has run only on the Mac. Before the 1–32-node runs, each engine's settings need choosing, as section 186 did for traffic and dragonfly, and three questions about the model need answers: which window suits a clocked circuit, whether a copy spread over nodes (span 4) scales worse than one per node, and whether aggregation helps when most messages stay in the process.
