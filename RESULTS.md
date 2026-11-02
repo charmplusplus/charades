@@ -7612,7 +7612,7 @@ The sequential scheduler commits 30,302,829 events. That is the count of every r
   - The quantile rule falls to 0.31 (dragonfly).
   - Any single fixed W falls to 0.54 (PHOLD alone).
   - On steady workloads it ties a well-chosen fixed W (0.93–1.03), as PAPER.md already says. Its weakest workload is phase-changing PHOLD (0.91–0.95).
-- **Still to run for F4 (PAPER.md item 3):**
+- **Still to run for F4 (PAPER.md item 3; item 4 since 2026-11-02, when the application runs moved ahead of it):**
   - Devastator's rule in Charades (`--ctl=2`) on the same workloads;
   - Devastator's own adaptive window on the PHOLD workloads;
   - the frozen rule at 32 nodes (F1's runs; section 184's W 400 question).

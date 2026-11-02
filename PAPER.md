@@ -69,8 +69,8 @@ Status:
 | F1 | weak scaling 1–32 nodes, Gaussian PHOLD σ 100 to uniform and lookahead 10, three engines (M ev/s, and Charades ÷ each) | 3 | 142–143, 153 (A2r), 166 (N32 launch) | rerun on final defaults; 5 reps at 32 nodes (32-node runs vary ±14% between reps) |
 | F2 | aggregation ablation: direct sends, eager flush (`--agg-policy=0`), deadline flush, by σ; events per message and messages per event | 1 | 12, 28, 36 (4 nodes, older stack) | rerun at 4 and 16 nodes |
 | F3 | the PADS'19 static hold and opportunistic (eager) aggregation as baselines | 1, 2 | open issue 1 (hold cutoff); `bucket_hold` config | missing |
-| F4 | robustness: each policy ÷ the best fixed W per workload (controller, best single fixed W, Devastator's rule in Charades, Devastator's own window), and each policy's worst case | 2 | 181, 185 (frozen rule, quantile rule, fixed grids; 7 workloads, 4 and 16 nodes) | have for Charades' rules; Devastator's rule in Charades and Devastator's own window still to run (item 3) |
-| F5 | applications: traffic and dragonfly at 1–32 nodes, three engines | 3 | 168–172, 175, 177 (ports, counts, sizes) | missing (all inputs ready) |
+| F4 | robustness: each policy ÷ the best fixed W per workload (controller, best single fixed W, Devastator's rule in Charades, Devastator's own window), and each policy's worst case | 2 | 181, 185 (frozen rule, quantile rule, fixed grids; 7 workloads, 4 and 16 nodes) | have for Charades' rules; Devastator's rule in Charades and Devastator's own window still to run (item 4) |
+| F5 | applications: traffic and dragonfly at 1–32 nodes, three engines | 3 | 168–172, 175, 177 (ports, counts, sizes) | missing; next (item 3) |
 | F6 | where a wider window's cost goes: blocked time and GVT wave period by W | 2, 4 | 176 (4/16 nodes), 184 (16/32 nodes) | have |
 | T2 | what scaling took: each fix and its gain | 4 | 21, 26, 24, 50, 88–90, 111, 161, 164, 152 | have; one table |
 
@@ -95,18 +95,31 @@ time without a reason written here first.
    - The quantile rule reaches 0.87–0.96 of it on σ 100.
    - The measured rule is the rule this item called for, so no separate blocked-time rule.
    - F1's 32-node runs check that it finds W 400.
-3. **Ablation and robustness on the current stack (F2, F3, F4).** 4 and 16 nodes, skx-dev; about 2 jobs.
+3. **Applications at 1–32 nodes, three engines (F5, T1): next.** Moved ahead of the ablation and out of the paper-grade block on 2026-11-02 (user decision). About 3–4 jobs.
+   - **Why first:**
+     - Traffic and dragonfly have never run above 16 nodes. At 32 nodes PHOLD needed changes no smaller run showed (NUMA balancing, best W 400); a problem found after the freeze would leave no time to fix it.
+     - Claim 3 rests on them, and the evidence so far is mixed: dragonfly gains only 1.06–1.10× from aggregation at 1 and 4 nodes (RESULTS.md 179), and traffic sends little across the network. The results set how claim 3 is worded.
+     - Section 6 can then be written around them in December.
+   - **Paper-grade now.** The paths these runs use are already final: the frozen controller, the defaults in item 5 and the heap fix. If a change before the freeze touches them, the affected cells are rerun in item 6.
+   - **Jobs:**
+     - Calibration (skx-dev, 1 and 4 nodes): Devastator's W grid and ROSS's settings on both applications, never swept. Charades' best fixed W is known (dragonfly 10,000–20,000 ps, traffic 500).
+     - 1–16 nodes (skx-dev, 16 nodes): the series side by side, as in A1.
+     - 32 nodes (skx): 16 nodes side by side on the two halves, then 32 nodes; 5 reps at 32.
+   - **Arms:** Charades' controller and its best fixed W, and direct sends at that W (aggregation's gain on the applications); Devastator over its W grid; ROSS's better of optimistic and conservative.
+   - **Checks:** every Charades run with `--commit-digest`. T1 compares counts across engines and digests within Charades.
+   - **Sizes** (RESULTS.md 177; about 10 s at the 1-node rate): dragonfly arrival 500 ns, generating 300,000 ns; traffic end 12,000,000. ROSS takes 2–5× as long, which sets the job lengths.
+4. **Ablation and robustness on the current stack (F2, F3, F4).** 4 and 16 nodes, skx-dev; about 2 jobs.
    - Workloads: lookahead 10 and 100 × σ 100, σ 2,000 and uniform; phase-changing PHOLD; traffic; dragonfly.
    - Arms: direct, eager and deadline aggregation; the PADS'19 hold over a cutoff sweep; a fixed W grid; the controller; Devastator's rule in Charades.
    - Devastator's own adaptive window, run on the PHOLD workloads.
-4. **Engine freeze, 2026-12-07.**
+5. **Engine freeze, 2026-12-07.**
    - **Defaults already set:** per-LP rollback, `--agg-pp-alloc=1`, ring input buffers, `numactl --localalloc` launch (Charades only), 23 LCI devices, `+mempool_remote_free`.
    - **Frozen 2026-11-01:** the controller (`--ctl=3`, bracketed; item 1). The pending heap fix (item 1a) is in.
-5. **Paper-grade runs, 2026-12-08 to 2027-01-05.**
+6. **Paper-grade runs, 2026-12-08 to 2027-01-05.**
    - F1 at 1–32 nodes, three engines; 5 reps at 32.
-   - F5 at 1–32 nodes, three engines.
-   - F2 and F4 on the final defaults, if items 1–3 used earlier ones.
-6. **Writing.**
+   - F5 cells only where a change before the freeze touched the paths they use (item 3).
+   - F2 and F4 on the final defaults, if items 1–4 used earlier ones.
+7. **Writing.**
    - Sections 1–5 in December, while the runs go.
    - Section 6 in January, finished by 2027-01-15, before the IPDPS revision.
 
