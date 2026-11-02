@@ -2,7 +2,7 @@
 #define VLSI_NETLIST_H_
 
 /*
- * The VLSI workload (RESULTS.md section 189): gate-level simulation of an
+ * The VLSI workload (RESULTS.md section 190): gate-level simulation of an
  * ITC'99 netlist (.bench), N copies joined in a ring, as ITC'99 itself builds
  * b17, b18 and b19 from smaller circuits joined on their data buses.
  *

@@ -148,7 +148,7 @@ MODELS = [
   # its remote messages fit the 24 B htram payload slot
   Model('Dragonfly', 'dragonfly', 'dragonfly'),
   # Gate-level simulation of a netlist (ITC'99 .bench), copies joined in a
-  # ring (RESULTS.md section 189); its events never tie at a gate in a way
+  # ring (RESULTS.md section 190); its events never tie at a gate in a way
   # that matters, by construction (pin changes at even times, evaluations at
   # odd ones)
   Model('VLSI', 'vlsi', 'vlsi'),

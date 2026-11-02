@@ -336,7 +336,8 @@ Sections 1–128 were re-read before planning sections 129 onward.
 | 186 | 2026-11-02 | 3672846 / 3672847 | The applications at 1–32 nodes in three engines (F5, PAPER.md item 3): the plan (F5a 1–16 nodes, F5b 32 nodes, T1), and a calibration job at 1 and 4 nodes (Charades W grid, controller, direct sends; Devastator W grid and its adaptive window; ROSS conservative and four optimistic settings), with the rules that set the scaling jobs' arms | current (design) |
 | 187 | 2026-11-02 | 3672846; F5a 3673108 / 3673109, F5b 3673110 | F5 calibration (1 and 4 nodes): one count per cell in all three engines; aggregation 1.36–1.38× on traffic although htram sends only 0.72% of events to other processes (the same-process path, to be separated in F2 with `--agg-scope=1`), 1.06–1.08× on dragonfly; Devastator's best W equals Charades' on dragonfly, 4× on traffic, its adaptive window 0.28–0.33 on traffic at 4 nodes; controller 1.00–1.03 (dragonfly), 0.94–1.00 (traffic, same mode); Charades ÷ Devastator 0.94 / 1.27 (dragonfly 1 / 4 nodes), 1.13–1.14 (traffic); ÷ ROSS 3.9–4.2 / 1.85–2.16; F5a and F5b arms and predictions | current / design |
 | 188 | 2026-11-02 | 3673108; F5b 3673481, F5c 3673482 / 3673483 | F5a, 1–16 nodes, three engines: one count per cell (T1); dragonfly Charades ÷ Devastator 0.94 / 1.04 / 1.29 / 1.51 / 1.80 at 1–16 nodes (per-node efficiency at 16: 0.62 against 0.32), ÷ ROSS 3.7–4.0 (ROSS's grid unsettled: batch 2 ÷ 4 up to 1.88); traffic both scale at 0.94, Charades ahead 1.06–1.11 (controller 1.02–1.05), ÷ ROSS 1.8–2.2; controller 0.93–1.04 (dragonfly), 0.90–1.01 (traffic); F5b amended (ROSS batch 1/2 × GVT 16/64) and F5c (ROSS fill-in) designed | current / design |
-| 189 | 2026-11-02 | — (Mac) | VLSI workload (user's choice): gate-level simulation of b19 × N, copies of ITC'99's largest circuit (231 k nets, 6.6 k flip-flops) joined in a ring through registered bus XORs; b19 alone has too little work past a few nodes (10 messages per PE per cycle at 32 nodes), so weak scaling at one copy per node; pin changes at even times and evaluations at odd ones make the result independent of tie order; `--span` spreads a copy over nodes (0.2% to 12% of messages cross nodes); Mac change tier 30/30, b19 × 2 sequential and optimistic runs one digest at each padding | design |
+| 189 | 2026-11-02 | 3673482 | F5c (ROSS on dragonfly, 1–16 nodes): batch 2 / GVT interval 64 is ROSS's best (batch 1 0.74–0.77×, GVT interval 16 0.55–0.63×); Charades ÷ ROSS stays 3.69–4.01; GVT interval 256 at batch 2 to join the next skx-dev job | current |
+| 190 | 2026-11-02 | — (Mac) | VLSI workload (user's choice): gate-level simulation of b19 × N, copies of ITC'99's largest circuit (231 k nets, 6.6 k flip-flops) joined in a ring through registered bus XORs; b19 alone has too little work past a few nodes (10 messages per PE per cycle at 32 nodes), so weak scaling at one copy per node; pin changes at even times and evaluations at odd ones make the result independent of tie order; `--span` spreads a copy over nodes (0.2% to 12% of messages cross nodes); Mac change tier 30/30, b19 × 2 sequential and optimistic runs one digest at each padding | design |
 
 ## Stampede3 runs, in order
 
@@ -7900,6 +7901,32 @@ With Charades' best fixed setting instead of its controller, Charades ÷ Devasta
 - **R1.** Batch 1 is at least 1.1× batch 2 (GVT interval 64) at 8, 16 and 32 nodes.
 - **R2.** At batch 2, GVT interval 16 is within ±10% of GVT interval 64.
 - **R3.** With ROSS at its best of the four, Charades ÷ ROSS on dragonfly stays at least 2.5 at every node count.
+
+### F5c results: ROSS's best on dragonfly is batch 2 / GVT interval 64; batch 1 and GVT interval 16 are slower; Charades ÷ ROSS stays 3.7–4.0 (2026-11-02; skx-dev batch job 3673482, 16 nodes)
+
+> **Status: current.** Design and predictions in section 188 (amendment). 49 minutes, 60 ROSS runs, all finished (skx copy 3673483 cancelled). Data `~/charades-data/f5/rossdf_j3673482/`.
+
+**ROSS on dragonfly** (M committed ev/s, median of 3, higher is better; batch / GVT interval; Charades ÷ ROSS uses Charades' controller from F5a and ROSS's best over F5a and F5c):
+
+| nodes | 4 / 64 (F5a) | 2 / 64 (F5a / F5c) | 1 / 64 | 2 / 16 | 1 / 16 | Charades ÷ ROSS |
+|---|---|---|---|---|---|---|
+| 1 | 10.1 | 10.2 / 9.8 | 7.5 | 6.5 | 4.5 | 3.80 |
+| 2 | **18.1** | 17.2 / 17.1 | 12.9 | 10.7 | 7.0 | 3.69 |
+| 4 | 25.4 | 27.8 / **28.5** | 21.6 | 17.2 | 11.2 | 3.94 |
+| 8 | 33.2 | **52.2** / 51.9 | 38.4 | 29.1 | 18.6 | 4.01 |
+| 16 | 51.8 | **97.5** / 96.7 | 73.2 | 54.1 | 34.0 | 3.94 |
+
+- **Batch 2 / GVT interval 64 is ROSS's best**, and the grid now brackets it in batch: batch 1 is 0.74–0.77× of it at every node count, batch 4 is 0.53–0.91× from 4 nodes up. ROSS's efficiency at 16 nodes is 57–62% at every setting.
+- **Shorter GVT intervals lose:** 16 is 0.55–0.63× of 64 at batch 2.
+- **The two allocations agree:** batch 2 / 64 within 3% between F5a and F5c.
+- **Not yet bracketed:** GVT interval 256 was tried only at batch 16 (section 187: 0.09–0.27× of 64 there). It joins the next skx-dev job as one extra ROSS arm (batch 2 / 256 at 4 and 16 nodes) rather than a job of its own.
+
+**Predictions (section 188):**
+- **R1 wrong:** batch 1 is 0.74–0.77× of batch 2, not ≥ 1.1×.
+- **R2 wrong:** GVT interval 16 is 0.55–0.63× of 64, not within ±10%.
+- **R3 right:** Charades ÷ ROSS on dragonfly is 3.69–4.01.
+
+F5b (32 nodes, still queued) runs the same four ROSS settings; it confirms them at 32 nodes at a cost of about 25 minutes of its allocation.
 
 ### A VLSI workload: gate-level simulation of b19 × N, copies of ITC'99's largest circuit joined in a ring; the model, and checks on the Mac (2026-11-02; design, written before any Stampede3 runs)
 
