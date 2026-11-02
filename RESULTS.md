@@ -7930,7 +7930,7 @@ F5b (32 nodes, still queued) runs the same four ROSS settings; it confirms them 
 
 ### A VLSI workload: gate-level simulation of b19 × N, copies of ITC'99's largest circuit joined in a ring; the model, and checks on the Mac (2026-11-02; design, written before any Stampede3 runs)
 
-> **Status: design (model built and checked on the Mac).** The user's advisor asked for a VLSI application; the user chose gate-level simulation (2026-11-02) and b19 × N as the workload. Model in `models/vlsi` (main, this commit). Measurement scripts in the session scratchpad (`activity.py`, `composed.py`).
+> **Status: design (model and both ports built and checked on the Mac).** The user's advisor asked for a VLSI application; the user chose gate-level simulation (2026-11-02) and b19 × N as the workload. Model in `models/vlsi` (main, this commit). Measurement scripts in the session scratchpad (`activity.py`, `composed.py`).
 
 **Prior work and why not reuse it.** Gonsiorowski, Carothers and Tropper simulated a gate-level model built from OpenSPARC T2 on ROSS (about 6 M LPs, up to 1 billion gates, 130× on 1,024 Blue Gene/L processors). Their model (`github.com/gonsie/gates`) has no licence file, its netlist converter is not in the repository, and its timestamps are floating-point with random jitter, which cannot give equal committed events in three engines. McGill's XTW/DVS (Tropper's group, 5–25 M gates) appears unreleased. So Charades gets its own model, following the same design (one LP per gate, cell-type logic and delays, clocked flip-flops).
 
@@ -7978,10 +7978,16 @@ The two ends are the two cases of the advisor's note: a loosely coupled split (e
   - at each padding, one digest across all runs (87749955…, a74454b9…, ace31535…), with 14,719–96,759 events rolled back;
   - one LP per chare runs 462,652 chares and reaches 0.02 M ev/s; 128 per chare 2.7–2.8 M ev/s (the Mac's rates are not comparable with Stampede3's).
 
+**Ports (2026-11-02, Mac; `~/pdes-baselines/ross-vlsi.patch`, `devastator-vlsi.patch`).** Both compile Charades' own `netlist.C`, so the circuit, layout and gids are the same in all three engines. Neither needs a tie order: equal-timestamp events at a gate commute by construction.
+- **ROSS** (`models/vlsi`, C++, `-DVLSI_NETLIST_DIR`; uneven gid blocks per rank): sequential and optimistic (3–4 ranks, `--read-buffer=1`) give 15,489, 40,905 and 1,866,314 committed events on `base`, `span` and b19 × 2, equal to Charades, with equal gate and pin counts.
+- **Devastator** (`bench/vlsi.cxx`, threads world, 2 and 4 ranks, adaptive window and W 5,000 ps): the same counts and statistics, every run flagged deterministic.
+- **A Mac-only build issue:** with Devastator's own `operator new`, libc++'s out-of-line string code allocates with libc++'s allocator and the bench frees with Devastator's, so the Mac binaries crash in `operator delete`. Mac checks use `opnew=libc`. Linux resolves the replacement process-wide; the calibration job's first runs confirm it with Devastator's own allocator.
+
 **Next:**
-1. ROSS and Devastator ports sharing `netlist.C` (standard C++), with counts checked against Charades on the Mac.
+1. Stampede3: a separate worktree for the VLSI model (so F5b's `charades-phaseb` binaries stay untouched), ROSS reconfigured with `VLSI_NETLIST_DIR`, Devastator's VLSI binaries for 1–32 nodes with Charades' `models/vlsi` on the include path; I99T cloned to `$WORK`.
 2. A calibration job on Stampede3 (1 and 4 nodes, span 1 and 4, LPs per chare, W grid, the controller, direct sends), like section 186's.
 3. b19 × N at 1–32 nodes, then 64–256 (the user's goal once 32 is solid), which needs Devastator builds beyond 32 nodes.
+4. ROSS batch 2 / GVT interval 256 on dragonfly (section 189) joins the calibration job as one extra arm.
 
 ## Baseline verification on the Mac
 
