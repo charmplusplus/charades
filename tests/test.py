@@ -59,11 +59,14 @@ KNOWN_BROKEN = {'cd', 'phased'}
 # waiting lists, whose reverse computation leans on commit handlers;
 # gentime, the generation window used for weak scaling (--gen-time). Traffic
 # trips: cars keep driving (--trip-radius), its form for weak scaling.
+# VLSI base and span: copies of a netlist joined in a ring, on one group of
+# LPs and spread over two (--span).
 CORE_MODEL_CFGS = {
   'Simple PHOLD': ['base', 'phases'],
   'Imbalanced PHOLD': ['combo'],
   'Traffic': ['base', 'trips'],
   'Dragonfly': ['base', 'congested', 'gentime'],
+  'VLSI': ['base', 'span'],
 }
 # The engine tier's repeat pass looks for races, which need concurrency and
 # depend on timing more than on the model: multi-PE shapes only, on PHOLD
@@ -144,6 +147,11 @@ MODELS = [
   # A CODES-derived dragonfly network (routers, terminals, MPI processes);
   # its remote messages fit the 24 B htram payload slot
   Model('Dragonfly', 'dragonfly', 'dragonfly'),
+  # Gate-level simulation of a netlist (ITC'99 .bench), copies joined in a
+  # ring (RESULTS.md section 189); its events never tie at a gate in a way
+  # that matters, by construction (pin changes at even times, evaluations at
+  # odd ones)
+  Model('VLSI', 'vlsi', 'vlsi'),
 ]
 
 

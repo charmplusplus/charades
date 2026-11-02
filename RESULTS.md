@@ -336,6 +336,7 @@ Sections 1–128 were re-read before planning sections 129 onward.
 | 186 | 2026-11-02 | 3672846 / 3672847 | The applications at 1–32 nodes in three engines (F5, PAPER.md item 3): the plan (F5a 1–16 nodes, F5b 32 nodes, T1), and a calibration job at 1 and 4 nodes (Charades W grid, controller, direct sends; Devastator W grid and its adaptive window; ROSS conservative and four optimistic settings), with the rules that set the scaling jobs' arms | current (design) |
 | 187 | 2026-11-02 | 3672846; F5a 3673108 / 3673109, F5b 3673110 | F5 calibration (1 and 4 nodes): one count per cell in all three engines; aggregation 1.36–1.38× on traffic although htram sends only 0.72% of events to other processes (the same-process path, to be separated in F2 with `--agg-scope=1`), 1.06–1.08× on dragonfly; Devastator's best W equals Charades' on dragonfly, 4× on traffic, its adaptive window 0.28–0.33 on traffic at 4 nodes; controller 1.00–1.03 (dragonfly), 0.94–1.00 (traffic, same mode); Charades ÷ Devastator 0.94 / 1.27 (dragonfly 1 / 4 nodes), 1.13–1.14 (traffic); ÷ ROSS 3.9–4.2 / 1.85–2.16; F5a and F5b arms and predictions | current / design |
 | 188 | 2026-11-02 | 3673108; F5b 3673481, F5c 3673482 / 3673483 | F5a, 1–16 nodes, three engines: one count per cell (T1); dragonfly Charades ÷ Devastator 0.94 / 1.04 / 1.29 / 1.51 / 1.80 at 1–16 nodes (per-node efficiency at 16: 0.62 against 0.32), ÷ ROSS 3.7–4.0 (ROSS's grid unsettled: batch 2 ÷ 4 up to 1.88); traffic both scale at 0.94, Charades ahead 1.06–1.11 (controller 1.02–1.05), ÷ ROSS 1.8–2.2; controller 0.93–1.04 (dragonfly), 0.90–1.01 (traffic); F5b amended (ROSS batch 1/2 × GVT 16/64) and F5c (ROSS fill-in) designed | current / design |
+| 189 | 2026-11-02 | — (Mac) | VLSI workload (user's choice): gate-level simulation of b19 × N, copies of ITC'99's largest circuit (231 k nets, 6.6 k flip-flops) joined in a ring through registered bus XORs; b19 alone has too little work past a few nodes (10 messages per PE per cycle at 32 nodes), so weak scaling at one copy per node; pin changes at even times and evaluations at odd ones make the result independent of tie order; `--span` spreads a copy over nodes (0.2% to 12% of messages cross nodes); Mac change tier 30/30, b19 × 2 sequential and optimistic runs one digest at each padding | design |
 
 ## Stampede3 runs, in order
 
@@ -7899,6 +7900,61 @@ With Charades' best fixed setting instead of its controller, Charades ÷ Devasta
 - **R1.** Batch 1 is at least 1.1× batch 2 (GVT interval 64) at 8, 16 and 32 nodes.
 - **R2.** At batch 2, GVT interval 16 is within ±10% of GVT interval 64.
 - **R3.** With ROSS at its best of the four, Charades ÷ ROSS on dragonfly stays at least 2.5 at every node count.
+
+### A VLSI workload: gate-level simulation of b19 × N, copies of ITC'99's largest circuit joined in a ring; the model, and checks on the Mac (2026-11-02; design, written before any Stampede3 runs)
+
+> **Status: design (model built and checked on the Mac).** The user's advisor asked for a VLSI application; the user chose gate-level simulation (2026-11-02) and b19 × N as the workload. Model in `models/vlsi` (main, this commit). Measurement scripts in the session scratchpad (`activity.py`, `composed.py`).
+
+**Prior work and why not reuse it.** Gonsiorowski, Carothers and Tropper simulated a gate-level model built from OpenSPARC T2 on ROSS (about 6 M LPs, up to 1 billion gates, 130× on 1,024 Blue Gene/L processors). Their model (`github.com/gonsie/gates`) has no licence file, its netlist converter is not in the repository, and its timestamps are floating-point with random jitter, which cannot give equal committed events in three engines. McGill's XTW/DVS (Tropper's group, 5–25 M gates) appears unreleased. So Charades gets its own model, following the same design (one LP per gate, cell-type logic and delays, clocked flip-flops).
+
+**The circuit.** ITC'99 (Politecnico di Torino, EUPL-1.2, `github.com/cad-polito-it/I99T`; not copied into this repository):
+- b14 is a subset of the Viper processor, b15 of the 80386. b17 is 3 × b15 joined through data registers, b18 is 2 × b14 + 2 × b17 joined on their datapaths, b19 is 2 × b18 joined on their data buses.
+- b19's `.bench` form: 231,266 nets, 6,642 flip-flops, six gate types (NAND, NOT, AND, OR, NOR, DFF; fan-in ≤ 5, fanout ≤ 92). Its inputs are 3 control lines, a 10-bit and an 8-bit bus (IN1, IN2) and 3 constant-zero pseudo-inputs; its 27 distinct outputs are a subtractor's.
+
+**How much work b19 holds** (unit-delay simulation, random inputs each cycle; `activity.py` held the three constants random, which raised activity, so the second row is the one that counts):
+
+| run | gates changing per cycle | messages per cycle | depth (unit delays) |
+|---|---|---|---|
+| b19, constants random (wrong) | 2.6% | 14,875 | 33 |
+| b19 × 4, constants 0, per copy | 1.2% | about 8,000 | 25 |
+
+At 32 nodes (1,472 PEs) b19 alone gives 157 gates and about 10 messages per PE per cycle, and fewer than one change per PE in the busiest gate delay: not enough work. Weak scaling keeps each PE near b19-on-1-node (about 5,000 gates, 170 messages per cycle), 7.4 M gates at 32 nodes and 59 M at 256.
+
+**b19 × N.** N copies joined in a ring, as ITC'99 builds its larger circuits:
+- copy k's bus inputs become XOR gates of a random external input and a ring flip-flop that samples one of copy k−1's outputs at each clock edge. The flip-flop keeps the ring free of combinational paths between copies;
+- the other inputs take a new value at each clock edge, from a hash of (seed, copy, net, cycle), so they carry no random state through rollbacks and do not depend on the layout;
+- per copy: 231,326 nets, 224,642 gates, 6,660 flip-flops (18 of them the ring's), 21 random inputs.
+
+**Timing.** Integer ps. A linear delay model, since ITC'99 carries no timing: an intrinsic delay by type (NOT and BUFF 6, NAND 8, NOR 10, AND 12, OR 14, XOR 16), plus 2 ps per input beyond two and 2 ps per fanout up to eight. Flip-flops change 20 ps after the edge, inputs 10 ps after. b19's longest path is 1,934 ps, and the clock period defaults to the longest path plus 25%, rounded up to 100 ps: 2,500 ps.
+
+**Events, and why equal timestamps cannot change the result.**
+- A pin change (`PinMsg`) arrives at an even time. A combinational gate's first pin change at time t schedules one evaluation (`EvalMsg`) at t + 1, which sees every pin change of time t. Every delay is even and the output is sent delay − 1 after the evaluation, so pin changes stay at even times and evaluations at odd ones.
+- A flip-flop records its D pin and takes it at the clock edge (`ClockMsg`, multiples of the period). Since the period exceeds the longest path, no pin change reaches it at an edge.
+- So no two events whose order matters share a timestamp at a gate. The model does not rely on the tie order that traffic and dragonfly needed reproduced in ROSS and Devastator.
+
+**Layout (`--span=s`).** With one copy per node, span s spreads each copy over s nodes: node i of a group of s holds the i-th slice (file order) of each of the group's s copies. Each PE keeps one copy's worth of nets. The layout changes no committed event. Where messages go, b19 × 4 on 4 nodes (2 processes × 23 PEs each; `composed.py`):
+
+| layout | messages per PE per cycle | crossing PEs | crossing processes | crossing nodes |
+|---|---|---|---|---|
+| each copy on 1 node | 174 | 41% | 7.4% | 0.2% |
+| each copy over 2 nodes | 174 | 41% | 7.4% | 7.3% |
+| each copy over 4 nodes | 174 | 45% | 12% | 12% |
+
+The two ends are the two cases of the advisor's note: a loosely coupled split (each copy on its own node, as in chiplet co-simulation) and a cut through the circuit.
+
+**Padding.** Charades' block mapper needs the LP count to be a multiple of the LPs per chare, so the model adds inert LPs at the end (68 for b19 × 2 at 128 per chare). The commit digest covers every LP, so digests compare only at the same LPs per chare.
+
+**Checks on the Mac (main, this commit):**
+- `test.py --tier change --model VLSI`, five engine configs (bucketed window, deadline PP and WPs, the measured controller with and without htram) × `base` (3 copies of `tiny.bench`, our own 25-gate test circuit) and `span` (4 copies, span 2) × shapes 1, 4 and 2 × 2: 30/30, with up to 9,534 events rolled back.
+- **b19 × 2, 40 cycles (1,866,314 committed events):**
+  - the sequential run and optimistic runs at 2 processes × 4 PEs (bucketed window, deadline PP, the controller), at 1, 128 and 1,024 LPs per chare, all commit the same events;
+  - at each padding, one digest across all runs (87749955…, a74454b9…, ace31535…), with 14,719–96,759 events rolled back;
+  - one LP per chare runs 462,652 chares and reaches 0.02 M ev/s; 128 per chare 2.7–2.8 M ev/s (the Mac's rates are not comparable with Stampede3's).
+
+**Next:**
+1. ROSS and Devastator ports sharing `netlist.C` (standard C++), with counts checked against Charades on the Mac.
+2. A calibration job on Stampede3 (1 and 4 nodes, span 1 and 4, LPs per chare, W grid, the controller, direct sends), like section 186's.
+3. b19 × N at 1–32 nodes, then 64–256 (the user's goal once 32 is solid), which needs Devastator builds beyond 32 nodes.
 
 ## Baseline verification on the Mac
 
