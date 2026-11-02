@@ -84,7 +84,7 @@ NUMA_WRAP=${NUMA_WRAP-numactl --localalloc}
 C=$WORK/$TREE
 out=${RUNS:-$WORK/charades-runs}/ctl_sweep; mkdir -p $out/logs; cd $out
 csv=${2:-$out/sweep_$(date +%Y%m%d_%H%M%S).csv}
-echo "rep,nodes,procs,pes,lps,workload,agg,bucket,margin,arm,status,wall_s,exec_s,committed,rolled_back,efficiency,event_rate,gvts,remote_sends,agg_events_per_msg,ctl_rounds,final_window,mean_window,stragglers_per_event,alpha,count_waves,kappa,ts_rollbacks,late_stragglers,gvt_lag,blocked_pct,blocked_min_pct,blocked_max_pct,spell_us,max_events,htram_events,htram_msgs" > $csv
+echo "rep,nodes,procs,pes,lps,workload,agg,bucket,margin,arm,status,wall_s,exec_s,committed,rolled_back,efficiency,event_rate,gvts,remote_sends,agg_events_per_msg,ctl_rounds,final_window,mean_window,stragglers_per_event,alpha,count_waves,kappa,ts_rollbacks,late_stragglers,gvt_lag,blocked_pct,blocked_min_pct,blocked_max_pct,spell_us,max_events,htram_events,htram_msgs,digest" > $csv
 echo "writing $csv (tree $TREE, $(git -C $C log --oneline -1 | cut -c1-40))"
 
 stat() { awk -v k="$1" 'index($0, k) {print $NF; exit}' "$2"; }
@@ -100,7 +100,8 @@ run_one() {  # nodes procs pes cfg arm label
     q)    extra+=(--ctl=1 --ctl-epsilon=$val) ;;
     qb)   extra+=(--ctl=1 --ctl-epsilon=$val --ctl-calibrate=0) ;;
     hill) extra+=(--optimism-window=$val --ctl=2) ;;
-    m)    extra+=(--ctl=3) ;;                         # measured cost; m:0 (the value is unused)
+    m)    extra+=(--ctl=3 --ctl-bracket=0) ;;         # measured cost, section 180 (trial against the base before); m:0
+    mb)   extra+=(--ctl=3 --ctl-bracket=1) ;;         # measured cost, bracketed (section 182); mb:0
     hill1) extra+=(--optimism-window=$val --ctl=2 --ctl-interval=1) ;;
     dry)  extra+=(--optimism-window=$val --ctl=1 --ctl-dry=1) ;;
     hills) extra+=(--optimism-window=$val --ctl=2 --ctl-reduction=1 --ctl-interval=1) ;;
@@ -144,6 +145,8 @@ run_one() {  # nodes procs pes cfg arm label
     fi
   done
   wait $sp 2>/dev/null; local rc=$?
+  # --commit-digest writes its per-LP table into the working directory
+  [ -f commit_digest.csv ] && mv commit_digest.csv logs/$label.digest.csv
   local wall=$(echo "$(date +%s.%N) - $t0" | bc)
   if [ $status = ok ] && { [ $rc -ne 0 ] || ! grep -q "Simulation Executed Successfully" $f; }; then
     status=fail
@@ -152,7 +155,7 @@ run_one() {  # nodes procs pes cfg arm label
   [ $kind = w ] && fw=$val mw=$val
   [[ $kind =~ ^drys ]] && fw=$val mw=$val
   [ $kind = blk ] && fw=none mw=none
-  echo "$rep,$N,$n,$pe,$lps,$wl,$AGG,$bucket,$margin,$arm,$status,$(printf %.2f $wall),$(stat 'Execution Time' $f),$(stat 'Events Committed' $f),$(stat 'Events Rolled Back' $f),$(stat 'Efficiency' $f),$(stat 'Event Rate' $f),$(stat 'Total GVT Computations' $f),$(stat 'Remote Sends' $f),$(stat 'Events per htram Message' $f),$(stat 'Rounds' $f),$fw,$mw,$(stat 'Stragglers per executed event' $f),$(stat 'Final alpha' $f),$(stat 'Count Reductions :' $f),$(stat 'Final kappa' $f),$(stat 'Timestamp Rollback Calls' $f),$(stat 'Late Stragglers' $f),$(stat 'Slowest PE' $f),$(stat 'Time Blocked at Window %' $f),$(stat 'Time Blocked at Window %, least PE' $f),$(stat 'Time Blocked at Window %, most PE' $f),$(stat 'Blocked Spell Mean us' $f),$(stat 'Max Events Allocated on a PE' $f),$(stat 'Events Through htram' $f),$(stat 'htram Messages' $f)" >> $csv
+  echo "$rep,$N,$n,$pe,$lps,$wl,$AGG,$bucket,$margin,$arm,$status,$(printf %.2f $wall),$(stat 'Execution Time' $f),$(stat 'Events Committed' $f),$(stat 'Events Rolled Back' $f),$(stat 'Efficiency' $f),$(stat 'Event Rate' $f),$(stat 'Total GVT Computations' $f),$(stat 'Remote Sends' $f),$(stat 'Events per htram Message' $f),$(stat 'Rounds' $f),$fw,$mw,$(stat 'Stragglers per executed event' $f),$(stat 'Final alpha' $f),$(stat 'Count Reductions :' $f),$(stat 'Final kappa' $f),$(stat 'Timestamp Rollback Calls' $f),$(stat 'Late Stragglers' $f),$(stat 'Slowest PE' $f),$(stat 'Time Blocked at Window %' $f),$(stat 'Time Blocked at Window %, least PE' $f),$(stat 'Time Blocked at Window %, most PE' $f),$(stat 'Blocked Spell Mean us' $f),$(stat 'Max Events Allocated on a PE' $f),$(stat 'Events Through htram' $f),$(stat 'htram Messages' $f),$(awk '/^Commit Digest/ {print $3; exit}' $f)" >> $csv
   printf "%-60s %-5s %7.2fs\n" $label $status $wall
 }
 

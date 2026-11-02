@@ -151,11 +151,14 @@ class Controller : public CBase_Controller {
     double efficiency;
 
     /** --ctl=3 state */
-    int m_phase;                 ///< 0: no histogram yet, 1: measuring a base, 2: a trial
+    int m_phase;                 ///< 0: no histogram yet, 1: measuring a base, 2: a trial,
+                                 ///< 3: the base again (--ctl-bracket)
     unsigned m_round;            ///< rounds into the current period, settling included
     double m_elapsed, m_committed;  ///< summed over the measured rounds
     double m_base_cost;          ///< PE ns per committed event at m_base_window
     Time m_base_window;
+    double m_trial_cost;         ///< --ctl-bracket: the trial's cost, judged after the base again
+    Time m_trial_window;
     double m_log_step;           ///< ln of the multiplicative step
     int m_dir;                   ///< +1 wider, -1 narrower
     int m_rejects;               ///< trials rejected in a row
@@ -164,6 +167,11 @@ class Controller : public CBase_Controller {
 
     /** Fold a round's delays into the decayed histogram; true if it did */
     bool fold(const uint64_t* sum);
+    /** --ctl=3: take cost as the base at the current W and pick the next trial */
+    Time measured_trial(double cost);
+    /** --ctl=3: a trial was kept or dropped; adjust the step and direction */
+    void measured_kept();
+    void measured_dropped();
     Time measured_window(const uint64_t* sum);
     /** clamp_window, and within the histogram's [Q_MIN, Q_MAX] quantiles */
     Time measured_clamp(double w) const;

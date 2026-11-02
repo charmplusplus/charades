@@ -308,6 +308,10 @@ Event* event_alloc();
 void tw_event_send(Event* event);
 void tw_event_free(Event* e, bool commit);
 void tw_event_rollback(Event* event);
+/** --commit-log-until: write this PE's committed events to commit_log_<pe>.bin */
+void commit_log_write();
+/** --trace-lp: print one line about e if it is the traced LP's */
+void trace_event(const char* what, const Event* e, long long extra = 0);
 /** An event message with room for size bytes of data (--msg-pool: reused) */
 RemoteEvent* remote_event_new(size_t size);
 /** Free an event message (--msg-pool: keep it for reuse); NULL is ignored */

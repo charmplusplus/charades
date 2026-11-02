@@ -263,6 +263,23 @@ void LPChare::finalize() {
   for (int i = 0; i < lp_structs.size(); i++) {
     lp_structs[i]->finalize();
   }
+  if (g_tw_commit_digest) {
+    // One record per LP: gid, committed events, hash, then the hash at each
+    // multiple of --commit-digest-interval (the final hash past the last one)
+    size_t marks = digest_marks();
+    std::vector<uint64_t> rec;
+    rec.reserve(lp_structs.size() * (3 + marks));
+    for (LPBase* lp : lp_structs) {
+      rec.push_back(lp->gid);
+      rec.push_back(lp->digest_count);
+      rec.push_back(lp->digest);
+      for (size_t k = 0; k < marks; k++) {
+        rec.push_back(k < lp->digest_marks.size() ? lp->digest_marks[k] : lp->digest);
+      }
+    }
+    contribute(rec.size() * sizeof(uint64_t), rec.data(), CkReduction::concat,
+        CkCallback(CkIndex_Scheduler::commit_digest(NULL), CProxy_Scheduler(scheduler_id)[0]));
+  }
   contribute(CkCallback(CkReductionTarget(Scheduler, finalize_complete), CProxy_Scheduler(scheduler_id)));
 }
 
@@ -374,6 +391,7 @@ void LPChare::recv_local_event(Event* e) {
    * \todo Locally sent events can't cause violations so this should be moved
    * to the remote handler.
    */
+  if (g_tw_trace_lp >= 0) trace_event("recv", e, (long long)straggler_time(e->owner));
   if(isOptimistic && e->ts <= straggler_time(e->owner)) {
     if (g_tw_rollback_unit) {
       BRACKET_TRACE(rollback_lp(e->owner, e->ts);,USER_EVENT_RB)
@@ -440,6 +458,7 @@ int LPChare::execute_me() {
   if (events.size()) {
     /** Pull off the top event for execution and set the current event and ts */
     Event* e = events.pop();
+    if (g_tw_trace_lp >= 0) trace_event("exec", e);
     set_current_event(e);
     if (isOptimistic) {
       e->cv.clear();
@@ -658,6 +677,7 @@ void LPChare::cancel_event(Event* e) {
 }
 
 void LPChare::add_to_cancel_q(Event* e) {
+  if (g_tw_trace_lp >= 0) trace_event("cancel_q", e);
   /** Put the event at the head of the cancel queue */
   e->state.cancel_q = 1;
   e->cancel_next = cancel_q;

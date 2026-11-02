@@ -193,7 +193,8 @@ void BucketGVT::finalize() {
     std::cout << "Total Reductions : " << start_reductions + count_reductions << std::endl;
     // How far GVT trails the slowest PE when a wave completes (time units)
     std::cout << "Slowest PE's lead over GVT, mean over count waves : "
-              << (count_reductions ? (double)lead_buckets_sum / count_reductions * bucket_size : 0.0);
+              << (count_reductions ? (double)lead_buckets_sum / count_reductions * bucket_size : 0.0)
+              << std::endl;
   }
 
   std::ofstream outfile;

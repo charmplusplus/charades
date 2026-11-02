@@ -83,6 +83,15 @@ extern unsigned g_tw_gvt_wave_tree;      ///< bucketed gvt, node waves: fan-out 
 extern Time     g_tw_optimism_window; ///< execute no event past GVT + this (0: off)
 extern unsigned g_tw_comm_stats;      ///< time remote sends and send->receive latency
 extern unsigned g_tw_blocked_time;    ///< time PEs spend stopped at the optimism window's edge
+extern unsigned g_tw_commit_digest;   ///< hash each LP's committed events, in commit order
+extern Time     g_tw_commit_digest_interval; ///< --commit-digest: also keep the hash at each multiple of this time
+extern Time     g_tw_commit_log_until; ///< write every committed event below this time to commit_log_<pe>.bin
+extern int64_t  g_tw_trace_lp;        ///< print what happens to this LP's events (-1: off)
+extern Time     g_tw_trace_from, g_tw_trace_to; ///< --trace-lp: only events in [from, to]
+/** --commit-digest-interval: the hashes kept per LP, one per multiple of the interval below the end time */
+inline size_t digest_marks() {
+  return g_tw_commit_digest_interval ? (size_t)((g_tw_ts_end - 1) / g_tw_commit_digest_interval) : 0;
+}
 extern unsigned g_tw_async_reduction; ///< use asynchronous reductions in GVTs
 extern double   g_tw_reserve_threshold;
 extern uint32_t g_tw_reserve_buckets;
@@ -124,6 +133,7 @@ extern unsigned g_tw_agg_auto_wps;    ///< --agg-auto: may also choose WPs (make
 extern unsigned g_tw_ctl;             ///< 0: fixed window, 1: delay quantile, 2: hill climb, 3: measured cost
 extern unsigned g_tw_ctl_period;      ///< --ctl=3: rounds per measured period
 extern unsigned g_tw_ctl_settle;      ///< --ctl=3: rounds left out after each change of W
+extern unsigned g_tw_ctl_bracket;     ///< --ctl=3: a trial must beat the base before and after it
 extern double   g_tw_ctl_epsilon;     ///< quantile rule: target share of PE time lost to rollbacks (--ctl-cost=0: of executed events rolled back)
 extern unsigned g_tw_ctl_cost;        ///< quantile rule: 0 (default) epsilon is a share of events rolled back, 1 of PE time (experimental)
 extern unsigned g_tw_ctl_calibrate;   ///< quantile rule: scale the bound by the waste seen

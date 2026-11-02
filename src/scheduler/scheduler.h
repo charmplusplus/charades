@@ -71,7 +71,9 @@ class Scheduler : public CBase_Scheduler {
     void finalize(CkReductionMsg *m); /**< Receives stats reduction and exits */
     /** --pe-stats, PE 0: writes pe_stats.csv; exits once finalize() has too */
     void pe_stats(CkReductionMsg *m);
-    bool final_printed, pe_stats_written;
+    /** --commit-digest, PE 0: writes commit_digest.csv; exits once finalize() has too */
+    void commit_digest(CkReductionMsg *m);
+    bool final_printed, pe_stats_written, digest_written;
     void exit_when_done();
 
     /** Method for printing out basic info about the current progress */

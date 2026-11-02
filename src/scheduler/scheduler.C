@@ -32,7 +32,7 @@ Scheduler::Scheduler() {
   running = false;
   parked = false;
   ended = false;
-  final_printed = pe_stats_written = false;
+  final_printed = pe_stats_written = digest_written = false;
 
   // Initialize rng // TODO: Definitely doesn't belong here
   tw_rand_init(31, 41);
@@ -100,6 +100,7 @@ void Scheduler::all_ended() {
 }
 
 void Scheduler::finalize_complete() {
+  commit_log_write();
   agg_collect_stats(cumulative_stats);
   // Per PE until reduced (Statistics::reduce keeps the least and the most)
   cumulative_stats->blocked_min = cumulative_stats->blocked_max =
@@ -139,7 +140,43 @@ void Scheduler::pe_stats(CkReductionMsg* msg) {
 }
 
 void Scheduler::exit_when_done() {
-  if (final_printed && (pe_stats_written || !g_tw_pe_stats)) CkExit();
+  if (final_printed && (pe_stats_written || !g_tw_pe_stats) &&
+      (digest_written || !g_tw_commit_digest)) CkExit();
+}
+
+/**
+ * --commit-digest: write commit_digest.csv (one row per LP, by gid) and print
+ * a hash of all LPs' hashes, which equal runs share
+ */
+void Scheduler::commit_digest(CkReductionMsg* msg) {
+  size_t width = 3 + digest_marks();
+  const uint64_t* d = (const uint64_t*)msg->getData();
+  size_t n = msg->getSize() / sizeof(uint64_t) / width;
+  std::vector<const uint64_t*> rows(n);
+  for (size_t i = 0; i < n; i++) rows[i] = d + i * width;
+  std::sort(rows.begin(), rows.end(),
+      [](const uint64_t* a, const uint64_t* b) { return a[0] < b[0]; });
+  uint64_t all = 0, committed = 0;
+  FILE* f = fopen("commit_digest.csv", "w");
+  fprintf(f, "gid,committed,digest");
+  for (size_t k = 3; k < width; k++) {
+    fprintf(f, ",t%llu", (unsigned long long)((k - 2) * g_tw_commit_digest_interval));
+  }
+  fprintf(f, "\n");
+  for (const uint64_t* r : rows) {
+    all = all * 1000003 + r[2];
+    committed += r[1];
+    fprintf(f, "%llu,%llu,%016llx", (unsigned long long)r[0],
+        (unsigned long long)r[1], (unsigned long long)r[2]);
+    for (size_t k = 3; k < width; k++) fprintf(f, ",%016llx", (unsigned long long)r[k]);
+    fprintf(f, "\n");
+  }
+  fclose(f);
+  delete msg;
+  CkPrintf("Commit Digest                  %016llx (%zu LPs, %llu events)\n",
+      (unsigned long long)all, n, (unsigned long long)committed);
+  digest_written = true;
+  exit_when_done();
 }
 
 void Scheduler::finalize(CkReductionMsg* msg) {

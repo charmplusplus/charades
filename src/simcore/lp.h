@@ -322,6 +322,14 @@ class LPBase {
      */
     Event* lp_head = NULL;
     Event* lp_tail = NULL;
+    /**
+     * --commit-digest: a hash of this LP's committed events in commit order,
+     * their count, and (--commit-digest-interval) the hash at each multiple
+     * of the interval
+     */
+    uint64_t digest = 0;
+    uint64_t digest_count = 0;
+    std::vector<uint64_t> digest_marks;
 
     /** Called to initialize LP state and seed initial events */
     virtual void initialize() {}

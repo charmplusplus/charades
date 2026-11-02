@@ -1,0 +1,15 @@
+# agg_ctl_measured_fast_bucket_pp judging each trial against the base
+# before it only (--ctl-bracket=0, section 180's rule)
+sync=3
+gvt=4
+buffer-size=655360
+optimism-window=2000
+aggregation=1
+agg-mode=2
+agg-buffer=16
+agg-policy=1
+ctl=3
+ctl-interval=1
+ctl-period=1
+ctl-settle=0
+ctl-bracket=0

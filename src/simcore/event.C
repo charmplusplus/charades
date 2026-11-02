@@ -13,6 +13,8 @@
 #include "statistics.h"
 #include "typedefs.h"
 #include "util.h"
+#include <cstring>
+#include <string>
 
 extern CProxy_LPChare lps;
 
@@ -122,8 +124,71 @@ Event* event_alloc(RemoteEvent* msg, uint64_t dest_gid, Time offset, LPBase * se
   return e;
 }
 
+static inline uint64_t digest_mix(uint64_t x) {
+  // splitmix64's finalizer
+  x ^= x >> 30;
+  x *= 0xbf58476d1ce4e5b9ULL;
+  x ^= x >> 27;
+  x *= 0x94d049bb133111ebULL;
+  return x ^ (x >> 31);
+}
+
+/**
+ * --commit-digest: fold a committed event into its LP's hash. Each LP commits
+ * in timestamp order, ties in the pending heap's order, so two correct runs
+ * give every LP the same hash. Event ids are left out (a rollback renumbers
+ * the events it re-creates), and so are payloads (padding bytes may differ);
+ * a different random draw changes the timestamps that follow.
+ */
+static void commit_digest(LPBase* lp, const Event* e) {
+  if (g_tw_commit_digest_interval) {
+    size_t mark = e->ts / g_tw_commit_digest_interval;
+    while (lp->digest_marks.size() < mark) lp->digest_marks.push_back(lp->digest);
+  }
+  uint64_t h = digest_mix(e->ts) ^ digest_mix(e->src_lp ^ 0x9e3779b97f4a7c15ULL) ^ e->type_id;
+  lp->digest = digest_mix(lp->digest * 31 + h);
+  lp->digest_count++;
+}
+
+/** --commit-log-until: this PE's committed events, written at the end */
+struct CommitRecord {
+  uint64_t lp, ts, src_lp, event_id, type;
+  uint64_t payload[2];  ///< the event's first 16 bytes of data (zero past its size)
+};
+static thread_local std::vector<CommitRecord> commit_log;
+
+void commit_log_write() {
+  if (!g_tw_commit_log_until) return;
+  std::string name = "commit_log_" + std::to_string(CkMyPe()) + ".bin";
+  FILE* f = fopen(name.c_str(), "wb");
+  if (f) {
+    fwrite(commit_log.data(), sizeof(CommitRecord), commit_log.size(), f);
+    fclose(f);
+  }
+  commit_log.clear();
+  commit_log.shrink_to_fit();
+}
+
+void trace_event(const char* what, const Event* e, long long extra) {
+  if (g_tw_trace_lp < 0 || e->dest_lp != (uint64_t)g_tw_trace_lp) return;
+  if (e->ts < g_tw_trace_from || e->ts > g_tw_trace_to) return;
+  uint32_t p[4] = {0, 0, 0, 0};
+  if (e->msg) memcpy(p, e->msg->data, std::min<size_t>(e->type_size, sizeof(p)));
+  CkPrintf("TRACE pe %d %s ts %llu src %llu id %llu type %u car %u/%u ptr %p state %d cq %d x %lld\n",
+      CkMyPe(), what, (unsigned long long)e->ts, (unsigned long long)e->src_lp,
+      (unsigned long long)e->event_id, (unsigned)e->type_id, p[0], p[1], (const void*)e,
+      (int)e->state.owner, (int)e->state.cancel_q, extra);
+}
+
 void tw_event_free(Event *e, bool commit) {
+  if (g_tw_trace_lp >= 0) trace_event(commit ? "commit" : "free", e);
   if(commit == true) {
+    if (g_tw_commit_digest) commit_digest(e->owner, e);
+    if (g_tw_commit_log_until && e->ts < g_tw_commit_log_until) {
+      CommitRecord r = {e->dest_lp, e->ts, e->src_lp, e->event_id, e->type_id, {0, 0}};
+      if (e->msg) memcpy(r.payload, e->msg->data, std::min<size_t>(e->type_size, sizeof(r.payload)));
+      commit_log.push_back(r);
+    }
     e->owner->commit(e);
     PE_STATS(events_committed)++;
   }
@@ -254,6 +319,7 @@ void charm_event_release(RemoteEvent* e) {
 void tw_event_rollback(Event * event) {
   Event* e = event->caused_by_me;
   LPBase* dest_lp = event->owner;
+  if (g_tw_trace_lp >= 0) trace_event("rollback", event);
 
   dest_lp->set_current_event(event);
   dest_lp->reverse(event);

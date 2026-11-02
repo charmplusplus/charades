@@ -43,6 +43,12 @@ void parse_command_line(int argc, char** argv) {
   kernel.register_argument("gvt-reserve-threshold","Bucketed GVT: also hold events at offsets whose anti/regular ratio exceeds this", g_tw_reserve_threshold);
   kernel.register_argument("gvt-clear-lag",        "Bucketed GVT: release a held event once GVT has advanced more than this many buckets since it was held", g_tw_clear_lag);
   kernel.register_argument("gvt-clear-buckets",    "Bucketed GVT: buckets from GVT checked for early release on each advance (0 = all; 1 = release only on reaching its bucket)", g_tw_clear_buckets);
+  kernel.register_argument("commit-digest",        "Hash each LP's committed events (timestamp, source LP, type) in commit order; print the combined hash and write commit_digest.csv (one row per LP) - NO=0, YES=1", g_tw_commit_digest);
+  kernel.register_argument("commit-digest-interval", "--commit-digest: also record each LP's hash at every multiple of this virtual time, to find where two runs part (0 = off)", g_tw_commit_digest_interval);
+  kernel.register_argument("commit-log-until",     "Write every committed event below this virtual time (LP, time, source LP, type, id) to commit_log_<pe>.bin, in commit order, to compare runs event by event (0 = off)", g_tw_commit_log_until);
+  kernel.register_argument("trace-lp",             "Debugging: print each receive, execution, rollback, cancellation and commit of this LP's events (-1 = off)", g_tw_trace_lp);
+  kernel.register_argument("trace-from",           "--trace-lp: only events at or after this time", g_tw_trace_from);
+  kernel.register_argument("trace-to",             "--trace-lp: only events at or before this time", g_tw_trace_to);
   kernel.register_argument("blocked-time",         "Time each PE spends stopped at the optimism window's edge, from the pass that stops there to the next event it executes - NO=0, YES=1", g_tw_blocked_time);
   kernel.register_argument("comm-stats",           "Time remote send calls and send-to-receive latency - NO=0, YES=1", g_tw_comm_stats);
   kernel.register_argument("aggregation",          "Send remote events through htram (needs HTRAM_DIR in config.mk) - NO=0, YES=1", g_tw_aggregation);
@@ -75,6 +81,7 @@ void parse_command_line(int argc, char** argv) {
   kernel.register_argument("ctl",                  "Set the optimism window online - NO=0, DELAY QUANTILE=1, HILL CLIMB (Devastator)=2, MEASURED COST=3", g_tw_ctl);
   kernel.register_argument("ctl-period",           "--ctl=3: controller rounds per measured period (default 8)", g_tw_ctl_period);
   kernel.register_argument("ctl-settle",           "--ctl=3: rounds left out of the measurement after each change of the window (default 2)", g_tw_ctl_settle);
+  kernel.register_argument("ctl-bracket",          "--ctl=3: keep a trial only if it costs less than the base measured both before and after it - NO=0 (compare with the base before only), YES=1 (default)", g_tw_ctl_bracket);
   kernel.register_argument("ctl-epsilon",          "Delay quantile rule: target share of executed events rolled back (default 0.001); with --ctl-cost=1 the share of PE time lost to rollbacks (default 0.01); uncalibrated, primary stragglers per executed event", g_tw_ctl_epsilon);
   kernel.register_argument("ctl-cost",             "Delay quantile rule: epsilon is a share of - EVENTS ROLLED BACK=0 (default), PE TIME LOST TO ROLLBACKS=1 (experimental: misses the indirect cost of rollbacks)", g_tw_ctl_cost);
   kernel.register_argument("ctl-calibrate",        "Delay quantile rule: scale the straggler bound by the events seen rolled back - NO=0, YES=1", g_tw_ctl_calibrate);

@@ -116,7 +116,8 @@ Controller::Controller()
       window(g_tw_optimism_window), first_time(0),
       window_time_sum(0), window_time(0), last_rate(-1), efficiency(0),
       m_phase(0), m_round(0), m_elapsed(0), m_committed(0), m_base_cost(0),
-      m_base_window(0), m_log_step(std::log(M_STEP_START)), m_dir(1),
+      m_base_window(0), m_trial_cost(0), m_trial_window(0),
+      m_log_step(std::log(M_STEP_START)), m_dir(1),
       m_rejects(0), m_trials(0), m_kept(0), m_last_cost(0) {
   CpvInitialize(Controller*, g_controller);
   CpvAccess(g_controller) = this;
@@ -473,13 +474,18 @@ Time Controller::measured_clamp(double w) const {
  * at W times or over the step. Each period leaves out its first --ctl-settle
  * rounds, while GVT and the htram horizon catch up with the new W, and then
  * sums --ctl-period rounds of PE time (every PE's elapsed time) and committed
- * events. A trial that costs less per committed event than the base before
- * it is kept and becomes the base for the next trial in the same direction,
- * and the step grows. A dearer one is dropped: W returns to the base, the
- * direction flips, the base is measured again (so drift between periods does
- * not decide), and after two such in a row the step shrinks. Only adjacent
- * periods are compared, so the rule follows phase changes. Every PE makes
- * the same choice from the same sums.
+ * events. A trial that costs less per committed event than its base is kept:
+ * W moves to it and the step grows. A dearer one is dropped: W returns to the
+ * base, the direction flips, and after two drops in a row the step shrinks.
+ *
+ * --ctl-bracket=1 (default): the base is measured again after the trial, and
+ * the trial is kept only if it costs less than both. Comparing with the base
+ * before it alone kept trials that were measured in a cheaper phase of the
+ * workload, whatever their W, and each keep grew the step: on phase-changing
+ * PHOLD W wandered and reached 0.88-0.94 of the best fixed W (RESULTS.md 181).
+ * A dropped trial's second base opens the next comparison; after a kept one
+ * the new W is measured as a base first. Every PE makes the same choice from
+ * the same sums.
  */
 Time Controller::measured_window(const uint64_t* sum) {
   bool folded = fold(sum);
@@ -500,24 +506,36 @@ Time Controller::measured_window(const uint64_t* sum) {
   m_round = 0;
   m_elapsed = m_committed = 0;
 
+  if (m_phase == 1) return measured_trial(cost);
+  if (m_phase == 2 && g_tw_ctl_bracket) {
+    // Measure the base again before judging the trial
+    m_trial_cost = cost;
+    m_trial_window = window;
+    m_phase = 3;
+    return m_base_window;
+  }
   if (m_phase == 2) {
     if (cost < m_base_cost) {
       // Kept: the trial is the new base; try further the same way
-      m_kept++;
-      m_rejects = 0;
-      m_log_step = std::min(std::log(M_STEP_MAX), m_log_step * 1.5);
-    } else {
-      // Dropped: back to the base, measured afresh, then the other way
-      m_dir = -m_dir;
-      if (++m_rejects >= 2) {
-        m_log_step = std::max(std::log(M_STEP_MIN), m_log_step / 2);
-        m_rejects = 0;
-      }
-      m_phase = 1;
-      return m_base_window;
+      measured_kept();
+      return measured_trial(cost);
     }
+    // Dropped: back to the base, measured afresh, then the other way
+    measured_dropped();
+    m_phase = 1;
+    return m_base_window;
   }
-  // A base (or a kept trial) is measured: try a step from it
+  // m_phase 3: the base after the trial
+  if (m_trial_cost < std::min(m_base_cost, cost)) {
+    measured_kept();
+    m_phase = 1;
+    return m_trial_window;
+  }
+  measured_dropped();
+  return measured_trial(cost);
+}
+
+Time Controller::measured_trial(double cost) {
   m_base_cost = cost;
   m_base_window = window;
   Time w = measured_clamp(window * std::exp(m_dir * m_log_step));
@@ -529,6 +547,20 @@ Time Controller::measured_window(const uint64_t* sum) {
   m_phase = 2;
   m_trials++;
   return w;
+}
+
+void Controller::measured_kept() {
+  m_kept++;
+  m_rejects = 0;
+  m_log_step = std::min(std::log(M_STEP_MAX), m_log_step * 1.5);
+}
+
+void Controller::measured_dropped() {
+  m_dir = -m_dir;
+  if (++m_rejects >= 2) {
+    m_log_step = std::max(std::log(M_STEP_MIN), m_log_step / 2);
+    m_rejects = 0;
+  }
 }
 
 /**
@@ -638,6 +670,8 @@ void Controller::finalize() {
   } else if (g_tw_ctl == 3) {
     CkPrintf("Policy                         measured cost (PE time per committed event), "
         "W within the delay histogram's %g-%g quantiles\n", Q_MIN, Q_MAX);
+    CkPrintf("Trials judged against          %s\n",
+        g_tw_ctl_bracket ? "the base before and after" : "the base before");
     CkPrintf("Trials kept                    %d of %d\n", m_kept, m_trials);
     CkPrintf("Final step                     %.3f\n", std::exp(m_log_step));
     CkPrintf("Last measured cost             %.1f PE ns per committed event\n",
