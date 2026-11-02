@@ -328,7 +328,10 @@ Sections 1–128 were re-read before planning sections 129 onward.
 | 178 | 2026-11-01 | — | The controller on dragonfly, start-up or rollback target: job D design (W 2,500–20,000 ps; controller at ε 0.001/0.01/0.03 and from α 0.005; PP and direct at W 10,000; 1 and 4 nodes, long runs) | design |
 | 179 | 2026-11-01 | 3669044 | Job D (1 and 4 nodes, dragonfly): both controller bounds misfire: the rollback rule chases dragonfly's ~3% rollback level that no window removes (W ≈ 1,000 ps, 0.33–0.40), κ caps W at the median delay (≈ 5,900 ps, 0.78–0.87); start-up is not it; best W 10,000 (1 node), 10,000–20,000 (4); aggregation 1.06–1.10× | current |
 | 180 | 2026-11-01 | — | The window by measured cost (`--ctl=3`, main 0e158d5): the delay histogram gives the scale (start at the median delay, range 0.01–0.99 quantiles), PE time per committed event over alternating periods picks W; job M design (7 workloads, 4 and 16 nodes, against the quantile rule and fixed windows) | design |
-| 181 | 2026-11-01 | 3669193 | Job M (4 and 16 nodes): the measured rule fixes dragonfly (1.00–1.03 of the best fixed W; quantile rule 0.31–0.34), 0.94–1.00 on steady PHOLD, 1.02–1.07 on traffic (W ≈ 510–610, between the grid points); 0.88–0.94 on phase-changing PHOLD, where W wanders (Mac trace) as trials straddle phases; worst case 0.88 against 0.31 (quantile) and ≤ 0.59 (any single W); M1 wrong narrowly, M2 and M3 right, M4 wrong; one traffic run committed a different count, as did earlier full-node traffic runs (bug, open) | current |
+| 181 | 2026-11-01 | 3669193 | Job M (4 and 16 nodes): the measured rule fixes dragonfly (1.00–1.03 of the best fixed W; quantile rule 0.31–0.34), 0.94–1.00 on steady PHOLD, 1.02–1.07 on traffic (W ≈ 510–610, between the grid points); 0.88–0.94 on phase-changing PHOLD, where W wanders (Mac trace) as trials straddle phases; worst case 0.88 against 0.31 (quantile) and ≤ 0.59 (any single W); M1 wrong narrowly, M2 and M3 right, M4 wrong; one traffic run committed a different count, as did earlier full-node traffic runs (bug, fixed in 183) | current |
+| 182 | 2026-11-01 | — | The measured rule's last change: a trial must beat the base measured before and after it (`--ctl-bracket=1`); job N design (phase-changing PHOLD with W 50–250, traffic with W 500–1,000, the other five workloads; bracketed against unbracketed); the controller freezes after job N | design |
+| 183 | 2026-11-01 | — (Mac) | Traffic's varying count found and fixed: `PendingHeap::erase` chose up or down by timestamp alone (since 2015), so after erasing a cancelled event two equal-timestamp events could pop in the wrong order and swap cars; found with new `--commit-digest`, `--commit-log-until` and `--trace-lp`; Mac 60/60 runs equal the sequential digest after the fix (6 of 65 differed before) | current |
+| 184 | 2026-11-01 | 3668913 | Job L32 (16 and 32 nodes): the best fixed W at 32 nodes is 400 (σ 100: 1.04–1.09 of W 300; σ 2,000: 1.01–1.21); the lowest blocked share marks the best W in 5 of 6 cells (11 of 12 with L16); the quantile rule (W 313) reaches 0.87–0.96 of W 400 on σ 100; L1 mostly wrong, L2 and L3 wrong; item 2 closes into the measured rule | current |
 
 ## Stampede3 runs, in order
 
@@ -7054,7 +7057,7 @@ At W 300, 16 → 32 nodes: µs per count wave σ 100 151 → 193, σ 2,000 190 �
 
 ### Job L16 results: above W 300 a wider window costs blocked time, not busy time; GVT advance per wave levels off at W 300 while waves keep lengthening; the blocked share is lowest at the best W (2026-11-01; skx-dev batch job 3668911, 16 nodes)
 
-> **Status: current for 4 and 16 nodes; job L32 (32 and 16 nodes) pending.** Design and predictions in section 174.
+> **Status: current for 4 and 16 nodes; 32 nodes in section 184.** Design and predictions in section 174.
 > - **Job:** 108 runs, all finished; gate 24/24.
 > - **Data:** `~/charades-data/scale32/blocked/j3668911/`; script `~/charades-data/scale32/blocked/l_summary.py`.
 > - **Noise:** low. Per-rep ratios to W 300 agree within about ±3% (the 32-node spread in section 173 was ±14%).
@@ -7388,6 +7391,165 @@ On the first application, both are wrong. A rule that suits every model has to u
 **What follows:**
 - Per section 180, M1 wrong means one more change to the measured rule, then freeze. The change has to stop the wandering on phase-changing PHOLD without costing the steady workloads, dragonfly or traffic. The design comes next.
 - The traffic count is a correctness bug, ahead of the controller in priority. It must be fixed before the engine freeze (2026-12-07).
+
+### The measured rule's last change: a trial must beat the base on both sides of it; job N (design, 2026-11-01; written before any runs)
+
+> **Status: design.** PAPER.md work item 1, the one change section 180 allowed after M1 failed. Whatever job N shows, the controller freezes after it.
+
+**The change (`--ctl-bracket=1`, the new default; `0` is section 180's rule).** Section 181: on phase-changing PHOLD the rule kept trials that were measured in a cheaper phase than their base, whatever their W, and each keep enlarged the step. Now a trial is judged against two bases:
+- **Order:** base, trial, base again, each a full period (2 settle rounds, 8 measured).
+- **Kept** only if the trial costs less than both bases. W moves to the trial and the step grows as before. The next comparison starts with a fresh base at the new W.
+- **Dropped** otherwise. The direction flips, two drops in a row halve the step as before, and the closing base opens the next comparison.
+- **Effect:** a change in cost during the three periods has to look better than both neighbours to be kept, which a phase change alone rarely does. A dropped trial still takes 2 periods, but a kept one takes 3 instead of 1, so W moves more slowly.
+- **Not changed:** the start at the median delay, the 0.01–0.99 quantile range, the cost, and the step sizes.
+
+**Considered and not chosen.** Making W a multiple of the median delay, so that W follows a change in scale at once. On the Mac the best W in each phase is not a fixed multiple of the median delay (100 at a median of about 150, 200 at about 790; computed as the lookahead plus the exponential's median), and the best W per phase would gain only 1.024× there (section 181). The wandering is what lost, so the change targets the comparison.
+
+**Mac check, before Stampede3:**
+- the change tier on every model;
+- the section 181 trace again (phase-changing PHOLD, 8 PEs, `--ctl-log`), bracketed against unbracketed.
+- Expected: the kept share falls from about 44% toward the steady workloads' 30–34%, and W stays within 50–300 in every phase.
+- **Result (2026-11-01, 2 runs each, main b67e32d):**
+  - change tier 176/176;
+  - bracketed: 20–32% of trials kept, final step 1.05–1.12, W within 42–381 and 77–221 over the run (per-phase medians 77–307 and 93–147);
+  - unbracketed: 33–38% kept, final step 1.16–2.0, W within 25–476 and 36–989 (per-phase medians up to 740);
+  - rates (M ev/s): bracketed 8.63 and 9.20, unbracketed 9.65 and 8.60, W 100 9.35 and 9.56. These are within the Mac's ±5%, so job N decides.
+
+**Job N** (16 nodes, then the allocation's first 4; 2 reps, arm order reversed in rep 2; `--ctl-log=1` on the controller arms; `m` = section 180's rule, `mb` = bracketed):
+
+| workload | htram | arms |
+|---|---|---|
+| phase-changing PHOLD | PP 512 | W 50, 75, 100, 150, 250; quantile; m; mb |
+| PHOLD lookahead 10, σ 500 | PP 512 | W 50, 100; m; mb |
+| PHOLD σ 100 | PP 2,048 | W 300; m; mb |
+| PHOLD σ 2,000 | PP 512 | W 300; m; mb |
+| PHOLD uniform | WPs 512 | W 300; m; mb |
+| traffic | PP 2,048 | W 500, 750, 1,000; quantile; m; mb |
+| dragonfly | WPs 512 | W 10,000, 20,000; m; mb |
+
+The sizes are job M's. That makes 31 runs per rep and node count, 124 in all, about 25 minutes.
+
+**Predictions:**
+- **N1 (the gate):** the bracketed rule reaches at least 0.9 of the best fixed W in every cell, and at least 0.95 on phase-changing PHOLD.
+- **N2:** on phase-changing PHOLD its kept share is at most 35% and its final step at most 1.35×, against 44% and 1.68–2.0× unbracketed.
+- **N3:** on the other six workloads it is within 0.03 of the unbracketed rule.
+- **N4:** traffic's best fixed W on the finer grid is 500 or 750, and the measured rules reach 0.95–1.02 of it, not section 181's 1.02–1.07.
+- **N5:** phase-changing PHOLD's best fixed W is 75–150.
+
+**What follows:**
+- **N1 right:** the bracketed rule is the default and the controller is frozen; F4 uses jobs M and N.
+- **N1 wrong:** the controller freezes anyway, on whichever rule has the better worst case over jobs M and N, and the paper reports phase-changing PHOLD as its limit.
+
+### Traffic's varying count: the pending heap reordered equal-timestamp events after an erase; fixed (2026-11-01, Mac)
+
+> **Status: current.** Section 181 found one traffic run of job M whose committed count differed. It found the same in earlier full-node traffic data.
+> - **Fix:** `src/collections/pending_heap.h`, in the commit after this section's.
+> - **Data and scripts:** the session scratchpad (`trrep/`); not kept.
+
+**Reproduction on the Mac.** Congested traffic: 128 × 64 intersections, 15 cars each, half of them starting in the 32 × 32 corner; end 512,000; direct sends:
+
+| launch | W | runs | runs with a different count |
+|---|---|---|---|
+| 1 process × 8 PEs | 1,000 (and the quantile rule) | 24 | 0 |
+| 4 processes × 2 PEs | 500 (direct sends; 13 runs also htram PP 512) | 53 | 3 (one of them htram) |
+| 8 processes × 1 PE | 1,000 | 65 | 6 |
+
+The sequential scheduler commits 30,302,829 events. That is the count of every run that agreed, so the runs that differed were wrong (+355 to +591 events).
+
+**New tools (off by default):**
+- **`--commit-digest=1`:**
+  - each LP hashes its committed events (timestamp, source LP, type) in commit order;
+  - the run prints one combined hash and writes `commit_digest.csv`, one row per LP;
+  - `--commit-digest-interval=T` also keeps each LP's hash at every multiple of T.
+- **`--commit-log-until=T`:** each PE writes its committed events below T, with the first 16 bytes of each event's data, to `commit_log_<pe>.bin`.
+- **`--trace-lp=N`** (with `--trace-from`, `--trace-to`): prints every receive, execution, rollback, cancellation and commit of LP N's events.
+- **`ctl_sweep.sh`:** keeps each run's digest table (`logs/<label>.digest.csv`) and adds a `digest` column.
+
+**The diagnosis:**
+1. **Digests at 8,000-step marks:** a divergent run first differs from a good one between t = 16,000 and 24,000, in LPs around (10, 7) inside the congested corner.
+2. **Commit logs** (first difference with its data):
+   - At LP 906, two arrivals from LP 905 share t = 17,346.
+   - The good run committed car 1031/1 (event ID 18504), then car 391/19 (18506).
+   - The divergent run committed 391/19 (18652), then 1031/1 (18650). The comparator puts the lower ID first.
+   - Both IDs follow creation order (LP 905 sent 1031 at t = 17,043 and 391 at 17,046), so the heap, not the IDs, chose the order.
+3. **`--trace-lp=906` in a divergent run:**
+   - Both arrivals were in LP 906's chare heap when an older, cancelled arrival at the same timestamp was erased from it (`delete_pending`).
+   - The next two `pop()`s returned 391 before 1031.
+   - In good runs the heap held other events at that moment.
+4. **The cause:**
+   - `PendingHeap::erase` moves the last element into the gap. It then chose between moving it up and moving it down by timestamp alone (`elems[i]->ts <= victim->ts` → up).
+   - An event with the victim's timestamp that sorts after it, on destination LP, source LP or ID, must move down. It was tried upward, stayed where it was, and sat above a child that sorts first.
+   - The code dates from 2015 (Charades' original heap). It is the same kind of fault as the comparator fix of 2026-10-20 (CONTEXT.md, open issue 8): equal timestamps handled by time alone.
+5. **Why only traffic, and why rarely:**
+   - It needs a cancelled pending event, an equal-timestamp pair, and a particular heap layout, which depends on timing.
+   - The swapped pair must also carry different data. PHOLD's events are interchangeable; traffic's carry cars, and swapping two cars gives each the other's random draws.
+   - Direct sends and htram both cancel pending events, so both showed it.
+
+**The fix:** `erase` decides by the comparator: up if the moved event sorts before the victim, otherwise down. The heap's order is total, so exactly one direction can be needed.
+
+**Verification:**
+- **8 processes × 1 PE, W 1,000:** 60 of 60 runs commit 30,302,829 events with the sequential run's digest (5d094f47e80f6250). Before the fix, 6 of 65 did not; at that rate 60 clean runs has a probability of about 0.003.
+- **Mac change tier:** 152/152 on every model (bucketed, htram, the measured rule bracketed and not, sequential).
+- **Engine tier:** 2,887 of 2,888, with one timeout. It is dragonfly `gentime` with `bucket_hold_early` (the PADS'19 hold, early release) at 2 processes × 2 PEs.
+  - That combination hangs in 5 of 5 runs with this fix and in 5 of 5 at the parent commit (638c8b8). So it predates this fix and the other changes of this session.
+  - Single-process shapes pass. Open issue: it matters for F3 if the hold baseline is run on dragonfly.
+
+**What it changes:**
+- **Rates:** none. Erase does the same work. Every rate in this file stands.
+- **Traffic and dragonfly counts:** their committed counts are now deterministic on several processes. Earlier traffic counts that differed between runs are wrong, but none is quoted as a count.
+- **Table T1:**
+  - the paper-grade runs of traffic and dragonfly carry `--commit-digest`;
+  - T1 compares digests across arms, node counts and repeats, not counts alone;
+  - ROSS and Devastator are compared on counts and model statistics, as before.
+- **Job N:** it runs on the fixed engine, with `--commit-digest` on traffic and dragonfly, so it checks the fix on Stampede3 at 4 and 16 nodes.
+
+### Job L32 results: at 32 nodes the lowest blocked share again marks the best fixed W (W 400 for σ 100 and σ 2,000), and the quantile rule reaches 0.87–0.96 of it on σ 100; the measured rule is the rule section 174 called for (2026-11-01; skx batch job 3668913, 32 nodes)
+
+> **Status: current.** Design and predictions in section 174; L16 (4 and 16 nodes) in section 176.
+> - **Job:** 108 runs, all finished in 20 minutes; gate 30/30. Committed counts are equal within every workload and node count.
+> - **Tree:** `charades-alloc` at 3dc65ad, so the controller arm is the quantile rule (`q:0.001`). The measured rule did not exist yet.
+> - **Data:** `~/charades-data/scale32/blocked/blocked32_j3668913/`; script `l_summary.py` there.
+> - **Start-up:** two `/work2` I/O errors at the job's start (chdir), harmless.
+> - **Noise:** per-rep ratios vary by up to ±10% at 32 nodes (uniform most).
+
+**Medians of 3 reps** (the same allocation for 16 and 32 nodes; rate in M committed ev/s, higher is better; blocked share = mean over PEs of the PE time stopped at the window's edge, lower is better):
+
+| workload | nodes | W 250 | W 300 | W 400 | W 500 | W 600 | quantile rule (mean W) | lowest blocked share at |
+|---|---|---|---|---|---|---|---|---|
+| σ 100 | 16 | 625.3 (30.9%) | 659.5 (26.0%) | **686.1** (21.2%) | 613.4 (28.9%) | 576.8 (32.2%) | 662.6 (313) | W 400 |
+| | 32 | 1,167.5 (35.8%) | 1,242.7 (31.1%) | **1,295.5** (26.5%) | 1,256.1 (27.7%) | 1,169.9 (31.7%) | 1,133.2 (313) | W 400 |
+| σ 2,000 | 16 | 466.2 (40.3%) | 509.7 (32.8%) | **517.0** (28.3%) | 479.4 (31.0%) | 447.5 (34.8%) | 515.2 (299) | W 400 |
+| | 32 | 919.2 (41.6%) | 938.5 (38.4%) | **1,010.6** (30.7%) | 961.9 (32.0%) | 826.1 (38.5%) | 998.4 (299) | W 400 |
+| uniform | 16 | 316.4 (42.9%) | 322.1 (40.6%) | **324.6** (36.4%) | 313.4 (38.9%) | 297.0 (40.9%) | 327.9 (299) | W 400 |
+| | 32 | 493.7 (48.6%) | 521.2 (44.9%) | **526.9** (41.7%) | 520.8 (41.0%) | 500.9 (40.8%) | 540.7 (298) | W 600 (W 400–600 within 1 point) |
+
+**What it says:**
+- **The best fixed W at 32 nodes is 400 for σ 100 and σ 2,000.** σ 100: 1.04–1.09 of W 300 per rep. σ 2,000: 1.01–1.21. On uniform, W 300–500 are level within the noise.
+- **The lowest blocked share marks the best fixed W in 5 of 6 cells.** In the sixth (uniform, 32 nodes) W 400–600 are within a point of each other and within the noise in rate. With L16 that makes 11 of 12 cells.
+- **The quantile rule misses W 400 on σ 100 at 32 nodes:**
+  - It holds W at 313 and reaches 0.87–0.96 of W 400 per rep.
+  - On σ 2,000 it reaches 0.96–0.98 of W 400; on uniform it is the best arm.
+- **The cost of a wider window is still mostly blocked time.**
+  - At W 600, busy time per committed event is 1.05× W 300 (σ 100), 1.10× (σ 2,000) and 1.12× (uniform) at 32 nodes.
+  - The blocked share stops falling at W 400 and rises again.
+- **σ 100 at 32 nodes is not a blocked-time outlier in this allocation:**
+  - From 16 to 32 nodes at W 300 its blocked share rises 5.1 points, about as much as σ 2,000's (5.6).
+  - PE time per committed event rises 6.5% (1.12 to 1.19 µs), not section 173's 23%. Section 173 ran in another allocation, and 32-node runs vary between allocations (section 166).
+
+**Predictions (section 174):**
+- **L1 mostly wrong.**
+  - σ 100's blocked share rises 5.1 points from 16 to 32 nodes at W 300, not ≥ 12.
+  - σ 2,000's rises ≤ 6 points (5.6), which is right.
+  - σ 100 at W 500 on 32 nodes is within 6 points of its 16-node W 300 share (27.7 vs 26.0), which is right.
+- **L2 wrong**, as at 16 nodes: busy time at W 600 is 1.05× W 300 for σ 100, below 1.06.
+- **L3 wrong**, as at 16 nodes: the blocked share at the best W spans 26.5–41.7%.
+
+**What follows (PAPER.md item 2):**
+- Item 2 said: if the lowest blocked share again marks the best W and the controller misses it at 32 nodes, try a blocked-time rule. Both hold.
+- The rule section 174 named for "L3 wrong" already exists: the measured rule (sections 180 and 182). It perturbs W and compares busy plus blocked PE time per committed event.
+- So no separate blocked-time rule: item 2 is closed into item 1.
+- Section 181 shows why the cost must include busy time. On phase-changing PHOLD the lowest blocked share is at the worst W, where rollbacks dominate.
+- Whether the measured rule finds W 400 on σ 100 at 32 nodes is checked in the paper-grade 32-node runs (F1), which run it as the default.
 
 ## Baseline verification on the Mac
 

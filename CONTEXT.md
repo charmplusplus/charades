@@ -155,6 +155,9 @@ Every run's numbers (designs with predictions, results, job IDs, status) are in 
      - before the fix: 113/152;
      - traffic is back in `test.py`.
    - **Open:** the `USE_SPLAY` queue (off by default) still orders by timestamp alone.
+   - **2026-11-01, a second cause (RESULTS.md 183):** `PendingHeap::erase` chose between moving the last element up or down by timestamp alone, so after a cancelled pending event was erased, two equal-timestamp events could pop in the wrong order. Up to 1 multi-process traffic run in 11 committed a different count, with direct sends and htram alike, from 2026-10-22 on (unnoticed: those sections reported rates). Fixed to decide by the comparator. Mac 60/60 runs now equal the sequential run's `--commit-digest`.
+
+9. OPEN 2026-11-01: **dragonfly `gentime` with `bucket_hold_early` hangs at 2 processes × 2 PEs** on the Mac (5/5; the engine tier's only timeout). It hangs at 638c8b8 too, so it predates the heap fix. Single-process shapes pass. It matters only if F3 runs the PADS'19 hold on dragonfly; `--trace-lp` or a `sample` of the hung processes is the next step.
 
 ## Building on Stampede3
 

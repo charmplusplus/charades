@@ -66,7 +66,7 @@ Status:
 | F3 | the PADS'19 static hold and opportunistic (eager) aggregation as baselines | 1, 2 | open issue 1 (hold cutoff); `bucket_hold` config | missing |
 | F4 | robustness: each policy ÷ the best fixed W per workload (controller, best single fixed W, Devastator's rule in Charades, Devastator's own window), and each policy's worst case | 2 | 32–34, 36, 40 (older stack); 173, 176 (current, steady workloads only); 177 (dragonfly: 0.29–0.41) | missing on the current stack; needs the dragonfly fix |
 | F5 | applications: traffic and dragonfly at 1–32 nodes, three engines | 3 | 168–172, 175, 177 (ports, counts, sizes) | missing (all inputs ready) |
-| F6 | where a wider window's cost goes: blocked time and GVT wave period by W | 2, 4 | 176 (4/16 nodes), L32 pending | have at 4/16 nodes |
+| F6 | where a wider window's cost goes: blocked time and GVT wave period by W | 2, 4 | 176 (4/16 nodes), 184 (16/32 nodes) | have |
 | T2 | what scaling took: each fix and its gain | 4 | 21, 26, 24, 50, 88–90, 111, 161, 164, 152 | have; one table |
 
 ## Work left, in order
@@ -77,14 +77,21 @@ time without a reason written here first.
 1. **Controller on dragonfly.**
    - **Status, 2026-11-01:** job D (RESULTS.md 179) found that start-up is not the cause: both of the quantile rule's bounds misfire on dragonfly (0.33–0.40 and 0.78–0.87 of the best W).
    - The user chose the hybrid rule: `--ctl=3` (main 0e158d5), where the delay histogram gives the scale and measured PE time per committed event picks W.
-   - Job M (RESULTS.md 180; 3669193 skx-dev / 3669194 skx) tests it on seven workloads at 4 and 16 nodes. The gate below applies to it.
+   - Job M (RESULTS.md 181, 3669193): it fixes dragonfly (1.00–1.03 of the best fixed W) and is 0.94–1.07 elsewhere, but 0.88–0.94 on phase-changing PHOLD, where W wanders. Worst case 0.88, against 0.31 for the quantile rule and ≤ 0.59 for any single W.
+   - The one allowed change (RESULTS.md 182): a trial must beat the base measured before and after it (`--ctl-bracket=1`). Job N tests it; the controller freezes after job N whatever it shows.
    - The original plan for this item, kept for the record:
    - Start W from the delay histogram's quantile instead of the smallest window, or let W grow faster in the first updates.
    - Then a dragonfly W sweep at 1 and 4 nodes on long runs: W 2,500–20,000 ps and the controller. One skx-dev job.
    - **Gate:** the controller reaches at least 0.9 of the best W.
-2. **Job L32 (queued, 32 and 16 nodes).**
-   - If the lowest blocked share again marks the best W, and the controller misses it at 32 nodes, try one blocked-time rule in one job.
-   - Otherwise the controller is final.
+1a. **Traffic's committed count varied between runs: FIXED (RESULTS.md 183).**
+   - `PendingHeap::erase` reordered equal-timestamp events (code from 2015); up to 1 multi-process run in 11 differed, with direct sends and htram alike.
+   - Fixed and verified on the Mac (60/60 runs equal the sequential run's digest); job N checks it on Stampede3.
+   - Every paper run of traffic and dragonfly carries `--commit-digest`, and T1 compares digests, not only counts.
+2. **Job L32: CLOSED into item 1 (RESULTS.md 184).**
+   - At 32 nodes the best fixed W is 400 for σ 100 and σ 2,000, and the lowest blocked share marks it (11 of 12 cells with L16).
+   - The quantile rule reaches 0.87–0.96 of it on σ 100.
+   - The measured rule is the rule this item called for, so no separate blocked-time rule.
+   - F1's 32-node runs check that it finds W 400.
 3. **Ablation and robustness on the current stack (F2, F3, F4).** 4 and 16 nodes, skx-dev; about 2 jobs.
    - Workloads: lookahead 10 and 100 × σ 100, σ 2,000 and uniform; phase-changing PHOLD; traffic; dragonfly.
    - Arms: direct, eager and deadline aggregation; the PADS'19 hold over a cutoff sweep; a fixed W grid; the controller; Devastator's rule in Charades.
