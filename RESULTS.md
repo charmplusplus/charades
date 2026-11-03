@@ -359,7 +359,8 @@ Sections 1–128 were re-read before planning sections 129 onward.
 | 200 | 2026-11-03 | vbuild200 3677266, V4 3677339 / 3677340; Mac (results in 201 and later) | One process per node against shared memory between the node's processes (Charm++ `--enable-shmem`, user's addition; Reconverse `+ipc`), Devastator at 1 × 46, Charades 1 × 46 / shared memory at W 2,500–10,000; per-copy activity of b19 × 4–32 (Mac); new counters (shared-memory messages, `--copy-stats`); predictions P1–P2, Z1–Z8 and the reading rule | design |
 | 201 | 2026-11-03 | vbuild200 3677266; Mac | Builds (Charm++ `--enable-shmem`, Charades on it, Devastator p1w46 / p4w46) and gates pass; shared-memory smoke runs 0.47× / 0.68× with 1% of messages through the pool: Charades' message pool kept the pool's blocks, FIXED (c7373b4: all messages through the pool, 3.6 µs per send call on the Mac); per-copy activity: copy 2 alone does 1.75× the median copy at 4–32 copies, so from 3 nodes one node carries 1.75× the work in every engine; P1, P2 right | current |
 | 202 | 2026-11-03 | 3677339 | V4 results (incomplete: hit the time limit): 1 × 46 is Charades' best VLSI layout (1.33× / 1.27× 2 × 23; W 5,000 1.47× at 1 node), Charades ÷ Devastator 0.77 / 0.95 each at its best; Charm++ `--enable-shmem` and `+ipc` carry the messages after the fix but run at 0.17–0.21× (16 µs sends, ~260 µs delivery: one locked queue and one locked allocator per process in Reconverse's pool); Devastator 1 × 46 hangs; Z1, Z5, Z6, Z7 half, Z8 right, Z2–Z4 wrong | current |
-| 203 | 2026-11-03 | idev (pending) | Closing the gap (user decision; Reconverse changes allowed): single-worker profiles of both engines, skip the cancel-queue walk when nothing is queued, network polling by one PE / a progress thread, fast shared memory between processes; predictions E1–E3 | design |
+| 203 | 2026-11-03 | idev 3677573 (results in 204) | Closing the gap (user decision; Reconverse changes allowed): single-worker profiles of both engines, skip the cancel-queue walk when nothing is queued, network polling by one PE / a progress thread, fast shared memory between processes; predictions E1–E3 | design |
+| 204 | 2026-11-03 | idev 3677573 | Closing the gap, round 1: skipping the empty cancel-queue walk (single worker 0.65 → 1.53 M ev/s, Devastator 1.59; 1–2% at 46 PEs), lazy fossil collection (`--fossil-lazy=1`, 1.12× at 1 × 46; fast-path wait 29 → 13 µs mean), batch 32, W 5,000: Charades 38.1 = 0.85 of Devastator's best at 1 node (V4 0.77); in-pass draining −6% (rejected); one polling PE +1.4%; E1 right, E2, E3 wrong | current |
 
 ## Stampede3 runs, in order
 
@@ -8644,6 +8645,47 @@ Committed count and digest as V1. About 1% of V3's 15.5 M messages between the n
 - **E1.** The single-worker rates repeat V3's within 5% (Charades 0.64, Devastator 1.60 M ev/s). In Charades' profile, the model's own handlers (gate forward, reverse, commit) take under 25% of cycles; the rest is engine and runtime per event.
 - **E2.** The cancel-queue skip makes 1 × 46 at 1 node 3–8% faster at W 2,500, with the same count and digest.
 - **E3.** One polling PE makes 1 × 46 at 1 node another 5–10% faster.
+
+### Closing the gap, round 1: skipping the empty cancel-queue walk (2.36× on one PE), committing fossils lazily (1.12× on VLSI), and a wider window now paying off: Charades at 0.85 of Devastator's best at 1 node (2026-11-03; idev 3677573, c455-104)
+
+> **Status: current.** Design and predictions in section 203. Charades changes tested in `$WORK/charades-perf` (charades c7373b4 plus the diff below), against `charades-vlsi` c7373b4, both on `charm-pads-exp`. Scripts `$WORK/charades-runs/perf1w.sh`, `cmp1n.sh` (b19 × 1, 1 node, direct sends, buckets of 2,500, 5,000 cycles, 2 reps alternating unless noted); outputs `$WORK/charades-runs/{perf1w,cmp1n}/`. Same committed count and digest (87c11aec…) in every run.
+
+**Single worker** (b19 × 1, 500 cycles; perf, process 0):
+
+| | M committed ev/s (higher is better) | top costs |
+|---|---|---|
+| Charades (c7373b4) | 0.65 | `execute()` 24.8%, `process_cancel_q` 21.0%, `clcg4::seed` 12.4% (setup), `fossil_me` 5.5% |
+| Devastator p1w1 | 1.59 | worker loop 21%; much of the rest its master thread polling psm2 |
+| **Charades, cancel-queue walk skipped when empty** | **1.53** (2.36×) | setup, `fossil_me`, event allocation and queues |
+
+On one PE the walk visited all 1,840 chares on every pass, and most of `execute()`'s own time was that walk's snapshot. Single-worker per-event cost is now about Devastator's.
+
+**1 node, 46 PEs** (M committed ev/s, 2 reps; higher is better):
+
+| change (all on 1 × 46 unless noted) | W 2,500 | W 5,000 |
+|---|---|---|
+| c7373b4 (V4's B) | 29.9 / 30.3 | 34.2 (V4) |
+| cancel-queue skip | 30.4 / 30.7 (2 × 23: 23.5 / 22.2, against 22.9 / 23.3) | 34.6 / 34.2 |
+| + one PE polls the network (`+lci_ndevices 1 +backend_poll_thread 46`) | 30.7 / 31.0 | |
+| **+ lazy fossils (`--fossil-lazy=1`)** | **33.6 / 33.2** (2 × 23: 23.4 / 23.6) | **37.6 / 37.4** |
+| lazy fossils, 4 chares per pass | 32.3 / 32.6 | |
+| lazy fossils, `--batch` 4 / 8 / 32 | 30.9 / 32.2 / 33.8 | batch 32: **38.1 / 38.2**; 64: 38.1 |
+| lazy fossils, input buffer drained after every event in a pass (rejected) | 31.6 / 31.4 | |
+| lazy fossils, batch 32, W 10,000 | | 36.1 (1 rep) |
+| Devastator 2 × 23 (V4) | 41.5 | 44.6 |
+
+- **Fast-path latency** (`--comm-stats=1` now times sends between PEs of a process, "Same Process"): at 1 × 46, W 2,500, an event pushed to another PE waited a mean of 29.4 µs before that PE drained it (median 4–8 µs, p90 ≤ 131, p99 ≤ 524). With lazy fossils: mean 13.4 µs, p90 ≤ 33, p99 ≤ 262.
+- **Why lazy fossils help:** on each GVT update (once per clock cycle here) every PE committed the whole previous cycle's events (~550) before running anything, while the next cycle's events waited in its input buffer. `--fossil-lazy=1` records the GVT and commits one chare's fossils per pass that ends without a full batch; all at once at the end, before load balancing, and after 4 updates without finishing. Commit order within each LP is unchanged.
+- **Per pass the scheduler machinery still costs:** re-enqueuing `execute()` as a Charm++ message and the Converse sweep (about 25% of process 0's cycles), and LCI progress with nothing to receive (13%), mostly while blocked. `CmiNodeBarrier` (4%) is setup, as `clcg4::seed` is (no frame pointers, so no call graph).
+
+**Predictions (section 203):**
+- **E1 right.** Single-worker rates 0.65 / 1.59 (V3 0.64 / 1.60); the model's own handlers take a few percent of Charades' cycles.
+- **E2 wrong.** The skip is worth 1–2% at 46 PEs (about 40 chares each), not 3–8%; it is 2.36× on one PE.
+- **E3 wrong.** One polling PE is worth 1.4%, not 5–10%.
+
+**Where this leaves the gap (1 node):** Charades' best, 1 × 46 with lazy fossils, batch 32, W 5,000, is 38.1 M ev/s: **0.85 of Devastator's best** (44.6), up from 0.77 (V4) and 0.51 (V1). At 2 × 23 the sends between processes still hold Charades at about 23.5.
+
+**Next:** the Mac engine tier on the cancel-queue skip, then commit; the same tiers with `--fossil-lazy=1` before it becomes the default, and the controller rechecked (it reads committed counts per round); Reconverse's shared-memory pool rewritten (per-PE receive queues, per-sender return lists; branch `pads-perf`), tested on the Mac, then built on an skx node.
 
 ## Baseline verification on the Mac
 
