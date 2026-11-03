@@ -26,7 +26,7 @@ Every number from every run: Stampede3 runs in order (each design, written befor
 | dragonfly | **0.94** / 1.04 / 1.29 / 1.51 / 1.80 / 2.03 | 3.80 / 3.69 / 3.94 / 4.01 / 3.94 / 4.26 | **0.56** / 0.26 / 0.50 | 689.6 / 339.2 / 161.9 |
 | traffic | 1.03 / 1.05 / 1.02 / 1.04 / 1.03 / 1.08 | 1.70 / 1.99 / 1.99 / 2.04 / 2.12 / 2.19 | **0.94** / 0.89 / 0.73 | 1,846.6 / 1,706.1 / 843.6 |
 
-(Bold: below 1 in the ratio columns; best of the three in the efficiency column.) The controller is 0.95–1.05 of Charades' best fixed W per rep at 32 nodes. VLSI (b19 × N) joins this table after V1 (section 193).
+(Bold: below 1 in the ratio columns; best of the three in the efficiency column.) The controller is 0.95–1.05 of Charades' best fixed W per rep at 32 nodes. VLSI (b19 × N) at 1 and 4 nodes (V1, section 195): Charades ÷ Devastator 0.51 / 0.75, ÷ ROSS 6.9 / 7.9; its 1–32-node runs wait on a diagnostic job.
 
 **Paper-grade weak scaling, Charades against Devastator and ROSS, 1–32 nodes, all eight workloads** (jobs 3653803, 3654651 and 3657016, sections 142–143 and 153; long runs, 3 reps; Charades: its controller, the better htram setting at each node count, chare rollback (per-LP rollback came later, section 152); Devastator: its best of three W; ROSS: the better of optimistic batch 16 / GVT interval 64 and conservative; the same committed events in all three engines in every cell):
 
@@ -351,6 +351,7 @@ Sections 1–128 were re-read before planning sections 129 onward.
 | 192 | 2026-11-02 | 3674282 | V0 results: one count per cell in all three engines, Devastator's own allocator fine on Linux; but b19's file order puts all flip-flops (28% of events, a clock event each per cycle) on PE 0, 9.83× the mean load, so every engine's rate is one PE's per-event cost (Charades 8.5 / Devastator 5.9 M ev/s at 1 node; blocked at the window 67–70%, per PE 0–99.9%); controller held at W 500 ps (0.85–0.90); htram ÷ direct 1.01–1.05; ROSS ran without its window (`--max-opt-lookahead`); ROSS dragonfly GVT 256 ÷ 64 0.64–0.84; balanced layout (activity-weighted equal-count chunks, 1.03× offline) needed before any VLSI scaling run | current |
 | 193 | 2026-11-02 | — (Mac); V1 3675179 (gate failed, not reproduced in 1,210 reruns), resubmitted 3675299 / 3675300 | Balanced VLSI layout (`--chunk=512`, default; user decision): chunks placed heaviest first by a pre-simulated activity estimate into one equal bin per PE, the same in all three engines; busiest PE 1.04× the mean (file order 9.93×), 66% of messages cross PEs; span 4 now 45% across nodes; Mac: change tier 48/48, b19 × 2 one count, statistics and digest across engines and schedulers; job V1 design (window, controller, aggregation, span, Devastator, ROSS with `--max-opt-lookahead`), predictions W1–W10 | design |
 | 194 | 2026-11-02 | 3673481 | F5b, 32 nodes: one count per cell in all three engines (T1); dragonfly Charades ÷ Devastator 2.03, ÷ ROSS 4.26, Charades 16→32 per-node 0.90 (Devastator 0.80); traffic ÷ Devastator 1.08, ÷ ROSS 2.19, 16→32 0.99; traffic's best W widens to 1,000 and the controller follows (0.95–1.10 of best fixed per rep); 16-node half reproduces F5a within 1–3%; S1, S3, S4, S6 right, S2 just short once at 16, S7 half; ROSS ran without its window | current |
+| 195 | 2026-11-02 | 3675299 | V1 (balanced VLSI layout, 1 and 4 nodes): one count per cell in three engines; Charades ÷ Devastator 0.51 / 0.75 (span 4 0.55), ÷ ROSS 6.9–7.9 (ROSS with its window); Charades' best is direct sends at W 2,500 (22.9 / 61.9 M ev/s), PP 0.65–0.83 of direct, controller held at W 500 (0.80–0.89 of PP's best); Charades makes one GVT update per clock cycle at every W and waits at the window 44–75%; hypotheses H1 (per-hop latency on the cycle's critical path) and H2 (GVT pace) to test; W1, W3–W6, W9 right, W2, W7, W8, W10 wrong | current |
 
 ## Stampede3 runs, in order
 
@@ -8206,6 +8207,60 @@ Each PE receives about 186 messages per cycle in every layout. Chunks of 512 sta
 - F5 and T1 are complete for traffic and dragonfly at 1–32 nodes. Charades leads Devastator from 2 nodes on (dragonfly 1.04 → 2.03) and at every node count on traffic (1.02–1.08 with the controller). ROSS trails by 1.7–4.3×.
 - The VLSI cells wait on V1 (section 193).
 - Before the paper quotes Charades ÷ ROSS, ROSS needs a `--max-opt-lookahead` arm on dragonfly and traffic. The user has not yet decided whether a job gets it.
+
+### V1 results: on the balanced layout Devastator is 2.0× Charades at 1 node and 1.3× at 4 nodes; Charades advances GVT once per clock cycle and waits at the window 44–75% of the time at every W; htram loses to direct sends (2026-11-02; skx-dev batch job 3675299, 6 nodes)
+
+> **Status: current.** Design and predictions in section 193 (W1–W10). 38 min 40 s (skx copy 3675300 cancelled). Gate 45/45. Devastator's vlsi binaries rebuilt for 1–32 nodes. Every Charades and Devastator run finished. ROSS's unwindowed batch 8 hit its 240 s cap at 1 node and ran out of event buffers at 4 nodes ("Out of events in GVT"). Summary `~/charades-data/vlsi/vcal193_summary.py` (output `j3675299_summary.txt`); data `~/charades-data/vlsi/j3675299/`.
+
+**Rates** (b19 × N, one copy per node, 5,000 cycles; M committed ev/s, median of 2 reps, higher is better):
+
+| engine and setting | 1 node | 4 nodes, span 1 | 4 nodes, span 4 |
+|---|---|---|---|
+| Charades, direct sends, W 2,500 (its best) | **22.9** | **61.9** | **48.9** |
+| Charades, WPs 512, W 2,500 | 22.7 | 59.3 | — |
+| Charades, PP 2,048, its best W | 19.3 (W 5,000) | 48.0 (W 2,500) | 33.9 (W 10,000) |
+| Charades, controller (PP 2,048) | 15.4 | 42.1 | 30.3 |
+| Charades, file order (PP 2,048, W 2,500) | 8.2 | 35.9 | — |
+| Devastator, its best W | **45.0** (W 10,000) | **82.6** (W 2,500) | **88.2** (W 10,000) |
+| Devastator, adaptive window | 27.0 | 44.3 | — |
+| Devastator, file order (W 10,000) | 6.7 | 32.0 | — |
+| ROSS, best (with `--max-opt-lookahead`) | 3.3 (batch 2, 5,000) | 7.8 (batch 8, 2,500) | 6.2 (batch 8, 5,000) |
+| **Charades ÷ Devastator**, each at its best | 0.51 | 0.75 | 0.55 |
+| Charades ÷ ROSS, each at its best | 6.9 | 7.9 | 7.9 |
+
+- **The balanced layout** speeds Charades up 2.3× (1 node) and 1.3× (4 nodes) over file order at the same setting, and Devastator 6.7× and 2.6×. V0's Charades ÷ Devastator of 1.44 (section 192) compared one overloaded PE's per-event cost and does not carry over.
+- **Charades' window** (PP 2,048, 1 node): W 1,250 15.8, W 2,500 19.1, W 5,000 19.3, W 10,000 15.1, W 20,000 12.8. Efficiency falls from 97–99% at W ≤ 2,500 to 80–84% at W 10,000 and 69% at W 20,000. Devastator's best W runs at 88% (1 node) and 99% (4 nodes).
+- **Per-node rate at 4 nodes ÷ at 1** (span 1): Charades 0.68, Devastator 0.46, ROSS 0.59. Devastator loses more per node, as on dragonfly (section 194), but from a 2× lead.
+- **Span 4 ÷ span 1 at 4 nodes:** Charades 0.79, Devastator 1.07.
+
+**What limits Charades here** (measured facts; the cause is not yet established):
+- **GVT advances once per clock cycle.** Every Charades run, at every W, mode, node count and span, makes 4,992–5,008 GVT updates for 5,000 cycles. The run time is 5,000 × the update interval: 1.1 ms at 1 node (903 updates/s, direct W 2,500), 1.85 ms at 4 nodes (540/s). Each update takes 2–4 count waves.
+- **PEs wait at the window at every W.** Mean blocked share 63% at W 2,500 and still 49% at W 10,000 (1 node); 72–75% at 4 nodes. The least-blocked PE waits about 20% of the time, so no single PE holds the rest back (file order: 0%).
+- **Aggregation adds to the cycle time.** PP 2,048 ÷ direct is 0.83 / 0.78 / 0.65 at W 2,500 (1 node / 4 nodes / span 4) and 0.67–0.74 at W 10,000. WPs 512 is 0.96–0.99 of direct.
+- **Hypotheses, to be told apart by perturbation before any fix:**
+  - **H1, the critical path within a cycle:** about 25 gate levels, with 66% of hops crossing PEs. Each cycle's work then waits on per-hop message latency, and speculation past it is rolled back (efficiency falls with W). Devastator's shared-memory queues deliver a message to another thread faster, and htram's buffering adds latency to each hop. Test: change Charades' per-hop latency (scheduler batch `--batch` 4 / 16 / 64) with the GVT settings fixed.
+  - **H2, GVT pace:** the update interval itself sets the cycle time. Test: buckets of 2,500 ps (one per cycle) against 500, with the window fixed.
+
+**Predictions (section 193):**
+- **W1 right.**
+  - One count per cell in all three engines (125,998,590 / 574,541,914), the file-order arms included.
+  - Charades gives one digest per layout. Its file-order digests equal V0's (be287b9c…, d936d32a…).
+  - Devastator is deterministic in every run.
+- **W2 wrong.** The blocked share stayed 62–75% at W ≤ 2,500, not ≤ 35%. The per-PE spread narrowed from 0–99.9% to about 20–90%, still not within 40 points.
+- **W3 right.** Charades' best is 22.9 M ev/s at 1 node (direct sends; PP 2,048 reaches 19.3). The file-order arm gives 8.2, 0.96 of V0's 8.5.
+- **W4 right.** Devastator's best is 45.0 M ev/s, 7.6× V0's.
+- **W5 right.** The best fixed W is 2,500 (direct; PP 2,500 and 5,000 within 1%). W 1,250 and W 20,000 are 0.69–0.82 and 0.56–0.66 of the best.
+- **W6 right in the same mode.** The controller holds W at 500 ps and reaches 0.80 / 0.88 / 0.89 of PP 2,048's best fixed W. Against Charades' best arm overall (direct sends) it reaches 0.62–0.70.
+- **W7 wrong.** htram ÷ direct is 0.78–0.99, not ≥ 1.15.
+- **W8 wrong.** Span 4 ÷ span 1 is 0.79, not ≤ 0.6. htram ÷ direct at span 4 is 0.65–0.72, not ≥ 1.5. Charades ÷ Devastator at span 4 is 0.55, not ≥ 1.2.
+- **W9 right.** With a window, ROSS's best is 3.3 / 7.8 M ev/s, 2.1× / 3.5× V0's unwindowed batch 8. Unwindowed batch 8 stalled or ran out of event buffers here. Charades ÷ ROSS is 6.9–7.9.
+- **W10 wrong.** Charades ÷ Devastator is 0.51 and 0.75, not 1.0–1.4.
+
+**Consequences:**
+- **Claim 3's wording:** on VLSI at 1–4 nodes Charades trails Devastator by 1.3–2.0×. This is the first application where it does. Charades loses less per node (0.68 against 0.46 from 1 to 4 nodes), so the 1–32-node runs decide whether the order changes, as it did on dragonfly (0.94 → 2.03).
+- **The controller (claim 2)** gets 0.62–0.70 of the best arm on VLSI. Its smallest W is one bucket, and every remote delay here falls inside one. Buckets of one clock period (2,500 ps) would make its smallest W the best fixed W; that needs measuring, as the H2 test does.
+- **Aggregation (claim 1)** does not help on VLSI. PP loses up to 35%. That fits a workload limited by latency rather than by message count, if H1 holds.
+- **Before the 1–32-node VLSI job:** a short diagnostic job at 1 and 4 nodes (the H1 and H2 tests, and the 2,500 ps buckets for the controller), with predictions written first. The user decides whether VLSI gets that engine time.
 
 ## Baseline verification on the Mac
 
