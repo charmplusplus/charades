@@ -356,6 +356,7 @@ Sections 1–128 were re-read before planning sections 129 onward.
 | 197 | 2026-11-02 | 3675628 | V2 results: GVT rounds fill 5–6% of each cycle (2 waves of 0.03–0.04 ms, then 0.6–2.4 ms with none), so GVT pace is out; faster waves change nothing; shorter passes are slower (batch 4 0.87–0.90); each cycle's execution is a chain of dependent events with every PE waiting ≥ 20%; buckets of one clock period make the controller pick W 2,500 (0.99 of the best fixed W); step cost and Devastator's gain from a wider window open | current |
 | 198 | 2026-11-03 | V3 3677137 (results in 199) | Why a Charades clock cycle takes 1.8× Devastator's at the same window (job V3 design): most of V1's gap is at the same W (0.56 at 1 node; Devastator's wider window adds only 1.09×); 1 → 4 nodes adds 0.76 / 0.78 ms per cycle in both engines; hypotheses per-event cost (single-worker runs of both engines), hops between processes (1 × 46 PEs per node), delivery latency (`--comm-stats`); per-PE stats at W 2,500 / 10,000 (new `blocked_s`); perf of both engines; predictions Y1–Y7 and the reading rule | design |
 | 199 | 2026-11-03 | 3677137 | V3 results: sends between the node's two processes cost the sending PE 1.97 µs each (11.8% of PE time) and stall the heaviest senders; 1 × 46 PEs per node is 1.32× (1 node) / 1.28× (4 nodes), Charades ÷ Devastator 0.73 / 0.96 (2 × 23: 0.56 / 0.75); the cost added at 4 nodes is copy 2's 1.56× activity, the same in every engine; single worker Charades ÷ Devastator 0.40 (working set dominates); perf: Charades polls the network on every PE (~18% of cycles), Devastator 0.3%; Y1, Y2, Y6 right, Y5, Y7 half, Y3, Y4 wrong | current |
+| 200 | 2026-11-03 | vbuild200, V4 (to be submitted); Mac | One process per node against shared memory between the node's processes (Charm++ `--enable-shmem`, user's addition; Reconverse `+ipc`), Devastator at 1 × 46, Charades 1 × 46 / shared memory at W 2,500–10,000; per-copy activity of b19 × 4–32 (Mac); new counters (shared-memory messages, `--copy-stats`); predictions P1–P2, Z1–Z8 and the reading rule | design |
 
 ## Stampede3 runs, in order
 
@@ -8479,6 +8480,48 @@ Every arm makes 4,999–5,008 GVT updates (one per clock cycle) at 2.0–3.4 cou
 - **The remaining 1-node gap (0.73)** is in the chain's step time with every PE blocked at least 49%. The 2 × 23 profile points at per-PE network polling (about 18% of cycles), `process_cancel_q` and spin locks; a 1 × 46 profile is needed to say what remains once the sends between processes are gone.
 - **Charades' wider window** may pay off at 1 × 46, where the heavy senders no longer set the pace; untested.
 - **Before the 1–32-node job:** measure each copy's activity for N up to 32 offline (the busiest copy sets every engine's pace), and decide whether the workload keeps independent inputs per copy.
+
+### One process per node against shared memory between the node's processes, in both engines; each copy's activity (job V4 and a Mac check, design, 2026-11-03; written before any runs)
+
+> **Status: design.** User decisions 2026-11-03: a per-copy activity check on the Mac and a short job with Devastator at one process per node and Charades' 1 × 46 at wider windows; **the user added Charades runs on Charm++ built with `--enable-shmem`**. Builds and checks run first in job vbuild200 on skx compute nodes (LCI compiles with `-march=native`; the login nodes are Sapphire Rapids). Scripts `~/charades-data/vlsi/vbuild200.slurm`, `vdiag200.slurm`, `vdiag200_summary.py`. Charades 269c608 counts messages delivered through the runtime's shared-memory pool ("Shared-Memory Messages Received"); the model's `--copy-stats=1` prints each copy's committed pin changes plus evaluations.
+
+**What the shared-memory runs use:**
+- **`charm-pads-shmem`:** `charm-pads-exp`'s source (Charm++ 9d6a55780, Reconverse `pads-dest-device` 22871c6) and the same patched LCI source, built `--with-production --enable-shmem`. With `CMK_USE_SHMEM`, Charm++ sets up Reconverse's shared-memory pool (POSIX shared memory) at startup and sends each message for a PE in another process on the same host through it (`_tryIpcSend`), falling back to the network when a message exceeds the pool's block size or no block is free. Charades' tree `charades-shmem` builds against it.
+- **Reconverse's `+ipc`:** the same pool, switched on at run time and used by Converse's send (`CmiSyncSendAndFree`), with the existing build. Included because it needs no rebuild.
+- On the Mac (2 processes, tiny circuit) `+ipc` delivered 1,740 messages through the pool with the same committed count, and the VLSI change tier passed 15/15 at 2 × 2.
+
+**Per-copy check (Mac, one process, 8 PEs, W 2,500, buckets of 2,500):** b19 × 4 over 5,000 cycles (V3's 4-node workload), and b19 × 4, 8, 16, 32 over 1,000 cycles.
+- **P1.** 4 copies over 5,000 cycles commit 574,541,914, V3's 4-node count. Copy 2 is the most active, at least 1.5× the mean of the other three.
+- **P2.** The most active copy's activity ÷ the mean copy's is at least 1.3 at 8, 16 and 32 copies over 1,000 cycles, and it does not shrink as copies are added.
+
+**Job V4 runs** (b19 × N, span 1, direct sends, buckets of 2,500 ps, 5,000 cycles, `--copy-stats=1`; 1-node and 4-node series side by side; 2 reps, rep 2 reversed):
+- **Charades:**
+  - A: 2 × 23 PEs per node (reference), W 2,500.
+  - B: 1 × 46 on the same cores, W 2,500 / 5,000 / 10,000.
+  - C: 2 × 23 on `charades-shmem` (Charm++ `--enable-shmem`), W 2,500 / 5,000 / 10,000.
+  - D: 2 × 23 with `+ipc`, W 2,500.
+  - C with `--comm-stats=1` at W 2,500.
+  - Rep 1, 1 node: `--pe-stats=1 --gvt-trace=1` for B and C at W 2,500; perf (process 0) of B and C.
+- **Devastator:** 2 × 23 (p2w23 / p8w23) and 1 × 46 (p1w46 / p4w46, built in vbuild200), each at W 2,500 / 5,000 / 10,000.
+- Gate: the VLSI change tier on 2 nodes (charades-vlsi). vbuild200 already ran it with the shared-memory tree on 1 node (2 × 2, 4 × 2) and 2 nodes, and with `+ipc` on 1 node, on the same binaries.
+
+**Predictions:**
+- **Z1.**
+  - One count per cell (125,998,590 / 574,541,914) in both engines and every Charades build and layout; every Charades arm gives V1's digest (87c11aec… / 0c800d36…); Devastator deterministic.
+  - Shared-memory messages: 0 for A and B. For C and D, at least 90% of V3's count of events between processes on a node (15.5 M at 1 node, 71.9 M at 4 nodes).
+- **Z2 (Charm++ shared memory).** C ÷ A at W 2,500 is at least 1.15 at 1 node and at least 1.13 at 4 nodes (half or more of 1 × 46's gain). C ÷ B is 0.87–1.00: a send still copies the message into a shared block, and the receiver polls the pool.
+- **Z3 (`+ipc`).** D is within ±5% of C.
+- **Z4 (latency through the pool).** With `--comm-stats=1` on C, the mean latency between processes on a node is at most 7 µs (V3 through LCI: 14.5) and the mean send call at most 1 µs (V3: 1.97).
+- **Z5 (Devastator's layout).** Devastator 1 × 46 ÷ 2 × 23, each at its best W, is 0.95–1.10 at 1 and 4 nodes. Its workers already hand messages to other processes through a master thread and GASNet's shared-memory transport. Then Charades ÷ Devastator, each at its best layout and W, is 0.68–0.80 at 1 node and 0.88–1.05 at 4 nodes.
+- **Z6 (wider windows).** For B and C, the better of W 5,000 and W 10,000 ÷ W 2,500 is 1.00–1.10 (at 2 × 23 through LCI, V3: 0.98).
+- **Z7 (per PE, 1 node, W 2,500).** The least-blocked PE is blocked at least 40% (V3 2 × 23: 20%); the correlation between blocked share and remote sends is at most 0.4 in size for B and 0.5 for C (V3 2 × 23: −0.74).
+- **Z8 (copy activity).** Every Charades arm at 4 nodes prints the same per-copy activity as the Mac's 4-copy, 5,000-cycle run.
+
+**Reading** (fixed before the runs):
+- **If C is at least 0.95 of B**, shared memory between the node's processes gives Charades one process per node's gain while keeping one process per socket. VLSI uses it, and it is tested on the other applications before it becomes the default launch.
+- **If C is below 0.90 of B**, the pool still costs on the send path. 1 × 46 is Charades' VLSI launch, with Devastator also at its best layout.
+- Paper comparisons use each engine's best layout and W at each node count. This is a launch and runtime-build choice; the frozen engine does not change.
+- The per-copy results decide whether the 1–32-node job keeps independent random inputs per copy.
 
 ## Baseline verification on the Mac
 
