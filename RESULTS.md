@@ -26,7 +26,7 @@ Every number from every run: Stampede3 runs in order (each design, written befor
 | dragonfly | **0.94** / 1.04 / 1.29 / 1.51 / 1.80 / 2.03 | 3.80 / 3.69 / 3.94 / 4.01 / 3.94 / 4.26 | **0.56** / 0.26 / 0.50 | 689.6 / 339.2 / 161.9 |
 | traffic | 1.03 / 1.05 / 1.02 / 1.04 / 1.03 / 1.08 | 1.70 / 1.99 / 1.99 / 2.04 / 2.12 / 2.19 | **0.94** / 0.89 / 0.73 | 1,846.6 / 1,706.1 / 843.6 |
 
-(Bold: below 1 in the ratio columns; best of the three in the efficiency column.) The controller is 0.95–1.05 of Charades' best fixed W per rep at 32 nodes. VLSI (b19 × N) at 1 and 4 nodes (V1, section 195): Charades ÷ Devastator 0.51 / 0.75, ÷ ROSS 6.9 / 7.9. With one process per node (V3, section 199) Charades is 1.28–1.32× faster: ÷ Devastator 0.73 / 0.96 at W 2,500, Devastator not yet run with one process per node. Its 1–32-node runs wait on that and on a per-copy activity check.
+(Bold: below 1 in the ratio columns; best of the three in the efficiency column.) The controller is 0.95–1.05 of Charades' best fixed W per rep at 32 nodes. VLSI (b19 × N) at 1 and 4 nodes (V5, section 208): Charades (one process per node, lazy fossils, batch 32; its best W) ÷ Devastator (2 × 23, its best W) 0.85 / 1.00 (V1, section 195: 0.51 / 0.75; ÷ ROSS 6.9 / 7.9 then). Devastator at one process per node still hangs on Stampede3 (it runs on the Mac). The 1–32-node runs wait on that and on section 207's trace of the 1-node gap.
 
 **Paper-grade weak scaling, Charades against Devastator and ROSS, 1–32 nodes, all eight workloads** (jobs 3653803, 3654651 and 3657016, sections 142–143 and 153; long runs, 3 reps; Charades: its controller, the better htram setting at each node count, chare rollback (per-LP rollback came later, section 152); Devastator: its best of three W; ROSS: the better of optimistic batch 16 / GVT interval 64 and conservative; the same committed events in all three engines in every cell):
 
@@ -362,8 +362,9 @@ Sections 1–128 were re-read before planning sections 129 onward.
 | 203 | 2026-11-03 | idev 3677573 (results in 204) | Closing the gap (user decision; Reconverse changes allowed): single-worker profiles of both engines, skip the cancel-queue walk when nothing is queued, network polling by one PE / a progress thread, fast shared memory between processes; predictions E1–E3 | design |
 | 204 | 2026-11-03 | idev 3677573 | Closing the gap, round 1: skipping the empty cancel-queue walk (single worker 0.65 → 1.53 M ev/s, Devastator 1.59; 1–2% at 46 PEs), lazy fossil collection (`--fossil-lazy=1`, 1.12× at 1 × 46; fast-path wait 29 → 13 µs mean), batch 32, W 5,000: Charades 38.1 = 0.85 of Devastator's best at 1 node (V4 0.77); in-pass draining −6% (rejected); one polling PE +1.4%; E1 right, E2, E3 wrong | current |
 | 205 | 2026-11-03 | idev 3677573 | Reconverse's shared-memory pool rewritten (`pads-perf`: one receive queue per PE, per-sender return lists, no locks): 2 × 23 with the pool 32.5–33.3 M ev/s = 1.38× over LCI, 0.86 of 1 × 46 (38.1); `--enable-shmem` = `+ipc`; send call 0.74 µs (old 16, LCI 2.0); the controller holds W 2,500 while the best fixed W is now 5,000 (0.88) | current |
-| 206 | 2026-11-03 | V5 (results in a later section) | Round 1's settings at 1 and 4 nodes in both engines (job V5 design): VLSI 1 × 46 with lazy fossils / batch 32 at W 2,500–10,000, the controller at buckets of 5,000 ps, 2 × 23 over `+ipc` / `--enable-shmem` / LCI, Devastator 2 × 23 (and 1 × 46 if its Stampede3 hang is fixed: on the Mac p1w46 runs); lazy against eager fossils on six workloads at two W and the controller, `+ipc` and the paper's tree for reference; predictions F1–F9 and the default rule | design |
+| 206 | 2026-11-03 | V5 3678312, 3678365 (results in 208) | Round 1's settings at 1 and 4 nodes in both engines (job V5 design): VLSI 1 × 46 with lazy fossils / batch 32 at W 2,500–10,000, the controller at buckets of 5,000 ps, 2 × 23 over `+ipc` / `--enable-shmem` / LCI, Devastator 2 × 23 (and 1 × 46 if its Stampede3 hang is fixed: on the Mac p1w46 runs); lazy against eager fossils on six workloads at two W and the controller, `+ipc` and the paper's tree for reference; predictions F1–F9 and the default rule | design |
 | 207 | 2026-11-03 | idev (results in a later section) | Where a VLSI clock cycle's wall time goes (design): `--event-trace-from/-to` records each event's send, arrival, executions and rollbacks and each PE's passes and GVT updates; `event_trace.py` follows each cycle's last event back through its senders and splits the chain into send, transit and queue, and those by what the receiving PE did (later / earlier events, pass, blocked, empty, outside); hypotheses H1 ahead work, H2 busiest PEs, H3 per-pass machinery; predictions T1–T4 | design |
+| 208 | 2026-11-03 | 3678365 | V5 results: Charades ÷ Devastator 0.853 at 1 node (37.3 against 43.8 M ev/s) and 1.001 at 4 (both 1.40 ms per cycle at W 2,500; copy 2's node sets the pace; W 5,000 reps vary up to 4.8×); 2 × 23 over the new pool 0.86 / 0.91 of 1 × 46 (`+ipc` = `--enable-shmem`); the controller on VLSI sits at one bucket in every round, so the bucket width sets W; lazy fossils 0.94–0.95 on Gaussian and uniform PHOLD (blocked share up), stay off by default (a VLSI setting); the new tree 0.96–1.06 of the paper's; `+ipc` with htram 0.97–1.12; F1, F2, F4 right, F8 mostly, F5, F7 half, F3 one of three, F6 wrong | current |
 
 ## Stampede3 runs, in order
 
@@ -8786,6 +8787,73 @@ Each workload runs eager and lazy fossils at both W and under the frozen control
 - T3 right: a frontier event's arrival should preempt the batch. Check the input buffer with one relaxed load per event and drain only when it is not empty (the drain after every event of section 204 paid an exchange per event and lost 6%), or end a pass early when the input buffer holds an event earlier than the next one in the heap.
 - 'earlier' dominates (H2): the layout, which balances events per PE but not sends or chain position.
 - 'outside' or 'pass' dominates (H3): the scheduler loop. Run passes inside one Converse handler instead of re-enqueuing `execute()` as a message each pass, and cut the engine's per-event work.
+
+### V5 results: Charades equals Devastator at 4 nodes (1.00) and is 0.85 of it at 1 node; one process per node stays Charades' VLSI launch; lazy fossils lose 4–6% on Gaussian and uniform PHOLD and stay a VLSI setting; on VLSI the controller sits at one bucket, so the bucket width sets W (2026-11-03; skx-dev batch job 3678365, 5 nodes)
+
+> **Status: current.** Design and predictions in section 206.
+> - **Job:** gate 60/60; all 224 runs finished in 20 minutes (skx copy 3678366 cancelled). The first submission (3678312) stopped at its own pre-run checks (section 206). Devastator 1 × 46 not run.
+> - **Data:** `~/charades-data/vlsi/j3678365/`; summary `~/charades-data/vlsi/v5gap206_summary.py` (output `j3678365_summary.txt`).
+> - **Counts (F1 right):** one committed count per cell over every arm and both engines (VLSI 125,998,590 at 1 node, 574,541,914 at 4); one digest per VLSI node count and per traffic and dragonfly cell; Devastator deterministic.
+
+**Part A, VLSI** (b19 × N; M committed ev/s, median of 2 reps (each rep after the slash), higher is better; ms per clock cycle, lower is better):
+
+| arm | 1 node | ms / cycle | 4 nodes | ms / cycle |
+|---|---|---|---|---|
+| R: 1 × 46, eager fossils, batch 16, W 5,000 | 34.24 (34.15 / 34.33) | 0.736 | 67.20 (59.29 / 75.10) | 1.734 |
+| L: 1 × 46, lazy fossils, batch 32, W 2,500 | 33.20 | 0.759 | **81.91 (82.67 / 81.15)** | 1.403 |
+| L, W 5,000 | **37.34 (37.72 / 36.95)** | 0.675 | 69.08 (71.19 / 66.96) | 1.665 |
+| L, W 10,000 | 35.85 | 0.703 | 59.50 (64.85 / 54.15) | 1.947 |
+| Lc: L with the controller, buckets of 5,000 ps (W 5,000 in every round) | 36.68 | 0.687 | 74.76 | 1.537 |
+| I: 2 × 23, `+ipc`, as L at W 5,000 | 32.06 | 0.786 | 63.14 | 1.820 |
+| S: 2 × 23, Charm++ `--enable-shmem`, as I | 31.98 | 0.788 | 63.24 | 1.817 |
+| N: 2 × 23 over LCI, as I | 22.83 | 1.104 | 58.84 | 1.953 |
+| Devastator 2 × 23, W 2,500 | 40.25 | 0.626 | **81.85 (81.15 / 82.55)** | 1.404 |
+| Devastator, W 5,000 | 42.98 | 0.586 | 46.95 (77.80 / **16.11**) | 4.305 |
+| Devastator, W 10,000 | **43.80 (43.95 / 43.64)** | 0.575 | 81.42 | 1.411 |
+| **Charades' best ÷ Devastator's best** | **0.853** | | **1.001** | |
+
+- **At 1 node** the gap is section 204's: 37.3 against 43.8 M ev/s, 0.675 against 0.575 ms per cycle.
+- **At 4 nodes** both engines run 1.40 ms per cycle at W 2,500. The node holding copy 2 (1.75× the median copy's activity, section 201) sets both engines' pace. Wider windows lose for Charades here (W 5,000 0.84 of W 2,500), and the 4-node reps of R, L W 10,000 and Devastator W 5,000 differ by up to 4.8× (Devastator 77.8 against 16.1). Only W 2,500 repeats within 2% in both engines.
+- **Layouts:** sending between the node's two processes through the new pool gives 0.86 (1 node) and 0.91 (4 nodes) of one process per node, against 0.61 / 0.85 over LCI. Charm++'s `--enable-shmem` and Reconverse's `+ipc` are within 0.3% of each other. **One process per node stays Charades' VLSI launch.**
+- **The controller on VLSI:** its W was 5,000 ps (one bucket) in every round of all four runs, as it was 2,500 with buckets of 2,500 (section 205). Its smallest W is one bucket and it never widens from there, so on VLSI the bucket width sets W. Buckets of 5,000 ps give 0.98 of the best fixed W at 1 node (best W 5,000) and 0.91 at 4 nodes (best W 2,500). Buckets of 2,500 would give about 0.89 at 1 node and 1.00 at 4.
+
+**Part B, lazy fossils elsewhere** (2 × 23 over LCI; median M committed ev/s of 2 reps at the better of the two W; ratios higher is better):
+
+| workload | nodes | eager | lazy ÷ eager, best W / controller | eager ÷ the paper's tree (first W) | `+ipc` ÷ LCI, lazy (first W) |
+|---|---|---|---|---|---|
+| phase-changing PHOLD | 1 | 38.53 | 0.977 / 1.038 | 0.998 | 1.099 |
+| | 4 | 116.12 | 1.058 / 0.965 | 0.964 | 1.007 |
+| σ 100 | 1 | 45.63 | **0.951** / 0.953 | 0.994 | 1.002 |
+| | 4 | 178.72 | **0.954** / 0.956 | 1.032 | 1.003 |
+| σ 2,000 | 1 | 37.77 | **0.945** / 0.943 | 1.003 | 1.008 |
+| | 4 | 138.80 | **0.939** / 0.943 | 1.005 | 1.020 |
+| uniform | 1 | 39.99 | **0.943** / 0.957 | 0.998 | 1.032 |
+| | 4 | 121.04 | **0.848** / 0.970 | 1.003 | 1.117 |
+| traffic | 1 | 66.62 | 0.979 / 0.963 | 1.058 | 1.041 |
+| | 4 | 252.19 | 1.008 / 0.999 | 1.048 | 0.985 |
+| dragonfly | 1 | 38.96 | 1.013 / 0.998 | 1.061 | 1.072 |
+| | 4 | 111.04 | 1.003 / 0.955 | 1.032 | 0.971 |
+
+- **Lazy fossils lose 4–6% on Gaussian and uniform PHOLD** at both node counts, in both reps, at the best W and under the controller. The share of time blocked at the window rises with them at W 300: from 14.4 to 17.7% (σ 100, 1 node), 15.9 to 19.4% (σ 2,000), 17.1 to 22.8% (uniform); at 4 nodes 18.1 to 21.3%, 22.5 to 27.1%, 23.6 to 39.9%. Uniform at 4 nodes includes one lazy run at 89.0 with 48% blocked (the other rep 116.4, 31%). On traffic, dragonfly and phase-changing PHOLD they are within −4% to +6%.
+- **The new tree with eager fossils against the paper's tree** is 0.96–1.06: unchanged on PHOLD, 1.03–1.06 on traffic and dragonfly.
+- **`+ipc` with htram** is 0.97–1.12 of LCI: up to 1.10 at 1 node (phase-changing PHOLD) and within ±3% on most cells. Uniform at 4 nodes (1.117) is set against the slow lazy run above (against its other rep, 0.99).
+
+**Predictions (section 206):**
+- **F1 right.**
+- **F2 right:** L at W 5,000 37.3 M ev/s; Charades ÷ Devastator 0.853.
+- **F3 one part of three:** Charades ÷ Devastator at 4 nodes is 1.001 (inside 1.00–1.12, at its edge). But L ÷ R at W 5,000 is 1.03, not 1.08–1.15 (R's reps 59.3 / 75.1), and Charades' best W is 2,500, not 5,000.
+- **F4 right:** I ÷ L 0.859 / 0.914, S ÷ I 0.997 / 1.002, N ÷ L 0.611 at 1 node.
+- **F5 half:** 0.98 at 1 node; 0.91 at 4 nodes, where the controller's one bucket (5,000) is not the best W.
+- **F6 wrong:** lazy ÷ eager is 0.94–0.95 on three of six workloads, not 0.97–1.03.
+- **F7 half:** 0.96–1.06, not 1.00–1.04; outside it on traffic and dragonfly (above) and phase-changing PHOLD at 4 nodes (below).
+- **F8 mostly right:** 10 of 12 cells inside 0.98–1.08.
+- **F9 not run.**
+
+**What follows (section 206's rules):**
+- **`--fossil-lazy` stays off by default** and is a VLSI setting, reported with it as the bucket width is. The paper's other numbers are unchanged; the new tree is within 0.96–1.06 of the paper's tree on them.
+- **One process per node is Charades' VLSI launch** at 1 and 4 nodes. Devastator needs the same choice, which waits on its 1 × 46 hang.
+- **VLSI's bucket width (the controller's W):** 2,500 ps for the scaling runs. From 4 nodes on, copy 2's node sets the pace and W 2,500 is best in both engines, and runs at W 5,000 vary up to 4.8× between reps there.
+- **F3 did not clearly hold**, and the 1-node gap (0.85) is unchanged by this job. Section 207's trace runs next. The VLSI scaling job waits on the trace and on Devastator 1 × 46.
 
 ## Baseline verification on the Mac
 
