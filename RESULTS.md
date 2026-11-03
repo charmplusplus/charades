@@ -340,6 +340,7 @@ Sections 1–128 were re-read before planning sections 129 onward.
 | 190 | 2026-11-02 | — (Mac) | VLSI workload (user's choice): gate-level simulation of b19 × N, copies of ITC'99's largest circuit (231 k nets, 6.6 k flip-flops) joined in a ring through registered bus XORs; b19 alone has too little work past a few nodes (10 messages per PE per cycle at 32 nodes), so weak scaling at one copy per node; pin changes at even times and evaluations at odd ones make the result independent of tie order; `--span` spreads a copy over nodes (0.2% to 12% of messages cross nodes); Mac change tier 30/30, b19 × 2 sequential and optimistic runs one digest at each padding | design |
 | 191 | 2026-11-02 | 3674282 / 3674283 | VLSI calibration (job V0): b19 × N at 1 and 4 nodes in three engines; Charades W 1,250–20,000 ps, controller, PP/WPs/direct, LPs per chare, bucket size; span 1 against span 4; Devastator W grid and adaptive; ROSS batch 2/8/32; ROSS dragonfly batch 2 / GVT 256; predictions V1–V9 | design (results in 192) |
 | 192 | 2026-11-02 | 3674282 | V0 results: one count per cell in all three engines, Devastator's own allocator fine on Linux; but b19's file order puts all flip-flops (28% of events, a clock event each per cycle) on PE 0, 9.83× the mean load, so every engine's rate is one PE's per-event cost (Charades 8.5 / Devastator 5.9 M ev/s at 1 node; blocked at the window 67–70%, per PE 0–99.9%); controller held at W 500 ps (0.85–0.90); htram ÷ direct 1.01–1.05; ROSS ran without its window (`--max-opt-lookahead`); ROSS dragonfly GVT 256 ÷ 64 0.64–0.84; balanced layout (activity-weighted equal-count chunks, 1.03× offline) needed before any VLSI scaling run | current |
+| 193 | 2026-11-02 | — (Mac); V1 pending | Balanced VLSI layout (`--chunk=512`, default; user decision): chunks placed heaviest first by a pre-simulated activity estimate into one equal bin per PE, the same in all three engines; busiest PE 1.04× the mean (file order 9.93×), 66% of messages cross PEs; span 4 now 45% across nodes; Mac: change tier 48/48, b19 × 2 one count, statistics and digest across engines and schedulers; job V1 design (window, controller, aggregation, span, Devastator, ROSS with `--max-opt-lookahead`), predictions W1–W10 | design |
 
 ## Stampede3 runs, in order
 
@@ -8089,6 +8090,67 @@ The equal-count chunk layouts only reorder gids inside `netlist.C`, which all th
 1. A balanced layout in `netlist.C` before any VLSI scaling run. Chunks of 512 nets, assigned by pre-simulated activity at equal counts, keep every engine's mapping. File order stays as an option for reference.
 2. ROSS gets `--max-opt-lookahead` arms (2,500, 5,000 and 10,000 ps). F5's ROSS grids on traffic and dragonfly had no window arm either (dragonfly efficiency 57–70%); to add when ROSS runs next.
 3. A shortened V0 on the balanced layout (W grid, controller, direct sends, span 1 and 4, Devastator, ROSS with windows), with new predictions, then the 1–32-node VLSI job.
+
+### A balanced VLSI layout: chunks of 512 nets placed by pre-simulated activity (busiest PE 1.04× the mean, estimated), the same in all three engines; Mac checks; calibration job V1 (2026-11-02; design, written before any runs)
+
+> **Status: design (layout built and checked on the Mac; V1 not yet run).** User decision 2026-11-02: the chunk layout (section 192's recommendation). Charades main 017e722; ports `~/pdes-baselines/ross-vlsi.patch` and `devastator-vlsi.patch` regenerated. Offline estimates `~/charades-data/vlsi/imbalance*.py` and the session scratchpad's `layout/check.C` and `layout/cross.C`.
+
+**The layout** (`--chunk=c`, default 512; `--chunk=0` keeps file order; `netlist.C`, which all three engines compile):
+- **Profile.** A unit-delay simulation of one copy (ring flip-flops sampling its own outputs; inputs from a fixed hash, not `--input-seed`), 50 warm-up and 200 counted cycles. Each net's estimate is its clock events plus pin changes received plus evaluations, in integers, so the layout is the same in every engine and depends only on the circuit. It takes 36 ms for b19.
+- **Placement.** Copies come in groups of `--span`. Each copy is cut into chunks of c nets in file order. The group's gids form `bins` equal bins of whole chunk slots, with slots per bin = ⌈chunks per group ÷ bins⌉. Chunks go, heaviest first (ties in file order), to the least-loaded bin with a free slot (ties: the lowest bin). Within a bin they keep file order, and unused slots and the tail of a copy's last chunk are inert LPs.
+- **Bins per group** default to PEs (ranks) × span ÷ copies, and `--layout-bins` overrides it. With one bin per PE, an engine that maps gids to PEs in even blocks gives each PE exactly one bin. Charades does (128 LPs per chare, 5,120 LPs per bin, no remainder), and so do the ROSS and Devastator ports (uneven blocks with a remainder of 0). All three run 46 PEs or ranks per node, so all three put the same nets on each PE.
+- **Span s > 1:** a copy's chunks spread over every bin of its group of s nodes, with no regard to locality. This is a load-balanced cut without locality, the most communication-heavy case. File order (`--chunk=0`) keeps section 190's slices.
+
+**Estimates** (b19 × 4 on 4 nodes, 2 × 23 PEs each, even gid blocks; from the profile; lower is better in every column):
+
+| layout | busiest PE ÷ mean load | inert LPs (%) | messages crossing PEs (%) | crossing processes (%) | crossing nodes (%) |
+|---|---|---|---|---|---|
+| file order, span 1 | 9.93 | 0 | 36.6 | 6.8 | 0.6 |
+| file order, span 4 | — | 0 | 37.2 | 10.1 | 10.1 |
+| chunks of 512, span 1 | 1.04 | 1.8 | 65.9 | 29.1 | 0.0 |
+| chunks of 512, span 2 | 1.04 | 1.8 | 65.9 | 45.5 | 29.1 |
+| chunks of 512, span 4 | 1.04 | 1.8 | 65.9 | 58.2 | 45.5 |
+| chunks of 128, span 1 | 1.00 | 1.8 | 70.6 | 34.8 | 0.0 |
+
+Each PE receives about 186 messages per cycle in every layout. Chunks of 512 stay balanced at 1, 2, 4 and 32 copies. The C++ profile agrees with section 192's Python estimate (file order 9.93 against 9.83; chunks of 512 1.04 against 1.03).
+
+**Checks on the Mac** (all on 017e722 and the regenerated ports):
+- **The layout is a bijection.** `gid` and `locate` invert each other over every net of b19 × 1, 2, 4 and 32 at spans 1, 2 and 4 and of `tiny.bench`, and every other gid is inert.
+- **`test.py --tier change --model VLSI`**: sequential plus five engine configs × `base` (chunks of 4), `span` (chunks of 4, span 2) and the new `file` (span 2, file order) × shapes 1, 4 and 2 × 2: 48/48.
+- **b19 × 2, 40 cycles:** 1,866,314 committed events in every run.
+  - Charades sequential, and optimistic at 2 processes × 2 PEs (deadline PP, the bucketed window without htram, and 1,024 LPs per chare), all at 2 bins per copy: one digest, 7f3a5cec…. In file order the digest is still a74454b9… (section 190).
+  - ROSS sequential and at 4 ranks: 262,906 gate changes and 684,438 pin changes, equal to Charades.
+  - Devastator at 2 and 4 ranks, adaptive and W 5,000: equal counts and statistics, every run deterministic.
+  - `tiny.bench`: ROSS (3 and 4 ranks) and Devastator (2 and 4 ranks) commit 15,489 (`base`) and 40,905 (`span`), the test configs' counts.
+- The layout, and so the digest, depends on the bin count: digests compare only at equal `--layout-bins` and LPs per chare.
+
+**Stampede3:**
+- `charades-vlsi` fast-forwarded to 017e722 and its model rebuilt on the login node.
+- ROSS's `vlsi` target rebuilt. F5b's dragonfly and traffic binaries are untouched; F5b, 3673481, is running on `charades-phaseb`.
+- Devastator's `bench/vlsi.cxx` copied; its binaries are rebuilt inside V1.
+
+**Job V1** (`~/charades-data/vlsi/vcal193.slurm`; 6 nodes, laid out as V0's; 2 reps, rep 2 reversed; 5,000 cycles; caps 300 s, ROSS 240 s):
+- **Gate:** the VLSI change tier (five engine configs × `base`, `span`, `file`) on 2 nodes.
+- **Charades** (PP 2,048, buckets of 500 ps, 128 LPs per chare):
+  - span 1: W 1,250, 2,500, 5,000, 10,000 and 20,000, and the frozen controller; direct sends at W 2,500 and 10,000; WPs 512 at W 2,500; file order at W 2,500 (V0's best, as a same-job reference);
+  - 4 nodes, span 4: W 2,500, 5,000 and 10,000, the controller, and direct sends at W 2,500 and 10,000.
+- **Devastator:** span 1 W 1,250 to 20,000 and its adaptive window; file order at W 10,000; span 4 W 2,500 to 10,000.
+- **ROSS** (GVT interval 64): span 1 batch 8 with `--max-opt-lookahead` 2,500, 5,000 and 10,000 ps and without a window (rep 1 only); batch 2 and 32 at 5,000; span 4 batch 8 at 5,000.
+- Left out, settled by V0: 512 LPs per chare, buckets of 2,500 ps, ROSS on dragonfly.
+
+**Predictions:**
+- **W1. Counts.** V0's counts in every cell and engine (125,998,590 at 1 node, 574,541,914 at 4), the file-order arms included; Charades gives one digest per layout.
+- **W2. Balance.** Charades' blocked share at span 1 falls from 67–70% to at most 35% (mean over PEs), and the busiest PE (lowest blocked share) no longer sits at 0% while others sit at 99.9%: per-PE spread at most 40 points.
+- **W3. Rate.** Charades' best fixed W at 1 node reaches at least 20 M ev/s (2.4× V0), and the same-job file-order arm is within 10% of V0's 8.5.
+- **W4.** Devastator's best fixed W at 1 node is at least 2× V0's 5.9 M ev/s.
+- **W5. The window.** Charades' best fixed W is 2,500 or 5,000; W 1,250 and W 20,000 are each at least 10% below it.
+- **W6. The controller** still holds W at 500 ps (every remote delay is under 32 ps) and reaches 0.80–0.92 of the best fixed W.
+- **W7. Aggregation at span 1:** best htram ÷ direct sends at the same W is at least 1.15 (66% of messages cross PEs, 29% cross processes).
+- **W8. Span 4** (45% of messages cross nodes): Charades' best at span 4 is at most 0.6 of span 1; htram ÷ direct at least 1.5; Charades ÷ Devastator at least 1.2.
+- **W9. ROSS:** a window lifts ROSS's best by at least 2× over its unwindowed batch 8, and Charades ÷ ROSS stays at least 2.
+- **W10. Engines at span 1:** Charades ÷ Devastator, each at its best fixed W, 1.0–1.4 at both node counts.
+
+**What follows:** the arms of the 1–32-node VLSI job (one copy per node at span 1, and span 4 if W8 shows it is a distinct case), set by these results.
 
 ## Baseline verification on the Mac
 
