@@ -12,6 +12,7 @@ int tw_ismaster();
 #define TW_ASSERT(condition, format, ...) if (!(condition)) { \
   CkPrintf("Assertion Failed: %s\n", #condition); \
   CkPrintf("%s:%i: " format, __FILE__, __LINE__, ## __VA_ARGS__ ); \
+  fflush(stdout); /* CkAbort does not flush stdout: piped, the message was lost */ \
   CkAbort("Assertion Failure\n"); \
 }
 #else
