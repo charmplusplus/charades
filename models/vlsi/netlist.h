@@ -24,10 +24,23 @@
  * events. The clock period exceeds the longest path, so no pin change
  * reaches a flip-flop at a clock edge.
  *
- * Layout: --span=s spreads each copy over s groups of LPs. With one copy per
- * node, span s places each copy's i-th slice (file order) on node i of its
- * group of s nodes, together with the i-th slices of the group's other
- * copies. The model's behaviour does not depend on the layout.
+ * Layout (gid order; the model's behaviour does not depend on it). Copies
+ * come in groups of --span=s, each group laid over its own range of gids.
+ * - Balanced (--chunk=c > 0, the default, RESULTS.md section 192): each
+ *   copy is cut into chunks of c nets in file order. A short unit-delay
+ *   simulation of one copy (fixed inputs, so the layout depends only on the
+ *   circuit) estimates each chunk's events. The group's range is split
+ *   into `bins` equal bins of whole chunk slots, and chunks go, heaviest
+ *   first, to the least-loaded bin with a free slot; slots not filled, and
+ *   the tail of a copy's last chunk, hold inert LPs. With bins = PEs per
+ *   group and an engine that block-maps gids evenly, each PE gets one bin.
+ *   With span s > 1 a copy's chunks spread over every bin of its group,
+ *   with no regard to locality.
+ * - File order (--chunk=0, RESULTS.md sections 190-192): with one copy per
+ *   node, span s places each copy's i-th slice (file order) on node i of
+ *   its group of s nodes, together with the i-th slices of the group's
+ *   other copies. ITC'99's .bench files list every flip-flop first, so the
+ *   first PE of a copy gets them all (9.8x the mean load for b19).
  *
  * This file and netlist.C use only standard C++, so the ROSS and Devastator
  * ports can share them.
@@ -91,9 +104,24 @@ struct Netlist {
   /** Reads path and builds one copy; aborts with a message on bad input */
   void load(const std::string& path, uint32_t copies, uint32_t span, uint64_t period, uint64_t seed);
 
-  uint64_t total() const { return (uint64_t)copies * nets; }
+  // ---- the balanced layout (chunk > 0); see the comment at the top
+  uint32_t chunk = 0, bins = 1, slots = 0, nchunks = 0;
+  uint64_t group_size = 0;
+  std::vector<uint32_t> item_slot, slot_item;      ///< item = copy in group * nchunks + chunk
+  std::vector<uint64_t> activity;                  ///< estimated events per net (per copy, summed over the profile's cycles)
+  double busiest = 1.0;                            ///< the busiest bin's estimated events / the mean bin's
+
+  /** Lays copies out in balanced chunks of `chunk` nets over `bins` bins per
+   *  group of span copies (0: file order); call after load() */
+  void balance(uint32_t chunk, uint32_t bins);
+  /** Fills `activity` (balance() calls it) */
+  void profile();
+
+  /** LPs in the layout, inert ones included */
+  uint64_t total() const { return chunk ? (uint64_t)(copies / span) * group_size : (uint64_t)copies * nets; }
   uint64_t gid(uint32_t copy, uint32_t local) const;
-  void locate(uint64_t gid, uint32_t* copy, uint32_t* local) const;
+  /** The net at gid; false for an inert LP (padding) */
+  bool locate(uint64_t gid, uint32_t* copy, uint32_t* local) const;
   /** A random input's value from clock edge `cycle` on */
   int input_value(uint32_t copy, uint32_t local, uint64_t cycle) const;
   /** The initial values of a net's pins, as a bitmask */

@@ -1,9 +1,11 @@
 # base with 4 copies, each spread over two groups of LPs (--span=2, the
 # layout that puts a copy on two nodes), 200 cycles; the layout does not
-# change the committed events (span 1 commits the same count)
+# change the committed events (span 1 commits the same count); balanced
+# layout in chunks of 4 nets, so each copy spreads over both groups' bins
 netlist=netlists/tiny.bench
 copies=4
 span=2
+chunk=4
 end-time=40000
 gvt-bucket-size=100
 buffer-size=65536

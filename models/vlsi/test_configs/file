@@ -1,0 +1,10 @@
+# span with the file-order layout (--chunk=0): each copy's two halves, in
+# file order, on the two groups of LPs; the same count as span
+netlist=netlists/tiny.bench
+copies=4
+span=2
+chunk=0
+end-time=40000
+gvt-bucket-size=100
+buffer-size=65536
+expected-events=40905

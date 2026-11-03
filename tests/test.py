@@ -60,13 +60,14 @@ KNOWN_BROKEN = {'cd', 'phased'}
 # gentime, the generation window used for weak scaling (--gen-time). Traffic
 # trips: cars keep driving (--trip-radius), its form for weak scaling.
 # VLSI base and span: copies of a netlist joined in a ring, on one group of
-# LPs and spread over two (--span).
+# LPs and spread over two (--span), in the balanced layout (--chunk); file:
+# span in the file-order layout (--chunk=0).
 CORE_MODEL_CFGS = {
   'Simple PHOLD': ['base', 'phases'],
   'Imbalanced PHOLD': ['combo'],
   'Traffic': ['base', 'trips'],
   'Dragonfly': ['base', 'congested', 'gentime'],
-  'VLSI': ['base', 'span'],
+  'VLSI': ['base', 'span', 'file'],
 }
 # The engine tier's repeat pass looks for races, which need concurrency and
 # depend on timing more than on the model: multi-PE shapes only, on PHOLD

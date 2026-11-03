@@ -71,11 +71,10 @@ class GateLP : public LP<GateLP, PinMsg, EvalMsg, ClockMsg> {
 class GateFactory : public LPFactory {
   public:
     LPBase* create_lp(uint64_t gid) const {
-      // Padding past the netlist (the LP count is rounded up to a multiple of
-      // the LPs per chare): inert LPs that never send
-      if (gid >= g_netlist.total()) return new GateLP(PAD_COPY, 0);
+      // Padding (unfilled chunk slots of the balanced layout, and LPs past
+      // the layout that fill the last chare): inert LPs that never send
       uint32_t c, l;
-      g_netlist.locate(gid, &c, &l);
+      if (!g_netlist.locate(gid, &c, &l)) return new GateLP(PAD_COPY, 0);
       return new GateLP(c, l);
     }
 };

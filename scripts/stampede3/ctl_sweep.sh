@@ -27,14 +27,15 @@
 #       router, p terminals per router; one router per chare), generating
 #       until gen-time; END is in ps; LPS_PER_PE and LPC are not used. Set
 #       BUCKETS in ps too (the test configs use 1000)
-#     vlsi:<circuit>:<copies per node>:<span>
-#       the VLSI model (models/vlsi, RESULTS.md section 190): copies of the
+#     vlsi:<circuit>:<copies per node>:<span>[:<chunk>]
+#       the VLSI model (models/vlsi, RESULTS.md sections 190 and 193): copies of the
 #       netlist $VLSI_NETLISTS/<circuit>/<circuit>.bench (default
 #       VLSI_NETLISTS=$WORK/I99T/i99t, the ITC'99 benchmarks; e.g.
 #       vlsi:b19:1:1) joined in a ring, copies per node x NODES of them, each
 #       spread over <span> nodes; LPC is the LPs per chare (the model pads
 #       the LP count to whole chares), LPS_PER_PE is not used; END and
-#       BUCKETS in ps
+#       BUCKETS in ps; <chunk> the layout (default 512: chunks of 512 nets
+#       balanced over the PEs; 0: file order)
 #   ARMS="w:25 w:50 w:100 w:250 w:500 q:0.02 q:0.05 q:0.1 hill:250"
 #     w:<W> a fixed window; q:<epsilon> the quantile rule (calibrated: the
 #     share of events rolled back; from the smallest window); qb:<epsilon>
@@ -194,7 +195,7 @@ for rep in $(seq $reps); do
       elif [ $kind = vlsi ]; then
         bin=$C/models/vlsi/vlsi
         printf '%s\n' "netlist=${VLSI_NETLISTS:-$WORK/I99T/i99t}/$a/$a.bench" "copies=$((N * b))" "span=$c" "lps-per-chare=$LPC" \
-            "end-time=$END" > $cfg
+            "chunk=${d:-512}" "end-time=$END" > $cfg
       elif [ $kind = steady ]; then
         printf '%s\n' "lookahead=$a" "mean=$b" "remote=$c" >> $cfg
       elif [ $kind = gauss ]; then

@@ -2,6 +2,8 @@
 
 #include <algorithm>
 #include <fstream>
+#include <functional>
+#include <queue>
 #include <stdexcept>
 #include <unordered_map>
 
@@ -46,6 +48,7 @@ static uint64_t mix(uint64_t z) {   // splitmix64's finalizer
 
 void Netlist::load(const std::string& path, uint32_t n_copies, uint32_t n_span, uint64_t want_period, uint64_t s) {
   copies = n_copies; span = n_span; seed = s;
+  chunk = 0;
   if (copies == 0 || span == 0 || copies % span)
     throw std::runtime_error("VLSI: --span must divide --copies");
   name = path.substr(path.find_last_of('/') + 1);
@@ -212,14 +215,131 @@ void Netlist::load(const std::string& path, uint32_t n_copies, uint32_t n_span, 
   }
 }
 
+// The profile behind the balanced layout: unit-delay simulation of one copy
+// (its ring flip-flops sample its own outputs), inputs from a fixed seed
+static const uint32_t PROFILE_WARM = 50, PROFILE_CYCLES = 200;
+static const uint32_t NO_ITEM = 0xffffffffu;
+
+void Netlist::profile() {
+  const uint32_t B = (uint32_t)bus.size();
+  std::vector<uint8_t> v(init.begin(), init.end());
+  std::vector<uint32_t> mark(nets, 0), changed, pend;
+  std::vector<std::pair<uint32_t, uint8_t>> upd;
+  uint32_t stamp = 0;
+  activity.assign(nets, 0);
+  for (uint64_t cycle = 1; cycle <= PROFILE_WARM + PROFILE_CYCLES; cycle++) {
+    const bool count = cycle > PROFILE_WARM;
+    // the clock edge: one event at every flip-flop and random input
+    upd.clear();
+    for (uint32_t q = 0; q < nets; q++) {
+      int nv;
+      if (type[q] == G_DFF) {
+        nv = v[q >= orig + B ? outputs[(q - orig - B) % outputs.size()] : fanin[fanin_start[q]]];
+      } else if (type[q] == G_INPUT) {
+        nv = (int)(mix(mix(1 ^ mix((uint64_t)q)) ^ cycle) & 1);
+      } else {
+        continue;
+      }
+      if (count) activity[q]++;
+      if (nv != v[q]) upd.push_back({q, (uint8_t)nv});
+    }
+    changed.clear();
+    for (auto& u : upd) { v[u.first] = u.second; changed.push_back(u.first); }
+    // then one level of gates per step: a pin change per fanout of each
+    // change, and one evaluation per gate whose pins changed
+    while (!changed.empty()) {
+      stamp++;
+      pend.clear();
+      for (uint32_t g : changed) {
+        for (uint32_t k = fan_start[g]; k < fan_start[g + 1]; k++) {
+          uint32_t d = fan[k].dest;
+          if (count) activity[d]++;
+          if (type[d] >= G_NOT && mark[d] != stamp) { mark[d] = stamp; pend.push_back(d); }
+        }
+        if (count) for (uint32_t k = ring_start[g]; k < ring_start[g + 1]; k++) activity[ring[k]]++;
+      }
+      upd.clear();
+      for (uint32_t d : pend) {
+        if (count) activity[d]++;
+        uint32_t pins = 0;
+        for (uint32_t k = fanin_start[d]; k < fanin_start[d + 1]; k++)
+          if (v[fanin[k]]) pins |= 1u << (k - fanin_start[d]);
+        int nv = eval(type[d], pins, nin[d]);
+        if (nv != v[d]) upd.push_back({d, (uint8_t)nv});
+      }
+      changed.clear();
+      for (auto& u : upd) { v[u.first] = u.second; changed.push_back(u.first); }
+    }
+  }
+}
+
+void Netlist::balance(uint32_t c, uint32_t b) {
+  chunk = c;
+  item_slot.clear(); slot_item.clear();
+  busiest = 1.0;
+  if (!chunk) return;
+  bins = b ? b : 1;
+  profile();
+  nchunks = (nets + chunk - 1) / chunk;
+  std::vector<uint64_t> cw(nchunks, 0);
+  for (uint32_t l = 0; l < nets; l++) cw[l / chunk] += activity[l];
+  const uint32_t items = span * nchunks;
+  slots = (items + bins - 1) / bins;
+  group_size = (uint64_t)bins * slots * chunk;
+  // heaviest first (ties: file order, then copy) to the least-loaded bin
+  // with a free slot (ties: the lowest bin)
+  std::vector<uint32_t> order(items);
+  for (uint32_t x = 0; x < items; x++) order[x] = x;   // x = chunk * span + copy in group
+  std::stable_sort(order.begin(), order.end(), [&](uint32_t x, uint32_t y) { return cw[x / span] > cw[y / span]; });
+  typedef std::pair<uint64_t, uint32_t> Load;
+  std::priority_queue<Load, std::vector<Load>, std::greater<Load>> open;
+  for (uint32_t i = 0; i < bins; i++) open.push({0, i});
+  std::vector<std::vector<uint32_t>> in(bins);
+  std::vector<uint64_t> load(bins, 0);
+  for (uint32_t x : order) {
+    uint32_t j = x / span, cp = x % span;
+    Load top = open.top(); open.pop();
+    in[top.second].push_back(cp * nchunks + j);
+    load[top.second] += cw[j];
+    if (in[top.second].size() < slots) open.push({load[top.second], top.second});
+  }
+  item_slot.assign(items, NO_ITEM);
+  slot_item.assign((size_t)bins * slots, NO_ITEM);
+  for (uint32_t i = 0; i < bins; i++) {
+    std::sort(in[i].begin(), in[i].end());   // file order within a bin
+    for (uint32_t k = 0; k < in[i].size(); k++) {
+      item_slot[in[i][k]] = i * slots + k;
+      slot_item[(size_t)i * slots + k] = in[i][k];
+    }
+  }
+  uint64_t sum = 0, mx = 0;
+  for (uint64_t x : load) { sum += x; mx = std::max(mx, x); }
+  busiest = sum ? (double)mx * bins / sum : 1.0;
+}
+
 uint64_t Netlist::gid(uint32_t copy, uint32_t local) const {
   uint32_t group = copy / span, c = copy % span;
+  if (chunk) {
+    return group * group_size + (uint64_t)item_slot[c * nchunks + local / chunk] * chunk + local % chunk;
+  }
   uint32_t part = (uint32_t)((uint64_t)local * span / nets);
   uint64_t l = lo(part), len = lo(part + 1) - l;
   return (uint64_t)group * span * nets + span * l + c * len + (local - l);
 }
 
-void Netlist::locate(uint64_t g, uint32_t* copy, uint32_t* local) const {
+bool Netlist::locate(uint64_t g, uint32_t* copy, uint32_t* local) const {
+  if (g >= total()) return false;
+  if (chunk) {
+    uint32_t group = (uint32_t)(g / group_size);
+    uint64_t r = g % group_size;
+    uint32_t item = slot_item[r / chunk];
+    if (item == NO_ITEM) return false;
+    uint64_t l = (uint64_t)(item % nchunks) * chunk + r % chunk;
+    if (l >= nets) return false;
+    *copy = group * span + item / nchunks;
+    *local = (uint32_t)l;
+    return true;
+  }
   uint64_t gs = (uint64_t)span * nets;
   uint32_t group = (uint32_t)(g / gs);
   uint64_t r = g % gs;
@@ -229,6 +349,7 @@ void Netlist::locate(uint64_t g, uint32_t* copy, uint32_t* local) const {
   uint64_t l = lo(part), len = lo(part + 1) - l, off = r - span * l;
   *copy = group * span + (uint32_t)(off / len);
   *local = (uint32_t)(l + off % len);
+  return true;
 }
 
 int Netlist::input_value(uint32_t copy, uint32_t local, uint64_t cycle) const {

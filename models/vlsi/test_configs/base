@@ -1,9 +1,10 @@
 # tiny.bench (a small clocked circuit), 3 copies joined in a ring, 100 clock
 # cycles (period 200 ps). Pin changes arrive at even times and gates evaluate
 # at odd ones, so the count does not depend on the order of equal-timestamp
-# events.
+# events. Balanced layout in chunks of 4 nets (36 nets per copy).
 netlist=netlists/tiny.bench
 copies=3
+chunk=4
 end-time=20000
 gvt-bucket-size=100
 buffer-size=65536
