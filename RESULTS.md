@@ -361,6 +361,7 @@ Sections 1–128 were re-read before planning sections 129 onward.
 | 202 | 2026-11-03 | 3677339 | V4 results (incomplete: hit the time limit): 1 × 46 is Charades' best VLSI layout (1.33× / 1.27× 2 × 23; W 5,000 1.47× at 1 node), Charades ÷ Devastator 0.77 / 0.95 each at its best; Charm++ `--enable-shmem` and `+ipc` carry the messages after the fix but run at 0.17–0.21× (16 µs sends, ~260 µs delivery: one locked queue and one locked allocator per process in Reconverse's pool); Devastator 1 × 46 hangs; Z1, Z5, Z6, Z7 half, Z8 right, Z2–Z4 wrong | current |
 | 203 | 2026-11-03 | idev 3677573 (results in 204) | Closing the gap (user decision; Reconverse changes allowed): single-worker profiles of both engines, skip the cancel-queue walk when nothing is queued, network polling by one PE / a progress thread, fast shared memory between processes; predictions E1–E3 | design |
 | 204 | 2026-11-03 | idev 3677573 | Closing the gap, round 1: skipping the empty cancel-queue walk (single worker 0.65 → 1.53 M ev/s, Devastator 1.59; 1–2% at 46 PEs), lazy fossil collection (`--fossil-lazy=1`, 1.12× at 1 × 46; fast-path wait 29 → 13 µs mean), batch 32, W 5,000: Charades 38.1 = 0.85 of Devastator's best at 1 node (V4 0.77); in-pass draining −6% (rejected); one polling PE +1.4%; E1 right, E2, E3 wrong | current |
+| 205 | 2026-11-03 | idev 3677573 | Reconverse's shared-memory pool rewritten (`pads-perf`: one receive queue per PE, per-sender return lists, no locks): 2 × 23 with the pool 32.5–33.3 M ev/s = 1.38× over LCI, 0.86 of 1 × 46 (38.1); `--enable-shmem` = `+ipc`; send call 0.74 µs (old 16, LCI 2.0); the controller holds W 2,500 while the best fixed W is now 5,000 (0.88) | current |
 
 ## Stampede3 runs, in order
 
@@ -8686,6 +8687,30 @@ On one PE the walk visited all 1,840 chares on every pass, and most of `execute(
 **Where this leaves the gap (1 node):** Charades' best, 1 × 46 with lazy fossils, batch 32, W 5,000, is 38.1 M ev/s: **0.85 of Devastator's best** (44.6), up from 0.77 (V4) and 0.51 (V1). At 2 × 23 the sends between processes still hold Charades at about 23.5.
 
 **Next:** the Mac engine tier on the cancel-queue skip, then commit; the same tiers with `--fossil-lazy=1` before it becomes the default, and the controller rechecked (it reads committed counts per round); Reconverse's shared-memory pool rewritten (per-PE receive queues, per-sender return lists; branch `pads-perf`), tested on the Mac, then built on an skx node.
+
+### Shared memory between processes, rewritten in Reconverse: 2 × 23 with the pool is 1.38× 2 × 23 over LCI, 0.86 of one process per node; Charm++ `--enable-shmem` and `+ipc` alike (2026-11-03; idev 3677573, c455-104)
+
+> **Status: current.** Reconverse branch `pads-perf` a7e5108 (Mac worktree `~/reconverse_perf`, local only; on Stampede3 as 80b7417 by `git am` in `$WORK/charm-pads-perf/contrib/reconverse`). Runtimes built on the idev node (Xeon 8160): `$WORK/charm-pads-perf` (`--with-production`, the pool on with `+ipc`) and `$WORK/charm-pads-perfshm` (`--enable-shmem`), both with `charm-pads-exp`'s patched LCI source. Charades trees `charades-perf` and `charades-perfshm` (c7373b4 plus section 204's changes). b19 × 1 on 1 node, W 5,000, `--fossil-lazy=1 --batch=32`, 2 reps; same count and digest in every run. Reconverse's own tests on the Mac are still to run (they were blocked by the Mac engine tier, which also uses lcrun).
+
+**The change** (`cmishmem.cpp`, `cmi-shmem-common.h`, `scheduler.cpp`, `converse.h`):
+- One receive queue per PE in its process's segment instead of one per process. Senders push with a compare-and-swap; the PE takes its whole list each scheduler pass and delivers it oldest first (`CmiDeliverIpcInbox`). Node datagrams get their own queue.
+- Each block records the host-local index of the PE that allocated it. Freeing pushes it onto that sender's return list in the block's segment; the sender takes that list whole when its private list of that size is empty; new blocks come from the heap by `fetch_add`.
+- Every list is pushed by compare-and-swap and emptied whole by one exchange, so none needs a lock or an ABA counter. Before, one queue and one heap per process were each guarded by an exchange used as a lock, receivers gave up for the pass when it was held, and each PE took one block per pass.
+
+**Rates** (M committed ev/s, higher is better):
+
+| layout | r1 / r2 | ÷ 2 × 23 over LCI | ÷ 1 × 46 |
+|---|---|---|---|
+| 2 × 23, LCI between processes | 23.8 / 23.6 | 1.00 | 0.62 |
+| 2 × 23, new pool, `+ipc` | 33.3 / 32.5 (later pair 32.4 / 32.5) | 1.38 | 0.86 |
+| 2 × 23, new pool, Charm++ `--enable-shmem` | 32.6 / 33.0 | 1.38 | 0.86 |
+| 1 × 46 | 38.2 / 38.1 (38.3 / 38.0) | 1.61 | 1.00 |
+| old pool (V4, W 2,500, before section 204's changes), `--enable-shmem` / `+ipc` | 4.1 / 4.8 | 0.17 / 0.21 | |
+
+- **Through the new pool** (`--comm-stats=1`, `+ipc`): a send call takes 0.74 µs (old pool 16, LCI 2.0), send calls are 6.4% of PE time, and delivery takes a mean of 13.9 µs (median 4–8), the same as within a process (14.2). 16.3 M messages went through the pool.
+- **What is left between 2 × 23 and 1 × 46:** a cross-process event still goes through Charm++'s message path (envelope, the send, the copy into a block, delivery to the array element) where a same-process event is a pointer handed to the PE's input buffer.
+
+**The frozen controller with lazy fossils** (1 × 46, batch 32, buckets of 2,500): it holds W at 2,500 ps (one bucket) and runs 33.4 M ev/s, as fixed W 2,500 does (33.4), but the best fixed W is now 5,000 (38.1): 0.88 of it, where V2 had 0.99. Its smallest W is one bucket and every remote delay is shorter than one, so its scale does not reach W 5,000.
 
 ## Baseline verification on the Mac
 
