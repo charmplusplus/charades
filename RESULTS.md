@@ -354,6 +354,7 @@ Sections 1–128 were re-read before planning sections 129 onward.
 | 195 | 2026-11-02 | 3675299 | V1 (balanced VLSI layout, 1 and 4 nodes): one count per cell in three engines; Charades ÷ Devastator 0.51 / 0.75 (span 4 0.55), ÷ ROSS 6.9–7.9 (ROSS with its window); Charades' best is direct sends at W 2,500 (22.9 / 61.9 M ev/s), PP 0.65–0.83 of direct, controller held at W 500 (0.80–0.89 of PP's best); Charades makes one GVT update per clock cycle at every W and waits at the window 44–75%; hypotheses H1 (per-hop latency on the cycle's critical path) and H2 (GVT pace) to test; W1, W3–W6, W9 right, W2, W7, W8, W10 wrong | current |
 | 196 | 2026-11-02 | V2 3675628 (results in 197) | Why Charades trails on VLSI (job V2 design): per-hop latency (H1) against GVT pace (H2); direct sends at W 2,500 with `--batch` 4/16/64, `--gvt-wave-events=16`, `--wave-batch=4`; buckets of one clock period (2,500 ps); the controller with 500 and 2,500 ps buckets; WPs at 2,500 ps buckets; `--gvt-trace=1` runs; predictions X1–X7 and the reading rule | design |
 | 197 | 2026-11-02 | 3675628 | V2 results: GVT rounds fill 5–6% of each cycle (2 waves of 0.03–0.04 ms, then 0.6–2.4 ms with none), so GVT pace is out; faster waves change nothing; shorter passes are slower (batch 4 0.87–0.90); each cycle's execution is a chain of dependent events with every PE waiting ≥ 20%; buckets of one clock period make the controller pick W 2,500 (0.99 of the best fixed W); step cost and Devastator's gain from a wider window open | current |
+| 198 | 2026-11-03 | V3 (to be submitted) | Why a Charades clock cycle takes 1.8× Devastator's at the same window (job V3 design): most of V1's gap is at the same W (0.56 at 1 node; Devastator's wider window adds only 1.09×); 1 → 4 nodes adds 0.76 / 0.78 ms per cycle in both engines; hypotheses per-event cost (single-worker runs of both engines), hops between processes (1 × 46 PEs per node), delivery latency (`--comm-stats`); per-PE stats at W 2,500 / 10,000 (new `blocked_s`); perf of both engines; predictions Y1–Y7 and the reading rule | design |
 
 ## Stampede3 runs, in order
 
@@ -8367,6 +8368,66 @@ Every arm makes 4,999–5,008 GVT updates (one per clock cycle) at 2.0–3.4 cou
 - **For the VLSI scaling job:** buckets of one clock period (2,500 ps) make the frozen controller pick the best fixed W (0.99 of it at 1 and 4 nodes). This is a per-model setting, as every model's bucket size already is. The arms are direct sends and WPs 512 at W 2,500, and the controller, all with buckets of 2,500. PP 2,048 is dropped (0.76–0.84).
 - **To find the step cost** (if the user wants it before the paper's VLSI numbers): one process per node (1 × 46 PEs) against two, which removes cross-process hops at 1 node; then a traced cycle that times the hops along one chain.
 - **Claim 3's wording on VLSI** stands as in section 195 until the 1–32-node runs show whether Charades' smaller per-node loss (0.68 against 0.46 at 4 nodes) closes the gap.
+
+### Why a Charades clock cycle takes 1.8× Devastator's at the same window (job V3 design, 2026-11-03; written before any runs)
+
+> **Status: design.** User decision 2026-11-03: diagnose the gap before the 1–32-node VLSI job (any fix would change every VLSI number, and the engine freezes 2026-12-07). Script `~/charades-data/vlsi/vdiag198.slurm`, summary `vdiag198_summary.py` (both written before the run); `charades-vlsi` 5f6983a, which adds each PE's blocked time to `pe_stats.csv` (`blocked_s`; Mac VLSI change tier 15/15).
+
+**What V1 and V2 already say about the gap** (V1, section 195; M committed ev/s, higher is better; ms per clock cycle = run time ÷ 5,000, lower is better):
+
+| | Charades, W 2,500 | Devastator, W 2,500 | Devastator, W 10,000 | Charades ÷ Devastator, same W 2,500 |
+|---|---|---|---|---|
+| 1 node, M ev/s (ms per cycle) | 22.9 (1.10) | 41.2 (0.61) | 45.0 (0.56) | 0.56 |
+| 4 nodes, span 1 | 61.9 (1.86) | 82.6 (1.39) | 82.5 (1.39) | 0.75 |
+
+- **Most of the gap is at the same window.** Devastator's wider window adds 1.09× at 1 node, 1.00× at 4 nodes and 1.12× at span 4. Section 197's "at W 10,000 Devastator runs 88% efficient and 2× faster" compared it with Charades at W 10,000, not with its own W 2,500; the wide-window part is about 10%, not 2×.
+- **Both engines run the same layout** (one bin of chunks per worker) **on 2 processes × 23 workers per node.** So per-level load imbalance and the share of messages between processes are the same in both; what differs is how each engine runs and delivers events.
+- **Going from 1 to 4 nodes adds nearly the same time per cycle in both engines:** 0.76 ms (Charades) and 0.78 ms (Devastator). Each copy also does 14% more work per cycle at 4 nodes (its ring inputs come from another copy). If that added time is common to both engines, the gap shrinks with node count because a shared cost dilutes it, not because Charades scales better per node (section 195's reading of 0.68 against 0.46).
+- **At span 1 almost no circuit events cross nodes.** b19 has 18 ring inputs per copy, so a copy receives at most a few dozen pin changes per cycle from the previous copy, against about 28,700 events per copy per cycle; the nodes are otherwise coupled by GVT and the window.
+- **V2 ruled out GVT pace and pass length** (section 197). Each cycle's execution is a chain of dependent events in which every PE waits at least 20% of the time.
+
+**Hypotheses for the 1.8× at the same window:**
+- **H3, per-event cost:** each event costs Charades more CPU time, and the cycle (a dependency-bound schedule over the same layout) stretches in proportion. October's PHOLD profile (section 23) measured 11,100 cycles per committed event for Charades against 5,300 for Devastator, before the fast paths (section 24, 1.28×): about 1.6× after them.
+- **H4, hops between the node's 2 processes** (29% of messages) cost Charades more than Devastator.
+- **H5, delivery and wake-up:** a message takes longer to reach, and be picked up by, the PE that runs it, within a process too.
+
+**Runs** (b19 × N, one copy per node, span 1, balanced layout, direct sends, W 2,500, buckets of 2,500 ps, 5,000 cycles, 128 LPs per chare; 1-node and 4-node series side by side; 2 reps, rep 2 reversed):
+- **Charades:**
+  - 2 × 23 PEs per node (the reference; V2's best setting).
+  - 1 × 46 PEs per node on the same cores (`+pemap 2-46:2,3-47:2`, `+lci_ndevices 23`): the same layout and digest, no hops between processes on a node (H4).
+  - Each of the two with `--comm-stats=1`: send-to-receive latency within a process, between processes on the node and between nodes (mean, p50, p90, p99), and the time inside send calls (H4, H5).
+  - 1 node only: W 10,000; one copy on a single PE, 500 cycles (H3).
+- **Devastator:**
+  - p2w23 / p8w23 at W 2,500: the same-job reference.
+  - 1 node only: W 10,000; one copy on a single worker (p1w1, built in the job), 500 cycles (H3).
+- **Rep 1 only:**
+  - `--pe-stats=1 --gvt-trace=1` at W 2,500 (1 and 4 nodes) and W 10,000 (1 node): each PE's executed, committed and rolled-back events, blocked time and time in `execute()`.
+  - perf (user cycles at 1,999 Hz, process 0) of both engines at 1 node, W 2,500. Data only: read if H3 holds, to rank what makes up Charades' per-event cost.
+- Gate: the VLSI change tier on 2 nodes.
+
+**Predictions:**
+- **Y1.**
+  - One count per cell: 125,998,590 (1 node) and 574,541,914 (4 nodes) in both engines.
+  - Every Charades arm gives V1's digest (87c11aec… / 0c800d36…), 1 × 46 included, since the layout depends on PEs per node, not on processes.
+  - The single-worker runs of the two engines commit the same count (no earlier value). Devastator is deterministic.
+- **Y2 (same-job reference).** Charades ÷ Devastator at W 2,500 is 0.50–0.62 at 1 node and 0.68–0.82 at 4 nodes (V1: 0.56, 0.75). At W 10,000 (1 node) it is 0.45–0.56 (V1: 0.50).
+- **Y3 (H3).** On a single worker, Charades ÷ Devastator is 0.50–0.70. Per-event cost then accounts for at least 0.6 of the 1-node gap (ln Y3 ÷ ln Y2). One copy on one core has a far larger working set than one bin per core, so this is a comparison between engines, not the per-event cost of the parallel run.
+- **Y4 (H4).** 1 × 46 ÷ 2 × 23 is 0.95–1.15 at 1 node and at 4 nodes: hops between processes account for at most a quarter of the 1-node gap.
+- **Y5 (H5).**
+  - At 2 × 23, 1 node: median send-to-receive latency at most 10 µs within a process and between processes, and between processes at most 2× within. Along a chain of about 25 gate levels that is at most 0.25 ms of the 1.10 ms cycle.
+  - `--comm-stats=1` costs at most 7% (rate at least 0.93 of the same layout without it).
+- **Y6 (the added cost at 4 nodes).** Per clock cycle, 4 nodes minus 1 node is 0.6–0.95 ms for Charades 2 × 23, Charades 1 × 46 and Devastator alike (V1: 0.76, 0.78).
+- **Y7 (wide window, per PE, 1 node).**
+  - At W 2,500 every PE is blocked 15–90% of the run (V1: 20–85%).
+  - At W 10,000 the least-blocked PE is blocked at most 3% (V1: 1.3%), executes at least 1.3× the mean PE's events, and its executed ÷ committed is at least 1.5, against at most 1.2 for the median PE: rollbacks keep it busy.
+  - Charades W 10,000 ÷ W 2,500 is 0.95–1.02, Devastator's 1.05–1.12 (V1: 0.99, 1.09).
+
+**Reading the results** (fixed before the runs):
+- The share of the 1-node gap that per-event cost accounts for is s3 = ln Y3 ÷ ln Y2; the share that hops between processes account for is s4 = ln(1 × 46 ÷ 2 × 23) ÷ (−ln Y2).
+- **If s3 + s4 ≥ 0.75**, the 1-node gap is accounted for. The next step is Charades' per-event cost (the perf profiles rank its parts against Devastator's) and, if s4 is material, a one-process launch for VLSI.
+- **If s3 + s4 < 0.75**, the rest is in delivery and wake-up (H5, Y5). The next step is a trace of the hops along one chain, which needs new instrumentation.
+- **If Y6 holds**, the 1–32-node job will show the gap shrinking by dilution, and only a lower per-event cost raises Charades' ratio at every node count. If Devastator's added time grows faster than Charades', the order can still change at scale, as on dragonfly.
+- No engine change follows from this job alone; a fix is designed once the cause is established.
 
 ## Baseline verification on the Mac
 
