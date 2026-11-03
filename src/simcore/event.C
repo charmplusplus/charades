@@ -66,6 +66,19 @@ static size_t remote_event_capacity(RemoteEvent* m) {
   return total > head ? total - head : 0;
 }
 
+/**
+ * A message delivered through the runtime's shared-memory pool (Charm++ built
+ * with --enable-shmem, or Reconverse's +ipc) sits in a block of this process's
+ * segment, and freeing it returns the block. Kept in the message pool, it
+ * would hold its block: the segment runs dry, and every send between the
+ * node's processes then falls back to the network after timed-out allocations
+ * (RESULTS.md section 201).
+ */
+static inline bool in_shared_block(RemoteEvent* m) {
+  CmiIpcManager* manager = CsvAccess(coreIpcManager_);
+  return manager && CmiMsgToIpcBlock(manager, (void*)UsrToEnv(m)) != nullptr;
+}
+
 RemoteEvent* remote_event_new(size_t size) {
   if (g_tw_msg_pool && size <= MSG_POOL_DATA) {
     std::vector<RemoteEvent*>& pool = PE_VALUE(msg_pool);
@@ -86,7 +99,8 @@ void remote_event_delete(RemoteEvent* m) {
   if (m == NULL) return;
   if (g_tw_msg_pool) {
     std::vector<RemoteEvent*>& pool = PE_VALUE(msg_pool);
-    if (pool.size() < MSG_POOL_MAX && remote_event_capacity(m) >= MSG_POOL_DATA) {
+    if (pool.size() < MSG_POOL_MAX && remote_event_capacity(m) >= MSG_POOL_DATA &&
+        !in_shared_block(m)) {
       pool.push_back(m);
       return;
     }
