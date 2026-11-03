@@ -86,6 +86,7 @@ extern unsigned g_tw_blocked_time;    ///< time PEs spend stopped at the optimis
 extern unsigned g_tw_commit_digest;   ///< hash each LP's committed events, in commit order
 extern Time     g_tw_commit_digest_interval; ///< --commit-digest: also keep the hash at each multiple of this time
 extern Time     g_tw_commit_log_until; ///< write every committed event below this time to commit_log_<pe>.bin
+extern Time     g_tw_etrace_from, g_tw_etrace_to; ///< --event-trace-from/-to: record what each PE did with these events (to 0: off)
 extern int64_t  g_tw_trace_lp;        ///< print what happens to this LP's events (-1: off)
 extern Time     g_tw_trace_from, g_tw_trace_to; ///< --trace-lp: only events in [from, to]
 /** --commit-digest-interval: the hashes kept per LP, one per multiple of the interval below the end time */

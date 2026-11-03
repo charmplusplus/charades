@@ -394,6 +394,10 @@ void LPChare::recv_local_event(Event* e) {
    * to the remote handler.
    */
   if (g_tw_trace_lp >= 0) trace_event("recv", e, (long long)straggler_time(e->owner));
+  if (etrace_ts(e->ts)) {
+    etrace_record(ET_RECV, CmiWallTimer(), e->ts, e->src_lp, e->event_id, 0, 0,
+        (uint32_t)e->dest_lp);
+  }
   if(isOptimistic && e->ts <= straggler_time(e->owner)) {
     if (g_tw_rollback_unit) {
       BRACKET_TRACE(rollback_lp(e->owner, e->ts);,USER_EVENT_RB)
@@ -471,6 +475,8 @@ int LPChare::execute_me() {
     // forward work cost (two timer reads per 16 events)
     static thread_local unsigned fwd_sample = 0;
     in_forward = true;
+    const bool et = etrace_ts(e->ts);
+    const double et0 = et ? CmiWallTimer() : 0;
     if (g_tw_ctl && g_tw_ctl_cost && (++fwd_sample & 15) == 0) {
       double t0 = CmiWallTimer();
       BRACKET_TRACE(lp->forward(e);, USER_EVENT_FWD)
@@ -480,6 +486,10 @@ int LPChare::execute_me() {
       BRACKET_TRACE(lp->forward(e);, USER_EVENT_FWD)
     }
     in_forward = false;
+    if (et) {
+      etrace_record(ET_EXEC, et0, e->ts, e->src_lp, e->event_id,
+          (uint64_t)((CmiWallTimer() - et0) * 1e9), 0, (uint32_t)e->dest_lp);
+    }
 
     /**
      * Move the event to the processed queue if we are optimistic, otherwise

@@ -51,6 +51,8 @@ Time OptimisticScheduler::get_min_time() const {
 /** Execute events in batches until the trigger dictates it's GVT time */
 void OptimisticScheduler::execute() {
   double t0 = g_tw_gvt_trace ? CmiWallTimer() : 0;
+  const bool et = g_tw_etrace_to && etrace_open();
+  const double et0 = et ? CmiWallTimer() : 0;
   unsigned num_executed = 0;
   bool blocked = false;
   // A count wave's result this PE's process now has (--gvt-node-waves)
@@ -132,6 +134,7 @@ void OptimisticScheduler::execute() {
   gvt_manager->iteration_end(num_executed < batch);
   if (t5) g_wave_timers.iter_end += CmiWallTimer() - ti;
   if (g_tw_gvt_trace >= 4) g_wave_timers.exec_end = CmiWallTimer();
+  if (et) etrace_pass(et0, CmiWallTimer(), blocked, num_executed);
   // --sched-park: blocked by the window, stop re-enqueuing execute() until
   // something can unblock this PE: a GVT update (gvt_done), an event or a
   // rollback inside the window (maybe_wake), a cancellation
@@ -167,6 +170,7 @@ void OptimisticScheduler::gvt_resume() {
 }
 
 void OptimisticScheduler::gvt_done(Time gvt, bool lb) {
+  if (g_tw_etrace_to) etrace_gvt(gvt);
   // --diag-gvt-spin-ns: a known extra cost in this step, on every PE
   if (g_tw_diag_gvt_spin_ns) {
     const double end = CmiWallTimer() + g_tw_diag_gvt_spin_ns * 1e-9;

@@ -310,6 +310,39 @@ void tw_event_free(Event* e, bool commit);
 void tw_event_rollback(Event* event);
 /** --commit-log-until: write this PE's committed events to commit_log_<pe>.bin */
 void commit_log_write();
+/**
+ * --event-trace-from/-to: one record per send, receive (into the pending heap),
+ * execution and rollback of an event in the range, and per scheduler pass and
+ * GVT update while the range is open on this PE; written to
+ * event_trace_<pe>.bin at the end (tools/event_trace.py reads it)
+ */
+enum EtraceKind : uint32_t {
+  ET_SEND = 0,      ///< x, y: the sending event's source LP and id (~0: none); aux: dest LP
+  ET_RECV = 1,      ///< aux: dest LP
+  ET_EXEC = 2,      ///< x: forward time (ns); aux: dest LP
+  ET_ROLLBACK = 3,  ///< aux: dest LP
+  ET_PASS = 4,      ///< wall: start; x: duration (ns); y: 1 blocked by the window; aux: events executed;
+                   ///< ts: passes (a run of passes that executed nothing is one record)
+  ET_GVT = 5        ///< ts: the new GVT
+};
+struct EtraceRecord {
+  double wall;
+  uint64_t ts, src_lp, event_id, x, y;
+  uint32_t kind, aux;
+};
+void etrace_record(uint32_t kind, double wall, Time ts, uint64_t src, uint64_t id,
+    uint64_t x, uint64_t y, uint32_t aux);
+/** A scheduler pass from start to end that executed n events */
+void etrace_pass(double start, double end, bool blocked, unsigned n);
+/** Whether events at time ts are traced */
+inline bool etrace_ts(Time ts) {
+  return g_tw_etrace_to && ts >= g_tw_etrace_from && ts <= g_tw_etrace_to;
+}
+/** Whether this PE records its passes and GVT updates now */
+bool etrace_open();
+/** GVT reached gvt: past the range, this PE stops recording passes */
+void etrace_gvt(Time gvt);
+void etrace_write();
 /** --trace-lp: print one line about e if it is the traced LP's */
 void trace_event(const char* what, const Event* e, long long extra = 0);
 /** An event message with room for size bytes of data (--msg-pool: reused) */

@@ -183,6 +183,48 @@ void commit_log_write() {
   commit_log.shrink_to_fit();
 }
 
+/** --event-trace-from/-to */
+static thread_local std::vector<EtraceRecord> etrace_log;
+static thread_local int etrace_state = 0;  // 0 before the range, 1 open, 2 past it
+
+void etrace_record(uint32_t kind, double wall, Time ts, uint64_t src, uint64_t id,
+    uint64_t x, uint64_t y, uint32_t aux) {
+  if (etrace_state == 0 && kind <= ET_ROLLBACK) etrace_state = 1;
+  etrace_log.push_back({wall, ts, src, id, x, y, kind, aux});
+}
+
+bool etrace_open() { return etrace_state == 1; }
+
+void etrace_pass(double start, double end, bool blocked, unsigned n) {
+  if (n == 0 && !etrace_log.empty()) {
+    EtraceRecord& r = etrace_log.back();
+    if (r.kind == ET_PASS && r.aux == 0 && r.y == (uint64_t)blocked) {
+      r.x = (uint64_t)((end - r.wall) * 1e9);
+      r.ts++;
+      return;
+    }
+  }
+  etrace_record(ET_PASS, start, 1, 0, 0, (uint64_t)((end - start) * 1e9), blocked, n);
+}
+
+void etrace_gvt(Time gvt) {
+  if (etrace_state != 1) return;
+  etrace_record(ET_GVT, CmiWallTimer(), gvt, 0, 0, 0, 0, 0);
+  if (gvt > g_tw_etrace_to) etrace_state = 2;
+}
+
+void etrace_write() {
+  if (!g_tw_etrace_to) return;
+  std::string name = "event_trace_" + std::to_string(CkMyPe()) + ".bin";
+  FILE* f = fopen(name.c_str(), "wb");
+  if (f) {
+    fwrite(etrace_log.data(), sizeof(EtraceRecord), etrace_log.size(), f);
+    fclose(f);
+  }
+  etrace_log.clear();
+  etrace_log.shrink_to_fit();
+}
+
 void trace_event(const char* what, const Event* e, long long extra) {
   if (g_tw_trace_lp < 0 || e->dest_lp != (uint64_t)g_tw_trace_lp) return;
   if (e->ts < g_tw_trace_from || e->ts > g_tw_trace_to) return;
@@ -255,6 +297,11 @@ void tw_event_send(Event* e) {
             "Lookahead violation: try decreasing the lookahead value");
 
   link_causality(e, e->owner->get_current_event());
+  if (etrace_ts(e->ts)) {
+    const Event* p = e->owner->get_current_event();
+    etrace_record(ET_SEND, CmiWallTimer(), e->ts, e->src_lp, e->event_id,
+        p ? p->src_lp : ~0ULL, p ? p->event_id : ~0ULL, (uint32_t)e->dest_lp);
+  }
 
   uint64_t dest_chare_id = g_lp_mapper->get_chare_id(e->dest_lp);
   LPChare* send_chare = (e->owner)->owner;
@@ -337,6 +384,10 @@ void tw_event_rollback(Event * event) {
   Event* e = event->caused_by_me;
   LPBase* dest_lp = event->owner;
   if (g_tw_trace_lp >= 0) trace_event("rollback", event);
+  if (etrace_ts(event->ts)) {
+    etrace_record(ET_ROLLBACK, CmiWallTimer(), event->ts, event->src_lp,
+        event->event_id, 0, 0, (uint32_t)event->dest_lp);
+  }
 
   dest_lp->set_current_event(event);
   dest_lp->reverse(event);

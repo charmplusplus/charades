@@ -62,6 +62,7 @@ unsigned g_tw_blocked_time;
 unsigned g_tw_commit_digest;
 Time     g_tw_commit_digest_interval;
 Time     g_tw_commit_log_until;
+Time     g_tw_etrace_from, g_tw_etrace_to;
 int64_t  g_tw_trace_lp;
 Time     g_tw_trace_from, g_tw_trace_to;
 unsigned g_tw_aggregation;
@@ -179,6 +180,8 @@ void clear_globals() {
   g_tw_commit_digest      = 0;
   g_tw_commit_digest_interval = 0;
   g_tw_commit_log_until   = 0;
+  g_tw_etrace_from        = 0;
+  g_tw_etrace_to          = 0;
   g_tw_trace_lp           = -1;
   g_tw_trace_from         = 0;
   g_tw_trace_to           = TIME_MAX;

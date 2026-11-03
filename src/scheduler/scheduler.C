@@ -104,6 +104,7 @@ void Scheduler::all_ended() {
 
 void Scheduler::finalize_complete() {
   commit_log_write();
+  etrace_write();
   agg_collect_stats(cumulative_stats);
   // Messages the shared-memory pool delivered to this PE (0 when it is off)
   cumulative_stats->ipc_received = (uint64_t)CmiIpcMessagesReceived();
