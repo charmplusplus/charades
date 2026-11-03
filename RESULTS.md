@@ -352,6 +352,7 @@ Sections 1–128 were re-read before planning sections 129 onward.
 | 193 | 2026-11-02 | — (Mac); V1 3675179 (gate failed, not reproduced in 1,210 reruns), resubmitted 3675299 / 3675300 | Balanced VLSI layout (`--chunk=512`, default; user decision): chunks placed heaviest first by a pre-simulated activity estimate into one equal bin per PE, the same in all three engines; busiest PE 1.04× the mean (file order 9.93×), 66% of messages cross PEs; span 4 now 45% across nodes; Mac: change tier 48/48, b19 × 2 one count, statistics and digest across engines and schedulers; job V1 design (window, controller, aggregation, span, Devastator, ROSS with `--max-opt-lookahead`), predictions W1–W10 | design |
 | 194 | 2026-11-02 | 3673481 | F5b, 32 nodes: one count per cell in all three engines (T1); dragonfly Charades ÷ Devastator 2.03, ÷ ROSS 4.26, Charades 16→32 per-node 0.90 (Devastator 0.80); traffic ÷ Devastator 1.08, ÷ ROSS 2.19, 16→32 0.99; traffic's best W widens to 1,000 and the controller follows (0.95–1.10 of best fixed per rep); 16-node half reproduces F5a within 1–3%; S1, S3, S4, S6 right, S2 just short once at 16, S7 half; ROSS ran without its window | current |
 | 195 | 2026-11-02 | 3675299 | V1 (balanced VLSI layout, 1 and 4 nodes): one count per cell in three engines; Charades ÷ Devastator 0.51 / 0.75 (span 4 0.55), ÷ ROSS 6.9–7.9 (ROSS with its window); Charades' best is direct sends at W 2,500 (22.9 / 61.9 M ev/s), PP 0.65–0.83 of direct, controller held at W 500 (0.80–0.89 of PP's best); Charades makes one GVT update per clock cycle at every W and waits at the window 44–75%; hypotheses H1 (per-hop latency on the cycle's critical path) and H2 (GVT pace) to test; W1, W3–W6, W9 right, W2, W7, W8, W10 wrong | current |
+| 196 | 2026-11-02 | V2 pending | Why Charades trails on VLSI (job V2 design): per-hop latency (H1) against GVT pace (H2); direct sends at W 2,500 with `--batch` 4/16/64, `--gvt-wave-events=16`, `--wave-batch=4`; buckets of one clock period (2,500 ps); the controller with 500 and 2,500 ps buckets; WPs at 2,500 ps buckets; `--gvt-trace=1` runs; predictions X1–X7 and the reading rule | design |
 
 ## Stampede3 runs, in order
 
@@ -8261,6 +8262,48 @@ Each PE receives about 186 messages per cycle in every layout. Chunks of 512 sta
 - **The controller (claim 2)** gets 0.62–0.70 of the best arm on VLSI. Its smallest W is one bucket, and every remote delay here falls inside one. Buckets of one clock period (2,500 ps) would make its smallest W the best fixed W; that needs measuring, as the H2 test does.
 - **Aggregation (claim 1)** does not help on VLSI. PP loses up to 35%. That fits a workload limited by latency rather than by message count, if H1 holds.
 - **Before the 1–32-node VLSI job:** a short diagnostic job at 1 and 4 nodes (the H1 and H2 tests, and the 2,500 ps buckets for the controller), with predictions written first. The user decides whether VLSI gets that engine time.
+
+### Why Charades trails on VLSI: per-hop latency against GVT pace (job V2 design, 2026-11-02; written before any runs)
+
+> **Status: design.** User decision 2026-11-02: run the short diagnostic job (section 195's proposal). Script `~/charades-data/vlsi/vdiag196.slurm`; Charades only, `charades-vlsi` 90e9922 (unchanged since V1).
+
+**What the bucketed GVT does here** (`src/gvt/bucketed.C`): a bucket completes only when every PE had passed it at the previous count wave and the sent and received totals match. GVT therefore trails the slowest PE by at least two waves. V1's mean lead of the slowest PE over GVT at wave completion was 2,138 ps (4.3 buckets) at W 2,500. So when a wave completes, PEs typically sit almost a window ahead of GVT. A PE contributes to a wave after executing 128 events (`--gvt-wave-events`) or as soon as it cannot execute.
+
+**The two hypotheses (section 195):**
+- **H1:** the cycle time is set by per-hop message latency along each cycle's chain of gates.
+- **H2:** it is set by GVT pace: per cycle, the slowest PE's work plus the waves that confirm it.
+
+**Runs** (b19 × N, one copy per node, span 1, balanced layout, 5,000 cycles; 1-node and 4-node series side by side; 2 reps, rep 2 reversed; 128 LPs per chare; direct sends unless noted):
+- At W 2,500, buckets of 500 ps:
+  - `--batch` 4, 16 (V1's setting) and 64. Pass size changes both message latency and wave pace (section 10, PHOLD).
+  - `--gvt-wave-events=16`, and `--wave-batch=4` (passes of 4 events only while a wave is in flight). These change wave pace only.
+  - On PHOLD at 16 nodes, the advance was the time the late PE took to run its 128 events (section 120), and `--wave-batch=4` cost 3–7%. Here a PE runs about 550 events per cycle at about 0.75 µs each, so 128 events take about 100 µs, against V1's 1.1 ms cycle.
+- Buckets of 2,500 ps (one per clock cycle): W 2,500 and W 5,000.
+- The frozen controller: direct sends with buckets of 500 and 2,500 ps; PP 2,048 with buckets of 2,500 ps.
+- WPs 512 at W 2,500 with buckets of 2,500 ps.
+- Rep 1 only: `--gvt-trace=1` (every count wave: start, end, valid buckets, the bucket completed, PE 0's lead over GVT) at W 2,500, with buckets of 500 and of 2,500 ps.
+- Gate: the VLSI change tier on 2 nodes. A failing case's output is now kept (`gate_fail_*.out`).
+
+**Predictions:**
+- **X1.** One count per cell, as in V1 (125,998,590 / 574,541,914). Every arm gives V1's balanced-layout digest (87c11aec… / 0c800d36…), since no setting here changes the layout.
+- **X2 (pass size).** At 1 node, batch 4 is at least 1.10× batch 16 and batch 64 at most 0.90×.
+- **X3 (wave pace only).** `--gvt-wave-events=16` and `--wave-batch=4` are each within ±5% of batch 16. If they are, H2 in its wave-latency form is out.
+- **X4 (buckets of one cycle).** GVT updates stay 4,990–5,010 per run. Direct sends at W 2,500 and at W 5,000 are each within ±10% of buckets of 500.
+- **X5 (the controller).**
+  - With buckets of 2,500 ps the direct-send controller's mean W is 2,500–5,000. It reaches at least 0.95 of direct W 2,500 at the same buckets.
+  - With buckets of 500 it stays at 500 and reaches 0.60–0.75 of direct W 2,500.
+  - PP 2,048's controller with buckets of 2,500 reaches at least 0.95 of V1's best PP 2,048 (19.3 / 48.0 M ev/s).
+- **X6.** WPs 512 at buckets of 2,500 is 0.95–1.00 of direct sends at the same buckets.
+- **X7 (trace, buckets of 500).**
+  - 2–4 count waves per GVT update; mean wave duration 0.3–0.6 ms at 1 node and 0.6–1.0 ms at 4 nodes.
+  - Waves run back to back: the gap from one wave's end to the next's start is under 10% of a wave.
+  - PE 0's lead over GVT is at least 1,500 ps in at least half the waves.
+
+**Reading the results** (fixed before the runs):
+- **H1 is supported** if X2 holds while X3 holds (pass size matters, wave pace alone does not) and the waves take a small share of each cycle.
+- **H2 is supported** if X3 fails (faster waves give faster cycles) or if waves × wave duration ≈ the cycle time with PEs at the window edge (X7).
+- **Both may hold.** The trace then gives each a share of the cycle.
+- No engine change follows from this job alone. A fix is designed only after the cause is established.
 
 ## Baseline verification on the Mac
 
