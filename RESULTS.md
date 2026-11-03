@@ -8575,7 +8575,7 @@ Committed count and digest as V1. About 1% of V3's 15.5 M messages between the n
 - **P1 right.** 4 copies over 5,000 cycles commit V3's 574,541,914; copy 2 is the most active, at 1.76× the mean of the other three.
 - **P2 right.** The most active copy ÷ the mean copy is 1.60, 1.67 and 1.71 at 8, 16 and 32 copies, rising toward 1.75 as copies are added.
 
-**Consequence for the 1–32-node job (user decides):** keep the inputs and report the most active copy (every engine pays it alike); or change the workload so no node carries an outlier copy, for example several copies per node, which dilutes it (4 copies per node: the node with copy 2 does 1.19× the mean; 8: 1.09×), or a seed with no outlier among the copies used (selected after the fact).
+**Consequence for the 1–32-node job: user decision 2026-11-03, keep the workload** (one copy per node, inputs as they are) **and report the per-copy activity.** Every engine pays the most active copy alike. The paper states that from 3 nodes on one copy does 1.75× the work of the others, so per-node rates from 1–2 nodes to 4 and more fall in every engine for that reason. Runs at 4 nodes and more print `--copy-stats=1`. (Not chosen: several copies per node, which would dilute it to 1.19× at 4 per node and 1.09× at 8; a seed with no outlier, selected after the fact.)
 
 ## Baseline verification on the Mac
 
