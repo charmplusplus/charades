@@ -37,6 +37,7 @@ OptimisticScheduler::OptimisticScheduler() {
   avl_list[g_event_buffer_size - 1].next = NULL;
   PE_VALUE(avl_list_head) = &avl_list[0];
   DEBUG_PE("Created AVL tree with %d nodes\n", g_event_buffer_size);
+  if (g_tw_etrace_to) etrace_init();
 }
 
 /** Min time for optimistic schedulers must also take cancel q into account */

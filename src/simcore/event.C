@@ -186,10 +186,20 @@ void commit_log_write() {
 /** --event-trace-from/-to */
 static thread_local std::vector<EtraceRecord> etrace_log;
 static thread_local int etrace_state = 0;  // 0 before the range, 1 open, 2 past it
+static thread_local uint64_t etrace_dropped = 0;
+
+void etrace_init() {
+  etrace_log.resize(g_tw_etrace_max);
+  etrace_log.clear();
+}
 
 void etrace_record(uint32_t kind, double wall, Time ts, uint64_t src, uint64_t id,
     uint64_t x, uint64_t y, uint32_t aux) {
   if (etrace_state == 0 && kind <= ET_ROLLBACK) etrace_state = 1;
+  if (etrace_log.size() == etrace_log.capacity()) {
+    etrace_dropped++;
+    return;
+  }
   etrace_log.push_back({wall, ts, src, id, x, y, kind, aux});
 }
 
@@ -215,6 +225,10 @@ void etrace_gvt(Time gvt) {
 
 void etrace_write() {
   if (!g_tw_etrace_to) return;
+  if (etrace_dropped) {
+    CkPrintf("PE %d: event trace full, %llu records dropped (--event-trace-max)\n",
+        CkMyPe(), (unsigned long long)etrace_dropped);
+  }
   std::string name = "event_trace_" + std::to_string(CkMyPe()) + ".bin";
   FILE* f = fopen(name.c_str(), "wb");
   if (f) {

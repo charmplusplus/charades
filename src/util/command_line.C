@@ -48,6 +48,7 @@ void parse_command_line(int argc, char** argv) {
   kernel.register_argument("commit-log-until",     "Write every committed event below this virtual time (LP, time, source LP, type, id) to commit_log_<pe>.bin, in commit order, to compare runs event by event (0 = off)", g_tw_commit_log_until);
   kernel.register_argument("event-trace-from",     "Write each PE's sends, receives, executions and rollbacks of events at or after this virtual time, its scheduler passes and its GVT updates, to event_trace_<pe>.bin (tools/event_trace.py)", g_tw_etrace_from);
   kernel.register_argument("event-trace-to",       "--event-trace-from: events at or before this time (0 = off)", g_tw_etrace_to);
+  kernel.register_argument("event-trace-max",      "--event-trace-from: records per PE (56 bytes each), allocated before the run so that recording never grows the buffer; records past it are counted and dropped", g_tw_etrace_max);
   kernel.register_argument("trace-lp",             "Debugging: print each receive, execution, rollback, cancellation and commit of this LP's events (-1 = off)", g_tw_trace_lp);
   kernel.register_argument("trace-from",           "--trace-lp: only events at or after this time", g_tw_trace_from);
   kernel.register_argument("trace-to",             "--trace-lp: only events at or before this time", g_tw_trace_to);

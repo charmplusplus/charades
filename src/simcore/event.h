@@ -338,6 +338,8 @@ void etrace_pass(double start, double end, bool blocked, unsigned n);
 inline bool etrace_ts(Time ts) {
   return g_tw_etrace_to && ts >= g_tw_etrace_from && ts <= g_tw_etrace_to;
 }
+/** Allocate and touch this PE's trace buffer (before the run: growing it mid-range stalled the PE) */
+void etrace_init();
 /** Whether this PE records its passes and GVT updates now */
 bool etrace_open();
 /** GVT reached gvt: past the range, this PE stops recording passes */
