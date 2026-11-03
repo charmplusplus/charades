@@ -17,6 +17,9 @@
 CkGroupID scheduler_id;
 CpvDeclare(SchedulerPtr, g_scheduler);
 
+/** --pe-stats: one record per PE, the columns of pe_stats.csv */
+static const int PE_STATS_FIELDS = 13;
+
 /******************************************************************************/
 /* Scheduler Base Class                                                       */
 /******************************************************************************/
@@ -107,11 +110,12 @@ void Scheduler::finalize_complete() {
       cumulative_stats->blocked_time;
   if (g_tw_pe_stats) {
     const Statistics* s = cumulative_stats;
-    double rec[12] = {(double)CkMyPe(), (double)CkMyNode(), (double)CkMyRank(),
+    // blocked_s needs --blocked-time, exec_s --gvt-trace (0 otherwise)
+    double rec[PE_STATS_FIELDS] = {(double)CkMyPe(), (double)CkMyNode(), (double)CkMyRank(),
         (double)s->events_executed, (double)s->events_committed,
         (double)s->events_rolled_back, (double)s->remote_sends,
         (double)s->iter_full, (double)s->iter_window, (double)s->iter_empty,
-        s->exec_time, s->total_time};
+        s->exec_time, s->total_time, s->blocked_time};
     contribute(sizeof(rec), rec, CkReduction::concat,
         CkCallback(CkIndex_Scheduler::pe_stats(NULL), thisProxy[0]));
   }
@@ -122,17 +126,18 @@ void Scheduler::finalize_complete() {
 void Scheduler::pe_stats(CkReductionMsg* msg) {
   std::vector<std::vector<double>> recs;
   const double* d = (const double*)msg->getData();
-  for (int i = 0; i + 12 <= (int)(msg->getSize() / sizeof(double)); i += 12) {
-    recs.emplace_back(d + i, d + i + 12);
+  const int n = PE_STATS_FIELDS;
+  for (int i = 0; i + n <= (int)(msg->getSize() / sizeof(double)); i += n) {
+    recs.emplace_back(d + i, d + i + n);
   }
   delete msg;
   std::sort(recs.begin(), recs.end());
   FILE* f = fopen("pe_stats.csv", "w");
   fprintf(f, "pe,process,rank,executed,committed,rolled_back,remote_sends,"
-             "batches_full,batches_window,batches_empty,exec_s,total_s\n");
+             "batches_full,batches_window,batches_empty,exec_s,total_s,blocked_s\n");
   for (const auto& r : recs) {
-    fprintf(f, "%.0f,%.0f,%.0f,%.0f,%.0f,%.0f,%.0f,%.0f,%.0f,%.0f,%.6f,%.6f\n",
-        r[0], r[1], r[2], r[3], r[4], r[5], r[6], r[7], r[8], r[9], r[10], r[11]);
+    fprintf(f, "%.0f,%.0f,%.0f,%.0f,%.0f,%.0f,%.0f,%.0f,%.0f,%.0f,%.6f,%.6f,%.6f\n",
+        r[0], r[1], r[2], r[3], r[4], r[5], r[6], r[7], r[8], r[9], r[10], r[11], r[12]);
   }
   fclose(f);
   pe_stats_written = true;
