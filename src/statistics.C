@@ -370,10 +370,10 @@ void Statistics::print() const {
     print_int("Held Events Cancelled In Sender", anti_cancels);
   }
 
-  if (timed_sends) {
+  if (timed_sends || lat_count[0] || lat_count[1] || lat_count[2]) {
     print_section("COMMUNICATION STATISTICS");
     print_int("Timed Send Calls", timed_sends);
-    print_double("Mean Send Call (us)", 1e6 * send_time / timed_sends);
+    print_double("Mean Send Call (us)", timed_sends ? 1e6 * send_time / timed_sends : 0.0);
     // Share of all PE time (execution time x PEs) spent inside send calls
     print_double("Send Calls % of PE Time", 100.0 * send_time / (total_time * CkNumPes()));
     const char* names[LAT_CLASSES] = {"Same Process", "Same Node", "Other Node"};

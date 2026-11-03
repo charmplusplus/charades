@@ -297,6 +297,9 @@ void tw_event_send(Event* e) {
     if (send_now) {
       // A chare in this process gets the message by pointer (--local-fast-path)
       const double ts2 = t5 ? CmiWallTimer() : 0;
+      // --comm-stats: stamped before the push, after which the receiver owns
+      // msg; an event that does not take the fast path is stamped again
+      if (g_tw_comm_stats) comm_send_begin(msg);
       fast = fp_send(msg, dest_chare_id);
       const double ts3 = t5 ? CmiWallTimer() : 0;
       if (fast) {

@@ -108,6 +108,8 @@ extern Time     g_tw_agg_urgent;      ///< events with ts < GVT + this ship at o
 extern unsigned g_tw_agg_scope;       ///< 0: all remote chares, 1: other processes only
 extern unsigned g_tw_agg_input_buffer;       ///< node-level receives hand items to PEs through input buffers (default 1)
 extern unsigned g_tw_local_fast_path; ///< events for other chares in this process go by pointer through per-PE input buffers (fastpath.h)
+extern unsigned g_tw_fossil_lazy;     ///< commit events below a new GVT a few chares per idle pass instead of all at once
+extern unsigned g_tw_fossil_chares;   ///< --fossil-lazy: chares committed per pass that ends without a full batch
 extern unsigned g_tw_rollback_unit;   ///< a straggler rolls back 0: its whole chare, 1: only its LP (default)
 extern unsigned g_tw_event_index;     ///< remote events indexed for cancellation by 0: AVL tree, 1: hash (default)
 extern unsigned g_tw_msg_pool;        ///< recycle RemoteEvent messages through a per-PE pool (default 1)

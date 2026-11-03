@@ -56,6 +56,8 @@ void parse_command_line(int argc, char** argv) {
   kernel.register_argument("agg-buffer",           "htram buffer size in events (PP: a multiple of 16)", g_tw_agg_buffer);
   kernel.register_argument("agg-urgent",           "Ship an event at once if its ts < GVT + this (0 = never)", g_tw_agg_urgent);
   kernel.register_argument("agg-scope",            "Aggregate events to - ALL REMOTE CHARES=0, OTHER PROCESSES ONLY=1", g_tw_agg_scope);
+  kernel.register_argument("fossil-lazy",          "Optimistic: commit the events below a new GVT a few chares at a time, on passes that end without a full batch, instead of all at once when the GVT arrives (which delays every event waiting for this PE) - NO=0, YES=1", g_tw_fossil_lazy);
+  kernel.register_argument("fossil-chares",        "--fossil-lazy: chares committed per such pass", g_tw_fossil_chares);
   kernel.register_argument("local-fast-path",      "Optimistic, bucketed GVT, not --sched-park: events for other chares in this process are handed over by pointer through per-PE input buffers, not htram or messages (elsewhere it turns itself off) - NO=0, YES=1 (default), THIS PE ONLY=2", g_tw_local_fast_path);
   kernel.register_argument("agg-input-buffer",            "Optimistic, bucketed GVT, not --sched-park: htram node receives hand events to PEs through input buffers, not messages - NO=0, YES=1 (default)", g_tw_agg_input_buffer);
   kernel.register_argument("rollback-unit",        "Optimistic: a straggler is judged against, and rolls back, 0 = its whole LPChare, 1 = only its LP (default)", g_tw_rollback_unit);

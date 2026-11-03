@@ -22,6 +22,9 @@ OptimisticScheduler::OptimisticScheduler() {
 
   // Initialize the cancel queue
   min_cancel_time = TIME_MAX;
+  fossil_gvt = 0;
+  fossil_next = 0;
+  fossil_rounds = 0;
 
   // Allocate AVL tree space // TODO: Move this to LPs
   AvlTree avl_list;
@@ -106,6 +109,11 @@ void OptimisticScheduler::execute() {
   } else {
     PE_STATS(iter_empty)++;
   }
+  // --fossil-lazy: commit some of the last GVT's fossils in time this PE
+  // would otherwise spend waiting
+  if (num_executed < batch && fossil_next < fossil_lps.size()) {
+    collect_fossils_step(g_tw_fossil_chares);
+  }
   // Nothing (more) this PE may execute: whatever it has buffered for other
   // PEs is now only delaying them
   if (num_executed < batch) {
@@ -166,7 +174,26 @@ void OptimisticScheduler::gvt_done(Time gvt, bool lb) {
   }
   const bool t5 = g_tw_gvt_trace >= 5;
   const double tf = t5 ? CmiWallTimer() : 0;
-  collect_fossils(gvt);
+  // --fossil-lazy: commit later, a few chares per pass that ends without a
+  // full batch. All at once here held every event that other PEs sent this
+  // one, through the GVT update that starts the next stretch of work (VLSI:
+  // ~550 events per PE once per clock cycle). At the end, before load
+  // balancing, and after 4 updates without finishing, all at once as before.
+  if (g_tw_fossil_lazy && !lb && gvt < g_tw_ts_end && fossil_rounds < 4) {
+    if (fossil_lps.empty()) {
+      for (int i = 0; i < next_lps.get_size(); i++) {
+        fossil_lps.push_back(next_lps.as_array()[i]->lp);
+      }
+    }
+    if (fossil_next < fossil_lps.size()) fossil_rounds++;
+    fossil_gvt = gvt;
+    fossil_next = 0;
+  } else {
+    collect_fossils(gvt);
+    fossil_next = fossil_lps.size();
+    fossil_rounds = 0;
+    if (lb) fossil_lps.clear();  // chares may move
+  }
   if (t5) {
     g_wave_timers.fossil += CmiWallTimer() - tf;
     g_wave_timers.gvt_done_n++;
@@ -178,6 +205,13 @@ void OptimisticScheduler::collect_fossils(Time gvt) {
   for (int i = 0; i < next_lps.get_size(); i++) {
     next_lps.as_array()[i]->lp->fossil_me(gvt);
   }
+}
+
+void OptimisticScheduler::collect_fossils_step(unsigned chares) {
+  for (unsigned i = 0; i < chares && fossil_next < fossil_lps.size(); i++) {
+    fossil_lps[fossil_next++]->fossil_me(fossil_gvt);
+  }
+  if (fossil_next >= fossil_lps.size()) fossil_rounds = 0;
 }
 
 void OptimisticScheduler::balancing_complete() {
@@ -195,6 +229,12 @@ void OptimisticScheduler::balancing_complete() {
  * GVT passed them and fossil collection committed events that were cancelled.
  */
 void OptimisticScheduler::process_cancel_q() {
+  // Every queued cancellation lowers min_cancel_time (add_to_cancel_q calls
+  // update_min_cancel when its chare's minimum drops, which the first one
+  // after a call always does), and a call resets it before emptying every
+  // queue. At TIME_MAX nothing is queued: skip the walk over every chare, which
+  // execute() made on every pass (RESULTS.md 203)
+  if (min_cancel_time == TIME_MAX) return;
   min_cancel_time = TIME_MAX;
   cancel_lps.clear();
   for (int i = 0; i < next_lps.get_size(); i++) {

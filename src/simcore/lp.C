@@ -341,6 +341,8 @@ void LPChare::recv_remote_event(RemoteEvent* event) {
 }
 
 void LPChare::recv_fast_event(RemoteEvent* event) {
+  // From push to this PE's next drain of its input buffer ("Same Process")
+  if (g_tw_comm_stats) comm_record_latency(event);
   scheduler->consume(event);
   Event* e = event_alloc();
   e->set_msg(event);

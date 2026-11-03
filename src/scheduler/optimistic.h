@@ -12,6 +12,13 @@ class OptimisticScheduler : public CBase_OptimisticScheduler {
     // TODO: Do we need a separate cancel queue, or can we treat it like FC?
     Time min_cancel_time; /**< minumum event time in the cancel queue */
     vector<LPChare*> cancel_lps; /**< process_cancel_q's snapshot of LPs */
+    /** --fossil-lazy: the GVT whose fossils are still being committed, the
+     *  chares (fixed: no load balancing in between) and the next one */
+    vector<LPChare*> fossil_lps;
+    Time fossil_gvt;
+    size_t fossil_next;
+    unsigned fossil_rounds;  /**< GVT updates since the last finished collection */
+    void collect_fossils_step(unsigned chares);
 
   public:
     OptimisticScheduler();
