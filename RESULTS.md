@@ -362,6 +362,8 @@ Sections 1–128 were re-read before planning sections 129 onward.
 | 203 | 2026-11-03 | idev 3677573 (results in 204) | Closing the gap (user decision; Reconverse changes allowed): single-worker profiles of both engines, skip the cancel-queue walk when nothing is queued, network polling by one PE / a progress thread, fast shared memory between processes; predictions E1–E3 | design |
 | 204 | 2026-11-03 | idev 3677573 | Closing the gap, round 1: skipping the empty cancel-queue walk (single worker 0.65 → 1.53 M ev/s, Devastator 1.59; 1–2% at 46 PEs), lazy fossil collection (`--fossil-lazy=1`, 1.12× at 1 × 46; fast-path wait 29 → 13 µs mean), batch 32, W 5,000: Charades 38.1 = 0.85 of Devastator's best at 1 node (V4 0.77); in-pass draining −6% (rejected); one polling PE +1.4%; E1 right, E2, E3 wrong | current |
 | 205 | 2026-11-03 | idev 3677573 | Reconverse's shared-memory pool rewritten (`pads-perf`: one receive queue per PE, per-sender return lists, no locks): 2 × 23 with the pool 32.5–33.3 M ev/s = 1.38× over LCI, 0.86 of 1 × 46 (38.1); `--enable-shmem` = `+ipc`; send call 0.74 µs (old 16, LCI 2.0); the controller holds W 2,500 while the best fixed W is now 5,000 (0.88) | current |
+| 206 | 2026-11-03 | V5 (results in a later section) | Round 1's settings at 1 and 4 nodes in both engines (job V5 design): VLSI 1 × 46 with lazy fossils / batch 32 at W 2,500–10,000, the controller at buckets of 5,000 ps, 2 × 23 over `+ipc` / `--enable-shmem` / LCI, Devastator 2 × 23 (and 1 × 46 if its Stampede3 hang is fixed: on the Mac p1w46 runs); lazy against eager fossils on six workloads at two W and the controller, `+ipc` and the paper's tree for reference; predictions F1–F9 and the default rule | design |
+| 207 | 2026-11-03 | idev (results in a later section) | Where a VLSI clock cycle's wall time goes (design): `--event-trace-from/-to` records each event's send, arrival, executions and rollbacks and each PE's passes and GVT updates; `event_trace.py` follows each cycle's last event back through its senders and splits the chain into send, transit and queue, and those by what the receiving PE did (later / earlier events, pass, blocked, empty, outside); hypotheses H1 ahead work, H2 busiest PEs, H3 per-pass machinery; predictions T1–T4 | design |
 
 ## Stampede3 runs, in order
 
@@ -8711,6 +8713,79 @@ On one PE the walk visited all 1,840 chares on every pass, and most of `execute(
 - **What is left between 2 × 23 and 1 × 46:** a cross-process event still goes through Charm++'s message path (envelope, the send, the copy into a block, delivery to the array element) where a same-process event is a pointer handed to the PE's input buffer.
 
 **The frozen controller with lazy fossils** (1 × 46, batch 32, buckets of 2,500): it holds W at 2,500 ps (one bucket) and runs 33.4 M ev/s, as fixed W 2,500 does (33.4), but the best fixed W is now 5,000 (38.1): 0.88 of it, where V2 had 0.99. Its smallest W is one bucket and every remote delay is shorter than one, so its scale does not reach W 5,000. **With buckets of 5,000 ps** the controller settles at W 5,000 and runs 37.7 / 36.6, the same as fixed W 5,000 at those buckets (36.5 / 37.0) and 0.97 of the best fixed setting (38.1, buckets of 2,500): the per-model bucket setting puts it back, as in V2.
+
+### Round 1's settings at 1 and 4 nodes in both engines, and lazy fossils on the other six workloads (job V5 design, 2026-11-03; written before any runs)
+
+> **Status: design.** User decision 2026-11-03: go ahead with section 205's next steps. Script `$WORK/charades-runs/v5gap206.slurm` (copy in `~/charades-data/vlsi/`); 5 nodes (the 4-node series and the 1-node series side by side), 2 reps, arm order reversed in rep 2. Trees: `charades-perf` at 5b06d09 (code 512a0b1: the cancel-queue skip, `--fossil-lazy`) on `charm-pads-perf` (Reconverse `pads-perf` with the new pool, section 205), `charades-perfshm` (the same code on Charm++ `--enable-shmem`), and the paper's tree `charades-phaseb` (e1fbdc4, `charm-pads-exp`) for reference. Gate: the change tier on 2 nodes for VLSI, Simple PHOLD, traffic and dragonfly with `--fossil-lazy=1`.
+
+**Devastator at one process per node** (section 202: p1w46 and p4w46 print their setup and stall). On the Mac, a p1w46 VLSI build (GASNet smp conduit, b14, W 2,500) runs and commits the same count as p1w24, with both `opnew=libc` and Devastator's own allocator. The hang is therefore specific to Stampede3: the psm2 conduit, thread pinning (Devastator pins thread t to the t-th CPU of the process's mask), or the launch. It is diagnosed on a 1-node idev (gdb backtraces of every thread) before V5 is submitted; V5 includes Devastator 1 × 46 only if it then runs.
+
+**Part A: VLSI** (b19 × N, one copy per node, span 1, `--chunk=512`, 5,000 cycles, direct sends, buckets of 2,500 ps unless noted, `--copy-stats=1 --commit-digest=1 --blocked-time=1`):
+
+| arm | layout | settings |
+|---|---|---|
+| R | 1 × 46 | W 5,000, eager fossils, batch 16 (round 1 before lazy fossils) |
+| L | 1 × 46 | `--fossil-lazy=1 --batch=32`, W 2,500 / 5,000 / 10,000 |
+| Lc | 1 × 46 | as L, the frozen controller (`--ctl=3 --ctl-bracket=1`), buckets of 5,000 ps |
+| I | 2 × 23, Reconverse `+ipc` | as L, W 5,000 |
+| S | 2 × 23, Charm++ `--enable-shmem` | as L, W 5,000 |
+| N | 2 × 23 over LCI | as L, W 5,000 |
+| Devastator | 2 × 23 (and 1 × 46 if it runs) | W 2,500 / 5,000 / 10,000 |
+
+**Part B: lazy fossils on the other workloads** (`charades-perf`, 2 × 23 over LCI, the paper's launch; job N's sizes, htram settings and buckets; dragonfly 13 × 4 routers at 1 node and 16 × 10 at 4, generating 150,000 ns):
+
+| workload | htram | W grid (first = best fixed W in job N / F5) |
+|---|---|---|
+| phase-changing PHOLD | PP 512 | 100, 150 |
+| σ 100 | PP 2,048 | 300, 500 |
+| σ 2,000 | PP 512 | 300, 500 |
+| uniform | WPs 512 | 300, 500 |
+| traffic | PP 2,048 | 500, 750 |
+| dragonfly | WPs 512 | 10,000, 20,000 |
+
+Each workload runs eager and lazy fossils at both W and under the frozen controller (6 runs), plus `+ipc` with lazy fossils at the first W, plus the paper's tree at the first W: 8 runs per workload, rep and node count.
+
+**Predictions:**
+- **F1.** One committed count per workload and node count over every Charades arm (lazy, `+ipc`, `--enable-shmem`, controller, the paper's tree), with one digest where digests are on; Devastator's VLSI count equals Charades'.
+- **F2 (VLSI, 1 node).** L at W 5,000 runs 37–39.5 M ev/s (section 204: 38.1). Charades' best ÷ Devastator's best is 0.82–0.88.
+- **F3 (VLSI, 4 nodes).** L at W 5,000 ÷ R is 1.08–1.15. Charades' best W is 5,000. Charades' best ÷ Devastator's best (2 × 23) is 1.00–1.12 (V4: 0.95).
+- **F4 (layouts).** At 1 node, I ÷ L (W 5,000) is 0.83–0.90, S is within ±3% of I, and N ÷ L is 0.58–0.66. At 4 nodes, I ÷ L is 0.85–0.95.
+- **F5.** The controller (Lc) reaches at least 0.95 of the best fixed W at both node counts.
+- **F6 (lazy fossils elsewhere).** At each workload's best fixed W, lazy ÷ eager is 0.97–1.03 at both node counts, and the best W of the two does not move. These workloads advance GVT every few hundred µs, so each update commits few events per PE; VLSI advances it once per clock cycle.
+- **F7.** The new tree with eager fossils ÷ the paper's tree at the same W is 1.00–1.04 (the cancel-queue skip, about 8 chares per PE).
+- **F8.** `+ipc` ÷ LCI with lazy fossils at the first W is 0.98–1.08: htram already combines the events sent between the node's processes.
+- **F9.** If Devastator runs at 1 × 46, its best there ÷ its best at 2 × 23 is 0.95–1.10.
+
+**What follows:**
+- `--fossil-lazy=1` becomes the default if lazy ÷ eager is at least 0.98 in every Part B cell (median of the 2 reps, best W and controller, both node counts). Otherwise it stays a per-model setting, reported with VLSI as the bucket width is.
+- Charades' VLSI launch is the best of L, I and S per node count. Devastator gets the same choice between 1 × 46 and 2 × 23, or the paper says its 1 × 46 could not be run and why.
+- If F3 holds, the VLSI scaling job (1–32 nodes, three engines) follows with these settings. The 1-node gap goes to an event-level trace of clock cycles in Charades (where each cycle's wall time goes along its chain of dependent events), designed in its own section before it runs.
+
+### Where a VLSI clock cycle's wall time goes: an event-level trace of Charades at 1 × 46 (design, 2026-11-03; written before any Stampede3 trace runs)
+
+> **Status: design.** Section 205's second next step. Tool: `--event-trace-from=<ts> --event-trace-to=<ts>` (new; off by default) and `scripts/stampede3/event_trace.py`. Mac: change tier 30/30 on VLSI and Simple PHOLD at 1 × 4 and 2 × 2 with the hooks built in; a traced b14 run (4 PEs, W 5,000, lazy fossils) reads back with every event's chain resolved.
+
+**What is recorded.** For each event whose timestamp is in the range, each PE writes a record of its send (with the sending event's identity), its arrival in the receiver's pending heap, each forward execution (start and length) and each rollback. While the range is open the PE also records its scheduler passes (start, length, events executed, blocked by the window; a run of passes that executed nothing is one record) and its GVT updates. The records go to `event_trace_<pe>.bin` at the end. Wall times compare only between PEs of one process, so trace runs use 1 × 46 on 1 node.
+
+**What the script computes.** For each clock period inside the range, it takes the committed event of that period whose final execution ends last and follows it back through the events that sent it, up to one period earlier. Each hop splits into the parent's forward up to the send, transit (send to the child's arrival in the heap; a hop to another PE includes the wait in that PE's input buffer), and queue (heap to the child's final execution). Transit and queue are split again by what the receiving PE did meanwhile: executing events with a later timestamp than the child ('later'), executing earlier ones ('earlier'), the rest of passes that executed events ('pass': the engine's per-event work outside `forward`), passes blocked by the window, empty passes, and time between passes ('outside': Converse scheduling, messages, GVT, eager fossils). The cycle's wall time is taken from PE 0's GVT updates.
+
+**Runs (idev, 1 node; b19 × 1, 1 × 46, `--fossil-lazy=1 --batch=32`, buckets of 2,500 ps):** W 5,000 and W 2,500, each traced over cycles 2,000–2,040 and once untraced; Devastator's per-cycle time from the same W (V4: 0.57 ms at W 5,000, 2 × 23).
+
+**Hypotheses for the remaining 1-node gap (Charades 0.66 ms per cycle at W 5,000, Devastator 0.57):**
+- **H1, ahead work:** an event sent to another PE waits in its input buffer while that PE finishes a batch of up to 32 later-timestamp events, because the input buffer is drained once per pass. Over a chain of tens of hops between PEs at about 13 µs each, this alone could take most of a cycle.
+- **H2, the busiest PEs:** chain events wait in the heap behind earlier-timestamp events on PEs carrying more than their share of the cycle's events.
+- **H3, per-pass machinery:** time between passes (re-enqueuing `execute()` through Charm++, the Converse sweep, network polling) and the engine's per-event work outside `forward`.
+
+**Predictions:**
+- **T1.** Tracing costs at most 10% of the rate.
+- **T2.** At W 5,000 the last event's chain has 20–80 hops, of which at least half go to another PE.
+- **T3 (H1).** Transit is the largest part of the chain (at least 40%), and most of it is 'later' plus 'pass' on the receiving PE. At W 2,500 the 'later' share is smaller than at W 5,000.
+- **T4.** 'blocked' plus 'empty' is under 15% of the chain at W 5,000: the chain's events are at the frontier, so their receivers are rarely held by the window.
+
+**What follows:**
+- T3 right: a frontier event's arrival should preempt the batch. Check the input buffer with one relaxed load per event and drain only when it is not empty (the drain after every event of section 204 paid an exchange per event and lost 6%), or end a pass early when the input buffer holds an event earlier than the next one in the heap.
+- 'earlier' dominates (H2): the layout, which balances events per PE but not sends or chain position.
+- 'outside' or 'pass' dominates (H3): the scheduler loop. Run passes inside one Converse handler instead of re-enqueuing `execute()` as a message each pass, and cut the engine's per-event work.
 
 ## Baseline verification on the Mac
 
