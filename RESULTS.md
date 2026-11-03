@@ -359,6 +359,7 @@ Sections 1–128 were re-read before planning sections 129 onward.
 | 200 | 2026-11-03 | vbuild200 3677266, V4 3677339 / 3677340; Mac (results in 201 and later) | One process per node against shared memory between the node's processes (Charm++ `--enable-shmem`, user's addition; Reconverse `+ipc`), Devastator at 1 × 46, Charades 1 × 46 / shared memory at W 2,500–10,000; per-copy activity of b19 × 4–32 (Mac); new counters (shared-memory messages, `--copy-stats`); predictions P1–P2, Z1–Z8 and the reading rule | design |
 | 201 | 2026-11-03 | vbuild200 3677266; Mac | Builds (Charm++ `--enable-shmem`, Charades on it, Devastator p1w46 / p4w46) and gates pass; shared-memory smoke runs 0.47× / 0.68× with 1% of messages through the pool: Charades' message pool kept the pool's blocks, FIXED (c7373b4: all messages through the pool, 3.6 µs per send call on the Mac); per-copy activity: copy 2 alone does 1.75× the median copy at 4–32 copies, so from 3 nodes one node carries 1.75× the work in every engine; P1, P2 right | current |
 | 202 | 2026-11-03 | 3677339 | V4 results (incomplete: hit the time limit): 1 × 46 is Charades' best VLSI layout (1.33× / 1.27× 2 × 23; W 5,000 1.47× at 1 node), Charades ÷ Devastator 0.77 / 0.95 each at its best; Charm++ `--enable-shmem` and `+ipc` carry the messages after the fix but run at 0.17–0.21× (16 µs sends, ~260 µs delivery: one locked queue and one locked allocator per process in Reconverse's pool); Devastator 1 × 46 hangs; Z1, Z5, Z6, Z7 half, Z8 right, Z2–Z4 wrong | current |
+| 203 | 2026-11-03 | idev (pending) | Closing the gap (user decision; Reconverse changes allowed): single-worker profiles of both engines, skip the cancel-queue walk when nothing is queued, network polling by one PE / a progress thread, fast shared memory between processes; predictions E1–E3 | design |
 
 ## Stampede3 runs, in order
 
@@ -8622,6 +8623,27 @@ Committed count and digest as V1. About 1% of V3's 15.5 M messages between the n
 - **Z8 right.** Same per-copy activity in every run, as on the Mac.
 
 **Reading (section 200's rule):** C is far below 0.90 of B, so **1 × 46 is Charades' VLSI launch**, with Devastator also at its best layout, which needs its 1 × 46 hang understood first. Charm++'s shared memory between processes is not usable at this message rate until Reconverse's pool has per-destination queues and an allocator that senders do not share; that is runtime work.
+
+### Closing the gap: where Charades' per-event and per-pass time goes, and the first changes (design, 2026-11-03; written before any runs)
+
+> **Status: design.** User decision 2026-11-03: close Charades' performance gap; Reconverse changes are allowed. Work on an interactive skx node (idev), one change at a time. Reconverse work on branch `pads-perf` (worktree `~/reconverse_perf`, from `pads-remote-free` e9a6668, the tree Stampede3 runs). Script `$WORK/charades-runs/perf1w.sh`.
+
+**What the gap is made of so far** (b19, 1 node, W 2,500; sections 199 and 202):
+- Between the node's two processes, each send costs the sender 2 µs through LCI, and the heaviest senders set the pace: 1 × 46 is 1.33× 2 × 23. Reconverse's shared-memory pool is slower still (0.17–0.21×).
+- At 1 × 46 Charades runs 0.74× Devastator at the same W. Its non-blocked time per executed event is 0.40 µs; Devastator's cycle (0.607 ms against 0.817) implies about 0.30 µs on the same layout.
+- In the 1 × 46 profile (process 0, including spinning while blocked): `process_cancel_q` 10.6% (a walk over all 40 chares on every pass, with nothing queued), LCI progress 11.7% (one process, so nothing to receive), `CmiNodeBarrier` 3.7%, Converse scheduling and queues about 8%. A blocked pass takes 0.70 µs.
+- On a single worker (no communication, no waiting) Charades takes 1.57 µs per event against Devastator's 0.63.
+
+**Steps, each measured before the next:**
+1. **Single-worker profiles of both engines** (b19 × 1, 500 cycles, perf): where each engine's per-event time goes when nothing waits.
+2. **Skip the cancel-queue walk when nothing is queued** (Charades; `min_cancel_time` is set by every queued cancellation). Mac: change tier 30/30 over four models; the engine tier runs before any commit.
+3. **Network polling:** at 1 × 46 on 1 node, `+lci_ndevices 1 +backend_poll_thread 46` (one PE polls) against every PE polling. If it pays, a dedicated progress thread on each process's free core in Reconverse, as Devastator's master thread does, so worker PEs never poll.
+4. **Fast shared memory between processes** (Reconverse): per-destination queues and allocation the senders do not share, replacing one locked queue and one locked heap per process.
+
+**Predictions:**
+- **E1.** The single-worker rates repeat V3's within 5% (Charades 0.64, Devastator 1.60 M ev/s). In Charades' profile, the model's own handlers (gate forward, reverse, commit) take under 25% of cycles; the rest is engine and runtime per event.
+- **E2.** The cancel-queue skip makes 1 × 46 at 1 node 3–8% faster at W 2,500, with the same count and digest.
+- **E3.** One polling PE makes 1 × 46 at 1 node another 5–10% faster.
 
 ## Baseline verification on the Mac
 
