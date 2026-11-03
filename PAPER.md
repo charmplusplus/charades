@@ -109,7 +109,8 @@ time without a reason written here first.
    - **Checks:** every Charades run with `--commit-digest`. T1 compares counts across engines and digests within Charades.
    - **VLSI, added 2026-11-02** (advisor's suggestion; user's choice of gate-level simulation and of b19 × N): copies of ITC'99's b19 (231 k nets) joined in a ring, one copy per node (RESULTS.md 190).
      - **Why b19 × N:** b19 alone gives 10 messages per PE per cycle at 32 nodes, too little work; one copy per node keeps each PE near 5,000 gates.
-     - **Status:** model and ports in all three engines; calibration job V0 (RESULTS.md 191), then 1–32 nodes.
+     - **Status:** model and ports in all three engines. V0 (RESULTS.md 192): one count in every engine, but the file-order layout put every flip-flop on one PE (9.8× the mean load), so its rates measured one PE. Balanced layout since 2026-11-02 (`--chunk=512`, RESULTS.md 193: busiest PE 1.04× the mean, the same nets per PE in all three engines). Calibration V1 on it, then 1–32 nodes.
+     - **Open from V0:** the controller holds W at 500 ps on VLSI (0.85–0.90 of the best fixed W; every remote delay is under one bucket); to recheck on the balanced layout. ROSS's runs need its window (`--max-opt-lookahead`), which no run used before V1; the F5 ROSS grids on traffic and dragonfly lack it too.
      - **Beyond 32 nodes (user's goal):** 64–256 nodes once 32 is solid. That needs Devastator builds past 32 nodes, and dragonfly shapes if the other applications go too.
    - **Sizes** (RESULTS.md 177; about 10 s at the 1-node rate): dragonfly arrival 500 ns, generating 300,000 ns; traffic end 12,000,000. ROSS takes 2–5× as long, which sets the job lengths.
 4. **Ablation and robustness on the current stack (F2, F3, F4).** 4 and 16 nodes, skx-dev; about 2 jobs.
