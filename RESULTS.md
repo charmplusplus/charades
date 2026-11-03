@@ -358,6 +358,7 @@ Sections 1–128 were re-read before planning sections 129 onward.
 | 199 | 2026-11-03 | 3677137 | V3 results: sends between the node's two processes cost the sending PE 1.97 µs each (11.8% of PE time) and stall the heaviest senders; 1 × 46 PEs per node is 1.32× (1 node) / 1.28× (4 nodes), Charades ÷ Devastator 0.73 / 0.96 (2 × 23: 0.56 / 0.75); the cost added at 4 nodes is copy 2's 1.56× activity, the same in every engine; single worker Charades ÷ Devastator 0.40 (working set dominates); perf: Charades polls the network on every PE (~18% of cycles), Devastator 0.3%; Y1, Y2, Y6 right, Y5, Y7 half, Y3, Y4 wrong | current |
 | 200 | 2026-11-03 | vbuild200 3677266, V4 3677339 / 3677340; Mac (results in 201 and later) | One process per node against shared memory between the node's processes (Charm++ `--enable-shmem`, user's addition; Reconverse `+ipc`), Devastator at 1 × 46, Charades 1 × 46 / shared memory at W 2,500–10,000; per-copy activity of b19 × 4–32 (Mac); new counters (shared-memory messages, `--copy-stats`); predictions P1–P2, Z1–Z8 and the reading rule | design |
 | 201 | 2026-11-03 | vbuild200 3677266; Mac | Builds (Charm++ `--enable-shmem`, Charades on it, Devastator p1w46 / p4w46) and gates pass; shared-memory smoke runs 0.47× / 0.68× with 1% of messages through the pool: Charades' message pool kept the pool's blocks, FIXED (c7373b4: all messages through the pool, 3.6 µs per send call on the Mac); per-copy activity: copy 2 alone does 1.75× the median copy at 4–32 copies, so from 3 nodes one node carries 1.75× the work in every engine; P1, P2 right | current |
+| 202 | 2026-11-03 | 3677339 | V4 results (incomplete: hit the time limit): 1 × 46 is Charades' best VLSI layout (1.33× / 1.27× 2 × 23; W 5,000 1.47× at 1 node), Charades ÷ Devastator 0.77 / 0.95 each at its best; Charm++ `--enable-shmem` and `+ipc` carry the messages after the fix but run at 0.17–0.21× (16 µs sends, ~260 µs delivery: one locked queue and one locked allocator per process in Reconverse's pool); Devastator 1 × 46 hangs; Z1, Z5, Z6, Z7 half, Z8 right, Z2–Z4 wrong | current |
 
 ## Stampede3 runs, in order
 
@@ -8576,6 +8577,51 @@ Committed count and digest as V1. About 1% of V3's 15.5 M messages between the n
 - **P2 right.** The most active copy ÷ the mean copy is 1.60, 1.67 and 1.71 at 8, 16 and 32 copies, rising toward 1.75 as copies are added.
 
 **Consequence for the 1–32-node job: user decision 2026-11-03, keep the workload** (one copy per node, inputs as they are) **and report the per-copy activity.** Every engine pays the most active copy alike. The paper states that from 3 nodes on one copy does 1.75× the work of the others, so per-node rates from 1–2 nodes to 4 and more fall in every engine for that reason. Runs at 4 nodes and more print `--copy-stats=1`. (Not chosen: several copies per node, which would dilute it to 1.19× at 4 per node and 1.09× at 8; a seed with no outlier, selected after the fact.)
+
+### V4 results: one process per node is Charades' best VLSI layout (1.33× / 1.27×; 1.47× with W 5,000 at 1 node), Charades ÷ Devastator 0.77 / 0.95; shared memory between the node's processes now carries the messages but runs at 0.17–0.21×, because Reconverse's pool funnels each process's traffic through one locked queue and one locked allocator; Devastator at one process per node hangs (2026-11-03; skx-dev batch job 3677339, 5 nodes)
+
+> **Status: current, incomplete.** Design and predictions in section 200; Charades c7373b4 (section 201's fix) in both trees. Gate 45/45. The job hit its 45-minute limit: all 12 Devastator runs at one process per node (p1w46, p4w46) stalled at the 300 s cap after printing their setup. Missing besides those: rep 2 of A and B at 4 nodes. Every other run finished. Summary `~/charades-data/vlsi/vdiag200_summary.py` (output `j3677339_summary.txt`); data and perf reports `~/charades-data/vlsi/j3677339/`.
+
+**Rates** (b19 × N, span 1, direct sends, buckets of 2,500 ps; M committed ev/s, median of 2 reps (4 nodes A and B: 1 rep), higher is better; ÷ A at W 2,500):
+
+| arm | 1 node | ÷ A | 4 nodes | ÷ A |
+|---|---|---|---|---|
+| A: 2 × 23, W 2,500 (LCI between processes) | 23.2 | 1.00 | 63.1 | 1.00 |
+| **B: 1 × 46, W 2,500** | **30.8** | **1.33** | **80.0** | **1.27** |
+| B: 1 × 46, W 5,000 | **34.2** | **1.47** | 75.4 | 1.19 |
+| B: 1 × 46, W 10,000 | 30.6 | 1.32 | 69.1 | 1.10 |
+| C: 2 × 23, Charm++ `--enable-shmem`, W 2,500 | 4.1 | 0.17 | 11.6 | 0.18 |
+| C, W 5,000 / 10,000 | 4.5 / 4.2 | | 12.9 / 10.0 | |
+| D: 2 × 23, `+ipc`, W 2,500 | 4.8 | 0.21 | 13.3 | 0.21 |
+| Devastator 2 × 23, W 2,500 / 5,000 / 10,000 | 41.5 / **44.6** / 44.3 | | 83.6 / 83.2 / **83.8** | |
+| Devastator 1 × 46 | stalled (6 of 6) | | stalled (6 of 6) | |
+| **Charades' best ÷ Devastator's best** (each over layouts and W) | **0.77** | | **0.95** | |
+
+**Shared memory between processes** (C and D):
+- The pool now carries the messages: 14.7 M (C) and 12.9 M (D) at 1 node against V3's 15.5 M between processes; 67.0 M and 59.2 M of 71.9 M at 4 nodes.
+- Through the pool a send call takes 15.8–16.2 µs (V3 through LCI: 1.97), 18% of PE time at 1 node, and delivery takes a mean of 275–437 µs, median in the 131–262 µs bucket (LCI: 14.5 µs, median 8–16 µs).
+- **Why** (Reconverse 22871c6, `cmishmem.cpp`, `scheduler_registered.cpp`): each process's segment has one incoming queue (`shared->queue`) and one block heap, each guarded by an atomic exchange used as a lock. A sender that finds the queue held spins; a receiver that finds it held gives up for that scheduler pass. Every PE takes at most one block per pass. All 23 senders of the other process and all 23 receivers of this one meet on those atomics at about 3 M messages per second per node, so sends wait and blocks sit in the queue for hundreds of µs. This is the pool's design, not a setting. LCI over psm2 spreads the same traffic over 23 devices.
+- Charm++'s `--enable-shmem` (C) is 15–19% slower than Reconverse's `+ipc` (D), which falls back to the network more often (83% through the pool against 93–95%).
+
+**Devastator at one process per node:** p1w46 and p4w46 print their setup (layout, 5,120 LPs per rank) and then make no progress for 300 s, at every W and both node counts. p1w1 (V3) and p2w23 run. Its signal slots are an array of counters per thread, so 47 threads do not overflow a bit mask; the cause is unknown and needs an interactive session.
+
+**Wider windows at 1 × 46:** W 5,000 gives 1.11× at 1 node (efficiency 96.4%), but 0.94× at 4 nodes, where copy 2's node sets the pace.
+
+**Per PE (1 node, W 2,500):** at 1 × 46 the least-blocked PE is blocked 49.5% (2 × 23 in V3: 20%), but the PEs that send the most are still the busiest (correlation between blocked share and remote sends −0.85; the layout balances events, not sends). With C, −0.76 and 26.8%.
+
+**Per-copy activity:** identical in all 16 Charades runs at 4 nodes and equal to the Mac's 4-copy run (copy 2 1.478× the mean).
+
+**Predictions (section 200):**
+- **Z1 half right.** One count and one digest per cell; Devastator deterministic. Pool messages: A and B 0; C 95% / 93% of V3's count between processes (right); D 83% / 82% (wrong, below 90%).
+- **Z2 wrong.** C ÷ A is 0.17 / 0.18, not at least 1.15 / 1.13; C ÷ B is 0.13 / 0.15.
+- **Z3 wrong.** D is 1.19× / 1.15× C, not within ±5%.
+- **Z4 wrong.** Mean latency through the pool 275–437 µs, not at most 7 µs; send call 16 µs, not at most 1 µs.
+- **Z5 half.** Devastator 1 × 46 hung, so its layout ratio is unmeasured. Charades' best ÷ Devastator's best (2 × 23) is 0.77 / 0.95, inside the predicted 0.68–0.80 / 0.88–1.05.
+- **Z6 half.** At 1 node the better of W 5,000 / 10,000 ÷ W 2,500 is 1.11 (B) and 1.11 (C), just above 1.00–1.10. At 4 nodes it is 0.94 for B (wrong) and 1.11 for C.
+- **Z7 half.** B's least-blocked PE is blocked 49.5% (right, at least 40%), C's 26.8% (wrong). The correlation is −0.85 (B) and −0.76 (C), not at most 0.4 / 0.5 in size.
+- **Z8 right.** Same per-copy activity in every run, as on the Mac.
+
+**Reading (section 200's rule):** C is far below 0.90 of B, so **1 × 46 is Charades' VLSI launch**, with Devastator also at its best layout, which needs its 1 × 46 hang understood first. Charm++'s shared memory between processes is not usable at this message rate until Reconverse's pool has per-destination queues and an allocator that senders do not share; that is runtime work.
 
 ## Baseline verification on the Mac
 
