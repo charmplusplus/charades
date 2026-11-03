@@ -70,7 +70,7 @@ Status:
 | F2 | aggregation ablation: direct sends, eager flush (`--agg-policy=0`), deadline flush, by σ; events per message and messages per event | 1 | 12, 28, 36 (4 nodes, older stack) | rerun at 4 and 16 nodes |
 | F3 | the PADS'19 static hold and opportunistic (eager) aggregation as baselines | 1, 2 | open issue 1 (hold cutoff); `bucket_hold` config | missing |
 | F4 | robustness: each policy ÷ the best fixed W per workload (controller, best single fixed W, Devastator's rule in Charades, Devastator's own window), and each policy's worst case | 2 | 181, 185 (frozen rule, quantile rule, fixed grids; 7 workloads, 4 and 16 nodes) | have for Charades' rules; Devastator's rule in Charades and Devastator's own window still to run (item 4) |
-| F5 | applications: traffic, dragonfly and VLSI (b19 × N) at 1–32 nodes, three engines | 3 | 168–172, 175, 177 (ports, counts, sizes) | missing; next (item 3) |
+| F5 | applications: traffic, dragonfly and VLSI (b19 × N) at 1–32 nodes, three engines | 3 | 168–172, 175, 177 (ports, counts, sizes); 188, 189, 194 (traffic and dragonfly, 1–32 nodes) | traffic and dragonfly have (2026-11-02; Charades ÷ Devastator 0.94–2.03 dragonfly, 1.02–1.08 traffic; ÷ ROSS 1.7–4.3, ROSS without its window); VLSI after V1 (item 3) |
 | F6 | where a wider window's cost goes: blocked time and GVT wave period by W | 2, 4 | 176 (4/16 nodes), 184 (16/32 nodes) | have |
 | T2 | what scaling took: each fix and its gain | 4 | 21, 26, 24, 50, 88–90, 111, 161, 164, 152 | have; one table |
 
@@ -96,6 +96,11 @@ time without a reason written here first.
    - The measured rule is the rule this item called for, so no separate blocked-time rule.
    - F1's 32-node runs check that it finds W 400.
 3. **Applications at 1–32 nodes, three engines (F5, T1): next.** Moved ahead of the ablation and out of the paper-grade block on 2026-11-02 (user decision). About 3–4 jobs.
+   - **Status 2026-11-02:**
+     - Traffic and dragonfly are done at 1–32 nodes (F5a, F5b, F5c; RESULTS.md 188, 189, 194), with one count per cell in all three engines.
+     - Charades ÷ Devastator: dragonfly 0.94 at 1 node, rising to 2.03 at 32; traffic 1.02–1.08. Per-node rate 16→32: Charades 0.90 and 0.99, Devastator 0.80 and 0.95.
+     - The controller is 0.95–1.10 of the best fixed W per rep at 32 nodes. On traffic it follows the best W as it widens from 500 to 1,000.
+     - Open: ROSS's optimism window (`--max-opt-lookahead`) was never tried, so Charades ÷ ROSS (1.7–4.3) is against ROSS's best without one. VLSI waits on V1.
    - **Why first:**
      - Traffic and dragonfly have never run above 16 nodes. At 32 nodes PHOLD needed changes no smaller run showed (NUMA balancing, best W 400); a problem found after the freeze would leave no time to fix it.
      - Claim 3 rests on them, and the evidence so far is mixed: dragonfly gains only 1.06–1.10× from aggregation at 1 and 4 nodes (RESULTS.md 179), and traffic sends little across the network. The results set how claim 3 is worded.
