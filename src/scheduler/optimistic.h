@@ -23,6 +23,7 @@ class OptimisticScheduler : public CBase_OptimisticScheduler {
   public:
     OptimisticScheduler();
     void execute();
+    void execute_pass();      /**< One pass: execute() runs one, or several (--pass-loop) */
 
     /** Method overrides for GVT control flow */
     void gvt_resume();        /**< Overriden to allow overlap with GVT */

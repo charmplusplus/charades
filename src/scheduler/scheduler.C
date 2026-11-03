@@ -1,3 +1,4 @@
+#include <dlfcn.h>
 #include "scheduler.h"
 
 #include "aggregation.h"
@@ -352,6 +353,18 @@ void DistributedScheduler::iteration_done() {
   }
 }
 
+// The runtime's check for waiting work (Reconverse pads-perf: int
+// CmiPeHasPendingWork(void)), looked up at run time: a runtime without it
+// leaves --pass-loop at 1, and a weak reference cannot stay undefined in a
+// static link on macOS
+typedef int (*PendingWorkFn)(void);
+static PendingWorkFn pending_work_fn() {
+  static PendingWorkFn fn =
+      (PendingWorkFn)dlsym(RTLD_DEFAULT, "_Z19CmiPeHasPendingWorkv");
+  return fn;
+}
+bool pass_loop_available() { return pending_work_fn() != nullptr; }
+
 /**
  * Helper method for starting the next scheduler iteration. It ensures that an
  * iteration will not start if an iteration is already running or if we are
@@ -360,6 +373,17 @@ void DistributedScheduler::iteration_done() {
 void DistributedScheduler::next_iteration() {
   if (!running && !parked) {
     running = true;
+    // --pass-loop: inside execute(), with nothing else waiting for this PE,
+    // run the next pass in the same call (OptimisticScheduler::execute)
+    // instead of sending execute() to this PE through the scheduler: the
+    // message, an envelope and two scheduler sweeps per pass. Network
+    // messages are not seen by the check, so the call ends after
+    // g_tw_pass_loop passes at most.
+    if (in_execute && ++loop_passes < g_tw_pass_loop && pending_work_fn() &&
+        !pending_work_fn()()) {
+      again = true;
+      return;
+    }
     thisProxy[CkMyPe()].execute();
   }
 }

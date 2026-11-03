@@ -75,6 +75,7 @@ unsigned g_tw_agg_input_buffer;
 unsigned g_tw_local_fast_path;
 unsigned g_tw_fossil_lazy;
 unsigned g_tw_fossil_chares;
+unsigned g_tw_pass_loop;
 unsigned g_tw_event_index;
 unsigned g_tw_rollback_unit;
 unsigned g_tw_msg_pool;
@@ -196,6 +197,7 @@ void clear_globals() {
   g_tw_local_fast_path    = 1;
   g_tw_fossil_lazy        = 0;
   g_tw_fossil_chares      = 1;
+  g_tw_pass_loop          = 1;
   g_tw_event_index        = 1;
   g_tw_rollback_unit      = 1;
   g_tw_msg_pool           = 1;

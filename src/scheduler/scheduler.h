@@ -123,6 +123,9 @@ class SequentialScheduler : public CBase_SequentialScheduler {
     void execute();
 };
 
+/** --pass-loop: whether the runtime can say that nothing waits for this PE */
+bool pass_loop_available();
+
 /**
  * Concrete base class for distributed schedulers. Unlike a sequential scheduler
  * distributed schedulers need to worry about GVTs, and load balancing. Because
@@ -139,6 +142,14 @@ class DistributedScheduler : public CBase_DistributedScheduler {
 #if CMK_TRACE_ENABLED
     TriggerPtr stat_trigger;  /**< Determines when to log stats */
 #endif
+
+    /**
+     * --pass-loop: execute() is running (in_execute), the pass that just
+     * ended asked for the next one to run in the same call (again), and the
+     * passes run in this call so far (loop_passes)
+     */
+    bool in_execute = false, again = false;
+    unsigned loop_passes = 0;
 
   public:
     DistributedScheduler();

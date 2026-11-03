@@ -25,6 +25,14 @@ OptimisticScheduler::OptimisticScheduler() {
   fossil_gvt = 0;
   fossil_next = 0;
   fossil_rounds = 0;
+  if (g_tw_pass_loop > 1 && CkMyPe() == 0) {
+    if (pass_loop_available()) {
+      CkPrintf("Pass loop: up to %u passes per execute() while nothing else waits (--pass-loop)\n",
+               g_tw_pass_loop);
+    } else {
+      CkPrintf("Pass loop: off, this runtime has no CmiPeHasPendingWork (--pass-loop ignored)\n");
+    }
+  }
 
   // Allocate AVL tree space // TODO: Move this to LPs
   AvlTree avl_list;
@@ -49,8 +57,19 @@ Time OptimisticScheduler::get_min_time() const {
   }
 }
 
-/** Execute events in batches until the trigger dictates it's GVT time */
+/** Entry method: one pass, or with --pass-loop several while nothing else waits */
 void OptimisticScheduler::execute() {
+  in_execute = true;
+  loop_passes = 0;
+  do {
+    again = false;
+    execute_pass();
+  } while (again);
+  in_execute = false;
+}
+
+/** Execute events in batches until the trigger dictates it's GVT time */
+void OptimisticScheduler::execute_pass() {
   double t0 = g_tw_gvt_trace ? CmiWallTimer() : 0;
   const bool et = g_tw_etrace_to && etrace_open();
   const double et0 = et ? CmiWallTimer() : 0;
