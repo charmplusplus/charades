@@ -26,7 +26,7 @@ Every number from every run: Stampede3 runs in order (each design, written befor
 | dragonfly | **0.94** / 1.04 / 1.29 / 1.51 / 1.80 / 2.03 | 3.80 / 3.69 / 3.94 / 4.01 / 3.94 / 4.26 | **0.56** / 0.26 / 0.50 | 689.6 / 339.2 / 161.9 |
 | traffic | 1.03 / 1.05 / 1.02 / 1.04 / 1.03 / 1.08 | 1.70 / 1.99 / 1.99 / 2.04 / 2.12 / 2.19 | **0.94** / 0.89 / 0.73 | 1,846.6 / 1,706.1 / 843.6 |
 
-(Bold: below 1 in the ratio columns; best of the three in the efficiency column.) The controller is 0.95–1.05 of Charades' best fixed W per rep at 32 nodes. VLSI (b19 × N) at 1 and 4 nodes (V5, section 208): Charades (one process per node, lazy fossils, batch 32; its best W) ÷ Devastator (2 × 23, its best W) 0.85 / 1.00 (V1, section 195: 0.51 / 0.75; ÷ ROSS 6.9 / 7.9 then). Devastator at one process per node still hangs on Stampede3 (it runs on the Mac). The 1–32-node runs wait on that and on section 207's trace of the 1-node gap.
+(Bold: below 1 in the ratio columns; best of the three in the efficiency column.) The controller is 0.95–1.05 of Charades' best fixed W per rep at 32 nodes. VLSI (b19 × N) at 1 and 4 nodes (V5, section 208): Charades (one process per node, lazy fossils, batch 32; its best W) ÷ Devastator (2 × 23, its best W) 0.85 / 1.00 (V1, section 195: 0.51 / 0.75; ÷ ROSS 6.9 / 7.9 then). Devastator at one process per node hung on Stampede3 because PSM2 pinned all its threads to one core; with `HFI_NO_CPUAFFINITY=1` it runs at 0.87 of its 2 × 23 at 1 node (section 209), so 0.85 compares each engine at its best layout. The 1–32-node runs wait on the 1-node gap (section 209: Charades' work per event and per pass).
 
 **Paper-grade weak scaling, Charades against Devastator and ROSS, 1–32 nodes, all eight workloads** (jobs 3653803, 3654651 and 3657016, sections 142–143 and 153; long runs, 3 reps; Charades: its controller, the better htram setting at each node count, chare rollback (per-LP rollback came later, section 152); Devastator: its best of three W; ROSS: the better of optimistic batch 16 / GVT interval 64 and conservative; the same committed events in all three engines in every cell):
 
@@ -365,6 +365,7 @@ Sections 1–128 were re-read before planning sections 129 onward.
 | 206 | 2026-11-03 | V5 3678312, 3678365 (results in 208) | Round 1's settings at 1 and 4 nodes in both engines (job V5 design): VLSI 1 × 46 with lazy fossils / batch 32 at W 2,500–10,000, the controller at buckets of 5,000 ps, 2 × 23 over `+ipc` / `--enable-shmem` / LCI, Devastator 2 × 23 (and 1 × 46 if its Stampede3 hang is fixed: on the Mac p1w46 runs); lazy against eager fossils on six workloads at two W and the controller, `+ipc` and the paper's tree for reference; predictions F1–F9 and the default rule | design |
 | 207 | 2026-11-03 | idev (results in a later section) | Where a VLSI clock cycle's wall time goes (design): `--event-trace-from/-to` records each event's send, arrival, executions and rollbacks and each PE's passes and GVT updates; `event_trace.py` follows each cycle's last event back through its senders and splits the chain into send, transit and queue, and those by what the receiving PE did (later / earlier events, pass, blocked, empty, outside); hypotheses H1 ahead work, H2 busiest PEs, H3 per-pass machinery; predictions T1–T4 | design |
 | 208 | 2026-11-03 | 3678365 | V5 results: Charades ÷ Devastator 0.853 at 1 node (37.3 against 43.8 M ev/s) and 1.001 at 4 (both 1.40 ms per cycle at W 2,500; copy 2's node sets the pace; W 5,000 reps vary up to 4.8×); 2 × 23 over the new pool 0.86 / 0.91 of 1 × 46 (`+ipc` = `--enable-shmem`); the controller on VLSI sits at one bucket in every round, so the bucket width sets W; lazy fossils 0.94–0.95 on Gaussian and uniform PHOLD (blocked share up), stay off by default (a VLSI setting); the new tree 0.96–1.06 of the paper's; `+ipc` with htram 0.97–1.12; F1, F2, F4 right, F8 mostly, F5, F7 half, F3 one of three, F6 wrong | current |
+| 209 | 2026-11-03 | idev 3678539 | Devastator's 1 × 46 hang: PSM2 binds a whole-node process to one core, so all 48 threads ran on core 0; `HFI_NO_CPUAFFINITY=1` fixes it (2 × 23 unchanged); Devastator 1 × 46 0.87 of its 2 × 23 (F9 wrong), so V5 compares each engine at its best layout; at 1 × 46 the engines are level (37.6 / 37.3); Devastator's two-process gain is socket locality (spread over both sockets 0.65×), Charades nearly insensitive (0.96×); the trace (28% inflated in its range after `--event-trace-max`; 2.1× before) shows no ahead-work delay (transit 14%, later 1–2%), chain events wait behind earlier events, per-event engine work and the window; profile: runtime 37% (network progress 13.9%, `execute()` re-enqueue about 5%); T1, T3, T4 wrong, T2 half | current |
 
 ## Stampede3 runs, in order
 
@@ -8854,6 +8855,54 @@ Each workload runs eager and lazy fossils at both W and under the frozen control
 - **One process per node is Charades' VLSI launch** at 1 and 4 nodes. Devastator needs the same choice, which waits on its 1 × 46 hang.
 - **VLSI's bucket width (the controller's W):** 2,500 ps for the scaling runs. From 4 nodes on, copy 2's node sets the pace and W 2,500 is best in both engines, and runs at W 5,000 vary up to 4.8× between reps there.
 - **F3 did not clearly hold**, and the 1-node gap (0.85) is unchanged by this job. Section 207's trace runs next. The VLSI scaling job waits on the trace and on Devastator 1 × 46.
+
+### Devastator's 1 × 46 hang was PSM2 pinning every thread to core 0; at the same layout the engines are level (Charades 37.3, Devastator 37.6 M ev/s), and Devastator's two-process gain is socket locality, to which Charades is nearly insensitive; the trace finds no ahead-work delay (2026-11-03; idev 3678539, c454-032)
+
+> **Status: current.** Section 207's trace design and section 206's Devastator question. Scripts `$WORK/charades-runs/{devap1.sh, dvq.sh, cmp1n.sh, cyc.py}`; data `~/charades-data/vlsi/idev3678539/` (traces themselves left on Stampede3, `cmp1n/et2/`). b19 × 1, 1 node; every run commits 125,998,590 events (Charades digest 87c11aec… in every run).
+
+**The Devastator hang.** At 1 × 46 (`-c 48`) all 48 threads of the process ran on CPU 0 (`ps -L`: PSR 0, 2.1% CPU each; every thread's affinity `0`). Devastator pins thread t to the t-th CPU of the mask it reads at start-up, and that mask held only CPU 0. PSM2, under GASNet's ofi conduit, binds a process that is bound to the whole node to one core near the adapter, so every thread inherited core 0. A process bound to a socket's 24 cores (2 × 23) is left alone. With `HFI_NO_CPUAFFINITY=1` (PSM2's switch to turn this off) the run takes 3.3 s at W 5,000. 2 × 23 does not change with it (44.2 / 44.1 without, 43.5 / 43.0 with), so earlier Devastator numbers stand. Round 1's single-worker rate (1.59, `-c 24`) also stands; bound to the whole node, p1w1 has its two threads on one core.
+
+**Devastator's layouts** (M committed ev/s, 2 reps, higher is better):
+
+| Devastator | W 2,500 | W 5,000 | W 10,000 |
+|---|---|---|---|
+| 1 × 46 (`HFI_NO_CPUAFFINITY=1`) | 34.6 / 35.9 | 37.8 / 37.4 | 36.7 / 38.3 (later 38.5 / 38.2) |
+| 2 × 23, each process on one socket | 40.1 / 40.5 | 42.7 / 43.1 | 43.7 / 43.6 (later 44.3 / 44.1, 43.7 / 43.6) |
+| 2 × 23, each process on cores 0–23 / 24–47 (both sockets) | | | **28.4 / 28.1** |
+
+- **Its best layout is 2 × 23:** 1 × 46 is 0.87 of it (F9 wrong: 0.95–1.10). So V5's comparison, Charades at 1 × 46 against Devastator at 2 × 23, has each engine at its best layout at 1 node. The 4-node comparison (p4w46) needs a batch run with `HFI_NO_CPUAFFINITY=1`.
+- **At the same layout the engines are level:** Devastator 1 × 46 runs 37.6 (W 5,000), Charades 1 × 46 37.3 (V5).
+- **Devastator's 2 × 23 gain is socket locality.** Spreading each process over both sockets costs it 0.65×, more than 1 × 46 does. Its threads exchange events through shared-memory queues, and those queues are slow across sockets.
+- **Charades is nearly insensitive to it.** At 1 × 46 with the PEs alternating sockets (`+pemap 2-47`, so neighbouring PEs in the layout sit on different sockets), Charades runs 36.0 / 35.9, against 37.3 / 37.5 with each socket's PEs in a block: 0.96×.
+- **Reading:** Devastator at 1 × 46 pays a large cross-socket cost and still equals Charades. Kept within a socket, Devastator does about 1.16× Charades' work per unit time. The remaining 1-node gap is Charades' own work per event and per pass, not the layout.
+
+**The trace** (Charades 1 × 46, `--fossil-lazy=1 --batch=32`, W 5,000, cycles 2,000–2,040):
+- **T1 wrong.** The run's overall rate does not move with the trace (37.39 / 37.06 against 37.39 / 36.84 untraced), but that was the wrong test: the traced range is under 1% of the run. Per `--gvt-trace=1`, the traced cycles took 1.40 ms against 0.665 untraced. Growing the trace buffer mid-range stalled PEs; allocating it before the run (`--event-trace-max`, charades 4844b20) brings the traced cycles to 0.829 / 0.814 ms against 0.639 / 0.644 untraced, so the trace still adds about 28% inside its range (timer reads, at 24.7 ns each, and the records). The breakdown below carries that inflation, mostly in 'pass'.
+- **T2 half:** the chain of each cycle's last event has 27–31 hops (mean 29.7); the share that crosses PEs was not computed.
+- **T3 wrong.** Transit (send to the receiver's heap) is 14% of the chain and 'later' (the receiver executing later-timestamp events) 1–2%. Ahead work is not the delay.
+- **T4 wrong.** 'blocked' is 25–27% of the chain (16% counting only the period's own chain).
+
+| share of the chain (2 traces, `--back 1`; `--back 0` in brackets) | |
+|---|---|
+| queue (in the receiver's heap until its final execution) | 85% / 85% (79%) |
+| transit | 14% / 14% (20%) |
+| receiver executing earlier or equal-timestamp events | 36% / 33% (39%) |
+| receiver in a pass, not executing (the engine's per-event work outside `forward`; trace cost included) | 34% / 36% (40%) |
+| receiver blocked by the window | 25% / 27% (16%) |
+| receiver between passes | 2% |
+
+**Profile** (Charades 1 × 46, lazy fossils, batch 32, W 5,000; user cycles of the process, spinning while blocked included): the runtime takes 37% (`libreconverse`), Charades and the model 55%, libc 7%.
+- **Runtime per pass:** network progress with nothing to receive 13.9% (`comm_backend::progress`); re-enqueuing `execute()` as a Charm++ message about 5% (`CkSendMsgBranch`, `CkAllocSysMsg`, `_processHandler`, `CmiCallHandler`); Converse queue polling about 6%; mutex lock and unlock 2.7%.
+- **Engine per event:** fast-path drain 4.5%, `event_alloc` 4.1%, `remote_event_delete` 3.8%, `execute_me` 3.8%, `fossil_me` 2.6%, `fp_push` 1.8%, glibc free and malloc 2.6%.
+- `CmiNodeBarrier` (3.9%) and `clcg4::seed` (1.5%) are setup, as in section 204.
+
+**What follows:**
+- **Paper fairness:** Devastator's best layout is two processes per node at 1 node. Its 4-node 1 × 46 runs go into the VLSI scaling job with `HFI_NO_CPUAFFINITY=1`.
+- **Closing the 1-node gap means cutting Charades' work per event and per pass, not changing the layout.** In order of the profile:
+  1. A pass that does not poll the network when the run has one process, or polls it every k passes.
+  2. Running passes in a loop inside one Converse handler instead of re-sending `execute()` to itself as a message.
+  3. Fewer allocations and frees per event (the message pool and `event_alloc`).
+- Each is to be measured on its own, with section 207's trace and `--gvt-trace=1` cycle times, before the next.
 
 ## Baseline verification on the Mac
 
