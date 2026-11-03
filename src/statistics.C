@@ -68,6 +68,7 @@ void Statistics::clear() {
   anti_sends = 0;
   anti_cancels = 0;
   fast_sends = fast_antis = fast_push_retries = 0;
+  ipc_received = 0;
 
   // Communication stats
   send_time = 0.0;
@@ -195,6 +196,7 @@ void Statistics::add_comm(const Statistics* other) {
   remote_holds += other->remote_holds;
   remote_cancels += other->remote_cancels;
   anti_cancels += other->anti_cancels;
+  ipc_received += other->ipc_received;
   send_time += other->send_time;
   timed_sends += other->timed_sends;
   agg_items += other->agg_items;
@@ -347,6 +349,7 @@ void Statistics::print() const {
   print_int("Local Sends", local_sends);
   print_int("Remote Sends", remote_sends);
   print_int("Anti Event Sends", anti_sends);
+  print_int("Shared-Memory Messages Received", ipc_received);
   if (fast_sends || fast_antis) {
     print_int("Process Sends (fast path)", fast_sends);
     print_int("Process Anti Sends (fast path)", fast_antis);
