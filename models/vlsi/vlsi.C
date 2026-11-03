@@ -13,6 +13,7 @@ static uint64_t g_period = 0;
 static uint64_t g_input_seed = 1;
 static uint32_t g_chunk = 512;
 static uint32_t g_layout_bins = 0;
+uint32_t g_copy_stats = 0;
 
 /** A relative path that does not exist from here is taken from the binary's directory */
 static std::string resolve(const std::string& path, const char* argv0) {
@@ -32,6 +33,7 @@ int main(int argc, char* argv[]) {
   args.register_argument("input-seed", "Seed of the random inputs", g_input_seed);
   args.register_argument("layout-bins", "Bins per group of span copies in the balanced layout (0: PEs x span / copies, one bin per PE); the layout, and so the commit digest, depend on it", g_layout_bins);
   args.register_argument("chunk", "Layout: chunks of this many nets, balanced over the PEs by pre-simulated activity (0: file order, which puts every flip-flop on a copy's first PE)", g_chunk);
+  args.register_argument("copy-stats", "After the model statistics, print each copy's committed pin changes plus evaluations (its activity) - NO=0, YES=1", g_copy_stats);
   tw_add_arguments(&args);
 
   tw_init(argc, argv);

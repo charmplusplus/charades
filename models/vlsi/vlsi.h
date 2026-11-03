@@ -27,7 +27,9 @@ struct VlsiStats {
   uint64_t pin_events;      ///< committed pin changes received (= messages)
   uint64_t evaluations;     ///< committed evaluations
 };
-void add_stats(const VlsiStats& s);
+/** Add an LP's statistics to its process's totals (and, with --copy-stats, to its copy's) */
+void add_stats(const VlsiStats& s, uint32_t copy);
+extern uint32_t g_copy_stats;   ///< --copy-stats: print each copy's activity
 
 /** The copy number of the inert LPs that pad the LP count */
 const uint32_t PAD_COPY = 0xffffffffu;

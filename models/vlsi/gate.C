@@ -21,7 +21,7 @@ void GateLP::initialize() {
 }
 
 void GateLP::finalize() {
-  add_stats(stats);
+  add_stats(stats, copy);
 }
 
 /** Send the output's new value to every pin it drives, offset ps from now */
