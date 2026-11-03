@@ -356,7 +356,8 @@ Sections 1–128 were re-read before planning sections 129 onward.
 | 197 | 2026-11-02 | 3675628 | V2 results: GVT rounds fill 5–6% of each cycle (2 waves of 0.03–0.04 ms, then 0.6–2.4 ms with none), so GVT pace is out; faster waves change nothing; shorter passes are slower (batch 4 0.87–0.90); each cycle's execution is a chain of dependent events with every PE waiting ≥ 20%; buckets of one clock period make the controller pick W 2,500 (0.99 of the best fixed W); step cost and Devastator's gain from a wider window open | current |
 | 198 | 2026-11-03 | V3 3677137 (results in 199) | Why a Charades clock cycle takes 1.8× Devastator's at the same window (job V3 design): most of V1's gap is at the same W (0.56 at 1 node; Devastator's wider window adds only 1.09×); 1 → 4 nodes adds 0.76 / 0.78 ms per cycle in both engines; hypotheses per-event cost (single-worker runs of both engines), hops between processes (1 × 46 PEs per node), delivery latency (`--comm-stats`); per-PE stats at W 2,500 / 10,000 (new `blocked_s`); perf of both engines; predictions Y1–Y7 and the reading rule | design |
 | 199 | 2026-11-03 | 3677137 | V3 results: sends between the node's two processes cost the sending PE 1.97 µs each (11.8% of PE time) and stall the heaviest senders; 1 × 46 PEs per node is 1.32× (1 node) / 1.28× (4 nodes), Charades ÷ Devastator 0.73 / 0.96 (2 × 23: 0.56 / 0.75); the cost added at 4 nodes is copy 2's 1.56× activity, the same in every engine; single worker Charades ÷ Devastator 0.40 (working set dominates); perf: Charades polls the network on every PE (~18% of cycles), Devastator 0.3%; Y1, Y2, Y6 right, Y5, Y7 half, Y3, Y4 wrong | current |
-| 200 | 2026-11-03 | vbuild200, V4 (to be submitted); Mac | One process per node against shared memory between the node's processes (Charm++ `--enable-shmem`, user's addition; Reconverse `+ipc`), Devastator at 1 × 46, Charades 1 × 46 / shared memory at W 2,500–10,000; per-copy activity of b19 × 4–32 (Mac); new counters (shared-memory messages, `--copy-stats`); predictions P1–P2, Z1–Z8 and the reading rule | design |
+| 200 | 2026-11-03 | vbuild200 3677266, V4 (results in 201 and later); Mac | One process per node against shared memory between the node's processes (Charm++ `--enable-shmem`, user's addition; Reconverse `+ipc`), Devastator at 1 × 46, Charades 1 × 46 / shared memory at W 2,500–10,000; per-copy activity of b19 × 4–32 (Mac); new counters (shared-memory messages, `--copy-stats`); predictions P1–P2, Z1–Z8 and the reading rule | design |
+| 201 | 2026-11-03 | vbuild200 3677266; Mac | Builds (Charm++ `--enable-shmem`, Charades on it, Devastator p1w46 / p4w46) and gates pass; shared-memory smoke runs 0.47× / 0.68× with 1% of messages through the pool: Charades' message pool kept the pool's blocks, FIXED (c7373b4: all messages through the pool, 3.6 µs per send call on the Mac); per-copy activity: copy 2 alone does 1.75× the median copy at 4–32 copies, so from 3 nodes one node carries 1.75× the work in every engine; P1, P2 right | current |
 
 ## Stampede3 runs, in order
 
@@ -8522,6 +8523,59 @@ Every arm makes 4,999–5,008 GVT updates (one per clock cycle) at 2.0–3.4 cou
 - **If C is below 0.90 of B**, the pool still costs on the send path. 1 × 46 is Charades' VLSI launch, with Devastator also at its best layout.
 - Paper comparisons use each engine's best layout and W at each node count. This is a launch and runtime-build choice; the frozen engine does not change.
 - The per-copy results decide whether the 1–32-node job keeps independent random inputs per copy.
+
+### Builds, the shared-memory pool starved by Charades' message pool (fixed), and each copy's activity: one copy in 32 does 1.75× the work of the others (2026-11-03; skx-dev batch job vbuild200 3677266, 2 nodes; Mac)
+
+> **Status: current.** Design and predictions in section 200. vbuild200: 8 min 30 s after a 3.5-minute `/work2` stall at start (skx copy 3677267 cancelled); log `/scratch/09863/rrao/charades-jobs/vbuild200_3677266.out`, outputs `$WORK/charades-runs/vbuild200/j3677266/`. Mac per-copy runs: `~/charades-data/vlsi/copies/` (logs, configs, `run.sh`).
+
+**Builds (on c454-103, Xeon 8160):**
+- `charm-pads-shmem`: `CMK_USE_SHMEM 1`, Release, LCI compiled from `charm-pads-exp`'s patched source (`LCI_SOURCE_DIR` points there); 2 minutes at `-j46`.
+- `charades-shmem` (same commit as `charades-vlsi`) links `charm-pads-shmem`.
+- Devastator `vlsi-p1w46` and `vlsi-p4w46` (ofi-psm2).
+- Gates: the shmem tree on 1 node (2 × 2, 4 × 2) 30/30 and on 2 nodes 45/45; `charades-vlsi` with `+ipc` on 1 node 30/30.
+
+**Smoke runs (b19, 1 node, 2 × 23, W 2,500; one run each, a preview):**
+
+| run | M committed ev/s (higher is better) | ÷ reference | messages through the shared-memory pool |
+|---|---|---|---|
+| reference (`charades-vlsi`) | 22.3 | 1.00 | 0 |
+| Charm++ `--enable-shmem` | 10.4 | 0.47 | 153,658 |
+| Reconverse `+ipc` | 15.1 | 0.68 | 153,510 |
+
+Committed count and digest as V1. About 1% of V3's 15.5 M messages between the node's processes went through the pool, and both runs were slower.
+
+**Cause: Charades' message pool kept the pool's blocks.**
+- A message from another process on the host arrives in a block of the receiving process's shared segment (8 MB by default), and `CmiFree` returns the block. `--msg-pool` (on by default, section 24) kept received event messages for reuse instead, up to 65,536 per PE, so the segment ran dry early.
+- After that, each send tried 4 times for a block and then fell back to LCI.
+- Mac check (b19, one copy, 2 processes × 4 PEs, 200 cycles, `+ipc`; Mac timings are not comparable, the per-copy runs shared the cores):
+
+| | messages to the other process | through the pool | mean send call (µs) |
+|---|---|---|---|
+| message pool on (before the fix) | 634 k | 305 k | 190 |
+| `--msg-pool=0` | 647 k | 649 k (all, and control messages) | 0.75 |
+| message pool on, fixed (c7373b4) | 642 k | 644 k (all) | 3.6 |
+
+- **Fix (charades c7373b4):** `remote_event_delete` never pools a message that sits in this process's shared segment (`CmiMsgToIpcBlock` on `coreIpcManager_`); freeing it returns the block. Messages within a process and from other nodes are pooled as before. Mac: VLSI change tier 15/15 at 1 × 4 and at 2 × 2 with `+ipc`; every model at 2 × 2 with `+ipc` 22/22. Both Stampede3 trees rebuilt at c7373b4.
+- Job V4 runs on c7373b4 with the arms of section 200 unchanged; its predictions Z1–Z8 stand for the fixed path.
+
+**Each copy's activity** (Mac, `--copy-stats=1`: committed pin changes plus evaluations; ÷ the median copy):
+
+| copies, cycles | committed events | copy 2 ÷ median copy | other copies ÷ their mean | most active ÷ mean copy |
+|---|---|---|---|---|
+| 4, 5,000 | 574,541,914 (= V3, 4 nodes) | 1.758 | 0.999–1.001 | 1.478 |
+| 4, 1,000 | 113,528,626 | 1.746 | 0.997–1.005 | 1.473 |
+| 8, 1,000 | 213,421,408 | 1.749 | 0.997–1.006 | 1.598 |
+| 16, 1,000 | 413,105,684 | 1.750 | 0.993–1.011 | 1.670 |
+| 32, 1,000 | 812,409,570 | 1.749 | 0.990–1.011 | 1.708 |
+
+- **Only copy 2 differs**, at every copy count, and it does so from the first 1,000 cycles. Its inputs (seed 1) put it in a mode with 1.75× the switching of every other copy; the other 31 copies agree within ±1.1%. It is a property of the inputs, not of the ring or the copy count, and it is the same in every engine.
+- **With one copy per node, from 3 nodes on, node 2 does 1.75× the work of the others** and sets every engine's pace. At 1 and 2 nodes no copy is in that mode. Per-node rates from 1–2 nodes to 4 and more therefore fall in every engine for a reason that has nothing to do with the engine (section 199's 1 → 4-node added cost).
+
+**Predictions (section 200):**
+- **P1 right.** 4 copies over 5,000 cycles commit V3's 574,541,914; copy 2 is the most active, at 1.76× the mean of the other three.
+- **P2 right.** The most active copy ÷ the mean copy is 1.60, 1.67 and 1.71 at 8, 16 and 32 copies, rising toward 1.75 as copies are added.
+
+**Consequence for the 1–32-node job (user decides):** keep the inputs and report the most active copy (every engine pays it alike); or change the workload so no node carries an outlier copy, for example several copies per node, which dilutes it (4 copies per node: the node with copy 2 does 1.19× the mean; 8: 1.09×), or a seed with no outlier among the copies used (selected after the fact).
 
 ## Baseline verification on the Mac
 
