@@ -366,6 +366,7 @@ Sections 1–128 were re-read before planning sections 129 onward.
 | 207 | 2026-11-03 | idev (results in a later section) | Where a VLSI clock cycle's wall time goes (design): `--event-trace-from/-to` records each event's send, arrival, executions and rollbacks and each PE's passes and GVT updates; `event_trace.py` follows each cycle's last event back through its senders and splits the chain into send, transit and queue, and those by what the receiving PE did (later / earlier events, pass, blocked, empty, outside); hypotheses H1 ahead work, H2 busiest PEs, H3 per-pass machinery; predictions T1–T4 | design |
 | 208 | 2026-11-03 | 3678365 | V5 results: Charades ÷ Devastator 0.853 at 1 node (37.3 against 43.8 M ev/s) and 1.001 at 4 (both 1.40 ms per cycle at W 2,500; copy 2's node sets the pace; W 5,000 reps vary up to 4.8×); 2 × 23 over the new pool 0.86 / 0.91 of 1 × 46 (`+ipc` = `--enable-shmem`); the controller on VLSI sits at one bucket in every round, so the bucket width sets W; lazy fossils 0.94–0.95 on Gaussian and uniform PHOLD (blocked share up), stay off by default (a VLSI setting); the new tree 0.96–1.06 of the paper's; `+ipc` with htram 0.97–1.12; F1, F2, F4 right, F8 mostly, F5, F7 half, F3 one of three, F6 wrong | current |
 | 209 | 2026-11-03 | idev 3678539 | Devastator's 1 × 46 hang: PSM2 binds a whole-node process to one core, so all 48 threads ran on core 0; `HFI_NO_CPUAFFINITY=1` fixes it (2 × 23 unchanged); Devastator 1 × 46 0.87 of its 2 × 23 (F9 wrong), so V5 compares each engine at its best layout; at 1 × 46 the engines are level (37.6 / 37.3); Devastator's two-process gain is socket locality (spread over both sockets 0.65×), Charades nearly insensitive (0.96×); the trace (28% inflated in its range after `--event-trace-max`; 2.1× before) shows no ahead-work delay (transit 14%, later 1–2%), chain events wait behind earlier events, per-event engine work and the window; profile: runtime 37% (network progress 13.9%, `execute()` re-enqueue about 5%); T1, T3, T4 wrong, T2 half | current |
+| 210 | 2026-11-03 | idev (results in a later section) | Closing the gap, round 2 (design): one-process runs skip network polling (Reconverse; `+backend_poll_single` restores it), `CmiPeHasPendingWork()`, Charades `--pass-loop=N` (passes run back to back in one `execute()` call while nothing is pending); predictions G1–G5 | design |
 
 ## Stampede3 runs, in order
 
@@ -8903,6 +8904,34 @@ Each workload runs eager and lazy fossils at both W and under the frozen control
   2. Running passes in a loop inside one Converse handler instead of re-sending `execute()` to itself as a message.
   3. Fewer allocations and frees per event (the message pool and `event_alloc`).
 - Each is to be measured on its own, with section 207's trace and `--gvt-trace=1` cycle times, before the next.
+
+### Closing the gap, round 2: no network polling in one-process runs, and several scheduler passes per `execute()` message (design, 2026-11-03; written before any runs)
+
+> **Status: design.** User decision 2026-11-03: go ahead with section 209's items 1 and 2. Reconverse branch `pads-perf` (worktree `~/reconverse_perf`), Charades `main`. Measured on an idev node, one change at a time.
+
+**Where a pass goes now** (Reconverse `scheduler_registered.cpp`; Charades `DistributedScheduler::next_iteration`): every pass ends by sending `execute()` to its own PE as a Charm++ group message (`CkAllocSysMsg`, `CkSendMsgBranch`). The scheduler loop then makes two sweeps before the next pass runs: one takes the message from the PE's thread queue and moves it into the prioritized queue (`_skipCldHandler`), and the next walks the slot table to the prioritized queue's slot, polling the network once on the way (`comm_backend::progress`, once per sweep). Section 209's profile puts this machinery at about 31% of the process's cycles (network progress 13.9%, Converse sweeps and queues about 11%, the message about 5%, mutexes 2.7%), most of it while PEs spin blocked at the window. Round 1's test of one polling PE (+1.4%) bounds what polling alone costs.
+
+**Changes:**
+1. **Reconverse:** a run with one process does not register the network poll in the scheduler's slot table. Sends within a process never use the network backend, and the backend's barriers poll it themselves. `+backend_poll_single` restores the poll, so one build gives both arms.
+2. **Reconverse:** `CmiPeHasPendingWork()`, true when this PE's thread queue, prioritized queue, node queues or shared-memory receive queue hold anything. It does not see the network.
+3. **Charades:** `--pass-loop=N` (default 1, today's behaviour). When a pass ends with nothing pending for this PE (change 2) and fewer than N passes have run since the last message, the next pass runs at once inside the same `execute()` call. It ends when the GVT trigger starts a round, when the PE parks, or when anything is pending; the PE then returns to the scheduler, which also bounds how long network messages wait to N passes.
+
+**Measurement** (idev, 1 node; b19 × 1, 1 × 46, `--fossil-lazy=1 --batch=32`, W 5,000, buckets of 2,500; 2 reps alternating; `--gvt-trace=1` cycle times; perf of the best arm):
+- base (`+backend_poll_single`, `--pass-loop=1`);
+- change 1 only;
+- change 1 with `--pass-loop` 4, 16, 64;
+- 2 × 23 over `+ipc` (change 1 does not apply there) with `--pass-loop` 1 and 16.
+
+Correctness: Mac change tier on every model with `--pass-loop=16`; Reconverse's ctest on the Mac; Stampede3 VLSI gates.
+
+**Predictions:**
+- **G1.** Change 1 alone: +0–3% at 1 × 46 (round 1: one polling PE gave +1.4%).
+- **G2.** `--pass-loop=16` on top: +3–8%. The Charm++ and Converse per-pass functions (`CkSendMsgBranch`, `CkAllocSysMsg`, `_processHandler`, `CsdSchedulerRegistered`, `pollConverseThreadQueue`, `pollThreadPrioQueue`, `CcdRaiseCondition`) fall from about 11% to under 3% of cycles. N = 4 gets most of it; N = 64 is no better than 16.
+- **G3.** Both together: at least 39.5 M ev/s at 1 × 46 (0.90 of Devastator's 43.8).
+- **G4.** 2 × 23 over `+ipc` gains as much from `--pass-loop=16` as 1 × 46 does, ±3%.
+- **G5.** The same committed count and digest in every run.
+
+**What follows:** whatever pays becomes the default (with the engine tier on the Mac first), and round 3 takes the per-event costs (allocation and freeing of events and messages, the fast-path drain).
 
 ## Baseline verification on the Mac
 
