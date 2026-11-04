@@ -366,7 +366,8 @@ Sections 1–128 were re-read before planning sections 129 onward.
 | 207 | 2026-11-03 | idev (results in a later section) | Where a VLSI clock cycle's wall time goes (design): `--event-trace-from/-to` records each event's send, arrival, executions and rollbacks and each PE's passes and GVT updates; `event_trace.py` follows each cycle's last event back through its senders and splits the chain into send, transit and queue, and those by what the receiving PE did (later / earlier events, pass, blocked, empty, outside); hypotheses H1 ahead work, H2 busiest PEs, H3 per-pass machinery; predictions T1–T4 | design |
 | 208 | 2026-11-03 | 3678365 | V5 results: Charades ÷ Devastator 0.853 at 1 node (37.3 against 43.8 M ev/s) and 1.001 at 4 (both 1.40 ms per cycle at W 2,500; copy 2's node sets the pace; W 5,000 reps vary up to 4.8×); 2 × 23 over the new pool 0.86 / 0.91 of 1 × 46 (`+ipc` = `--enable-shmem`); the controller on VLSI sits at one bucket in every round, so the bucket width sets W; lazy fossils 0.94–0.95 on Gaussian and uniform PHOLD (blocked share up), stay off by default (a VLSI setting); the new tree 0.96–1.06 of the paper's; `+ipc` with htram 0.97–1.12; F1, F2, F4 right, F8 mostly, F5, F7 half, F3 one of three, F6 wrong | current |
 | 209 | 2026-11-03 | idev 3678539 | Devastator's 1 × 46 hang: PSM2 binds a whole-node process to one core, so all 48 threads ran on core 0; `HFI_NO_CPUAFFINITY=1` fixes it (2 × 23 unchanged); Devastator 1 × 46 0.87 of its 2 × 23 (F9 wrong), so V5 compares each engine at its best layout; at 1 × 46 the engines are level (37.6 / 37.3); Devastator's two-process gain is socket locality (spread over both sockets 0.65×), Charades nearly insensitive (0.96×); the trace (28% inflated in its range after `--event-trace-max`; 2.1× before) shows no ahead-work delay (transit 14%, later 1–2%), chain events wait behind earlier events, per-event engine work and the window; profile: runtime 37% (network progress 13.9%, `execute()` re-enqueue about 5%); T1, T3, T4 wrong, T2 half | current |
-| 210 | 2026-11-03 | idev (results in a later section) | Closing the gap, round 2 (design): one-process runs skip network polling (Reconverse; `+backend_poll_single` restores it), `CmiPeHasPendingWork()`, Charades `--pass-loop=N` (passes run back to back in one `execute()` call while nothing is pending); predictions G1–G5 | design |
+| 210 | 2026-11-03 | idev 3679189 (results in 211) | Closing the gap, round 2 (design): one-process runs skip network polling (Reconverse; `+backend_poll_single` restores it), `CmiPeHasPendingWork()`, Charades `--pass-loop=N` (passes run back to back in one `execute()` call while nothing is pending); predictions G1–G5 | design |
+| 211 | 2026-11-03 | idev 3679621 | Round 2 results: no network poll 1.00, `--pass-loop` 4 / 16 / 64 1.01; profiles of the simulation alone show the per-pass machinery (about 10%) runs while PEs wait, and moves into the loop; section 209's 13.9% network progress was the setup barrier (corrected); left: Charades' per-event work (allocation, drain, frees, fossils); `+ipc` with one process hangs at start-up in `CmiCheckAffinity` (Reconverse, not round 2); G1–G3 wrong, G4, G5 right | current |
 
 ## Stampede3 runs, in order
 
@@ -8935,6 +8936,42 @@ Correctness: Mac change tier on every model with `--pass-loop=16`; Reconverse's 
 - **G5.** The same committed count and digest in every run.
 
 **What follows:** whatever pays becomes the default (with the engine tier on the Mac first), and round 3 takes the per-event costs (allocation and freeing of events and messages, the fast-path drain).
+
+### Closing the gap, round 2 results: neither change moves the rate (no network poll 1.00, `--pass-loop` 1.01); the per-pass machinery runs while PEs wait, and section 209's profile was mostly setup (2026-11-03; idev 3679621, c454-041)
+
+> **Status: current.** Design and predictions in section 210; first attempt and gate there. Runtime `charm-pads-perf` with Reconverse bab3df1 (75719d5), Charades 5b14290. b19 × 1, 1 node, `--fossil-lazy=1 --batch=32`, W 5,000, buckets of 2,500; 2 reps; one digest (87c11aec…) in every run. Data `~/charades-data/vlsi/idev3679621/`.
+
+**Rates** (M committed ev/s, higher is better; ÷ base, median of 2 reps):
+
+| arm | r1 / r2 | ÷ base |
+|---|---|---|
+| base: 1 × 46, network poll on (`+backend_poll_single`), `--pass-loop=1` | 37.84 / 37.95 | 1.00 |
+| change 1: no network poll | 38.07 / 37.39 | 1.00 |
+| + `--pass-loop=4` | 38.41 / 38.07 | 1.01 |
+| + `--pass-loop=16` | 37.84 / 38.77 | 1.01 |
+| + `--pass-loop=64` | 38.30 / 38.18 | 1.01 |
+| 2 × 23 `+ipc` / with `--pass-loop=16` | 32.64 / 32.39; 32.47 / 32.56 | 1.00 (÷ each other) |
+
+**Profiles of the simulation alone** (perf started 9.5 s in, after setup; user cycles of the process):
+- **Base:** Charades and the model 68%, runtime 23%, libc 8%. The scheduler machinery per pass is about 10% (`pollConverseThreadQueue` 2.4%, `CsdSchedulerRegistered` 1.6%, `CcdRaiseCondition` 1.5%, `pollNodeQueuesFirst` 1.5%, `CkSendMsgBranch` 1.5%, `_processHandler` 1.3%); network polling 1.3% (`pollProgress`).
+- **`--pass-loop=16`:** runtime 15%. Those functions drop out of the top of the profile, but `CmiPeHasPendingWork` takes 4.7% and `execute_pass` 9.7% (3.4% before): PEs blocked at the window (61% of the time) now spin inside the loop instead of in the scheduler. Spinning while blocked costs nothing that matters, so the rate does not move. This is the same lesson as Reconverse's idle cycles.
+- **What is left is Charades' per-event work:** `event_alloc` 5.3%, `execute_me` 5.3%, `fp_drain` 5.2–7.5%, `remote_event_delete` 4.7%, `fossil_me` 3.2%, glibc free and malloc 3.5%, mutex lock and unlock 3.2%, `fp_push` 2.1%, `tw_event_free` 2.0%, the event comparator 1.9%, `recv_local_event` and `recv_fast_event` 1.8% each.
+
+**Correction to section 209:** its profile covered the whole process, and a b19 run spends about 9 of its 12 s in setup, where PEs wait in `CmiNodeBarrier`, which polls the network. "Network progress 13.9%" was that setup barrier, not the run; during the simulation it is 1.3%. Section 209's other findings stand.
+
+**A start-up hang with `+ipc` in a one-process run** (`r2bisect.sh`; PHOLD at 1 × 4): `+ipc` hangs with or without `--pass-loop` and with the network poll restored, and every run without `+ipc` passes. gdb: PEs 0 and 1 wait in `CmiNodeBarrier` inside `CmiCheckAffinity` (Charm++'s `_initCharm`), while PEs 2 and 3 have passed it into the scheduler. `CmiCheckAffinity` returns early when the CPU topology is not enabled, and `+ipc` gathers the topology at Converse start-up, so the PEs evidently disagree on that test. This is Reconverse's, not round 2's; whether it predates the pool rewrite is untested. No Charades configuration runs `+ipc` with one process. Recorded for a Reconverse fix.
+
+**Predictions (section 210):**
+- **G1 wrong:** change 1 is 1.00, not +0–3%.
+- **G2 wrong:** `--pass-loop=16` is +1.5%, not +3–8%. The per-pass functions do drop out of the profile, but the time moves into the loop.
+- **G3 wrong:** 38.3, not at least 39.5.
+- **G4 right:** 2 × 23 gains as little as 1 × 46 does.
+- **G5 right.**
+
+**What follows:**
+- Both changes stay off. The Reconverse commit can stay on `pads-perf`: `CmiPeHasPendingWork` is harmless, and so is skipping the poll in one-process runs.
+- Per-pass work is not the 1-node gap. The remaining candidate is per-event work: allocating and freeing events and messages, the fast-path push and drain, and fossil commits.
+- But at the same layout the engines are already level (section 209). Devastator's lead comes from its two-process layout being faster than its one-process layout, which Charades cannot copy by cutting per-event work alone.
 
 ## Baseline verification on the Mac
 
