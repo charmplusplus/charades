@@ -29,6 +29,8 @@ Scheduler::Scheduler() {
   globals = new Globals();
   stats = new Statistics();
   cumulative_stats = stats;
+  tls_globals = globals;
+  tls_statistics = stats;
 
   CpvInitialize(SchedulerPtr, g_scheduler);
   CpvAccess(g_scheduler) = this;
@@ -224,7 +226,13 @@ void Scheduler::print_progress(Time ts) {
 bool Scheduler::schedule_next_lp() {
   LPToken *min = next_lps.top();
   if(min == NULL) return false;
-  int count = lps(min->lp->thisIndex).execute_me();
+  // Without load balancing a chare never leaves its PE, so its token's pointer
+  // is the chare: call it directly. Through the proxy, every event paid a
+  // location-table lookup and a push of Charm++'s call stack, which also
+  // starts and stops the load balancer's timer for the chare (RESULTS.md
+  // section 213).
+  int count = g_tw_direct_execute && g_tw_ldb_interval == 0 && g_tw_ldb_first == 0
+      ? min->lp->execute_me() : lps(min->lp->thisIndex).execute_me();
   PE_STATS(events_executed) += count;
   if (count) {
     return true;

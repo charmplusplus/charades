@@ -31,25 +31,42 @@ static FpInputBuffer* process_input_buffers() {
 
 /** Per-PE tables and the input buffer for messages from this PE to itself */
 struct FpState {
-  std::vector<int> chare_pe;          ///< home PE of every LP chare
+  /**
+   * Where each LP chare lives, seen from this PE: FP_SELF, FP_OTHER_PROCESS,
+   * or the rank of its PE in this process. Kept per PE so a send asks the
+   * runtime nothing (CkMyPe, CkNodeOf and CkRankOf are calls into it).
+   */
+  std::vector<int> chare_route;
+  int my_rank = -1;                   ///< this PE's rank in its process
   std::vector<LPChare*> local;        ///< this PE's chares, by index
   std::vector<RemoteEvent*> self_q;   ///< messages from this PE to itself
   std::vector<RemoteEvent*> scratch;
 
+  static const int FP_SELF = -1, FP_OTHER_PROCESS = -2;
+
   /**
-   * Home PE of an LP chare. LPs never migrate with the fast path on (load
-   * balancing is refused). Filled on first use: the LP array does not exist
-   * when the option is checked.
+   * Route to an LP chare's home PE. LPs never migrate with the fast path on
+   * (load balancing is refused). Filled on first use: the LP array does not
+   * exist when the option is checked.
    */
-  int home_pe(uint64_t chare) {
-    if (chare_pe.empty()) {
+  int route(uint64_t chare) {
+    if (chare_route.empty()) {
       CkLocMgr* mgr = lps.ckLocMgr();
-      chare_pe.resize(g_num_chares);
+      const int me = CkMyPe(), node = CkMyNode();
+      chare_route.resize(g_num_chares);
       for (uint64_t c = 0; c < g_num_chares; c++) {
-        chare_pe[c] = mgr->homePe(CkArrayIndex1D(c));
+        int pe = mgr->homePe(CkArrayIndex1D(c));
+        chare_route[c] = pe == me ? FP_SELF
+            : (g_tw_local_fast_path == 2 || CkNodeOf(pe) != node) ? FP_OTHER_PROCESS
+            : CkRankOf(pe);
       }
     }
-    return chare_pe[chare];
+    return chare_route[chare];
+  }
+
+  int rank() {
+    if (my_rank < 0) my_rank = CkMyRank();
+    return my_rank;
   }
 
   LPChare* local_chare(uint64_t chare) {
@@ -101,14 +118,15 @@ void fp_check() {
 /** Push msg onto the input buffer of the PE that owns its chare. False: elsewhere */
 static bool fp_push(RemoteEvent* msg, uint64_t dest_chare) {
   FpState& st = fp_state;
-  int pe = st.home_pe(dest_chare);
-  if (pe == CkMyPe()) {
+  const int r = st.route(dest_chare);
+  if (r == FpState::FP_SELF) {
     st.self_q.push_back(msg);
     return true;
   }
-  // --local-fast-path=2: this PE only (other PEs through htram or messages)
-  if (g_tw_local_fast_path == 2 || CkNodeOf(pe) != CkMyNode()) return false;
-  std::atomic<RemoteEvent*>& head = process_input_buffers()[CkRankOf(pe)].head;
+  // Another process; or with --local-fast-path=2, any other PE (through
+  // htram or messages)
+  if (r == FpState::FP_OTHER_PROCESS) return false;
+  std::atomic<RemoteEvent*>& head = process_input_buffers()[r].head;
   RemoteEvent* h = head.load(std::memory_order_relaxed);
   msg->fp_next = h;
   while (!head.compare_exchange_weak(h, msg, std::memory_order_release,
@@ -158,7 +176,7 @@ void fp_drain() {
   if (!g_tw_local_fast_path) return;
   FpState& st = fp_state;
   {
-    std::atomic<RemoteEvent*>& head = process_input_buffers()[CkMyRank()].head;
+    std::atomic<RemoteEvent*>& head = process_input_buffers()[st.rank()].head;
     if (head.load(std::memory_order_relaxed) != NULL) {
       RemoteEvent* m = head.exchange(NULL, std::memory_order_acquire);
       // Newest first: reverse to send order, so an event precedes its

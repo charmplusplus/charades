@@ -66,7 +66,8 @@ void parse_command_line(int argc, char** argv) {
   kernel.register_argument("agg-input-buffer",            "Optimistic, bucketed GVT, not --sched-park: htram node receives hand events to PEs through input buffers, not messages - NO=0, YES=1 (default)", g_tw_agg_input_buffer);
   kernel.register_argument("rollback-unit",        "Optimistic: a straggler is judged against, and rolls back, 0 = its whole LPChare, 1 = only its LP (default)", g_tw_rollback_unit);
   kernel.register_argument("event-index",          "Optimistic: index received events for cancellation by - AVL TREE=0, HASH=1 (default)", g_tw_event_index);
-  kernel.register_argument("msg-pool",             "Recycle event messages through a per-PE pool - NO=0, YES=1 (default)", g_tw_msg_pool);
+  kernel.register_argument("msg-pool",             "Recycle event messages through a per-PE pool - NO=0, PER-PE ONLY=1, PER-PE WITH A SHARED SPARE LIST=2 (default)", g_tw_msg_pool);
+  kernel.register_argument("direct-execute",       "Without load balancing, run each chare's events by direct call, not through its Charm++ proxy - NO=0, YES=1 (default)", g_tw_direct_execute);
   kernel.register_argument("agg-gvt-flush",        "On each GVT update flush - NOTHING=0, DESTINATIONS NOT FILLING=1, EVERYTHING=2", g_tw_agg_gvt_flush);
   kernel.register_argument("agg-policy",           "When htram buffers ship - EAGER (idle PEs and GVT updates flush everything)=0, DEADLINE (only events with ts < GVT + agg-horizon)=1", g_tw_agg_policy);
   kernel.register_argument("agg-horizon",          "Deadline policy: events with ts < GVT + this are due (0 = the optimism window)", g_tw_agg_horizon);

@@ -23,13 +23,21 @@ class LPMapper {
  * Maps g_lps_per_chare lps to each chare in contiguous blocks of global ids.
  */
 class BlockMapper : public LPMapper {
-  /** The chare id where \p gid is located is \p gid / \ref g_lps_per_chare */
-  uint64_t get_chare_id(uint64_t global_id) const {;
-    return global_id / g_lps_per_chare;
+  /**
+   * The chare id where \p gid is located is \p gid / \ref g_lps_per_chare.
+   * A power of two (every paper run) shifts instead of dividing: these run up
+   * to four times per event, and a 64-bit division takes tens of cycles.
+   */
+  uint64_t get_chare_id(uint64_t global_id) const {
+    const uint64_t n = g_lps_per_chare;
+    if ((n & (n - 1)) == 0) return global_id >> __builtin_ctzll(n);
+    return global_id / n;
   }
   /** The local offset of \p gid is \p gid % \ref g_lps_per_chare */
   uint64_t get_local_id(uint64_t global_id) const {
-    return global_id % g_lps_per_chare;
+    const uint64_t n = g_lps_per_chare;
+    if ((n & (n - 1)) == 0) return global_id & (n - 1);
+    return global_id % n;
   }
   /**
    * The global id for (\p chare_id,\ p local_id) is

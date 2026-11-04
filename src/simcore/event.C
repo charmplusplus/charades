@@ -13,7 +13,9 @@
 #include "statistics.h"
 #include "typedefs.h"
 #include "util.h"
+#include <algorithm>
 #include <cstring>
+#include <mutex>
 #include <string>
 
 extern CProxy_LPChare lps;
@@ -59,6 +61,72 @@ bool CustomEventComparator::operator()(const Event* e1, const Event* e2) {
 static const size_t MSG_POOL_DATA = 32;
 static const size_t MSG_POOL_MAX = 1 << 16;
 
+/**
+ * A message goes back into the pool of the PE that commits its event, not the
+ * one that sent it. A PE that sends more than it receives runs dry and
+ * allocates; one that receives more fills up and frees; and in a one-process
+ * run both go to the C library, freeing memory another thread allocated
+ * (RESULTS.md section 213: 4-11% of messages at 4-46 PEs). So a pool above
+ * MSG_POOL_HIGH gives MSG_POOL_BATCH of its oldest messages to a spare list
+ * shared by the process's PEs, and an empty pool takes a batch from it before
+ * allocating: one lock per batch.
+ */
+static const size_t MSG_POOL_HIGH = 4096;
+static const size_t MSG_POOL_BATCH = 2048;
+
+struct MsgSpare {
+  std::mutex lock;
+  std::vector<RemoteEvent*> msgs;
+  size_t cap;  ///< messages above this are freed
+};
+
+/**
+ * The spare list's cap: what the per-PE pools could hold before (MSG_POOL_MAX
+ * each), and at least 2^20 messages. Kept messages are never more than were
+ * in flight at once, so a cap below that peak only frees messages each GVT
+ * round to allocate them again in the next (on the Mac at 1 PE, b19 holds
+ * more than 65,536 in flight).
+ */
+static const size_t MSG_SPARE_MIN = 1 << 20;
+
+static MsgSpare& msg_spare() {
+  static MsgSpare* spare = [] {
+    MsgSpare* s = new MsgSpare();
+    s->cap = std::max<size_t>((size_t)CkMyNodeSize() * MSG_POOL_MAX, MSG_SPARE_MIN);
+    return s;
+  }();
+  return *spare;
+}
+
+/** Refill an empty pool from the spare list; false if it had none */
+static bool msg_pool_refill(std::vector<RemoteEvent*>& pool) {
+  MsgSpare& sp = msg_spare();
+  std::lock_guard<std::mutex> guard(sp.lock);
+  size_t n = std::min(sp.msgs.size(), MSG_POOL_BATCH);
+  if (n == 0) return false;
+  pool.insert(pool.end(), sp.msgs.end() - n, sp.msgs.end());
+  sp.msgs.resize(sp.msgs.size() - n);
+  return true;
+}
+
+/** Give a full pool's oldest batch to the spare list (or free it if that is full) */
+static void msg_pool_spill(std::vector<RemoteEvent*>& pool) {
+  MsgSpare& sp = msg_spare();
+  bool kept = false;
+  {
+    std::lock_guard<std::mutex> guard(sp.lock);
+    if (sp.msgs.size() + MSG_POOL_BATCH <= sp.cap) {
+      sp.msgs.insert(sp.msgs.end(), pool.begin(), pool.begin() + MSG_POOL_BATCH);
+      kept = true;
+    }
+  }
+  if (!kept) {
+    for (size_t i = 0; i < MSG_POOL_BATCH; i++) delete pool[i];
+    PE_STATS(msg_pool_frees) += MSG_POOL_BATCH;
+  }
+  pool.erase(pool.begin(), pool.begin() + MSG_POOL_BATCH);
+}
+
 static size_t remote_event_capacity(RemoteEvent* m) {
   envelope* env = UsrToEnv(m);
   size_t head = (size_t)(m->data - (char*)env);
@@ -82,7 +150,7 @@ static inline bool in_shared_block(RemoteEvent* m) {
 RemoteEvent* remote_event_new(size_t size) {
   if (g_tw_msg_pool && size <= MSG_POOL_DATA) {
     std::vector<RemoteEvent*>& pool = PE_VALUE(msg_pool);
-    if (!pool.empty()) {
+    if (!pool.empty() || (g_tw_msg_pool == 2 && msg_pool_refill(pool))) {
       RemoteEvent* m = pool.back();
       pool.pop_back();
       m->clear();
@@ -90,6 +158,7 @@ RemoteEvent* remote_event_new(size_t size) {
       _SET_USED(UsrToEnv(m), 0);
       return m;
     }
+    PE_STATS(msg_pool_misses)++;
     return new (MSG_POOL_DATA) RemoteEvent();
   }
   return new (size) RemoteEvent();
@@ -99,11 +168,13 @@ void remote_event_delete(RemoteEvent* m) {
   if (m == NULL) return;
   if (g_tw_msg_pool) {
     std::vector<RemoteEvent*>& pool = PE_VALUE(msg_pool);
-    if (pool.size() < MSG_POOL_MAX && remote_event_capacity(m) >= MSG_POOL_DATA &&
-        !in_shared_block(m)) {
+    if ((g_tw_msg_pool == 2 || pool.size() < MSG_POOL_MAX) &&
+        remote_event_capacity(m) >= MSG_POOL_DATA && !in_shared_block(m)) {
       pool.push_back(m);
+      if (g_tw_msg_pool == 2 && pool.size() > MSG_POOL_HIGH) msg_pool_spill(pool);
       return;
     }
+    PE_STATS(msg_pool_frees)++;
   }
   delete m;
 }

@@ -78,6 +78,8 @@ class Statistics {
     uint64_t fast_sends;   ///< remote sends handed over by pointer (--local-fast-path)
     uint64_t fast_antis;   ///< anti events handed over by pointer (--local-fast-path)
     uint64_t fast_push_retries; ///< input buffer pushes retried because another PE pushed first
+    uint64_t msg_pool_misses; ///< event messages allocated because this PE's message pool was empty (--msg-pool)
+    uint64_t msg_pool_frees;  ///< event messages freed because the message pools were full or could not keep them (--msg-pool)
     uint64_t ipc_received; ///< messages received through the runtime's shared-memory pool from another process on the host (Charm++ --enable-shmem, or Reconverse +ipc)
     ///@}
 
@@ -206,8 +208,9 @@ class Statistics {
 #endif
 };
 
-/** Helper function for accessing the local Statistics object */
-Statistics* get_statistics();
+/** This PE's Statistics, set by its scheduler (inline, as get_globals) */
+extern thread_local Statistics* tls_statistics;
+inline Statistics* get_statistics() { return tls_statistics; }
 /** Reducer function used by the Charm++ runtime when doing a stats reduction */
 CkReductionMsg *statsReduction(int nMsg, CkReductionMsg **msgs);
 /** Called during node init to register the stats reduction type */

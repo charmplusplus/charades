@@ -636,8 +636,11 @@ void LPChare::fossil_me(Time gvt) {
   Event* e;
   if (g_tw_rollback_unit) {
     // The processed queue is in execution order, not time order: commit each
-    // LP's events below GVT from the old end of its chain (time order)
-    for (LPBase* lp : lp_structs) {
+    // LP's events below GVT from the old end of its chain (time order). Only
+    // LPs with processed events can have any; an LP left with none leaves
+    // the list (a rollback may have emptied it since).
+    for (size_t i = 0; i < fossil_lps.size();) {
+      LPBase* lp = fossil_lps[i];
       while (lp->lp_tail != NULL && lp->lp_tail->ts < gvt) {
         e = lp->lp_tail;
         TW_ASSERT(!e->state.cancel_q,
@@ -650,6 +653,13 @@ void LPChare::fossil_me(Time gvt) {
         tw_event_free(e,true);
         committed_events++;
         committed_time = e->ts;
+      }
+      if (lp->lp_tail == NULL) {
+        lp->in_fossil_lps = false;
+        fossil_lps[i] = fossil_lps.back();
+        fossil_lps.pop_back();
+      } else {
+        i++;
       }
     }
     return;
@@ -759,6 +769,10 @@ Time LPChare::straggler_time(const LPBase* lp) const {
 }
 
 void LPChare::lp_chain_push(LPBase* lp, Event* e) {
+  if (!lp->in_fossil_lps) {
+    lp->in_fossil_lps = true;
+    fossil_lps.push_back(lp);
+  }
   e->lp_prev = NULL;
   e->lp_next = lp->lp_head;
   if (lp->lp_head) lp->lp_head->lp_prev = e;
@@ -773,7 +787,11 @@ void LPChare::lp_chain_unlink(LPBase* lp, Event* e) {
 }
 
 void LPChare::lp_chain_rebuild() {
-  for (LPBase* lp : lp_structs) lp->lp_head = lp->lp_tail = NULL;
+  for (LPBase* lp : lp_structs) {
+    lp->lp_head = lp->lp_tail = NULL;
+    lp->in_fossil_lps = false;
+  }
+  fossil_lps.clear();
   // Oldest first, so each push leaves the newest at the head
   for (Event* e = processed_events.back(); e != NULL; e = e->prev) {
     lp_chain_push(e->owner, e);

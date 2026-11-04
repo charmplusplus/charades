@@ -9,9 +9,7 @@
 
 #include <stdio.h>  // Included for printf
 
-Statistics* get_statistics() {
-  return CpvAccess(g_scheduler)->stats;
-}
+thread_local Statistics* tls_statistics = NULL;
 
 CkReduction::reducerType statsReductionType;
 void registerStatsReduction() {
@@ -68,6 +66,7 @@ void Statistics::clear() {
   anti_sends = 0;
   anti_cancels = 0;
   fast_sends = fast_antis = fast_push_retries = 0;
+  msg_pool_misses = msg_pool_frees = 0;
   ipc_received = 0;
 
   // Communication stats
@@ -131,6 +130,8 @@ void Statistics::add(const Statistics* other) {
   fast_sends += other->fast_sends;
   fast_antis += other->fast_antis;
   fast_push_retries += other->fast_push_retries;
+  msg_pool_misses += other->msg_pool_misses;
+  msg_pool_frees += other->msg_pool_frees;
   add_comm(other);
 
   // GVT stats
@@ -170,6 +171,8 @@ void Statistics::reduce(const Statistics* other) {
   fast_sends += other->fast_sends;
   fast_antis += other->fast_antis;
   fast_push_retries += other->fast_push_retries;
+  msg_pool_misses += other->msg_pool_misses;
+  msg_pool_frees += other->msg_pool_frees;
   add_comm(other);
 
   // GVT stats
@@ -354,6 +357,10 @@ void Statistics::print() const {
     print_int("Process Sends (fast path)", fast_sends);
     print_int("Process Anti Sends (fast path)", fast_antis);
     print_int("Input Buffer Push Retries (fast path)", fast_push_retries);
+  }
+  if (msg_pool_misses || msg_pool_frees) {
+    print_int("Message Pool Misses (allocated)", msg_pool_misses);
+    print_int("Message Pool Frees", msg_pool_frees);
   }
 
   /** \todo Add stats about cancellations */

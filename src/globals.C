@@ -79,6 +79,7 @@ unsigned g_tw_pass_loop;
 unsigned g_tw_event_index;
 unsigned g_tw_rollback_unit;
 unsigned g_tw_msg_pool;
+unsigned g_tw_direct_execute;
 unsigned g_tw_agg_gvt_flush;
 unsigned g_tw_agg_policy;
 Time     g_tw_agg_horizon;
@@ -200,7 +201,8 @@ void clear_globals() {
   g_tw_pass_loop          = 1;
   g_tw_event_index        = 1;
   g_tw_rollback_unit      = 1;
-  g_tw_msg_pool           = 1;
+  g_tw_msg_pool           = 2;
+  g_tw_direct_execute     = 1;
   g_tw_agg_gvt_flush      = 2;
   g_tw_agg_policy         = 0;
   g_tw_agg_horizon        = 0;
@@ -271,10 +273,7 @@ void clear_globals() {
   g_lp_factory  = NULL;
 }
 
-Globals* get_globals() {
-  /** Store the pointer in a static variable for faster lookup */
-  return CpvAccess(g_scheduler)->globals;
-}
+thread_local Globals* tls_globals = NULL;
 
 #if not USE_CHARMC
 // TODO: Maybe these should be moved somewhere else?

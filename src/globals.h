@@ -115,7 +115,8 @@ extern unsigned g_tw_fossil_chares;   ///< --fossil-lazy: chares committed per p
 extern unsigned g_tw_pass_loop;       ///< --pass-loop: passes per execute() message while nothing else waits for the PE
 extern unsigned g_tw_rollback_unit;   ///< a straggler rolls back 0: its whole chare, 1: only its LP (default)
 extern unsigned g_tw_event_index;     ///< remote events indexed for cancellation by 0: AVL tree, 1: hash (default)
-extern unsigned g_tw_msg_pool;        ///< recycle RemoteEvent messages through a per-PE pool (default 1)
+extern unsigned g_tw_msg_pool;        ///< recycle RemoteEvent messages through a per-PE pool; 2 (default): with a spare list shared by the process's PEs
+extern unsigned g_tw_direct_execute;  ///< without load balancing, call each chare's execute_me directly (default 1)
 extern unsigned g_tw_agg_gvt_flush;   ///< on each GVT update: 0 none, 1 stale, 2 all
 extern unsigned g_tw_agg_policy;      ///< 0: eager flushes, 1: flush by timestamp deadline
 extern Time     g_tw_agg_horizon;     ///< deadline policy: events with ts < GVT + this are due
@@ -242,7 +243,14 @@ class Globals {
 };
 
 void clear_globals();   ///< sets all global variables to default values
-Globals* get_globals(); ///< returns a pointer to the local Globals object
+/**
+ * This PE's Globals, set by its scheduler when it is made. A thread-local
+ * pointer read inline: PE_VALUE is used several times per event, and the
+ * out-of-line call through the scheduler cost about 1% of the cycles of a
+ * VLSI run (RESULTS.md section 213).
+ */
+extern thread_local Globals* tls_globals;
+inline Globals* get_globals() { return tls_globals; }
 
 /** Macro to simplify global variable access */
 #define PE_VALUE(x) get_globals()->x

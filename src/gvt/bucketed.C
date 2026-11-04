@@ -286,12 +286,15 @@ int BucketGVT::buckets_passed() const {
  * always start.
  */
 void BucketGVT::attempt_gvt() {
+  // Runs on every send and receive: while a round is under way there is
+  // nothing to decide, so skip the divisions below (RESULTS.md section 213)
+  if (active) return;
   int num_passed = buckets_passed();
   int need = g_tw_gvt_min_buckets;
   Time window = PE_VALUE(window);
   if (window) need = std::min<int>(need, std::max<Time>(1, window / bucket_size));
   need = std::max(1, std::min(need, total_buckets - curr_bucket));
-  if (num_passed >= need && !active) {
+  if (num_passed >= need) {
     active = true;
     contribute(sizeof(int), &num_passed, CkReduction::min_int,
         CkCallback(CkReductionTarget(BucketGVT, all_ready), thisProxy));

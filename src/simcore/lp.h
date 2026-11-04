@@ -91,6 +91,12 @@ class LPChare : public CBase_LPChare {
      * timestamp from the back of this queue.
      */
     ProcessedQueue processed_events;
+    /**
+     * --rollback-unit=1: the LPs whose chain held a processed event since
+     * fossil collection last saw them empty. fossil_me walks these, not
+     * every LP of the chare (RESULTS.md section 213).
+     */
+    std::vector<LPBase*> fossil_lps;
 
     /**
      * A list of all LPs owned by this chare.
@@ -182,7 +188,7 @@ class LPChare : public CBase_LPChare {
      */
     Time straggler_time(const LPBase* lp) const;
     /** --rollback-unit=1: add e, just executed, to its LP's chain */
-    static void lp_chain_push(LPBase* lp, Event* e);
+    void lp_chain_push(LPBase* lp, Event* e);
     /** --rollback-unit=1: take e out of its LP's chain */
     static void lp_chain_unlink(LPBase* lp, Event* e);
     /** --rollback-unit=1: rebuild every LP's chain from the processed queue */
@@ -322,6 +328,8 @@ class LPBase {
      */
     Event* lp_head = NULL;
     Event* lp_tail = NULL;
+    /** --rollback-unit=1: this LP is in its chare's fossil_lps */
+    bool in_fossil_lps = false;
     /**
      * --commit-digest: a hash of this LP's committed events in commit order,
      * their count, and (--commit-digest-interval) the hash at each multiple
