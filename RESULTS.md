@@ -368,6 +368,7 @@ Sections 1–128 were re-read before planning sections 129 onward.
 | 209 | 2026-11-03 | idev 3678539 | Devastator's 1 × 46 hang: PSM2 binds a whole-node process to one core, so all 48 threads ran on core 0; `HFI_NO_CPUAFFINITY=1` fixes it (2 × 23 unchanged); Devastator 1 × 46 0.87 of its 2 × 23 (F9 wrong), so V5 compares each engine at its best layout; at 1 × 46 the engines are level (37.6 / 37.3); Devastator's two-process gain is socket locality (spread over both sockets 0.65×), Charades nearly insensitive (0.96×); the trace (28% inflated in its range after `--event-trace-max`; 2.1× before) shows no ahead-work delay (transit 14%, later 1–2%), chain events wait behind earlier events, per-event engine work and the window; profile: runtime 37% (network progress 13.9%, `execute()` re-enqueue about 5%); T1, T3, T4 wrong, T2 half | current |
 | 210 | 2026-11-03 | idev 3679189 (results in 211) | Closing the gap, round 2 (design): one-process runs skip network polling (Reconverse; `+backend_poll_single` restores it), `CmiPeHasPendingWork()`, Charades `--pass-loop=N` (passes run back to back in one `execute()` call while nothing is pending); predictions G1–G5 | design |
 | 211 | 2026-11-03 | idev 3679621 | Round 2 results: no network poll 1.00, `--pass-loop` 4 / 16 / 64 1.01; profiles of the simulation alone show the per-pass machinery (about 10%) runs while PEs wait, and moves into the loop; section 209's 13.9% network progress was the setup barrier (corrected); left: Charades' per-event work (allocation, drain, frees, fossils); `+ipc` with one process hangs at start-up in `CmiCheckAffinity` (Reconverse, not round 2); G1–G3 wrong, G4, G5 right | current |
+| 212 | 2026-11-03 | VS a, big (results in a later section) | VLSI at 1–32 nodes in three engines, each at its best launch (design): Charades 1 × 46 with lazy fossils / batch 32, the controller at buckets of 2,500 ps and W 2,500 / 5,000; Devastator 2 × 23 and 1 × 46 (`HFI_NO_CPUAFFINITY=1`) at W 2,500–10,000; ROSS batch 8 / 2 with its window; 3 reps at 1–16 nodes, 5 at 32; predictions S1–S7 | design |
 
 ## Stampede3 runs, in order
 
@@ -8972,6 +8973,72 @@ Correctness: Mac change tier on every model with `--pass-loop=16`; Reconverse's 
 - Both changes stay off. The Reconverse commit can stay on `pads-perf`: `CmiPeHasPendingWork` is harmless, and so is skipping the poll in one-process runs.
 - Per-pass work is not the 1-node gap. The remaining candidate is per-event work: allocating and freeing events and messages, the fast-path push and drain, and fossil commits.
 - But at the same layout the engines are already level (section 209). Devastator's lead comes from its two-process layout being faster than its one-process layout, which Charades cannot copy by cutting per-event work alone.
+
+### VLSI at 1–32 nodes in three engines, each at its best launch (job VS design, 2026-11-03; written before any runs)
+
+> **Status: design.** User decision 2026-11-03: queue the scaling job now, and work on round 3 (per-event work) on the Mac while it waits. Script `$WORK/charades-runs/vscale212.slurm` (copy in `~/charades-data/vlsi/`); its pre-run checks pass on the login node. Trees:
+> - Charades `charades-perf` at 5b14290 on `charm-pads-perf`. That is Reconverse `pads-perf` (the pool rewrite and round 2's commits), which is not yet on a published branch.
+> - Devastator's VLSI binaries are built from `charades-vlsi`'s model header, as in V1 and vbuild200. The 1 × 46 binaries for 2, 8, 16 and 32 nodes are built inside the jobs, on a node the runs do not use at that time.
+> - ROSS as in V1.
+>
+> Gate: the change tier on 2 nodes, VLSI, with `--fossil-lazy=1`.
+
+**Why now.** Section 209 left two things before the VLSI scaling job: Devastator at one process per node, now fixed with `HFI_NO_CPUAFFINITY=1`, and the 1-node gap. Round 2 (section 211) did not move the gap. At 4 nodes the engines are already level (1.00, section 208). Round 3 continues on the Mac in parallel. If it pays, only Charades' cells are rerun.
+
+**Workload.** b19 × N, one copy per node, span 1, `--chunk=512`, 5,000 clock cycles (end 12,500,000 ps). From 3 nodes on, node 2 holds the copy that does 1.75× the work of the others and sets every engine's pace (section 201; reported as it is, user decision 2026-11-03). `--copy-stats=1` on every Charades run.
+
+**Arms (each engine at its best launch):**
+
+| engine | layout per node | arms |
+|---|---|---|
+| Charades | 1 process × 46 PEs, direct sends, `--fossil-lazy=1 --batch=32`, buckets of 2,500 ps, `--localalloc` launch | the frozen controller (`--ctl=3` bracketed); W 2,500; W 5,000 |
+| Devastator | 2 processes × 23 workers, each on one socket | W 2,500 / 5,000 / 10,000 |
+| | 1 × 46, `HFI_NO_CPUAFFINITY=1` | W 2,500 / 5,000 / 10,000 |
+| ROSS | 46 ranks, optimistic, `--read-buffer=1`, GVT interval 64 | batch 8 with `--max-opt-lookahead` 2,500 and 5,000; batch 2 with 5,000 (V1's best at 1 and 4 nodes) |
+
+**Jobs:**
+- **a** (skx-dev, 16 nodes): the 8-, 4-, 2- and 1-node series side by side, then 16 nodes alone. 3 reps. The engines are interleaved per rep, and engine and arm order are reversed in even reps.
+- **big** (skx, 32 nodes): 32 nodes, 5 reps (32-node reps vary more; section 188).
+- Each stream starts with one short Charades run (500 cycles) to warm the file system. An arm of Devastator or ROSS that hits its cap in rep 1 is skipped after that. Caps: Charades and Devastator 300 s, ROSS 240 s.
+- Estimate: about 60 minutes for a and 50 for big.
+
+**What is known** (M committed ev/s, higher is better):
+
+| | 1 node | 4 nodes |
+|---|---|---|
+| Charades 1 × 46 | 37.3 (W 5,000) | 81.9 (W 2,500) |
+| Devastator 2 × 23 | 43.8 (W 10,000) | 81.9 (W 2,500) |
+| Devastator 1 × 46 | 37.6–38.5 | not run |
+| ROSS | 3.3 | 7.8 |
+
+The per-node rate at 4 nodes ÷ at 1 is 0.55 for Charades and 0.47 for Devastator.
+
+**Predictions:**
+- **S1. Counts.** At each node count, every run of every engine commits the same events. Charades has one digest per node count, and Devastator reports itself deterministic.
+- **S2. Charades' best ÷ Devastator's best** (each over its layouts and W; higher is better):
+  - 0.82–0.88 at 1 node;
+  - 0.83–0.98 at 2;
+  - 0.95–1.05 at 4;
+  - 0.95–1.10 at 8, 16 and 32.
+
+  From 3 nodes on, node 2 paces both engines (V5: both 1.40 ms per cycle at 4 nodes). Neither engine sends much between nodes on this layout: only the ring's links between copies cross nodes.
+- **S3. Devastator's best layout is 2 × 23 at every node count.** Its 1 × 46 is 0.82–0.95 of it: the socket-locality gain (section 209) applies on every node, including the pacing one. 1 × 46 runs at every node count.
+- **S4. Charades' best fixed W** is 5,000 at 1 and 2 nodes and 2,500 from 4 nodes on.
+  - The controller runs at W 2,500 in every round and is within ±3% of W 2,500 in every cell.
+  - That makes it 0.97 or more of the best fixed W from 4 nodes on, and 0.86–0.92 at 1 and 2 nodes.
+- **S5. Rep spread.**
+  - At W 2,500, reps stay within ±5% in both engines at every node count.
+  - At W 5,000, at least one cell at 4–32 nodes varies by more than 20% between reps, in some engine.
+- **S6. Scaling** (per-node rate at 32 nodes ÷ at 1, each engine at its best; 1.0 is perfect):
+  - Charades 0.40–0.52; Devastator 0.35–0.47; Charades' is the higher.
+  - From 4 to 32 nodes the pacing copy stays the same, so the further loss is GVT and the ring's messages: 0.80–0.95 per node in both engines.
+- **S7. ROSS.** Charades ÷ ROSS is 5–9 at every node count (V1: 6.9–7.9). ROSS's best is batch 8 with 2,500 from 4 nodes on.
+
+**What follows:**
+- **The paper.** VLSI goes into the applications table with these cells. Charades is reported with its controller, and the bucket width (2,500 ps) and lazy fossils as VLSI's settings. Devastator is reported with its better layout per node count. The paper states the per-copy activity.
+- **If round 3 gains at least 3% on the 1-node VLSI rate:** Charades' arms are rerun on the new tree at all node counts in a Charades-only job.
+- **If S6 fails for Charades** (it loses more per node than Devastator from 4 to 32 nodes): `--gvt-trace=1` cycle times at 4 and 32 nodes, to separate GVT pace from the pacing node.
+- **Before the paper's runs are final:** the Reconverse `pads-perf` commits are published.
 
 ## Baseline verification on the Mac
 
