@@ -79,6 +79,8 @@ Status:
 Each item is a job or a code change. Nothing outside this list gets Stampede3
 time without a reason written here first.
 
+**Runtime for the paper's runs since V5 (job 3678365):** `charm-pads-perf` on Stampede3 is Charm++ 9d6a55780 with Reconverse at 75719d5. Its source tree is identical to `origin/pads-perf` (bab3df1), published 2026-11-04 without a PR. The shared-memory pool rewrite from that branch is upstream PR charmplusplus/reconverse#319 (RESULTS.md 218–219). Upstream Reconverse with current Charm++ runs Charades at about half this stack's rate; the cause is not measured (RESULTS.md 219).
+
 1. **Controller: DONE, frozen 2026-11-01 (RESULTS.md 185).**
    - **The rule:** the measured rule, bracketed (`--ctl=3`, `--ctl-bracket=1`, main b67e32d). The delay histogram gives the starting scale and range. W moves toward lower PE time per committed event, and a trial is kept only if it beats the base measured before and after it.
    - **Jobs M and N, 7 workloads at 4 and 16 nodes:**
