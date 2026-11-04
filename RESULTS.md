@@ -369,6 +369,7 @@ Sections 1–128 were re-read before planning sections 129 onward.
 | 210 | 2026-11-03 | idev 3679189 (results in 211) | Closing the gap, round 2 (design): one-process runs skip network polling (Reconverse; `+backend_poll_single` restores it), `CmiPeHasPendingWork()`, Charades `--pass-loop=N` (passes run back to back in one `execute()` call while nothing is pending); predictions G1–G5 | design |
 | 211 | 2026-11-03 | idev 3679621 | Round 2 results: no network poll 1.00, `--pass-loop` 4 / 16 / 64 1.01; profiles of the simulation alone show the per-pass machinery (about 10%) runs while PEs wait, and moves into the loop; section 209's 13.9% network progress was the setup barrier (corrected); left: Charades' per-event work (allocation, drain, frees, fossils); `+ipc` with one process hangs at start-up in `CmiCheckAffinity` (Reconverse, not round 2); G1–G3 wrong, G4, G5 right | current |
 | 212 | 2026-11-03 | VS a, big (results in a later section) | VLSI at 1–32 nodes in three engines, each at its best launch (design): Charades 1 × 46 with lazy fossils / batch 32, the controller at buckets of 2,500 ps and W 2,500 / 5,000; Devastator 2 × 23 and 1 × 46 (`HFI_NO_CPUAFFINITY=1`) at W 2,500–10,000; ROSS batch 8 / 2 with its window; 3 reps at 1–16 nodes, 5 at 32; predictions S1–S7 | design |
+| 213 | 2026-11-03 | (idev, later) | Closing the gap, round 3 (design): the engine's per-event work; a direct `execute_me` call without the Charm++ proxy when load balancing is off, message pools rebalanced through a process-wide spare list (Mac: 4–11% of messages miss the pool at 4–46 PEs, glibc and mutex about 7% of cycles), fossil collection over the LPs that hold processed events, inline per-PE accessors and a shift-based mapper; predictions R1–R6 | design |
 
 ## Stampede3 runs, in order
 
@@ -9039,6 +9040,65 @@ The per-node rate at 4 nodes ÷ at 1 is 0.55 for Charades and 0.47 for Devastato
 - **If round 3 gains at least 3% on the 1-node VLSI rate:** Charades' arms are rerun on the new tree at all node counts in a Charades-only job.
 - **If S6 fails for Charades** (it loses more per node than Devastator from 4 to 32 nodes): `--gvt-trace=1` cycle times at 4 and 32 nodes, to separate GVT pace from the pacing node.
 - **Before the paper's runs are final:** the Reconverse `pads-perf` commits are published.
+
+### Closing the gap, round 3: the engine's work per event (design, 2026-11-03; written before any Stampede3 runs)
+
+> **Status: design.** User decision 2026-11-03: work on round 3 on the Mac while the scaling job (section 212) waits. It is measured on Stampede3 when a 1-node allocation is free.
+
+**Where the per-event work goes.** Section 211's profile of the simulation alone (1 × 46, lazy fossils, batch 32, W 5,000) has PEs blocked at the window 61% of the time. The engine's per-event functions take most of the rest. Four costs in it are not the model's work.
+
+1. **Calling each event's chare through a Charm++ proxy.**
+   - `Scheduler::schedule_next_lp` runs `lps(i).execute_me()`, a `[local]` entry method. Every event builds a proxy and finds the chare in the location manager's hash table (`ckLocal`, `std::_Hashtable::find`). It then pushes and pops Charm++'s call stack, which starts and stops the load balancer's timer for the chare (`CkCallstackPush/Pop`, `CkLocRec::startTiming/stopTiming`).
+   - That is about 5% of the process's cycles: 1.17 + 1.07 + 0.84 + 0.69 + 0.61 + 0.61%.
+   - The scheduler's token already holds the chare's pointer.
+2. **Message allocation when a PE's message pool is empty.**
+   - Every event's message comes from the sending PE's pool (`--msg-pool`, section 24). It goes back into the pool of the PE that commits the event, the receiver.
+   - A PE that sends more than it receives runs dry and allocates. One that receives more fills to the cap (65,536) and frees.
+   - In a one-process run Reconverse has no memory pool, so both go to glibc. The message was allocated on another thread, so the free takes that thread's arena lock.
+   - glibc `_int_free`, `_int_malloc`, `malloc` and `free` plus mutex lock and unlock are about 7% of cycles; `CmiFree` adds 1.2%.
+   - Mac counts (b19 × 1, 500 cycles, new counters `Message Pool Misses` / `Frees`): 4% of messages miss at 4 PEs, 7% at 16, 11% at 46 (oversubscribed). At 1 PE, 56% miss because more messages are in flight than the cap.
+3. **Fossil collection visits every LP of a chare.** With per-LP rollback (the default), `fossil_me` walks all 128 LPs of the chare at each GVT update to find the events below GVT. b19 has about 4,900 LPs per PE, against about 550 events per PE per clock cycle. `fossil_me` is 3.2% of cycles.
+4. **Per-PE values and the mapper are out-of-line calls.**
+   - `PE_VALUE` and `PE_STATS` call `get_globals()` and `get_statistics()`, out-of-line functions used several times per event (1.19% + 0.80%).
+   - The block mapper divides by the run's LPs per chare, a runtime value, up to four times per event (1.01% + 0.53%).
+
+**Changes (Charades only; every one keeps the same committed events):**
+- **a. Direct call.** With load balancing off (`--ldb-interval` and `--ldb-first` 0, as in every paper run), the scheduler calls the chare's `execute_me()` through the token's pointer. The proxy, the location lookup and the call-stack push are skipped. With load balancing on, the proxy path stays.
+- **b. Pool rebalancing.**
+  - A PE whose pool holds more than 4,096 messages moves 2,048 of them to a process-wide spare list, held by a mutex, one lock per 2,048 messages. A PE whose pool is empty takes up to 2,048 from it before allocating.
+  - Messages are then freed only when the spare list holds more than the process's PEs × 65,536.
+  - Messages in this process's shared-memory segment are still never pooled (section 201).
+- **c. Fossil collection over the LPs that hold processed events.** Each chare keeps a list of its LPs whose chain of processed events is not empty. `fossil_me` walks that list and drops the LPs it empties.
+- **d. Inline per-PE accessors and a shift-based mapper.**
+  - `get_globals()` and `get_statistics()` become inline reads of a thread-local pointer, which the scheduler sets on each PE.
+  - When the LPs per chare are a power of two (128 for VLSI, 16 in the paper's other runs), the block mapper shifts and masks instead of dividing.
+
+**Mac checks:** the change tier on every model at 1 × 4 and 2 × 2; the engine tier before Stampede3; counts and digests unchanged.
+
+**Measurement** (1 node, b19 × 1, 1 × 46, `--fossil-lazy=1 --batch=32`, W 5,000, buckets of 2,500; 2 reps alternating; `--gvt-trace=1` cycle times):
+- the current tree;
+- each change alone;
+- all four together;
+- the profile of the simulation alone (`perfwrap_d.sh`) with all four;
+- all four at 2 × 23 over `+ipc`;
+- Simple PHOLD σ 100 and uniform at 2 × 23 (the paper's launch) against the current tree.
+
+**Predictions:**
+- **R1.** Pool misses fall to under 0.1% of messages after the first 100 cycles.
+- **R2. Each change alone at 1 × 46:**
+  - a: +1–4%;
+  - b: +2–6%;
+  - c: +0–2% (lazy fossils already run while PEs wait);
+  - d: +0–3%.
+- **R3. All four:** +5–12% at 1 × 46, 39–42 M ev/s (0.89–0.96 of Devastator's 43.8).
+- **R4. In the profile:** glibc allocation and mutex fall from about 7% to under 1%, and `ckLocal`, the location hash table, the call-stack push and the load balancer's timers leave it.
+- **R5. Elsewhere:** 2 × 23 over `+ipc` gains as much as 1 × 46, ±3%; PHOLD gains 0–5%.
+- **R6.** The same committed count and digest in every run.
+
+**What follows:**
+- What pays and passes the engine tier becomes the default. A change with no gain stays only if it is simpler than what it replaces.
+- If R3 holds, the VLSI scaling job's Charades cells are rerun (section 212's rule: a gain of 3% or more).
+- If R3 fails, the 1-node gap is reported as it stands: at the same layout the engines are level (section 209).
 
 ## Baseline verification on the Mac
 
