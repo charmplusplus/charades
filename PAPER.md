@@ -124,8 +124,9 @@ time without a reason written here first.
 4. **Ablation and robustness on the current stack (F2, F3, F4).** 4 and 16 nodes, skx-dev; about 2 jobs.
    - Workloads: lookahead 10 and 100 × σ 100, σ 2,000 and uniform; phase-changing PHOLD; traffic; dragonfly.
    - Arms: direct, eager and deadline aggregation; the PADS'19 hold over a cutoff sweep; a fixed W grid; the controller; Devastator's rule in Charades.
-   - Plus `--agg-scope=1` (htram for other processes only) on traffic and PHOLD. On traffic, aggregation gains 1.36–1.38× while htram sends only 0.72% of events to other processes (RESULTS.md 187). The gain is most likely the same-process path, and the paper cannot call it network aggregation until this arm separates the two.
+   - ~~`--agg-scope=1` on traffic and PHOLD~~ **dropped 2026-11-04** (RESULTS.md 187, correction, and 222). The local fast path, on by default, keeps events for the same process out of htram with direct sends and htram alike. So htram only carries events to other processes, and traffic's 1.36–1.40× is aggregation of those events (8.2 M messages become 0.69 M), not a same-process effect.
    - Devastator's own adaptive window, run on the PHOLD workloads.
+   - **Status 2026-11-04:** user decision: F2 and F3 on PHOLD and traffic, plus ROSS's window (`--max-opt-lookahead`) on traffic and dragonfly; job ABL (RESULTS.md 222). F4 (Devastator's rule in Charades, Devastator's own window, phase-changing PHOLD, dragonfly) is still to schedule.
 5. **Engine freeze, 2026-12-07.**
    - **Defaults already set:** per-LP rollback, `--agg-pp-alloc=1`, ring input buffers, `numactl --localalloc` launch (Charades only), 23 LCI devices, `+mempool_remote_free`.
    - **Frozen 2026-11-01:** the controller (`--ctl=3`, bracketed; item 1). The pending heap fix (item 1a) is in.

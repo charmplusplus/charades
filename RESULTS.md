@@ -378,6 +378,7 @@ Sections 1–128 were re-read before planning sections 129 onward.
 | 219 | 2026-11-04 | 3681031 | SHMPR results: the branch's pool ÷ main's, 2 × 23 over `+ipc`: VLSI 2.09 (1 node), 2.34 (2 nodes), PHOLD uniform 1.17, σ 100 1.03, same counts and digests; Charades change tier with `+ipc` 80/80 on both; no one-process `+ipc` hang upstream (main declines `+ipc` alone); Reconverse ctest on Stampede3 114 of 116 so far (two launcher-less one-process tests time out); this upstream stack runs Charades at about half `charm-pads-perf`'s rate (cause not measured); SP3, SP5, SP6 right, SP1 half, SP2, SP4 wrong | current |
 | 220 | 2026-11-04 | SHMPR2 (results in a later section) | Reconverse PR #319 after review (design): the branch at 4b1740a (full-segment counter and notice, bytes used, default segment 512 KiB per sender, limits 512/1,024, design document) against 4159d3e; VLSI 2 × 23 at the default and at 8 MiB, PHOLD uniform and σ 100, VLSI 4 × 11; Reconverse's IPC tests on Stampede3; predictions SR1–SR5 | design |
 | 221 | 2026-11-04 | 3682096 | SHMPR2 results: no send found a segment full in any run (VLSI 2 × 23 and 4 × 11 at 8 MiB and at the new default; PHOLD uniform and σ 100); VLSI's busiest segment peaks at 4.0–4.2 MiB, the same at 23 and 33 senders; reviewed branch ÷ branch before review 0.985 / 1.006 / 0.987 (within rep spread), same counts and digests; Reconverse IPC tests on Stampede3 20/20 after a rebuild (the job's own build hit the non-login-shell `module` mistake again); SR1, SR2 right, SR4 half, SR3, SR5 wrong | current |
+| 222 | 2026-11-04 | ABL (results in a later section) | F2 and F3 on PHOLD and traffic, and ROSS's window (design): direct, eager and deadline aggregation at two fixed W and the controller; the PADS'19 hold over three cutoffs; ROSS `--max-opt-lookahead` on traffic and dragonfly at 1 and 4 nodes; 4 and 16 nodes; `--agg-scope=1` dropped (the fast path already keeps same-process events out of htram; section 187 corrected); predictions AB1–AB6 | design |
 
 ## Stampede3 runs, in order
 
@@ -7785,6 +7786,7 @@ The sequential scheduler commits 30,302,829 events. That is the count of every r
   - 17.7% of committed events go to another PE, almost all in the same process. With aggregation on, `--agg-scope=0` (the default) sends these through htram too, which delivers them to the destination's input buffer instead of as one Charm++ message each.
   - With direct sends, PEs spend 43–46% of their time blocked at the window's edge, against 24–34% with htram.
   - So the gain most likely comes from the same-process path. Not tested here: `--agg-scope=1` (other processes only) would separate the two. It joins the aggregation ablation (item 4, F2), and the paper must not describe this gain as network aggregation until then.
+  - **Correction (2026-11-04, section 222): the explanation above is wrong.** The local fast path (`--local-fast-path=1`, the default) hands every event for another PE of the same process over by pointer, with direct sends and with htram alike. In this job's 4-node runs at W 500, it carried 192.0 M of 200.2 M remote sends in both arms. htram carried only the 8.2 M events to other processes, in 0.69 M messages (11.9 per message), where direct sends used 8.2 M messages. So `--agg-scope=1` changes nothing on this stack, and the 1.40× (258.6 against 184.7 M ev/s at W 500) comes from aggregating the events to other processes. It is not fewer rollbacks: htram rolled back more (38,222 events against 6,514).
 - **Dragonfly gains 1.06–1.08× from aggregation**, as in job D.
 - **Devastator's best W:**
   - On dragonfly it equals Charades' best (10,000 ps at 1 node, 20,000 at 4). Devastator runs it at 83% efficiency at 4 nodes, against Charades' 92%.
@@ -9482,6 +9484,52 @@ Which of these costs the half is not measured. It does not touch the paper's num
 - **SR5 wrong:** none at 4 × 11 either, and peak use is the same as at 2 × 23.
 
 **What follows:** this answers the review's question for Charades: it never ran out, with room to spare. The per-sender default size is a safeguard that these runs do not need. The reply to the review and the new PR description quote these numbers.
+
+### F2 and F3 on PHOLD and traffic, and ROSS's window on traffic and dragonfly (job ABL design, 2026-11-04; written before any runs)
+
+> **Status: design.** PAPER.md item 4. User decision 2026-11-04: run F2 (aggregation ablation) and F3 (the PADS'19 hold and eager aggregation as baselines) on PHOLD and traffic only, and add ROSS's optimism window (`--max-opt-lookahead`) on traffic and dragonfly. F4 is not part of this job.
+> - **Code:** round 3's engine (charades b0b4ed4 code; tree `charades-abl` at the commit of this section, which adds only statistics and an `AGG_POLICY` knob to `ctl_sweep.sh`), on `charm-pads-perf`, the paper's runtime.
+> - **Mac checks on this code:** the hold (`bucket_hold`, `bucket_hold_early`) on PHOLD and traffic, 24/24 and then 128/128 with 8 repeats at 2 × 2 and 2 × 4; eager aggregation (`agg_bucket_pp`, `agg_bucket_wps`) 72/72 with 3 repeats.
+>
+> **The `--agg-scope=1` arm is dropped** (correction in section 187). The local fast path is on by default. It hands every event for another PE of the same process over by pointer, with direct sends and with htram alike. So htram only ever carries events to other processes, and `--agg-scope=1` changes nothing. F2's direct-against-htram comparison is therefore already a comparison of how events to other processes travel.
+>
+> **Script:** `$WORK/charades-runs/abl222.slurm` (copy in `~/charades-data/abl/`), skx-dev, 16 nodes. Launch as in F1 and F5 (2 × 23, pemap, 23 LCI devices, `+mempool_remote_free`, `numactl --localalloc`, `--blocked-time=1 --ctl-log=1 --commit-digest=1`). 2 reps, with arm order reversed in rep 2.
+> 1. **Gate**, 2 nodes: Charades' change tier on Simple PHOLD and traffic with `bucket_hold`, `agg_bucket_pp`, `agg_ctl_measured_fast_bucket_pp` and `bucket_window`.
+> 2. **4 nodes**, groups side by side:
+>    - nodes 0–3: σ 100, then traffic;
+>    - nodes 4–7: σ 2,000, then uniform;
+>    - nodes 8–11: ROSS's window arms and Charades' controller at 4 nodes;
+>    - node 12: the same at 1 node.
+> 3. **16 nodes:** the four workloads.
+>
+> **Workloads** (paper sizes):
+> - PHOLD, lookahead 100, mean 1,000, END 2,048,000, 128 LPs per PE, 16 per chare, buckets of 8: σ 100 (htram PP 2,048), σ 2,000 (PP 512), uniform (WPs 512).
+> - Traffic: 64-wide grid, 16 cars per intersection, trip radius 3, END 12,000,000, 64 LPs per PE, buckets of 8, htram PP 2,048.
+>
+> **Arms per workload and rep** (fixed windows A and B: 250 and 400 on PHOLD, 500 and 1,000 on traffic):
+>
+> | figure | arm | transport | window |
+> |---|---|---|---|
+> | F2 | direct | direct sends | A, B, the controller |
+> | F2, F3 | eager | htram, eager flush (`--agg-policy=0`: idle PEs and GVT updates flush everything) | A, B, the controller |
+> | F2 | deadline | htram, deadline flush (`--agg-policy=1`, the default) | A, B, the controller |
+> | F3 | PADS'19 hold | direct sends, `--gvt-adaptive-buckets=1`, cutoff K buckets (`--gvt-reserve-buckets`) | none (W 0), as in PADS'19 |
+>
+> - The hold's cutoffs are K = 8, 32 and 128 buckets on PHOLD (64, 256 and 1,024 time units) and 16, 64 and 256 on traffic (128, 512 and 2,048), around each workload's best W. A held event is released when GVT reaches its bucket.
+> - The hold decision comes before the fast path, so it covers every event sent to another chare, as in PADS'19.
+> - The controller is the frozen rule (`--ctl=3`, bracketed).
+>
+> **ROSS's window** at 1 and 4 nodes, 2 reps: optimistic ROSS at its best F5 setting (traffic batch 64 / GVT interval 64; dragonfly batch 2 / GVT 64), without a window and with `--max-opt-lookahead` 250, 500, 1,000 and 2,000 (traffic) or 5,000, 10,000, 20,000 and 40,000 ps (dragonfly). Charades' controller runs alongside for the ratio: traffic (PP 2,048) and dragonfly (WPs 512, buckets of 1,000 ps) at 1 node, and dragonfly at 4 nodes; traffic at 4 nodes comes from the ablation's deadline arm. Paper sizes: traffic END 12,000,000; dragonfly arrival 500 ns, generating 300,000 ns, END 310,000,000 ps.
+>
+> **Measures:** M committed ev/s; for htram, events per message and messages per committed event; rolled-back events; blocked share; for the hold, held events.
+>
+> **Predictions:**
+> - **AB1:** within each workload and node count, every arm commits the same events with the same digest, the hold included.
+> - **AB2:** deadline htram ÷ direct sends, each at its better fixed W, at 4 nodes: σ 100 1.1–1.6 (the fast path took most of htram's old 2.3×); σ 2,000 2.0–3.5; uniform 2.5–4.5; traffic 1.3–1.5. At 16 nodes at least the 4-node value on σ 2,000 and uniform.
+> - **AB3:** eager ÷ deadline at the same W is 0.70–0.95 on σ 2,000 and uniform, with at least 1.5× fewer events per message. On σ 100 and traffic, where few events leave the process, 0.95–1.05.
+> - **AB4:** in each transport the controller is 0.90–1.05 of that transport's better fixed W.
+> - **AB5:** the hold's best K is at most 0.95 of direct sends at their better W on every workload, and below 0.5 of deadline htram on σ 2,000 and uniform. Its best K differs between PHOLD and traffic in time units, which is why PADS'19 tuned the cutoff per model. Some K at σ 2,000 or uniform may fail or hit the cap, since nothing bounds same-chare events.
+> - **AB6:** ROSS with its best window is 0.95–1.30× ROSS without a window, on both applications. Charades ÷ ROSS stays at least 1.5 on traffic and at least 3 on dragonfly.
 
 ## Baseline verification on the Mac
 

@@ -64,7 +64,8 @@
 #   BUCKETS="8" (bucketed GVT bucket sizes), MARGINS="8" (deadline policy:
 #     --agg-horizon-margin values, the horizon being W + margin),
 #   AGG="pp:512" (htram mode:buffer with the deadline policy, so the horizon
-#     follows the window; "off" sends directly), TREE=charades-exp (production
+#     follows the window; "off" sends directly), AGG_POLICY=1 (--agg-policy:
+#     1 deadline, 0 eager), TREE=charades-exp (production
 #     runtime with the psm2 LCI patch),
 #   XPORT=psm2 with LCI_ATTR_PACKET_SIZE=65536 (env.sh; XPORT=verbs for the old
 #     transport),
@@ -87,7 +88,7 @@ NODES=${NODES:-4} PPN=${PPN:-2} PEPP=${PEPP:-23} CPT=${CPT:-24} LPS_PER_PE=${LPS
 START=${START:-15} END=${END:-64000} CAP=${CAP:-180} TREE=${TREE:-charades-exp}
 WORKLOADS=${WORKLOADS:-"steady:10:200:0.5 steady:100:1000:0.5 phases:10:200:100:1000:0.5:8000"}
 ARMS=${ARMS:-"w:25 w:50 w:100 w:250 w:500 q:0.02 q:0.05 q:0.1 hill:250"}
-AGG=${AGG:-pp:512} BUCKETS=${BUCKETS:-8} MARGINS=${MARGINS:-8}
+AGG=${AGG:-pp:512} AGG_POLICY=${AGG_POLICY:-1} BUCKETS=${BUCKETS:-8} MARGINS=${MARGINS:-8}
 EXTRA_ARGS=${EXTRA_ARGS-"+lci_ndevices 23 +pemap 2-46:2,3-47:2 +mempool_remote_free"}
 NUMA_WRAP=${NUMA_WRAP-numactl --localalloc}
 C=$WORK/$TREE
@@ -137,7 +138,7 @@ run_one() {  # nodes procs pes cfg arm label
   extra+=(--gvt-bucket-size=$bucket)
   if [ "$AGG" != off ]; then
     extra+=(--aggregation=1 --agg-mode=$(mode_num ${AGG%%:*}) --agg-buffer=${AGG##*:}
-            --agg-policy=1 --agg-horizon-margin=$margin)
+            --agg-policy=$AGG_POLICY --agg-horizon-margin=$margin)
   fi
   extra+=(${EXTRA_ARGS:-})
   srun --mpi=pmi2 --kill-on-bad-exit=1 --wait=30 -N $N -n $n -c ${CPT:-$((pe / n))} ${SRUN_ARGS:-} -J cs_$label \
