@@ -9244,6 +9244,7 @@ The per-node rate at 4 nodes ÷ at 1 is 0.55 for Charades and 0.47 for Devastato
 > - **Script:** `$WORK/charades-runs/vscale216.slurm` (copy in `~/charades-data/vlsi/`).
 > - **Trees:** `charades-r3` at ae0dbd3 (round 3's code, b0b4ed4, plus `ctl_sweep.sh` keeping each run's `gvt_trace.csv`; the binaries built for job 3679892 are unchanged); `charades-perf` (5b14290) for job a's tree; Devastator and ROSS as in job VS.
 > - **Job big (3679725, still pending) is cancelled.** big2 replaces it and runs everything big would have plus the new tree, so the 32-node cells come from one allocation.
+> - **Submitted 2026-11-03:** a2 as 3679974 (skx-dev) and 3679975 (skx), the later starter to be cancelled; big2 as 3679976 (skx). Pre-run checks pass on the login node.
 
 **Arms:**
 - **Charades with round 3** (1 × 46, `--fossil-lazy=1 --batch=32`, buckets of 2,500 ps): the controller, W 2,500, W 5,000; 3 reps (5 at 32 nodes).
