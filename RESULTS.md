@@ -372,6 +372,7 @@ Sections 1–128 were re-read before planning sections 129 onward.
 | 213 | 2026-11-03 | (idev, later) | Closing the gap, round 3 (design): the engine's per-event work; a direct `execute_me` call without the Charm++ proxy when load balancing is off, message pools rebalanced through a process-wide spare list (Mac: 4–11% of messages miss the pool at 4–46 PEs, glibc and mutex about 7% of cycles), fossil collection over the LPs that hold processed events, inline per-PE accessors and a shift-based mapper; predictions R1–R6 | design |
 | 214 | 2026-11-03 | 3679723 | VS results at 1–16 nodes: Charades ÷ Devastator 0.839 / 0.908 / 0.989 / 0.965 / 0.893 (each at its best launch); one count per cell in three engines; from 4 nodes on Devastator's cycle stays 1.38–1.41 ms (node 2 paces it) while Charades' grows 1.39 → 1.57 ms (blocked share 79.5 → 83.8%); Devastator 1 × 46 0.80–0.86 of its 2 × 23; controller 0.97–0.99 of W 2,500; Charades ÷ ROSS 10–14; S1 right, S2 four of five, S3, S4 mostly, S5, S7 wrong, S6 waits on 32 nodes | current (1–16) |
 | 215 | 2026-11-03 | 3679892 | Round 3 results: 1 × 46 VLSI 37.61 → 61.76 M ev/s (1.64×; c+d 1.117, a 1.038, b 1.417), 1.35× Devastator's 1-node best; pool misses 12.4 M → 0.23 M, no frees; the profile showed only about 7% for glibc and mutex (sleeping on arena locks is invisible to `cycles:u`, inferred); `+ipc` 1.015 (shared blocks are never pooled); PHOLD 2 × 23 1.16–1.18; R1, R6 right, R4 half, R2 one of three, R3, R5 wrong | current |
+| 216 | 2026-11-03 | VS2 a2, big2 (results in a later section) | VLSI at 1–32 nodes with round 3 (design): Charades on `charades-r3` (the controller, W 2,500 / 5,000) and Devastator 2 × 23 in the same allocation; one `--gvt-trace=1` run per node count to split each cycle into the count wave and the time between waves; big2 replaces big (3679725) and adds the old tree, Devastator 1 × 46 and ROSS at 32 nodes; layout check, round 3 at 1 × 46 against 2 × 23 on σ 100, uniform, traffic and dragonfly at 1 and 4 nodes; predictions Q1–Q6 | design |
 
 ## Stampede3 runs, in order
 
@@ -9236,6 +9237,40 @@ The per-node rate at 4 nodes ÷ at 1 is 0.55 for Charades and 0.47 for Devastato
 - **Section 212's rule:** a gain of 3% or more reruns the Charades cells of the VLSI scaling job on the new tree (design in the next section).
 - **The paper's other tables** (PHOLD, traffic, dragonfly) used the paper's tree e1fbdc4. On the new tree PHOLD at 2 × 23 is 1.16–1.18× faster, so those tables would need rerunning to use it. That is the user's decision.
 - **Layout:** with glibc contention gone, one process per node may now beat two on the other workloads as well (section 78 found 0.71–0.87 before). It is checked in the rerun at 1 and 4 nodes.
+
+### VLSI at 1–32 nodes with round 3, a cycle-time trace per node count, and one process against two per node on the other workloads (job VS2 design, 2026-11-03; written before any runs)
+
+> **Status: design.** Section 212's rule: round 3 gained 1.64× at 1 node (section 215), more than 3%, so the Charades cells are rerun on the new tree.
+> - **Script:** `$WORK/charades-runs/vscale216.slurm` (copy in `~/charades-data/vlsi/`).
+> - **Trees:** `charades-r3` at ae0dbd3 (round 3's code, b0b4ed4, plus `ctl_sweep.sh` keeping each run's `gvt_trace.csv`; the binaries built for job 3679892 are unchanged); `charades-perf` (5b14290) for job a's tree; Devastator and ROSS as in job VS.
+> - **Job big (3679725, still pending) is cancelled.** big2 replaces it and runs everything big would have plus the new tree, so the 32-node cells come from one allocation.
+
+**Arms:**
+- **Charades with round 3** (1 × 46, `--fossil-lazy=1 --batch=32`, buckets of 2,500 ps): the controller, W 2,500, W 5,000; 3 reps (5 at 32 nodes).
+- **Once per node count**, W 2,500 with `--gvt-trace=1`. PE 0 then records each count wave's start and result. With W one bucket (one clock period), each cycle splits into the wave in flight and the time between a result and the next wave's start.
+- **Devastator 2 × 23** at W 2,500 / 5,000 / 10,000 in the same allocation. Its 1 × 46 and ROSS only in big2: job a measured them at 1–16 nodes, and neither layout nor engine was close.
+- **big2 only:** Charades on job a's tree (`charades-perf`), the same arms, for the 32-node cell of the old series.
+- **Layout check** (a2, the 1- and 4-node series after their VLSI reps):
+  - round 3 at 1 × 46 against 2 × 23 over LCI;
+  - σ 100 (PP 2,048, W 300), uniform (WPs 512, W 300), traffic (PP 2,048, W 500), dragonfly (WPs 512, W 10,000);
+  - V5's sizes, 2 reps.
+
+**Jobs:**
+- **a2** (skx-dev, 16 nodes): 1-, 2-, 4- and 8-node series side by side, then 16; about 25 minutes.
+- **big2** (skx, 32 nodes, 5 reps): builds Devastator's 32-node 1 × 46 binary first if it is missing; about 55 minutes.
+
+**Predictions:**
+- **Q1. Counts.** Each node count commits job a's count in every engine and tree. Round 3's digest equals the old tree's at each node count.
+- **Q2. Round 3 ÷ the old tree** (each at its best arm; job a for 1–16 nodes, big2 for 32): 1.55–1.75 at 1 and 2 nodes; 1.15–1.50 at 4–32 nodes. From 4 nodes on node 2's work paces each cycle, and the wait for each cycle's GVT advance does not shrink with per-event cost.
+- **Q3. Charades ÷ Devastator** (same allocation, each at its best): at least 1.25 at 1 and 2 nodes; at least 1.05 at 4–32 nodes.
+- **Q4. Scaling.** Charades' per-node rate from 4 to 16 nodes falls to 0.70–0.85 (job a: 0.80). The fixed GVT cost per cycle is now a larger share of a shorter cycle. Devastator stays at 0.85–0.95.
+- **Q5. The trace.** From 4 to 16 (and 32) nodes, at least 60% of the growth in Charades' cycle time is the count wave in flight (start to result), not the time between waves.
+- **Q6. Layout.** With glibc contention gone, round 3 at 1 × 46 is at least 0.95 of 2 × 23 on at least two of the four workloads at 1 node. Section 78's 0.71–0.87 was on the old tree, with the pool's misses going to glibc. At 4 nodes, where 1 × 46 sends all of a node's off-node events through one process's htram, it is 0.85–1.10.
+
+**What follows:**
+- The VLSI row of the paper's applications table uses round 3's cells, if Q1 holds.
+- If Q5 holds, the next step on VLSI scaling is the GVT advance: a wave per clock cycle is the design limit at W one period.
+- If Q6 finds 1 × 46 ahead on the other workloads, their launch changes. That would mean rerunning the paper's tables (with round 3's 1.16–1.18 on PHOLD as well), which the user decides.
 
 ## Baseline verification on the Mac
 
