@@ -375,6 +375,7 @@ Sections 1–128 were re-read before planning sections 129 onward.
 | 216 | 2026-11-03 | VS2 a2, big2 (results in a later section) | VLSI at 1–32 nodes with round 3 (design): Charades on `charades-r3` (the controller, W 2,500 / 5,000) and Devastator 2 × 23 in the same allocation; one `--gvt-trace=1` run per node count to split each cycle into the count wave and the time between waves; big2 replaces big (3679725) and adds the old tree, Devastator 1 × 46 and ROSS at 32 nodes; layout check, round 3 at 1 × 46 against 2 × 23 on σ 100, uniform, traffic and dragonfly at 1 and 4 nodes; predictions Q1–Q6 | design |
 | 217 | 2026-11-03 | 3679974 | VS2 results at 1–16 nodes: with round 3 Charades ÷ Devastator 1.365 / 1.266 / 1.234 / 1.290 / 1.189 (round 3 ÷ old 1.25–1.61); same counts and digests as job a; count waves 13–19% of each cycle, their growth 4 → 16 nodes about the cycle's growth (within trace noise); layout check: 1 × 46 ÷ 2 × 23 0.95–1.29 at 1 node, 0.59–0.86 at 4 (the other workloads keep 2 × 23); Q1, Q3 right, Q2 four of five, Q4 at its edge, Q5, Q6 half | current (1–16) |
 | 218 | 2026-11-04 | SHMPR (results in a later section) | The shared-memory pool rewrite as a Reconverse PR (design): branch `shmem-pool-queues` (main + the pool commits + review fixes + `ipc_order-multi`; Mac ctest 133/133); Stampede3: Charm++ recharm built on Reconverse main and on the branch, Reconverse ctest, the one-process `+ipc` hang on both, Charades change tier with `+ipc`, main's pool against the branch's on VLSI and PHOLD at 2 × 23 and VLSI on 2 nodes; predictions SP1–SP6 | design |
+| 219 | 2026-11-04 | 3681031 | SHMPR results: the branch's pool ÷ main's, 2 × 23 over `+ipc`: VLSI 2.09 (1 node), 2.34 (2 nodes), PHOLD uniform 1.17, σ 100 1.03, same counts and digests; Charades change tier with `+ipc` 80/80 on both; no one-process `+ipc` hang upstream (main declines `+ipc` alone); Reconverse ctest on Stampede3 114 of 116 so far (two launcher-less one-process tests time out); this upstream stack runs Charades at about half `charm-pads-perf`'s rate (cause not measured); SP3, SP5, SP6 right, SP1 half, SP2, SP4 wrong | current |
 
 ## Stampede3 runs, in order
 
@@ -9365,6 +9366,48 @@ The per-node rate at 4 nodes ÷ at 1 is 0.55 for Charades and 0.47 for Devastato
 - **SP4.** VLSI at 2 × 23 over `+ipc`, branch ÷ main 3–6. Section 202 measured main's design at 0.17–0.21 of one process per node on the old tree; section 205 measured the rewrite at 0.86.
 - **SP5.** PHOLD at 2 × 23 over `+ipc`, branch ÷ main 1.0–1.4. htram combines the events between the node's processes, so fewer messages cross the pool than on VLSI.
 - **SP6.** VLSI on 2 nodes, branch ÷ main at least 1.5.
+
+### SHMPR results: the branch's pool is 2.1× main's on VLSI at 2 × 23 over `+ipc` (2.3× on 2 nodes), 1.17× on uniform PHOLD, level on σ 100; Charades' change tier with `+ipc` passes on both; the one-process `+ipc` hang is gone upstream; this upstream stack runs Charades at about half `charm-pads-perf`'s rate (2026-11-04; skx-dev batch job 3681031, 2 nodes)
+
+> **Status: current; Reconverse's ctest on Stampede3 partly run (below).** Design and predictions in section 218.
+> - **Job:** 18 minutes (skx copy 3681032 cancelled). Both Charm++ trees built on the node in under 2 minutes; Charades against each in about a minute. `libreconverse.so` exports `CmiDeliverIpcInbox` only in the branch's build.
+> - **Data:** `~/charades-data/vlsi/shmpr/j3681031/`.
+> - **Counts:** every pair of runs commits the same events with the same digest in both builds.
+
+**Main's pool against the branch's** (2 × 23 per node over `+ipc`; M committed ev/s, median of the reps, higher is better):
+
+| workload | nodes | main (5471ba0) | branch | branch ÷ main |
+|---|---|---|---|---|
+| VLSI b19, `--fossil-lazy=1 --batch=32`, W 5,000 | 1 | 6.69 (6.69 / 6.57 / 6.73) | 13.97 (13.74 / 14.19 / 13.97) | **2.09** |
+| VLSI b19 × 2 | 2 | 12.49 (12.52 / 12.45) | 29.21 (29.31 / 29.11) | **2.34** |
+| PHOLD uniform, WPs 512, W 300 | 1 | 30.55 (31.09 / 30.01) | 35.62 (35.69 / 35.55) | 1.166 |
+| PHOLD σ 100, PP 2,048, W 300 | 1 | 38.55 (39.25 / 37.85) | 39.51 (39.59 / 39.42) | 1.025 |
+
+- **Against LCI:** the branch over LCI without `+ipc` runs VLSI at 10.69. Its `+ipc` is 1.31× that, as section 205 found on `pads-perf` (1.38×). Main's `+ipc` is 0.63× LCI.
+- **Charades' change tier with `+ipc`** (2 × 2 and 4 × 2; VLSI, Simple PHOLD, traffic, dragonfly; four configs) passes 80/80 on both builds. It took 1.5 minutes on the branch and 9 minutes on main.
+- **The one-process `+ipc` start-up hang** (section 211) does not occur on either. Reconverse main now declines `+ipc` in a one-process job (`+ipc ignored: this job has a single process`), so the hang was on `pads-perf`'s older base.
+- **Reconverse's ctest on Stampede3** (the branch, standalone, every test's processes on one node through `srun`):
+  - 114 of the first 116 tests pass;
+  - `ipc-onenode` and `pingpong_multipairs` time out at 180 s with no output. Both are one-process tests launched without `srun`, and `pingpong_multipairs` does not use the pool;
+  - stopped at test 117 so as not to share node 1 with the job's 2-node runs (the first of them overlapped the stop by a few seconds; its two reps agree within 0.5%).
+  - The rest and the two timeouts are rerun on an idev node, against main as well.
+
+**This upstream stack is slower for Charades.** On the same node and code (round 3), the branch's build runs VLSI at 2 × 23 over LCI at 10.69 M ev/s and with `+ipc` at 13.97. `charm-pads-perf` ran these at about 22.8 (section 208, older Charades) and 33.4 (section 215). PHOLD σ 100 at 2 × 23 is 39.5 here against 54.0 there, and the blocked share is 71–74% against 54% on VLSI.
+
+The two stacks differ in:
+- Charm++ (`recharm` 3d409d45d against 9d6a55780);
+- Reconverse (main lacks `pads-perf`'s TLS initial-exec model, `+lci_dest_device` and the old schedulers' poller rule);
+- LCI (stock 1287c59c against the patched tree with 64 KiB packets).
+
+Which of these costs the half is not measured. It does not touch the paper's numbers, which all come from `charm-pads-perf`, but it matters for running Charades on upstream Reconverse.
+
+**Predictions (section 218):**
+- **SP1 half:** both trees build; ctest as above.
+- **SP2 wrong:** no hang on either build.
+- **SP3 right.**
+- **SP4 wrong:** 2.09, not 3–6. Main's pool is less bad here than on the older stack, which section 202 measured at 0.17–0.21 of one process per node.
+- **SP5 right:** 1.03 and 1.17.
+- **SP6 right:** 2.34.
 
 ## Baseline verification on the Mac
 
