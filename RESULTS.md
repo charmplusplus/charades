@@ -370,6 +370,7 @@ Sections 1–128 were re-read before planning sections 129 onward.
 | 211 | 2026-11-03 | idev 3679621 | Round 2 results: no network poll 1.00, `--pass-loop` 4 / 16 / 64 1.01; profiles of the simulation alone show the per-pass machinery (about 10%) runs while PEs wait, and moves into the loop; section 209's 13.9% network progress was the setup barrier (corrected); left: Charades' per-event work (allocation, drain, frees, fossils); `+ipc` with one process hangs at start-up in `CmiCheckAffinity` (Reconverse, not round 2); G1–G3 wrong, G4, G5 right | current |
 | 212 | 2026-11-03 | VS a, big (results in a later section) | VLSI at 1–32 nodes in three engines, each at its best launch (design): Charades 1 × 46 with lazy fossils / batch 32, the controller at buckets of 2,500 ps and W 2,500 / 5,000; Devastator 2 × 23 and 1 × 46 (`HFI_NO_CPUAFFINITY=1`) at W 2,500–10,000; ROSS batch 8 / 2 with its window; 3 reps at 1–16 nodes, 5 at 32; predictions S1–S7 | design |
 | 213 | 2026-11-03 | (idev, later) | Closing the gap, round 3 (design): the engine's per-event work; a direct `execute_me` call without the Charm++ proxy when load balancing is off, message pools rebalanced through a process-wide spare list (Mac: 4–11% of messages miss the pool at 4–46 PEs, glibc and mutex about 7% of cycles), fossil collection over the LPs that hold processed events, inline per-PE accessors and a shift-based mapper; predictions R1–R6 | design |
+| 214 | 2026-11-03 | 3679723 | VS results at 1–16 nodes: Charades ÷ Devastator 0.839 / 0.908 / 0.989 / 0.965 / 0.893 (each at its best launch); one count per cell in three engines; from 4 nodes on Devastator's cycle stays 1.38–1.41 ms (node 2 paces it) while Charades' grows 1.39 → 1.57 ms (blocked share 79.5 → 83.8%); Devastator 1 × 46 0.80–0.86 of its 2 × 23; controller 0.97–0.99 of W 2,500; Charades ÷ ROSS 10–14; S1 right, S2 four of five, S3, S4 mostly, S5, S7 wrong, S6 waits on 32 nodes | current (1–16) |
 
 ## Stampede3 runs, in order
 
@@ -9049,7 +9050,7 @@ The per-node rate at 4 nodes ÷ at 1 is 0.55 for Charades and 0.47 for Devastato
 > - Change d gains two items: `BucketGVT::attempt_gvt`, run on every send and receive, returns at once while a GVT round is under way, before two 64-bit divisions and a virtual call; and the fast path keeps each chare's route (this PE, another PE's rank, another process) and this PE's rank, instead of asking the runtime (`CkMyPe`, `CkNodeOf`, `CkRankOf`, `CkMyRank`) on every send and drain.
 > - Switches for the measurement: `--msg-pool=2` is the spare list (the new default; `--msg-pool=1` is the old per-PE pool) and `--direct-execute=0` restores the proxy call.
 > - Changes c and d have no switch, so the measurement attributes the changes cumulatively: the current tree; c+d (`--direct-execute=0 --msg-pool=1`); + a (`--msg-pool=1`); + b (all). R2's per-change ranges apply to those steps.
-> - Script `$WORK/charades-runs/r3meas213.slurm` (copy in `~/charades-data/vlsi/`). It builds `charades-r3` on the node, gates it, and has 3 reps at 1 × 46. `charades-r3` is a worktree of `charades-perf` at b0b4ed4, with its `config.mk` pointed at itself. Submitted 2026-11-03 as 3679750 (skx; job a holds the skx-dev slot).
+> - Script `$WORK/charades-runs/r3meas213.slurm` (copy in `~/charades-data/vlsi/`). It builds `charades-r3` on the node, gates it, and has 3 reps at 1 × 46. `charades-r3` is a worktree of `charades-perf` at b0b4ed4, with its `config.mk` pointed at itself. Submitted 2026-11-03 as 3679750 (skx; job a held the skx-dev slot), then as 3679870 (skx-dev), which ran first and failed in 16 s: a fresh tree's `make -j46` compiled files before charmc had generated the `.decl.h` headers they include (3679750 had already been cancelled as the slower copy). The tree was then built on the login node (`-j4`), and the job's build step now retries serially. Resubmitted as 3679892 (skx-dev) and 3679893 (skx).
 > - **Mac checks so far** (development only; Mac timings do not compare with Stampede3's, and the Mac was in use):
 >   - **Pool misses** (b19 × 1, 500 cycles), before → after b: 1 PE 6.88 M → 0.20 M; 4 PEs 0.49 M → 0.18 M; 8 PEs 0.61 M → 0.17 M. No frees after b. What is left is the first allocation of the messages in flight.
 >   - **The same digest** as the current tree at 1, 4 and 8 PEs.
@@ -9117,6 +9118,60 @@ The per-node rate at 4 nodes ÷ at 1 is 0.55 for Charades and 0.47 for Devastato
 - What pays and passes the engine tier becomes the default. A change with no gain stays only if it is simpler than what it replaces.
 - If R3 holds, the VLSI scaling job's Charades cells are rerun (section 212's rule: a gain of 3% or more).
 - If R3 fails, the 1-node gap is reported as it stands: at the same layout the engines are level (section 209).
+
+### VS results at 1–16 nodes: Charades ÷ Devastator 0.84 / 0.91 / 0.99 / 0.97 / 0.89; one count per cell; from 4 nodes on Devastator's clock cycle stays at 1.38–1.41 ms while Charades' grows from 1.39 to 1.57 ms (2026-11-03; skx-dev batch job 3679723, 16 nodes)
+
+> **Status: current for 1–16 nodes; 32 nodes (job big, 3679725) pending.** Design and predictions in section 212.
+> - **Job:** gate 27/27; 41 minutes (skx copy 3679724 cancelled). Devastator's 1 × 46 binaries for 2, 8 and 16 nodes were built in the job, in 81 s. Every run finished.
+> - **Data:** `~/charades-data/vlsi/vscale212/a_j3679723/`; summary `~/charades-data/vlsi/vscale212_summary.py`.
+> - **Counts (S1 right at 1–16 nodes):** one committed count per node count over all three engines (125,998,590 / 252,049,665 / 574,541,914 / 1,078,843,202 / 2,087,384,844); one Charades digest per node count; Devastator deterministic in every run.
+
+**Each engine at its best** (M committed ev/s, median of 3 reps, higher is better; ms per clock cycle, lower is better):
+
+| nodes | Charades (1 × 46) | Devastator (2 × 23) | ROSS | Charades ÷ Devastator | Charades ÷ ROSS | ms per cycle, Charades / Devastator |
+|---|---|---|---|---|---|---|
+| 1 | 38.30 (W 5,000) | 45.65 (W 10,000) | 3.38 (batch 2, 5,000) | **0.839** | 11.3 | 0.658 / 0.552 |
+| 2 | 78.03 (W 5,000) | 85.91 (W 10,000) | 5.63 (batch 2, 5,000) | **0.908** | 13.9 | 0.646 / 0.587 |
+| 4 | 82.55 (W 2,500) | 83.43 (W 2,500) | 7.94 (batch 8, 2,500) | **0.989** | 10.4 | 1.392 / 1.377 |
+| 8 | 149.84 (W 2,500) | 155.28 (W 10,000) | 14.22 (batch 8, 2,500) | **0.965** | 10.5 | 1.440 / 1.390 |
+| 16 | 265.23 (W 2,500) | 297.09 (W 10,000) | 26.04 (batch 8, 2,500) | **0.893** | 10.2 | 1.574 / 1.405 |
+
+**Other quantities** (higher is better; per-node rate ÷ at 1 node, 1.0 is perfect):
+
+| nodes | Devastator 1 × 46 ÷ 2 × 23 (each at its best W) | Charades' controller ÷ W 2,500 | controller ÷ Charades' best fixed W | per-node rate ÷ at 1 node, Charades / Devastator / ROSS |
+|---|---|---|---|---|
+| 1 | 0.857 | 0.968 | 0.873 | 1 / 1 / 1 |
+| 2 | 0.849 | 0.988 | 0.764 | 1.019 / 0.941 / 0.833 |
+| 4 | 0.796 | 0.979 | 0.979 | 0.539 / 0.457 / 0.587 |
+| 8 | 0.814 | 0.984 | 0.984 | 0.489 / 0.425 / 0.526 |
+| 16 | 0.843 | 0.989 | 0.989 | 0.433 / 0.407 / 0.482 |
+
+- **At 1–2 nodes** Devastator leads by its two-process layout, as section 209 found (its one-process layout is 0.85 of it).
+- **At 4 nodes the engines are level.** Node 2 holds the copy that does 1.75× the work, and it paces both engines at about 1.38 ms per cycle.
+- **From 4 to 16 nodes** Devastator's cycle time stays at 1.38–1.41 ms, still paced by node 2. Charades' grows from 1.39 to 1.44 to 1.57 ms, and its blocked share rises from 79.5% to 81.5% to 83.8%. Charades keeps 0.80 of its per-node rate from 4 to 16 nodes, against Devastator's 0.89. Charades' window is one bucket, one clock period, so each cycle waits for a GVT advance, and the advance takes longer on more nodes. Devastator's asynchronous GVT does not hold its cycle this way. Neither cause is measured yet.
+- **Devastator's 1 × 46** is 0.80–0.86 of its 2 × 23 at every node count; 2 × 23 is its best layout throughout.
+- **Rep spread:**
+  - Charades W 2,500 at 4 nodes: one rep 0.89 of the others (73.75 against 82.6–83.2);
+  - Devastator 2 × 23 W 10,000 at 8 nodes: one rep at 0.34 (52.9 against 155);
+  - every other arm within 1.09.
+- **ROSS** with its window runs 3.4–26 M ev/s. Charades is 10–14× faster, about 1.5× V1's ratio because Charades has sped up since then (V1: 22 M ev/s at 1 node on 2 × 23).
+
+**Predictions (section 212), 1–16 nodes:**
+- **S1 right.**
+- **S2 four of five:** 0.839 (1 node), 0.908 (2), 0.989 (4), 0.965 (8) inside their ranges; 0.893 at 16 nodes, under 0.95–1.10.
+- **S3 mostly right:** 2 × 23 is Devastator's best layout at every node count; 1 × 46 is 0.80–0.86 of it, under 0.82 at 4 and 8 nodes.
+- **S4 mostly right:**
+  - best fixed W is 5,000 at 1–2 nodes and 2,500 from 4 on;
+  - the controller is 0.97–0.99 of W 2,500 everywhere and 0.98–0.99 of the best fixed W from 4 nodes on;
+  - but 0.76, not 0.86–0.92, at 2 nodes.
+- **S5 wrong:** W 2,500 strayed beyond ±5% once (Charades, 4 nodes). The run that strayed by more than 20% was Devastator at W 10,000, not W 5,000.
+- **S6 waits on 32 nodes.** At 16 nodes Charades' per-node rate ÷ at 1 node (0.433) is still above Devastator's (0.407), but from 4 nodes on Charades loses more per node.
+- **S7 wrong:** Charades ÷ ROSS is 10–14, not 5–9. ROSS's best is batch 8 / 2,500 from 4 nodes on, as predicted.
+
+**What follows:**
+- Job big (32 nodes) completes the table.
+- Section 212's S6 rule applies already: `--gvt-trace=1` cycle times at 4 and 16–32 nodes, to split Charades' growing cycle time into GVT advance and execution. One process per node with W at one clock period makes each cycle wait for a GVT round. That is a GVT-pace question, as on PHOLD at 32 nodes (sections 78–84), not a per-event one.
+- Round 3 (section 213) is measured separately; its 3% rule for rerunning the Charades cells stands.
 
 ## Baseline verification on the Mac
 
