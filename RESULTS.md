@@ -9049,7 +9049,7 @@ The per-node rate at 4 nodes ÷ at 1 is 0.55 for Charades and 0.47 for Devastato
 > - Change d gains two items: `BucketGVT::attempt_gvt`, run on every send and receive, returns at once while a GVT round is under way, before two 64-bit divisions and a virtual call; and the fast path keeps each chare's route (this PE, another PE's rank, another process) and this PE's rank, instead of asking the runtime (`CkMyPe`, `CkNodeOf`, `CkRankOf`, `CkMyRank`) on every send and drain.
 > - Switches for the measurement: `--msg-pool=2` is the spare list (the new default; `--msg-pool=1` is the old per-PE pool) and `--direct-execute=0` restores the proxy call.
 > - Changes c and d have no switch, so the measurement attributes the changes cumulatively: the current tree; c+d (`--direct-execute=0 --msg-pool=1`); + a (`--msg-pool=1`); + b (all). R2's per-change ranges apply to those steps.
-> - Script `$WORK/charades-runs/r3meas213.slurm` (copy in `~/charades-data/vlsi/`). It builds `charades-r3` on the node, gates it, and has 3 reps at 1 × 46.
+> - Script `$WORK/charades-runs/r3meas213.slurm` (copy in `~/charades-data/vlsi/`). It builds `charades-r3` on the node, gates it, and has 3 reps at 1 × 46. `charades-r3` is a worktree of `charades-perf` at b0b4ed4, with its `config.mk` pointed at itself. Submitted 2026-11-03 as 3679750 (skx; job a holds the skx-dev slot).
 > - **Mac checks so far** (development only; Mac timings do not compare with Stampede3's, and the Mac was in use):
 >   - **Pool misses** (b19 × 1, 500 cycles), before → after b: 1 PE 6.88 M → 0.20 M; 4 PEs 0.49 M → 0.18 M; 8 PEs 0.61 M → 0.17 M. No frees after b. What is left is the first allocation of the messages in flight.
 >   - **The same digest** as the current tree at 1, 4 and 8 PEs.
