@@ -26,7 +26,7 @@ Every number from every run: Stampede3 runs in order (each design, written befor
 | dragonfly | **0.94** / 1.04 / 1.29 / 1.51 / 1.80 / 2.03 | 3.80 / 3.69 / 3.94 / 4.01 / 3.94 / 4.26 | **0.56** / 0.26 / 0.50 | 689.6 / 339.2 / 161.9 |
 | traffic | 1.03 / 1.05 / 1.02 / 1.04 / 1.03 / 1.08 | 1.70 / 1.99 / 1.99 / 2.04 / 2.12 / 2.19 | **0.94** / 0.89 / 0.73 | 1,846.6 / 1,706.1 / 843.6 |
 
-(Bold: below 1 in the ratio columns; best of the three in the efficiency column.) The controller is 0.95–1.05 of Charades' best fixed W per rep at 32 nodes. VLSI (b19 × N) at 1 and 4 nodes (V5, section 208): Charades (one process per node, lazy fossils, batch 32; its best W) ÷ Devastator (2 × 23, its best W) 0.85 / 1.00 (V1, section 195: 0.51 / 0.75; ÷ ROSS 6.9 / 7.9 then). Devastator at one process per node hung on Stampede3 because PSM2 pinned all its threads to one core; with `HFI_NO_CPUAFFINITY=1` it runs at 0.87 of its 2 × 23 at 1 node (section 209), so 0.85 compares each engine at its best layout. The 1–32-node runs wait on the 1-node gap (section 209: Charades' work per event and per pass).
+(Bold: below 1 in the ratio columns; best of the three in the efficiency column.) The controller is 0.95–1.05 of Charades' best fixed W per rep at 32 nodes. VLSI (b19 × N) at 1 and 4 nodes (V5, section 208): Charades (one process per node, lazy fossils, batch 32; its best W) ÷ Devastator (2 × 23, its best W) 0.85 / 1.00 (V1, section 195: 0.51 / 0.75; ÷ ROSS 6.9 / 7.9 then). Devastator at one process per node hung on Stampede3 because PSM2 pinned all its threads to one core; with `HFI_NO_CPUAFFINITY=1` it runs at 0.87 of its 2 × 23 at 1 node (section 209), so 0.85 compares each engine at its best layout. **Round 3 (sections 213, 215, 217; charades b0b4ed4): Charades ÷ Devastator on VLSI is 1.37 / 1.27 / 1.23 / 1.29 / 1.19 at 1 / 2 / 4 / 8 / 16 nodes** (each at its best launch; 32 nodes pending in big2). Before round 3 it was 0.84 / 0.91 / 0.99 / 0.97 / 0.89 (section 214). Round 3 also runs PHOLD at 2 × 23 1.16–1.18× faster; the tables below predate it.
 
 **Paper-grade weak scaling, Charades against Devastator and ROSS, 1–32 nodes, all eight workloads** (jobs 3653803, 3654651 and 3657016, sections 142–143 and 153; long runs, 3 reps; Charades: its controller, the better htram setting at each node count, chare rollback (per-LP rollback came later, section 152); Devastator: its best of three W; ROSS: the better of optimistic batch 16 / GVT interval 64 and conservative; the same committed events in all three engines in every cell):
 
@@ -373,6 +373,7 @@ Sections 1–128 were re-read before planning sections 129 onward.
 | 214 | 2026-11-03 | 3679723 | VS results at 1–16 nodes: Charades ÷ Devastator 0.839 / 0.908 / 0.989 / 0.965 / 0.893 (each at its best launch); one count per cell in three engines; from 4 nodes on Devastator's cycle stays 1.38–1.41 ms (node 2 paces it) while Charades' grows 1.39 → 1.57 ms (blocked share 79.5 → 83.8%); Devastator 1 × 46 0.80–0.86 of its 2 × 23; controller 0.97–0.99 of W 2,500; Charades ÷ ROSS 10–14; S1 right, S2 four of five, S3, S4 mostly, S5, S7 wrong, S6 waits on 32 nodes | current (1–16) |
 | 215 | 2026-11-03 | 3679892 | Round 3 results: 1 × 46 VLSI 37.61 → 61.76 M ev/s (1.64×; c+d 1.117, a 1.038, b 1.417), 1.35× Devastator's 1-node best; pool misses 12.4 M → 0.23 M, no frees; the profile showed only about 7% for glibc and mutex (sleeping on arena locks is invisible to `cycles:u`, inferred); `+ipc` 1.015 (shared blocks are never pooled); PHOLD 2 × 23 1.16–1.18; R1, R6 right, R4 half, R2 one of three, R3, R5 wrong | current |
 | 216 | 2026-11-03 | VS2 a2, big2 (results in a later section) | VLSI at 1–32 nodes with round 3 (design): Charades on `charades-r3` (the controller, W 2,500 / 5,000) and Devastator 2 × 23 in the same allocation; one `--gvt-trace=1` run per node count to split each cycle into the count wave and the time between waves; big2 replaces big (3679725) and adds the old tree, Devastator 1 × 46 and ROSS at 32 nodes; layout check, round 3 at 1 × 46 against 2 × 23 on σ 100, uniform, traffic and dragonfly at 1 and 4 nodes; predictions Q1–Q6 | design |
+| 217 | 2026-11-03 | 3679974 | VS2 results at 1–16 nodes: with round 3 Charades ÷ Devastator 1.365 / 1.266 / 1.234 / 1.290 / 1.189 (round 3 ÷ old 1.25–1.61); same counts and digests as job a; count waves 13–19% of each cycle, their growth 4 → 16 nodes about the cycle's growth (within trace noise); layout check: 1 × 46 ÷ 2 × 23 0.95–1.29 at 1 node, 0.59–0.86 at 4 (the other workloads keep 2 × 23); Q1, Q3 right, Q2 four of five, Q4 at its edge, Q5, Q6 half | current (1–16) |
 
 ## Stampede3 runs, in order
 
@@ -9272,6 +9273,64 @@ The per-node rate at 4 nodes ÷ at 1 is 0.55 for Charades and 0.47 for Devastato
 - The VLSI row of the paper's applications table uses round 3's cells, if Q1 holds.
 - If Q5 holds, the next step on VLSI scaling is the GVT advance: a wave per clock cycle is the design limit at W one period.
 - If Q6 finds 1 × 46 ahead on the other workloads, their launch changes. That would mean rerunning the paper's tables (with round 3's 1.16–1.18 on PHOLD as well), which the user decides.
+
+### VS2 results at 1–16 nodes: with round 3 Charades ÷ Devastator is 1.37 / 1.27 / 1.23 / 1.29 / 1.19; the count waves take 13–19% of each clock cycle; one process per node is level with two at 1 node on the other workloads but 0.59–0.86 of it at 4 (2026-11-03; skx-dev batch job 3679974, 16 nodes)
+
+> **Status: current for 1–16 nodes; 32 nodes (big2, 3679976) pending.** Design and predictions in section 216.
+> - **Job:** gate 27/27; 18 minutes (skx copy 3679975 cancelled). Every run finished.
+> - **Data:** `~/charades-data/vlsi/vscale216/a2_j3679974/`; summary `~/charades-data/vlsi/vscale216_summary.py` (output `vscale216_a2_summary.txt`).
+> - **Counts (Q1 right):** at every node count, job a's count in both engines. Round 3's digest equals the old tree's (87c11aec…, 0002eae9…, 0c800d36…, 089e4484…, 377d0771…).
+
+**Each engine at its best** (M committed ev/s, median of 3 reps, higher is better; ms per clock cycle, lower is better; Devastator 2 × 23 from this allocation, the old tree from job a):
+
+| nodes | Charades, round 3 | Charades, old tree (job a) | Devastator | round 3 ÷ old | **Charades ÷ Devastator** | ms per cycle, round 3 / old / Devastator |
+|---|---|---|---|---|---|---|
+| 1 | 61.76 (W 5,000) | 38.30 | 45.26 (W 10,000) | 1.613 | **1.365** | 0.408 / 0.658 / 0.557 |
+| 2 | 108.18 (W 5,000) | 78.03 | 85.43 (W 10,000) | 1.386 | **1.266** | 0.466 / 0.646 / 0.590 |
+| 4 | 103.33 (W 2,500) | 82.55 | 83.75 (W 2,500) | 1.252 | **1.234** | 1.112 / 1.392 / 1.372 |
+| 8 | 192.31 (W 2,500) | 149.84 | 149.05 (W 10,000) | 1.283 | **1.290** | 1.122 / 1.440 / 1.448 |
+| 16 | 351.41 (the controller) | 265.23 | 295.49 (W 5,000) | 1.325 | **1.189** | 1.188 / 1.574 / 1.413 |
+
+- **The controller** (buckets of 2,500 ps) is 0.98–1.01 of W 2,500 at every node count. It is Charades' best arm at 16 nodes.
+- **Per-node rate from 4 to 16 nodes** (1.0 is perfect): round 3 0.850, old tree 0.803, Devastator 0.882. Charades still loses a little more per node than Devastator, but from a 1.23× lead.
+- **The cycle split** (`--gvt-trace=1`, W 2,500, cycles 1,000–4,000; about two count waves per cycle; the traced runs are within 5% of the untraced W 2,500 cycle times):
+
+| nodes | ms per cycle | count wave in flight | between waves |
+|---|---|---|---|
+| 1 | 0.466 | 0.059 (12.7%) | 0.407 |
+| 2 | 0.617 | 0.115 (18.6%) | 0.502 |
+| 4 | 1.172 | 0.149 (12.7%) | 1.023 |
+| 8 | 1.111 | 0.169 (15.2%) | 0.941 |
+| 16 | 1.173 | 0.215 (18.3%) | 0.958 |
+
+- From 4 to 16 nodes, the waves add 0.066 ms per cycle. The untraced W 2,500 cycle grows by 0.076 ms (1.112 → 1.188). So the growth is about the size of the waves' growth.
+- Most of each cycle, 0.94–1.02 ms from 4 nodes on, is execution between waves, set by node 2's busiest copy.
+
+**Layout, round 3 at 1 × 46 ÷ 2 × 23 over LCI** (M committed ev/s, median of 2; above 1 favours one process; one count per cell):
+
+| workload | 1 node: 1 × 46 / 2 × 23 | ratio | 4 nodes: 1 × 46 / 2 × 23 | ratio |
+|---|---|---|---|---|
+| σ 100, PP 2,048, W 300 | 51.48 / 54.26 | 0.949 | 179.18 / 211.95 | 0.845 |
+| uniform, WPs 512, W 300 | 44.85 / 46.63 | 0.962 | 96.25 / 137.35 | 0.701 |
+| traffic, PP 2,048, W 500 | 77.37 / 76.12 | 1.016 | 250.54 / 291.96 | 0.858 |
+| dragonfly, WPs 512, W 10,000 | 57.31 / 44.39 | 1.291 | 71.34 / 121.40 | 0.588 |
+
+- **At 1 node** one process per node is within 5% of two on PHOLD and traffic, and 1.29× on dragonfly. Before the glibc fix, section 78 found 0.71–0.87.
+- **At 4 nodes two processes per node win** by 1.17–1.70×. Off-node events go through htram, and one process per node puts a node's whole stream through one process's buffers. That is unlike VLSI, whose copies exchange few events across nodes.
+- **The paper's launch for these workloads stays 2 × 23.**
+
+**Predictions (section 216):**
+- **Q1 right.**
+- **Q2 four of five:** 1.61 at 1 node and 1.25–1.33 at 4–16 inside their ranges; 1.39 at 2 nodes, under 1.55–1.75.
+- **Q3 right:** 1.37 and 1.27 at 1 and 2 nodes (at least 1.25); 1.19–1.29 at 4–16 (at least 1.05).
+- **Q4 right at its edge:** round 3's per-node rate from 4 to 16 nodes is 0.850 (0.70–0.85); Devastator's 0.882 (0.85–0.95).
+- **Q5 half:** the waves' growth from 4 to 16 nodes (0.066 ms) is about 87% of the untraced cycle's growth (0.076 ms). But the traced cycles themselves did not grow (1.172 → 1.173), so the split is within the trace's noise.
+- **Q6 half:** right at 1 node (0.95–1.29, all four at least 0.95); wrong at 4 nodes (0.59–0.86, not 0.85–1.10).
+
+**What follows:**
+- big2 adds the 32-node cell (all three engines, both Charades trees).
+- **The VLSI row of the paper's table uses round 3** (Charades ÷ Devastator 1.19–1.37 at 1–16 nodes).
+- **The paper's other tables** were measured on the paper's tree. Round 3 is 1.16–1.18× on PHOLD at 2 × 23 (section 215), and the launch stays 2 × 23. Rerunning them on round 3 is the user's decision.
 
 ## Baseline verification on the Mac
 
