@@ -376,6 +376,7 @@ Sections 1–128 were re-read before planning sections 129 onward.
 | 217 | 2026-11-03 | 3679974 | VS2 results at 1–16 nodes: with round 3 Charades ÷ Devastator 1.365 / 1.266 / 1.234 / 1.290 / 1.189 (round 3 ÷ old 1.25–1.61); same counts and digests as job a; count waves 13–19% of each cycle, their growth 4 → 16 nodes about the cycle's growth (within trace noise); layout check: 1 × 46 ÷ 2 × 23 0.95–1.29 at 1 node, 0.59–0.86 at 4 (the other workloads keep 2 × 23); Q1, Q3 right, Q2 four of five, Q4 at its edge, Q5, Q6 half | current (1–16) |
 | 218 | 2026-11-04 | SHMPR (results in a later section) | The shared-memory pool rewrite as a Reconverse PR (design): branch `shmem-pool-queues` (main + the pool commits + review fixes + `ipc_order-multi`; Mac ctest 133/133); Stampede3: Charm++ recharm built on Reconverse main and on the branch, Reconverse ctest, the one-process `+ipc` hang on both, Charades change tier with `+ipc`, main's pool against the branch's on VLSI and PHOLD at 2 × 23 and VLSI on 2 nodes; predictions SP1–SP6 | design |
 | 219 | 2026-11-04 | 3681031 | SHMPR results: the branch's pool ÷ main's, 2 × 23 over `+ipc`: VLSI 2.09 (1 node), 2.34 (2 nodes), PHOLD uniform 1.17, σ 100 1.03, same counts and digests; Charades change tier with `+ipc` 80/80 on both; no one-process `+ipc` hang upstream (main declines `+ipc` alone); Reconverse ctest on Stampede3 114 of 116 so far (two launcher-less one-process tests time out); this upstream stack runs Charades at about half `charm-pads-perf`'s rate (cause not measured); SP3, SP5, SP6 right, SP1 half, SP2, SP4 wrong | current |
+| 220 | 2026-11-04 | SHMPR2 (results in a later section) | Reconverse PR #319 after review (design): the branch at 4b1740a (full-segment counter and notice, bytes used, default segment 512 KiB per sender, limits 512/1,024, design document) against 4159d3e; VLSI 2 × 23 at the default and at 8 MiB, PHOLD uniform and σ 100, VLSI 4 × 11; Reconverse's IPC tests on Stampede3; predictions SR1–SR5 | design |
 
 ## Stampede3 runs, in order
 
@@ -9412,6 +9413,30 @@ Which of these costs the half is not measured. It does not touch the paper's num
 - **SP4 wrong:** 2.09, not 3–6. Main's pool is less bad here than on the older stack, which section 202 measured at 0.17–0.21 of one process per node.
 - **SP5 right:** 1.03 and 1.17.
 - **SP6 right:** 2.34.
+
+### Reconverse PR #319 after review: the counter for full segments, the default segment size, and a check for slowdowns (job SHMPR2 design, 2026-11-04; written before any runs)
+
+> **Status: design.** Kale reviewed reconverse#319. The scheme was judged sound, with one design question: a freed block goes back only to the PE that allocated it, so one sender's burst can use up a segment while its freed blocks sit on its own lists, and other senders then fall back to the network with nothing reporting it. The review asked whether the Charades runs hit this. User decision 2026-11-04: make every change the review asks for except the chunked allocator (a later step).
+> - **Branch `shmem-pool-queues` at 4b1740a** (pushed; Mac ctest 135/135), on top of 4159d3e (section 218):
+>   - `CmiIpcPoolFullSends()` counts a PE's sends that went over the network because the destination's segment was full; the first one in a process prints a notice. `CmiIpcPoolBytesUsed()` gives the bytes of this process's segment cut into blocks.
+>   - Without `++ipcpoolsize`, a segment gets 512 KiB per PE of the host's other processes, at least 8 MiB: 11.5 MiB at 2 × 23, 16.5 MiB at 4 × 11.
+>   - Limits 512 PEs per process and 1,024 per host (header about 160 KiB), applied only when a host runs several processes.
+>   - Each PE's private lists are indexed by the host's processes, not the job's.
+>   - `CmiIpcBlock::src`/`dst` renamed `segment_proc`/`sender_proc`; design document `doc/shared-memory-ipc.md`; new test `ipc_poolfull`.
+> - **Charades f5e8179** reports the two counters ("Shared-Memory Pool Full (sent over the network)", "Shared-Memory Pool Bytes Used (most in a process)") when the runtime has them. Same engine code as ae0dbd3.
+> - **Charades keeps a received message as its event's storage until the event is freed** (`LPChare::recv_remote_event`, `e->set_msg(event)`), so a pool block stays in use for the event's lifetime, not just until delivery. How much of a segment VLSI needs is therefore unknown.
+> - **Script:** `$WORK/charades-runs/shmpr2.slurm` (copy in `~/charades-data/vlsi/`), 2 nodes, `HFI_NO_CPUAFFINITY=1` in every run:
+>   1. builds: Charm++ `charm-shm-pr2` (recharm 3d409d45d, Reconverse 4b1740a) on node 0, the standalone branch on node 1, then `charades-shm-pr2`;
+>   2. Reconverse's IPC tests on node 1 (`srun`, 30 s cap, `ipc-onenode` left out: it hangs on main too);
+>   3. node 0, `+ipc`, 2 × 23: VLSI b19 (settings of section 219) with `pr` (4159d3e), `pr2` (4b1740a, default segment) and `pr2` at `++ipcpoolsize 8388608`, 2 reps each; PHOLD uniform (WPs 512) and σ 100 (PP 2,048) at W 300, `pr` and `pr2`, 2 reps;
+>   4. node 0, `+ipc`, 4 × 11 (`+pemap 2-44:2,3-45:2`: one socket per process; `+lci_ndevices 11`): VLSI b19 with `pr2` at its default and at 8 MiB, 2 reps.
+>
+> **Predictions:**
+> - **SR1:** both builds pass; every IPC test passes on Stampede3, including `ipc_poolfull` and `ipc_poolfull-multi`.
+> - **SR2:** `pr2` ÷ `pr` at the default segment is 0.98–1.02 on VLSI, uniform and σ 100. The changes add one load per allocation, and counting happens only on a failure.
+> - **SR3:** VLSI at 2 × 23 with an 8 MiB segment records some full-segment sends, but under 1% of the cross-process sends; the bytes used then equal the segment's size within one block.
+> - **SR4:** the default segment (11.5 MiB at 2 × 23) has fewer full-segment sends than 8 MiB, and its rate is within 2% of 8 MiB's.
+> - **SR5:** at 4 × 11 (33 senders per segment), 8 MiB has more full-segment sends than at 2 × 23, and the default (16.5 MiB) has fewer than 8 MiB.
 
 ## Baseline verification on the Mac
 
