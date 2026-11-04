@@ -156,6 +156,8 @@ run_one() {  # nodes procs pes cfg arm label
   wait $sp 2>/dev/null; local rc=$?
   # --commit-digest writes its per-LP table into the working directory
   [ -f commit_digest.csv ] && mv commit_digest.csv logs/$label.digest.csv
+  # --gvt-trace writes gvt_trace.csv there too
+  [ -f gvt_trace.csv ] && mv gvt_trace.csv logs/$label.gvt_trace.csv
   local wall=$(echo "$(date +%s.%N) - $t0" | bc)
   if [ $status = ok ] && { [ $rc -ne 0 ] || ! grep -q "Simulation Executed Successfully" $f; }; then
     status=fail
