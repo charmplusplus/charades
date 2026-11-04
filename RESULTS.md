@@ -377,6 +377,7 @@ Sections 1–128 were re-read before planning sections 129 onward.
 | 218 | 2026-11-04 | SHMPR (results in a later section) | The shared-memory pool rewrite as a Reconverse PR (design): branch `shmem-pool-queues` (main + the pool commits + review fixes + `ipc_order-multi`; Mac ctest 133/133); Stampede3: Charm++ recharm built on Reconverse main and on the branch, Reconverse ctest, the one-process `+ipc` hang on both, Charades change tier with `+ipc`, main's pool against the branch's on VLSI and PHOLD at 2 × 23 and VLSI on 2 nodes; predictions SP1–SP6 | design |
 | 219 | 2026-11-04 | 3681031 | SHMPR results: the branch's pool ÷ main's, 2 × 23 over `+ipc`: VLSI 2.09 (1 node), 2.34 (2 nodes), PHOLD uniform 1.17, σ 100 1.03, same counts and digests; Charades change tier with `+ipc` 80/80 on both; no one-process `+ipc` hang upstream (main declines `+ipc` alone); Reconverse ctest on Stampede3 114 of 116 so far (two launcher-less one-process tests time out); this upstream stack runs Charades at about half `charm-pads-perf`'s rate (cause not measured); SP3, SP5, SP6 right, SP1 half, SP2, SP4 wrong | current |
 | 220 | 2026-11-04 | SHMPR2 (results in a later section) | Reconverse PR #319 after review (design): the branch at 4b1740a (full-segment counter and notice, bytes used, default segment 512 KiB per sender, limits 512/1,024, design document) against 4159d3e; VLSI 2 × 23 at the default and at 8 MiB, PHOLD uniform and σ 100, VLSI 4 × 11; Reconverse's IPC tests on Stampede3; predictions SR1–SR5 | design |
+| 221 | 2026-11-04 | 3682096 | SHMPR2 results: no send found a segment full in any run (VLSI 2 × 23 and 4 × 11 at 8 MiB and at the new default; PHOLD uniform and σ 100); VLSI's busiest segment peaks at 4.0–4.2 MiB, the same at 23 and 33 senders; reviewed branch ÷ branch before review 0.985 / 1.006 / 0.987 (within rep spread), same counts and digests; Reconverse IPC tests on Stampede3 20/20 after a rebuild (the job's own build hit the non-login-shell `module` mistake again); SR1, SR2 right, SR4 half, SR3, SR5 wrong | current |
 
 ## Stampede3 runs, in order
 
@@ -9437,6 +9438,50 @@ Which of these costs the half is not measured. It does not touch the paper's num
 > - **SR3:** VLSI at 2 × 23 with an 8 MiB segment records some full-segment sends, but under 1% of the cross-process sends; the bytes used then equal the segment's size within one block.
 > - **SR4:** the default segment (11.5 MiB at 2 × 23) has fewer full-segment sends than 8 MiB, and its rate is within 2% of 8 MiB's.
 > - **SR5:** at 4 × 11 (33 senders per segment), 8 MiB has more full-segment sends than at 2 × 23, and the default (16.5 MiB) has fewer than 8 MiB.
+
+### SHMPR2 results: Charades never fills a segment; VLSI's busiest segment peaks at 4.0–4.2 MiB of 8 MiB at both 2 × 23 and 4 × 11; the reviewed branch runs at 0.985–1.006 of the branch before review (2026-11-04; skx-dev batch job 3682096, 2 nodes)
+
+> **Status: current.** Design and predictions in section 220. Data in `~/charades-data/vlsi/shmpr2/j3682096/`.
+
+**No send found a segment full, in any run.** The table gives the pool's own counters from Reconverse 4b1740a. Two reps per row; both values are listed where they differ.
+
+| workload | processes × PEs | segment (MiB) | messages through the pool per run (M) | sends that found the segment full | most of one segment in blocks (MiB; lower means more room) |
+|---|---|---|---|---|---|
+| VLSI b19 | 2 × 23 | 11.5 (default) | 16.3 | 0 | 4.06 / 4.02 |
+| VLSI b19 | 2 × 23 | 8 | 16.3 | 0 | 4.02 / 4.03 |
+| VLSI b19 | 4 × 11 | 16.5 (default) | 27.0 | 0 | 4.03 / 4.01 |
+| VLSI b19 | 4 × 11 | 8 | 27.1 | 0 | 3.98 / 4.18 |
+| PHOLD uniform | 2 × 23 | 11.5 (default) | 1.27 | 0 | 1.51 / 1.47 |
+| PHOLD σ 100 | 2 × 23 | 11.5 (default) | 0.20 | 0 | 0.91 / 0.92 |
+
+- Charades keeps a received message as its event's storage until the event is freed (section 220), and still uses about half of an 8 MiB segment at most.
+- **Peak use does not grow with the number of senders.** At 4 × 11 (33 senders per segment) it is the same as at 2 × 23 (23 senders). So the messages in use at once set the peak, not how many PEs send them.
+
+**The review changes cost nothing measurable.** Rates are M committed events/s, the mean of 2 reps; higher is better.
+
+| workload | processes × PEs | before review, 4159d3e | after review, 4b1740a (default segment) | after ÷ before | 4b1740a at 8 MiB |
+|---|---|---|---|---|---|
+| VLSI b19 | 2 × 23 | 14.52 (14.39 / 14.65) | 14.31 (14.37 / 14.24) | 0.985 | 14.47 (14.51 / 14.42) |
+| PHOLD uniform, WPs 512, W 300 | 2 × 23 | 35.72 (35.50 / 35.93) | 35.92 (35.88 / 35.95) | 1.006 | — |
+| PHOLD σ 100, PP 2,048, W 300 | 2 × 23 | 40.14 (40.20 / 40.08) | 39.62 (39.97 / 39.27) | 0.987 | — |
+| VLSI b19 | 4 × 11 | — | 13.80 (13.82 / 13.77) | — | 13.77 (13.74 / 13.79) |
+
+- The ratios are inside the rep spread: the two reps of 4159d3e on VLSI differ by 1.8%.
+- **Same committed counts in every comparison, and the same digest within each layout.** VLSI 2 × 23: 87c11aec982ad656 (235,520 LPs). VLSI 4 × 11: 7348d5d9fb7409e8 (247,808 LPs, a different padding of the netlist). PHOLD ran without digests.
+- VLSI at 2 × 23 ran at 14.3–14.7 M ev/s here, against 13.97 in job 3681031 (section 219), with `HFI_NO_CPUAFFINITY=1` now set as well.
+
+**Reconverse's IPC tests on Stampede3.**
+- The job's standalone build failed with exit 127: the job ran it through a non-login ssh shell on node 1, which has no `module` and so no `cmake`. This is the same mistake as in section 219. The job's own ctest step therefore ran the old build (18/18 passed) and is not counted.
+- I rebuilt within the allocation from a login shell on node 1 (`build_rc_shmpr.sh`), then ran the IPC tests through `srun` (`ctest_ipc_shmpr2.sh`, 30 s cap): **20/20 pass**, including `ipc_poolfull` and `ipc_poolfull-multi`. `ipc-onenode` was left out; it hangs on main too (reconverse#320).
+
+**Predictions (section 220):**
+- **SR1 right**, after the rebuild.
+- **SR2 right:** 0.985, 1.006, 0.987.
+- **SR3 wrong:** no full-segment sends at 8 MiB. The peak is about 4.0 MiB, half the segment.
+- **SR4 half:** the default's rate is 0.989 of 8 MiB's, within 2%. But neither size had a full-segment send, so there was nothing to reduce.
+- **SR5 wrong:** none at 4 × 11 either, and peak use is the same as at 2 × 23.
+
+**What follows:** this answers the review's question for Charades: it never ran out, with room to spare. The per-sender default size is a safeguard that these runs do not need. The reply to the review and the new PR description quote these numbers.
 
 ## Baseline verification on the Mac
 
