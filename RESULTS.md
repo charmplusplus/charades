@@ -9369,7 +9369,7 @@ The per-node rate at 4 nodes ÷ at 1 is 0.55 for Charades and 0.47 for Devastato
 
 ### SHMPR results: the branch's pool is 2.1× main's on VLSI at 2 × 23 over `+ipc` (2.3× on 2 nodes), 1.17× on uniform PHOLD, level on σ 100; Charades' change tier with `+ipc` passes on both; the one-process `+ipc` hang is gone upstream; this upstream stack runs Charades at about half `charm-pads-perf`'s rate (2026-11-04; skx-dev batch job 3681031, 2 nodes)
 
-> **Status: current; Reconverse's ctest on Stampede3 partly run (below).** Design and predictions in section 218.
+> **Status: current.** Design and predictions in section 218.
 > - **Job:** 18 minutes (skx copy 3681032 cancelled). Both Charm++ trees built on the node in under 2 minutes; Charades against each in about a minute. `libreconverse.so` exports `CmiDeliverIpcInbox` only in the branch's build.
 > - **Data:** `~/charades-data/vlsi/shmpr/j3681031/`.
 > - **Counts:** every pair of runs commits the same events with the same digest in both builds.
@@ -9390,7 +9390,11 @@ The per-node rate at 4 nodes ÷ at 1 is 0.55 for Charades and 0.47 for Devastato
   - 114 of the first 116 tests pass;
   - `ipc-onenode` and `pingpong_multipairs` time out at 180 s with no output. Both are one-process tests launched without `srun`, and `pingpong_multipairs` does not use the pool;
   - stopped at test 117 so as not to share node 1 with the job's 2-node runs (the first of them overlapped the stop by a few seconds; its two reps agree within 0.5%).
-  - The rest and the two timeouts are rerun on an idev node, against main as well.
+  - **On an idev node** (3681098; c455-011, 20–30 s caps):
+    - tests 117–133 pass when launched through `srun`;
+    - every one-process test that timed out passes under `srun`, except three: `ipc-onenode`, `pingpong_multipairs` and `megarecon` (one process, `+pe 2` or `+pe 4`). Those three hang on Reconverse main (5471ba0) the same way, and pass on the Mac.
+    - Started straight from an ssh shell on the node, without `srun`, such tests had every thread on core 0, with or without `HFI_NO_CPUAFFINITY=1`, though the shell's mask was the whole node.
+  - **So on Stampede3 every test either passes on the branch or hangs on main as well.** Logs in `~/charades-data/vlsi/shmpr/idev/`.
 
 **This upstream stack is slower for Charades.** On the same node and code (round 3), the branch's build runs VLSI at 2 × 23 over LCI at 10.69 M ev/s and with `+ipc` at 13.97. `charm-pads-perf` ran these at about 22.8 (section 208, older Charades) and 33.4 (section 215). PHOLD σ 100 at 2 × 23 is 39.5 here against 54.0 there, and the blocked share is 71–74% against 54% on VLSI.
 
@@ -9402,7 +9406,7 @@ The two stacks differ in:
 Which of these costs the half is not measured. It does not touch the paper's numbers, which all come from `charm-pads-perf`, but it matters for running Charades on upstream Reconverse.
 
 **Predictions (section 218):**
-- **SP1 half:** both trees build; ctest as above.
+- **SP1 half:** both trees build. ctest: every test passes on the branch or hangs on main as well; three one-process tests hang on Stampede3 in both.
 - **SP2 wrong:** no hang on either build.
 - **SP3 right.**
 - **SP4 wrong:** 2.09, not 3–6. Main's pool is less bad here than on the older stack, which section 202 measured at 0.17–0.21 of one process per node.
