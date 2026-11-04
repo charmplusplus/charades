@@ -111,6 +111,15 @@ void Scheduler::finalize_complete() {
   agg_collect_stats(cumulative_stats);
   // Messages the shared-memory pool delivered to this PE (0 when it is off)
   cumulative_stats->ipc_received = (uint64_t)CmiIpcMessagesReceived();
+  // Sends that found the destination's pool full, and how much of this
+  // process's pool is in use; looked up at run time, since older runtimes
+  // lack them (reconverse#319)
+  {
+    static auto full = (long (*)(void))dlsym(RTLD_DEFAULT, "CmiIpcPoolFullSends");
+    static auto used = (size_t (*)(void))dlsym(RTLD_DEFAULT, "CmiIpcPoolBytesUsed");
+    cumulative_stats->ipc_pool_full = full ? (uint64_t)full() : 0;
+    cumulative_stats->ipc_pool_bytes = used ? (uint64_t)used() : 0;
+  }
   // Per PE until reduced (Statistics::reduce keeps the least and the most)
   cumulative_stats->blocked_min = cumulative_stats->blocked_max =
       cumulative_stats->blocked_time;

@@ -81,6 +81,8 @@ class Statistics {
     uint64_t msg_pool_misses; ///< event messages allocated because this PE's message pool was empty (--msg-pool)
     uint64_t msg_pool_frees;  ///< event messages freed because the message pools were full or could not keep them (--msg-pool)
     uint64_t ipc_received; ///< messages received through the runtime's shared-memory pool from another process on the host (Charm++ --enable-shmem, or Reconverse +ipc)
+    uint64_t ipc_pool_full; ///< sends the runtime made over the network because the destination's shared-memory pool was full (Reconverse CmiIpcPoolFullSends; 0 if the runtime lacks it)
+    uint64_t ipc_pool_bytes; ///< most bytes of any process's shared-memory pool cut into blocks (Reconverse CmiIpcPoolBytesUsed; 0 if the runtime lacks it)
     ///@}
 
     /** \name Communication stats (--comm-stats)
