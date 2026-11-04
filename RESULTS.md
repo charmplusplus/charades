@@ -374,6 +374,7 @@ Sections 1–128 were re-read before planning sections 129 onward.
 | 215 | 2026-11-03 | 3679892 | Round 3 results: 1 × 46 VLSI 37.61 → 61.76 M ev/s (1.64×; c+d 1.117, a 1.038, b 1.417), 1.35× Devastator's 1-node best; pool misses 12.4 M → 0.23 M, no frees; the profile showed only about 7% for glibc and mutex (sleeping on arena locks is invisible to `cycles:u`, inferred); `+ipc` 1.015 (shared blocks are never pooled); PHOLD 2 × 23 1.16–1.18; R1, R6 right, R4 half, R2 one of three, R3, R5 wrong | current |
 | 216 | 2026-11-03 | VS2 a2, big2 (results in a later section) | VLSI at 1–32 nodes with round 3 (design): Charades on `charades-r3` (the controller, W 2,500 / 5,000) and Devastator 2 × 23 in the same allocation; one `--gvt-trace=1` run per node count to split each cycle into the count wave and the time between waves; big2 replaces big (3679725) and adds the old tree, Devastator 1 × 46 and ROSS at 32 nodes; layout check, round 3 at 1 × 46 against 2 × 23 on σ 100, uniform, traffic and dragonfly at 1 and 4 nodes; predictions Q1–Q6 | design |
 | 217 | 2026-11-03 | 3679974 | VS2 results at 1–16 nodes: with round 3 Charades ÷ Devastator 1.365 / 1.266 / 1.234 / 1.290 / 1.189 (round 3 ÷ old 1.25–1.61); same counts and digests as job a; count waves 13–19% of each cycle, their growth 4 → 16 nodes about the cycle's growth (within trace noise); layout check: 1 × 46 ÷ 2 × 23 0.95–1.29 at 1 node, 0.59–0.86 at 4 (the other workloads keep 2 × 23); Q1, Q3 right, Q2 four of five, Q4 at its edge, Q5, Q6 half | current (1–16) |
+| 218 | 2026-11-04 | SHMPR (results in a later section) | The shared-memory pool rewrite as a Reconverse PR (design): branch `shmem-pool-queues` (main + the pool commits + review fixes + `ipc_order-multi`; Mac ctest 133/133); Stampede3: Charm++ recharm built on Reconverse main and on the branch, Reconverse ctest, the one-process `+ipc` hang on both, Charades change tier with `+ipc`, main's pool against the branch's on VLSI and PHOLD at 2 × 23 and VLSI on 2 nodes; predictions SP1–SP6 | design |
 
 ## Stampede3 runs, in order
 
@@ -9331,6 +9332,39 @@ The per-node rate at 4 nodes ÷ at 1 is 0.55 for Charades and 0.47 for Devastato
 - big2 adds the 32-node cell (all three engines, both Charades trees).
 - **The VLSI row of the paper's table uses round 3** (Charades ÷ Devastator 1.19–1.37 at 1–16 nodes).
 - **The paper's other tables** were measured on the paper's tree. Round 3 is 1.16–1.18× on PHOLD at 2 × 23 (section 215), and the launch stays 2 × 23. Rerunning them on round 3 is the user's decision.
+
+### The shared-memory pool rewrite as a Reconverse pull request: Stampede3 tests against Reconverse main (job SHMPR design, 2026-11-04; written before any runs)
+
+> **Status: design.** User decision 2026-11-04: push `pads-perf` as it is (done: `origin/pads-perf` at bab3df1, no PR), and make the pool rewrite (section 205) a pull request, tested on Stampede3 while job big2 waits.
+> - **Branch:** Reconverse `shmem-pool-queues` (4159d3e, pushed) is upstream main (5471ba0) with:
+>   - the two pool commits from `pads-perf`;
+>   - fixes found in review: return lists up to 2 MiB blocks, so a 128 KiB `++ipccutoff` works; `++ipccutoff` capped at 1 MiB, with a notice; the heap moves only for a block that fits;
+>   - `ipc_order` generalized to several PEs per process, with a new test `ipc_order-multi` (2 × 4 PEs).
+> - **Mac:** ctest 133/133.
+> - **Script:** `$WORK/charades-runs/shmpr.slurm` (copy in `~/charades-data/vlsi/`), 2 nodes.
+> - **Trees:**
+>   - Charm++ `recharm` 3d409d45d built twice (`charm-shm-base` with Reconverse main, `charm-shm-pr` with the branch), both on LCI 1287c59c (upstream's pin, which includes native psm2, lci#214);
+>   - Charades at ae0dbd3 (round 3's code) against each (`charades-shm-base`, `charades-shm-pr`);
+>   - the branch built alone with its tests (`reconverse-shmpr`).
+
+**Steps:**
+1. Builds on the nodes.
+2. Reconverse's ctest, every test's processes on one node.
+3. The one-process `+ipc` start-up hang (section 211), on both builds.
+4. Charades' change tier with `+ipc` at 2 × 2 and 4 × 2, on both builds.
+5. 1 node, 2 × 23 over `+ipc`, main's pool against the branch's:
+   - VLSI b19 (lazy fossils, batch 32, W 5,000), 3 reps;
+   - PHOLD σ 100 (PP 2,048) and uniform (WPs 512) at W 300, 2 reps;
+   - the branch over LCI for reference.
+6. 2 nodes, VLSI b19 × 2 at 2 × 23 over `+ipc`, 2 reps.
+
+**Predictions:**
+- **SP1.** Both trees build. Reconverse's ctest passes on Stampede3 as on the Mac.
+- **SP2.** The one-process `+ipc` hang happens on main as well as on the branch: it is not the rewrite's.
+- **SP3.** Charades' change tier with `+ipc` passes on both builds, with one count per config.
+- **SP4.** VLSI at 2 × 23 over `+ipc`, branch ÷ main 3–6. Section 202 measured main's design at 0.17–0.21 of one process per node on the old tree; section 205 measured the rewrite at 0.86.
+- **SP5.** PHOLD at 2 × 23 over `+ipc`, branch ÷ main 1.0–1.4. htram combines the events between the node's processes, so fewer messages cross the pool than on VLSI.
+- **SP6.** VLSI on 2 nodes, branch ÷ main at least 1.5.
 
 ## Baseline verification on the Mac
 
