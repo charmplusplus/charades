@@ -371,6 +371,7 @@ Sections 1–128 were re-read before planning sections 129 onward.
 | 212 | 2026-11-03 | VS a, big (results in a later section) | VLSI at 1–32 nodes in three engines, each at its best launch (design): Charades 1 × 46 with lazy fossils / batch 32, the controller at buckets of 2,500 ps and W 2,500 / 5,000; Devastator 2 × 23 and 1 × 46 (`HFI_NO_CPUAFFINITY=1`) at W 2,500–10,000; ROSS batch 8 / 2 with its window; 3 reps at 1–16 nodes, 5 at 32; predictions S1–S7 | design |
 | 213 | 2026-11-03 | (idev, later) | Closing the gap, round 3 (design): the engine's per-event work; a direct `execute_me` call without the Charm++ proxy when load balancing is off, message pools rebalanced through a process-wide spare list (Mac: 4–11% of messages miss the pool at 4–46 PEs, glibc and mutex about 7% of cycles), fossil collection over the LPs that hold processed events, inline per-PE accessors and a shift-based mapper; predictions R1–R6 | design |
 | 214 | 2026-11-03 | 3679723 | VS results at 1–16 nodes: Charades ÷ Devastator 0.839 / 0.908 / 0.989 / 0.965 / 0.893 (each at its best launch); one count per cell in three engines; from 4 nodes on Devastator's cycle stays 1.38–1.41 ms (node 2 paces it) while Charades' grows 1.39 → 1.57 ms (blocked share 79.5 → 83.8%); Devastator 1 × 46 0.80–0.86 of its 2 × 23; controller 0.97–0.99 of W 2,500; Charades ÷ ROSS 10–14; S1 right, S2 four of five, S3, S4 mostly, S5, S7 wrong, S6 waits on 32 nodes | current (1–16) |
+| 215 | 2026-11-03 | 3679892 | Round 3 results: 1 × 46 VLSI 37.61 → 61.76 M ev/s (1.64×; c+d 1.117, a 1.038, b 1.417), 1.35× Devastator's 1-node best; pool misses 12.4 M → 0.23 M, no frees; the profile showed only about 7% for glibc and mutex (sleeping on arena locks is invisible to `cycles:u`, inferred); `+ipc` 1.015 (shared blocks are never pooled); PHOLD 2 × 23 1.16–1.18; R1, R6 right, R4 half, R2 one of three, R3, R5 wrong | current |
 
 ## Stampede3 runs, in order
 
@@ -9172,6 +9173,69 @@ The per-node rate at 4 nodes ÷ at 1 is 0.55 for Charades and 0.47 for Devastato
 - Job big (32 nodes) completes the table.
 - Section 212's S6 rule applies already: `--gvt-trace=1` cycle times at 4 and 16–32 nodes, to split Charades' growing cycle time into GVT advance and execution. One process per node with W at one clock period makes each cycle wait for a GVT round. That is a GVT-pace question, as on PHOLD at 32 nodes (sections 78–84), not a per-event one.
 - Round 3 (section 213) is measured separately; its 3% rule for rerunning the Charades cells stands.
+
+### Closing the gap, round 3 results: 1.64× at one process per node (37.6 → 61.8 M ev/s, 1.35× Devastator's best at 1 node); the message pool's spare list alone is 1.42×, because a pool miss in a one-process run went to glibc and freed memory another thread allocated; PHOLD at 2 × 23 gains 1.16–1.18 (2026-11-03; skx-dev batch job 3679892, c455-033)
+
+> **Status: current.** Design, amendment and predictions in section 213.
+> - **Job:** 10.5 minutes; skx copy 3679893 cancelled; first attempt 3679870 failed at build (section 213).
+> - **Gate on the node:** 150/150 (VLSI, Simple PHOLD, traffic, dragonfly; 1 × 4, 2 × 2, 4 × 2), and with `--fossil-lazy=1` 75/75.
+> - **Counts:** every VLSI run commits 125,998,590 events with digest 87c11aec… (the same as V5 and job a); PHOLD one count per workload in both trees.
+> - **Data:** `~/charades-data/vlsi/r3meas213/j3679892/`.
+
+**VLSI b19 × 1, 1 node** (`--fossil-lazy=1 --batch=32`, W 5,000, buckets of 2,500; M committed ev/s, reps after the median; higher is better; cumulative, as amended):
+
+| arm | M ev/s | ÷ previous row | ÷ current tree | blocked share |
+|---|---|---|---|---|
+| current tree (5b14290), 1 × 46 | 37.61 (38.18 / 37.50 / 37.61) | | 1.00 | 60.2% |
+| + c and d: fossil list, inline accessors, mapper shift, `attempt_gvt` return, fast-path routes | 42.00 (42.14 / 42.00 / 41.58) | 1.117 | 1.117 | 60.8% |
+| + a: direct `execute_me` | 43.60 (43.60 / 43.15 / 43.60) | 1.038 | 1.159 | 65.3% |
+| + b: the pool's spare list (all four, the new defaults) | **61.76** (62.07 / 61.76 / 61.46) | **1.417** | **1.642** | 54.3% |
+| 2 × 23 over `+ipc`: current tree / all four | 32.95 / 33.43 | | 1.015 | 59.7% / 64.9% |
+
+**Simple PHOLD, 2 × 23 over LCI** (the paper's launch; W 300, 2 reps):
+
+| workload | current tree | all four | ratio (higher is better) |
+|---|---|---|---|
+| σ 100, PP 2,048 | 45.87 | 54.01 | 1.177 |
+| uniform, WPs 512 | 40.35 | 46.82 | 1.160 |
+
+**Against Devastator at 1 node:**
+- Charades with all four runs 61.76 M ev/s, 0.408 ms per clock cycle.
+- Devastator's best in job a is 45.65 (2 × 23, W 10,000), 0.552 ms per cycle.
+- **Charades ÷ Devastator is 1.35**, from 0.84. The two numbers come from different allocations, a node apart; Devastator's 1-node reps in job a vary by 4%.
+
+**The pool counters:**
+- **Without the spare list** (cda): 12.4 M of the run's roughly 131 M messages missed the pool and were allocated through glibc, and 11.1 M were freed into it from a thread other than the allocating one.
+- **With it:** 0.23 M misses (each message's first allocation) and no frees (R1 right).
+- **With `+ipc` and all four:** still 15.1 M misses and 15.0 M frees. A message from the other process arrives in a shared-memory block, which is never pooled (section 201), so the sender's pool drains at the rate of cross-process sends. That is why `+ipc` gains nothing.
+
+**Why the profile understated it.**
+- **What the profile showed:** glibc `_int_free`, `_int_malloc` and `malloc`, plus mutex lock and unlock, were about 7% of user cycles, yet removing them gained 1.42×.
+- **Likely reason:** in a one-process run Reconverse has no memory pool, so a miss is `malloc` and a free from another thread takes the allocating thread's arena lock. A thread waiting on a contended lock sleeps in the kernel, and `perf record -e cycles:u` does not count that time.
+- **Status:** this is inferred, not measured; a context-switch count would test it.
+- **What it changes:** section 78's finding that one process per node is 0.71–0.87 of two on PHOLD predates this fix, and the multi-process runs never had the problem.
+
+**Profile of the simulation alone, all four** (user cycles):
+- `fossil_me` and glibc `_int_free` drop out of the top.
+- `execute_me` (8.1%) and `fp_drain` (8.1%) now lead.
+- Mutex lock and unlock remain about 3.5%. The profile records no callers; they are probably the runtime's queues.
+
+**Predictions (section 213):**
+- **R1 right.**
+- **R2 one of three steps inside its range:**
+  - a: +3.8%, inside +1–4%;
+  - c and d together: +11.7%, above their combined +0–5%;
+  - b: +41.7%, far above +2–6%.
+- **R3 wrong, by far:** 1.64×, not 1.05–1.12; 61.8 M ev/s, not 39–42.
+- **R4 half:** glibc frees and the proxy path's functions are gone; mutex time is not under 1%.
+- **R5 wrong:** `+ipc` gains 1.015, not as much as 1 × 46; PHOLD at 2 × 23 gains 1.16–1.18, not 0–5%.
+- **R6 right.**
+
+**What follows:**
+- **All four are the defaults** (charades b0b4ed4). The engine tier on the Mac follows before the next merge.
+- **Section 212's rule:** a gain of 3% or more reruns the Charades cells of the VLSI scaling job on the new tree (design in the next section).
+- **The paper's other tables** (PHOLD, traffic, dragonfly) used the paper's tree e1fbdc4. On the new tree PHOLD at 2 × 23 is 1.16–1.18× faster, so those tables would need rerunning to use it. That is the user's decision.
+- **Layout:** with glibc contention gone, one process per node may now beat two on the other workloads as well (section 78 found 0.71–0.87 before). It is checked in the rerun at 1 and 4 nodes.
 
 ## Baseline verification on the Mac
 
