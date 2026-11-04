@@ -9044,6 +9044,24 @@ The per-node rate at 4 nodes ÷ at 1 is 0.55 for Charades and 0.47 for Devastato
 ### Closing the gap, round 3: the engine's work per event (design, 2026-11-03; written before any Stampede3 runs)
 
 > **Status: design.** User decision 2026-11-03: work on round 3 on the Mac while the scaling job (section 212) waits. It is measured on Stampede3 when a 1-node allocation is free.
+>
+> **Amended before any Stampede3 run** (2026-11-03, after the Mac checks below):
+> - Change d gains two items: `BucketGVT::attempt_gvt`, run on every send and receive, returns at once while a GVT round is under way, before two 64-bit divisions and a virtual call; and the fast path keeps each chare's route (this PE, another PE's rank, another process) and this PE's rank, instead of asking the runtime (`CkMyPe`, `CkNodeOf`, `CkRankOf`, `CkMyRank`) on every send and drain.
+> - Switches for the measurement: `--msg-pool=2` is the spare list (the new default; `--msg-pool=1` is the old per-PE pool) and `--direct-execute=0` restores the proxy call.
+> - Changes c and d have no switch, so the measurement attributes the changes cumulatively: the current tree; c+d (`--direct-execute=0 --msg-pool=1`); + a (`--msg-pool=1`); + b (all). R2's per-change ranges apply to those steps.
+> - Script `$WORK/charades-runs/r3meas213.slurm` (copy in `~/charades-data/vlsi/`). It builds `charades-r3` on the node, gates it, and has 3 reps at 1 × 46.
+> - **Mac checks so far** (development only; Mac timings do not compare with Stampede3's, and the Mac was in use):
+>   - **Pool misses** (b19 × 1, 500 cycles), before → after b: 1 PE 6.88 M → 0.20 M; 4 PEs 0.49 M → 0.18 M; 8 PEs 0.61 M → 0.17 M. No frees after b. What is left is the first allocation of the messages in flight.
+>   - **The same digest** as the current tree at 1, 4 and 8 PEs.
+>   - **Rates** (M committed ev/s, median of 3 alternating reps, higher is better), made before d's two added items:
+
+| Mac, b19 × 1 | current tree | c+d | + a | + b (all) |
+|---|---|---|---|---|
+| 1 PE, 500 cycles | 2.59 | 2.62 | 2.81 | 2.77 |
+| 4 PEs, 2,000 cycles | 7.69 | 9.16 | 9.82 | 9.71 |
+
+> - **Mac gate on the final code** (charades `b0b4ed4`): the change tier with 14 configs on every model at 1 × 4 and 2 × 2 passes 431 of 440. All 9 failures are VLSI under the conservative scheduler, which aborts on the lookahead check in the current tree too. With `--fossil-lazy=1`, VLSI and Simple PHOLD pass 60 of 60. The 4-PE digest is unchanged.
+
 
 **Where the per-event work goes.** Section 211's profile of the simulation alone (1 × 46, lazy fossils, batch 32, W 5,000) has PEs blocked at the window 61% of the time. The engine's per-event functions take most of the rest. Four costs in it are not the model's work.
 
@@ -9063,7 +9081,7 @@ The per-node rate at 4 nodes ÷ at 1 is 0.55 for Charades and 0.47 for Devastato
    - The block mapper divides by the run's LPs per chare, a runtime value, up to four times per event (1.01% + 0.53%).
 
 **Changes (Charades only; every one keeps the same committed events):**
-- **a. Direct call.** With load balancing off (`--ldb-interval` and `--ldb-first` 0, as in every paper run), the scheduler calls the chare's `execute_me()` through the token's pointer. The proxy, the location lookup and the call-stack push are skipped. With load balancing on, the proxy path stays.
+- **a. Direct call.** With load balancing off (`--ldb-interval` 0, as in every paper run), the scheduler calls the chare's `execute_me()` through the token's pointer. The proxy, the location lookup and the call-stack push are skipped. With load balancing on, the proxy path stays.
 - **b. Pool rebalancing.**
   - A PE whose pool holds more than 4,096 messages moves 2,048 of them to a process-wide spare list, held by a mutex, one lock per 2,048 messages. A PE whose pool is empty takes up to 2,048 from it before allocating.
   - Messages are then freed only when the spare list holds more than the process's PEs × 65,536.
