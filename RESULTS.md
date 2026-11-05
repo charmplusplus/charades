@@ -379,6 +379,7 @@ Sections 1–128 were re-read before planning sections 129 onward.
 | 220 | 2026-11-04 | SHMPR2 (results in a later section) | Reconverse PR #319 after review (design): the branch at 4b1740a (full-segment counter and notice, bytes used, default segment 512 KiB per sender, limits 512/1,024, design document) against 4159d3e; VLSI 2 × 23 at the default and at 8 MiB, PHOLD uniform and σ 100, VLSI 4 × 11; Reconverse's IPC tests on Stampede3; predictions SR1–SR5 | design |
 | 221 | 2026-11-04 | 3682096 | SHMPR2 results: no send found a segment full in any run (VLSI 2 × 23 and 4 × 11 at 8 MiB and at the new default; PHOLD uniform and σ 100); VLSI's busiest segment peaks at 4.0–4.2 MiB, the same at 23 and 33 senders; reviewed branch ÷ branch before review 0.985 / 1.006 / 0.987 (within rep spread), same counts and digests; Reconverse IPC tests on Stampede3 20/20 after a rebuild (the job's own build hit the non-login-shell `module` mistake again); SR1, SR2 right, SR4 half, SR3, SR5 wrong | current |
 | 222 | 2026-11-04 | ABL (results in a later section) | F2 and F3 on PHOLD and traffic, and ROSS's window (design): direct, eager and deadline aggregation at two fixed W and the controller; the PADS'19 hold over three cutoffs; ROSS `--max-opt-lookahead` on traffic and dragonfly at 1 and 4 nodes; 4 and 16 nodes; `--agg-scope=1` dropped (the fast path already keeps same-process events out of htram; section 187 corrected); predictions AB1–AB6 | design |
+| 223 | 2026-11-04 | 3682372 | ABL results: deadline htram ÷ direct sends 2.11 / 2.85 / 3.31 / 1.44 at 4 nodes and 2.20 / 2.87 / 2.65 / 1.37 at 16 (σ 100 / σ 2,000 / uniform / traffic); eager ÷ deadline 0.87–1.00 on PHOLD at 4 nodes, 0.61–0.63 on uniform at 16, level on σ 100 and traffic (eager 1.10 at traffic's best W at 16); controller 0.94–1.08 of the better fixed W in every transport; F3 hold arms used the wrong release rule (all capped; Mac: PADS'19's rule is neutral beside a window, 5× slower without one); ROSS's window 1.13–1.48× ROSS, Charades ÷ ROSS 1.75–1.90 (traffic), 3.0–3.2 (dragonfly, grid edge); AB1, AB4 right, AB3 mostly, AB2, AB6 half, AB5 untested | current (F2, ROSS) / superseded (F3) |
 
 ## Stampede3 runs, in order
 
@@ -9530,6 +9531,79 @@ Which of these costs the half is not measured. It does not touch the paper's num
 > - **AB4:** in each transport the controller is 0.90–1.05 of that transport's better fixed W.
 > - **AB5:** the hold's best K is at most 0.95 of direct sends at their better W on every workload, and below 0.5 of deadline htram on σ 2,000 and uniform. Its best K differs between PHOLD and traffic in time units, which is why PADS'19 tuned the cutoff per model. Some K at σ 2,000 or uniform may fail or hit the cap, since nothing bounds same-chare events.
 > - **AB6:** ROSS with its best window is 0.95–1.30× ROSS without a window, on both applications. Charades ÷ ROSS stays at least 1.5 on traffic and at least 3 on dragonfly.
+
+### ABL results: htram's deadline flush is 2.1–3.3× direct sends on PHOLD and 1.4× on traffic; eager flush loses up to 1.6× on uniform at 16 nodes; the F3 hold arms used the wrong release rule and are rerun; ROSS's window raises ROSS 1.13–1.48×, and Charades ÷ ROSS becomes 1.75–1.90 (traffic) and 3.0–3.2 (dragonfly) (2026-11-04; skx-dev batch job 3682372, 16 nodes)
+
+> **Status: current (F2, ROSS's window) / superseded (F3 hold arms, see below).** Design and predictions in section 222. 16 nodes, 78 minutes; gate 48/48. Data, `abl_summary.py` and `abl_summary.txt` in `~/charades-data/abl/`.
+> - **Counts:** within every workload and node count, all 18 runs that finished commit the same events with the same digest. ROSS commits the same counts as Charades on traffic and dragonfly at 1 and 4 nodes.
+> - **All 48 hold runs hit the 90 s cap.**
+
+**F2: deadline ÷ direct sends and eager ÷ deadline** (rates are M committed ev/s, mean of 2 reps; ratios are higher-is-better for the first arm named):
+
+| workload | nodes | direct, better fixed W | eager, better fixed W | deadline, better fixed W | **deadline ÷ direct** | eager ÷ deadline at W A / W B | events per message, eager / deadline |
+|---|---|---|---|---|---|---|---|
+| σ 100 | 4 | 95.4 | 197.3 | 201.2 | **2.11** | 0.98 / 1.00 | 10.7 / 39.3 |
+| σ 2,000 | 4 | 53.9 | 138.8 | 153.3 | **2.85** | 0.87 / 0.94 | 16.2 / 73.1 |
+| uniform | 4 | 40.0 | 120.2 | 132.2 | **3.31** | 0.91 / 0.96 | 14.5 / 33.2 |
+| traffic | 4 | 196.9 | 282.9 | 284.1 | **1.44** | 0.98 / 1.09 | 10.3 / 11.8 |
+| σ 100 | 16 | 368.5 | 779.9 | 810.7 | **2.20** | 0.97 / 0.96 | 11.9 / 35.6 |
+| σ 2,000 | 16 | 210.7 | 552.5 | 603.6 | **2.87** | 0.89 / 0.92 | 17.0 / 59.4 |
+| uniform | 16 | 145.0 | 242.3 | 384.2 | **2.65** | **0.61 / 0.63** | 4.2 / 12.6 |
+| traffic | 16 | 777.7 | 1,172.7 | 1,063.6 | **1.37** | 1.00 / 1.12 | 10.9 / 12.3 |
+
+(W A / W B are 250 / 400 on PHOLD and 500 / 1,000 on traffic.)
+- **Aggregation pays even at σ 100.** 2.1–2.2× there, although the fast path already keeps same-process events out of htram. Sending the few events that go to other processes one message each costs direct sends half their rate.
+- **Deadline flush packs 2.3–4.5× more events per message than eager on PHOLD.** It is faster by up to 1.6× on uniform at 16 nodes, where eager sends 4.2 events per message.
+- **On σ 100 and traffic the two flush policies are level.** On traffic at 16 nodes eager is 1.10× deadline, comparing each at its better fixed W.
+- **The controller holds in every transport:** 0.94–1.08 of the better fixed W in all 24 cells (deadline 0.94–1.04, eager 0.96–1.08, direct 0.96–0.99).
+- **Controllers against controllers** (the paper's configuration): deadline ÷ direct is 2.06 / 2.83 / 3.30 / 1.39 at 4 nodes and 2.16 / 2.85 / 2.68 / 1.49 at 16 nodes (σ 100 / σ 2,000 / uniform / traffic).
+
+**F3: the hold arms used the wrong release rule.**
+- The design released a held event only when GVT reached its bucket (`--gvt-clear-buckets=1`, the code's default). PADS'19 releases all held events at the next GVT computation ("for most models we release all events the next time a GVT is computed", Section 5): `--gvt-clear-buckets=0 --gvt-clear-lag=0`. It uses cutoffs of 2, 4, 8 and 16 buckets and no window.
+- **The arms in this job are therefore not the PADS'19 baseline**, and all of them hit the 90 s cap.
+- **Follow-up on the Mac** (PHOLD σ 100, 2 × 4 PEs, 1,024 LPs, END 256,000; M committed ev/s, higher is better):
+
+| arm | M ev/s | events rolled back | events held | held events cancelled in the sender |
+|---|---|---|---|---|
+| W 250 | 0.53 | 77 | — | — |
+| no window | 0.47 | 5.44 M | — | — |
+| no window + hold K 32, release when GVT reaches the bucket (this job's rule) | 0.07 | 5.69 M | 8.37 M | 5.25 M |
+| no window + PADS'19 hold, cutoff 2 / 8 / 16 | 0.08 / 0.09 / 0.09 | 34.7–35.2 M | 36.0–36.5 M | 20.0–20.3 M |
+| W 250 + hold K 32, release when GVT reaches the bucket | 0.19 | 2.06 M | 4.98 M | 1.86 M |
+| W 250 + PADS'19 hold, cutoff 8 | 0.52 | 691 | 3.67 M | 333 |
+
+  - Released at the bucket, a held event reaches a receiver that has already run past it, so it arrives as a straggler. With W 250 that costs 2.8×.
+  - Released at the next GVT (PADS'19), the hold beside a window changes nothing (0.52 against 0.53).
+  - Without a window it is 5× slower than no window at all, at every cutoff. Receivers run ahead unbounded, and held events arrive one GVT period late.
+- F3 needs a rerun with PADS'19's rule (no window and no hold; PADS'19's cutoffs without a window; the hold beside the best W), at full scale.
+
+**ROSS's optimism window** (`--max-opt-lookahead`; ROSS optimistic at its best F5 setting; M committed ev/s, mean of 2 reps):
+
+| application | nodes | none | 250 / 5,000 | 500 / 10,000 | 1,000 / 20,000 | 2,000 / 40,000 | best ÷ none | Charades controller | **Charades ÷ ROSS's best** |
+|---|---|---|---|---|---|---|---|---|---|
+| traffic | 1 | 35.8 | 35.8 | 39.4 | **40.5** | 39.9 | 1.13 | 70.9 | **1.75** |
+| traffic | 4 | 117.8 | 121.8 | 135.4 | 140.1 | **140.1** | 1.19 | 266.3 | **1.90** |
+| dragonfly (ps) | 1 | 10.0 | **13.5** | 10.0 | 10.0 | 10.0 | 1.35 | 43.2 | **3.20** |
+| dragonfly (ps) | 4 | 27.9 | **41.3** | 27.9 | 27.8 | 27.9 | 1.48 | 123.7 | **3.00** |
+
+- **The window helps ROSS:** 1.13–1.19× on traffic and 1.35–1.48× on dragonfly.
+- **On dragonfly the effect is all or nothing.** W 5,000 ps raises ROSS's efficiency from 63–71% to 94–96%, and 10,000 and above change nothing. The best value is the grid's smallest, so a smaller one may be better still. The dragonfly ratio is provisional until the grid is extended below 5,000 (2,500, 1,250).
+- **F5's Charades ÷ ROSS was against ROSS without a window** (3.7–4.0 on dragonfly, 1.8–2.2 on traffic). With it, at 1 and 4 nodes, the ratio is 3.0–3.2 on dragonfly and 1.75–1.90 on traffic.
+
+**Predictions (section 222):**
+- **AB1 right** for every arm that finished.
+- **AB2 half:**
+  - σ 2,000 (2.85), uniform (3.31) and traffic (1.44) are in range;
+  - σ 100 is 2.11, not 1.1–1.6: the fast path did not take htram's gain away;
+  - from 4 to 16 nodes σ 2,000 holds (2.87), but uniform falls (3.31 → 2.65).
+- **AB3 mostly right:**
+  - eager ÷ deadline is 0.87–0.94 on σ 2,000;
+  - on uniform it is 0.91–0.96 at 4 nodes and 0.61–0.63 at 16, below the predicted range;
+  - deadline packs at least 1.5× more events per message on PHOLD;
+  - level on σ 100 and traffic, except eager's 1.12 at traffic's W B.
+- **AB4 right in 23 of 24 cells;** eager uniform at 16 nodes is 1.08, above the range.
+- **AB5 not tested** (wrong release rule; rerun).
+- **AB6 half:** the window gains 1.13–1.19 on traffic (in range) and 1.35–1.48 on dragonfly (above it). Charades ÷ ROSS stays at least 1.5 on traffic and at least 3 on dragonfly (3.00 at 4 nodes, the edge).
 
 ## Baseline verification on the Mac
 
