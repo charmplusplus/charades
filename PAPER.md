@@ -133,7 +133,7 @@ time without a reason written here first.
        - **Done (job F3R, RESULTS.md 225), 4 and 16 nodes.** The hold reaches 0.83–1.02 of no hold with the fast path on. It turns the fast path off (worth up to 1.33× on σ 100), and beside a window it changes little (0.90–1.06). Without a window, cutoffs up to one mean delay cost PHOLD 1.4–5.6×; on traffic they gain 1.09–1.10× at 4 nodes and are level at 16.
        - ROSS's best dragonfly window is 2,500 ps at 1 node and 5,000 at 4 (7,500 untried). Charades ÷ ROSS with it is 2.98–3.05.
      - ROSS's window: 1.13–1.19× ROSS on traffic, 1.35–1.48× on dragonfly, where the best value is the grid's edge (5,000 ps; extend to 2,500 and 1,250). Charades ÷ ROSS with it: traffic 1.75–1.90, dragonfly 3.0–3.2 (1 and 4 nodes); F5's ratios were against ROSS without a window.
-     - F4 (Devastator's rule in Charades, Devastator's own window, phase-changing PHOLD, dragonfly) is still to schedule.
+     - F4 designed (job F4, RESULTS.md 227; user decision 2026-11-05: prepare F4): job N's seven workloads at 4 and 16 nodes on the current tree; Charades' fixed W grid, frozen controller and Devastator's rule in Charades (`--ctl=2` from one bucket), against Devastator's fixed W grid and its own window, in one allocation. Script ready (`f4227.slurm`, dry-run checks pass); not yet submitted.
 5. **Engine freeze, 2026-12-07.**
    - **Defaults already set:** per-LP rollback, `--agg-pp-alloc=1`, ring input buffers, `numactl --localalloc` launch (Charades only), 23 LCI devices, `+mempool_remote_free`.
    - **Frozen 2026-11-01:** the controller (`--ctl=3`, bracketed; item 1). The pending heap fix (item 1a) is in.
