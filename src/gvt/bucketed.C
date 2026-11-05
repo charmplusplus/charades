@@ -590,10 +590,12 @@ void BucketGVT::advance_gvt(int num_buckets) {
   curr_bucket += num_buckets;
   curr_gvt = curr_bucket * bucket_size;
 
-  if (g_tw_adaptive_buckets && curr_bucket < total_buckets) {
+  // GVT never passes a held event's bucket (it counts as sent, not received),
+  // so every held event lies in [curr_bucket, reserve_hi]
+  if (g_tw_adaptive_buckets && curr_bucket < total_buckets && held_now > 0) {
     int bucket = curr_bucket;
-    int last_bucket = std::min(total_buckets, curr_bucket + clear_buckets);
-    do {
+    int last_bucket = std::min({total_buckets, curr_bucket + clear_buckets, reserve_hi + 1});
+    while (bucket < last_bucket) {
       auto iter = reserves[bucket].begin();
       while (iter != reserves[bucket].end()) {
         if ((*iter)->offset - ((*iter)->phase - curr_bucket) > g_tw_clear_lag ||
@@ -601,12 +603,14 @@ void BucketGVT::advance_gvt(int num_buckets) {
           stats[(*iter)->offset].released++;
           charm_event_release(*iter);
           iter = reserves[bucket].erase(iter);
+          held_now--;
         } else {
           iter++;
         }
       }
       bucket++;
-    } while (bucket < last_bucket);
+    }
+    if (held_now == 0) reserve_hi = -1;
   }
   if (lb_trigger->ready() && g_tw_ldb_continuous) {
     lb_trigger->reset();
@@ -632,6 +636,7 @@ bool BucketGVT::attempt_cancel(RemoteEvent* anti) {
     stats[anti->offset].cancelled++;
     RemoteEvent* original = *iter;
     bucket.erase(iter);
+    held_now--;
     delete original;
     delete anti;
     return true;
@@ -685,6 +690,8 @@ bool BucketGVT::produce(RemoteEvent* e) {
           (e->offset > reserve_buckets ||
           stats[e->offset].anti_ratio() > reserve_threshold)) {
         reserves[e->phase].push_front(e);
+        held_now++;
+        reserve_hi = std::max(reserve_hi, (int)e->phase);
         stats[e->offset].held++;
         PE_STATS(remote_holds)++;
         return false;

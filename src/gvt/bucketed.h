@@ -329,6 +329,11 @@ class BucketGVT : public CBase_BucketGVT {
     int clear_buckets;
     double reserve_threshold;
     std::list<RemoteEvent*>* reserves;
+    // Events held now, and the highest bucket holding one. advance_gvt scans
+    // only up to it: with --gvt-clear-buckets=0 it would otherwise scan every
+    // remaining bucket of the run on each GVT advance
+    long held_now = 0;
+    int reserve_hi = -1;
 };
 
 #endif

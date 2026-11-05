@@ -1,0 +1,10 @@
+# Optimistic w/Bucketed GVT, holding remote events more than 4 buckets ahead
+# of GVT in the sender and releasing every held event at the next GVT advance
+# (Mikida & Kale, PADS'19, Sec. 5: static cutoff, release at the next GVT)
+sync=3
+gvt=4
+buffer-size=655360
+gvt-adaptive-buckets=1
+gvt-reserve-buckets=4
+gvt-clear-buckets=0
+gvt-clear-lag=0
