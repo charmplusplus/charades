@@ -68,7 +68,7 @@ Status:
 | T1 | committed events equal in all three engines, every workload and node count | 1, 3 | 142–143 (40 cells), 169–172, 177 | have; repeat in the final runs |
 | F1 | weak scaling 1–32 nodes, Gaussian PHOLD σ 100 to uniform and lookahead 10, three engines (M ev/s, and Charades ÷ each) | 3 | 142–143, 153 (A2r), 166 (N32 launch) | rerun on final defaults; 5 reps at 32 nodes (32-node runs vary ±14% between reps) |
 | F2 | aggregation ablation: direct sends, eager flush (`--agg-policy=0`), deadline flush, by σ; events per message and messages per event | 1 | 223 (job ABL, round 3, 4 and 16 nodes, PHOLD and traffic) | have: deadline ÷ direct 2.1–3.3 on PHOLD, 1.4 on traffic; eager ÷ deadline down to 0.61 (uniform, 16 nodes) |
-| F3 | the PADS'19 static hold and opportunistic (eager) aggregation as baselines | 1, 2 | 223 (eager: have; hold arms used the wrong release rule) | eager have; hold rerun submitted (job F3R, RESULTS.md 224): PADS'19's rule (release at the next GVT), cutoffs 0.13 / 1 / 4 mean delays without a window and beside W B, against no hold with the fast path on and off (the hold turns it off) |
+| F3 | the PADS'19 static hold and opportunistic (eager) aggregation as baselines | 1, 2 | 223 (eager), 225 (hold, 4 and 16 nodes) | have. Eager ÷ deadline down to 0.61; the PADS'19 hold (its own release rule; job F3R, 225) reaches at most 1.02 of no hold with the fast path on (0.83–1.02), and 0.30–0.40 (PHOLD) and 0.67–0.72 (traffic) of deadline htram |
 | F4 | robustness: each policy ÷ the best fixed W per workload (controller, best single fixed W, Devastator's rule in Charades, Devastator's own window), and each policy's worst case | 2 | 181, 185 (frozen rule, quantile rule, fixed grids; 7 workloads, 4 and 16 nodes) | have for Charades' rules; Devastator's rule in Charades and Devastator's own window still to run (item 4) |
 | F5 | applications: traffic, dragonfly and VLSI (b19 × N) at 1–32 nodes, three engines | 3 | 168–172, 175, 177 (ports, counts, sizes); 188, 189, 194 (traffic and dragonfly, 1–32 nodes) | traffic and dragonfly have (2026-11-02; Charades ÷ Devastator 0.94–2.03 dragonfly, 1.02–1.08 traffic; ÷ ROSS 1.7–4.3, ROSS without its window); VLSI on round 3 at 1–16 nodes (RESULTS.md 217: Charades ÷ Devastator 1.19–1.37), 32 nodes pending |
 | F6 | where a wider window's cost goes: blocked time and GVT wave period by W | 2, 4 | 176 (4/16 nodes), 184 (16/32 nodes) | have |
@@ -130,6 +130,8 @@ time without a reason written here first.
      - F2 is done (4 and 16 nodes).
      - F3's eager arm is done. The hold arms used the code's default release (at the event's bucket), not PADS'19's (all held events at the next GVT), and all hit the cap; they need a rerun.
      - F3 rerun (job F3R, RESULTS.md 224): PADS'19's release rule; cutoffs scaled to the mean delay (PADS'19 counts them in buckets of width 1 and gives no delays); no hold with the fast path off as the hold's reference; the release loop's scan of every remaining bucket fixed (8a34d51); ROSS's dragonfly window down to 625 ps.
+       - **Done (job F3R, RESULTS.md 225), 4 and 16 nodes.** The hold reaches 0.83–1.02 of no hold with the fast path on. It turns the fast path off (worth up to 1.33× on σ 100), and beside a window it changes little (0.90–1.06). Without a window, cutoffs up to one mean delay cost PHOLD 1.4–5.6×; on traffic they gain 1.09–1.10× at 4 nodes and are level at 16.
+       - ROSS's best dragonfly window is 2,500 ps at 1 node and 5,000 at 4 (7,500 untried). Charades ÷ ROSS with it is 2.98–3.05.
      - ROSS's window: 1.13–1.19× ROSS on traffic, 1.35–1.48× on dragonfly, where the best value is the grid's edge (5,000 ps; extend to 2,500 and 1,250). Charades ÷ ROSS with it: traffic 1.75–1.90, dragonfly 3.0–3.2 (1 and 4 nodes); F5's ratios were against ROSS without a window.
      - F4 (Devastator's rule in Charades, Devastator's own window, phase-changing PHOLD, dragonfly) is still to schedule.
 5. **Engine freeze, 2026-12-07.**
@@ -158,7 +160,8 @@ Ratios: Charades ÷ the other (higher is better for Charades).
   - 0.89 (σ 100), 1.04 (σ 500), 1.14 (σ 1,000), 1.24 (σ 2,000), 1.39 (σ 4,000), 1.66 (uniform);
   - lookahead 10: 0.99 (σ 500), 1.11 (σ 2,000);
   - 44 of 48 cells ahead over 1–32 nodes.
-- **Charades ÷ ROSS:** 2.4–5.3× everywhere.
+- **Charades ÷ ROSS:** 2.4–5.3× on PHOLD, against ROSS without its window (ROSS's window is untested on PHOLD). On the applications, against ROSS with its window, at 1 and 4 nodes: traffic 1.75–1.90, dragonfly 2.98–3.05 (sections 223, 225).
+- **The PADS'19 hold** (section 225): at most 1.02 of no hold with the fast path on (0.83–1.02), and 0.30–0.40 (PHOLD) and 0.67–0.72 (traffic) of deadline htram.
 - **Aggregation, deadline htram ÷ direct sends, each at its better fixed W** (job ABL, round 3; section 223): 2.11 / 2.85 / 3.31 / 1.44 at 4 nodes and 2.20 / 2.87 / 2.65 / 1.37 at 16 (σ 100 / σ 2,000 / uniform / traffic).
 - **Controller (frozen rule) ÷ best fixed W, 7 workloads at 4 and 16 nodes (section 185):**
   - 0.91–1.03 in every cell;

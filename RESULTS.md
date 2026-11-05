@@ -380,7 +380,8 @@ Sections 1–128 were re-read before planning sections 129 onward.
 | 221 | 2026-11-04 | 3682096 | SHMPR2 results: no send found a segment full in any run (VLSI 2 × 23 and 4 × 11 at 8 MiB and at the new default; PHOLD uniform and σ 100); VLSI's busiest segment peaks at 4.0–4.2 MiB, the same at 23 and 33 senders; reviewed branch ÷ branch before review 0.985 / 1.006 / 0.987 (within rep spread), same counts and digests; Reconverse IPC tests on Stampede3 20/20 after a rebuild (the job's own build hit the non-login-shell `module` mistake again); SR1, SR2 right, SR4 half, SR3, SR5 wrong | current |
 | 222 | 2026-11-04 | ABL (results in a later section) | F2 and F3 on PHOLD and traffic, and ROSS's window (design): direct, eager and deadline aggregation at two fixed W and the controller; the PADS'19 hold over three cutoffs; ROSS `--max-opt-lookahead` on traffic and dragonfly at 1 and 4 nodes; 4 and 16 nodes; `--agg-scope=1` dropped (the fast path already keeps same-process events out of htram; section 187 corrected); predictions AB1–AB6 | design |
 | 223 | 2026-11-04 | 3682372 | ABL results: deadline htram ÷ direct sends 2.11 / 2.85 / 3.31 / 1.44 at 4 nodes and 2.20 / 2.87 / 2.65 / 1.37 at 16 (σ 100 / σ 2,000 / uniform / traffic); eager ÷ deadline 0.87–1.00 on PHOLD at 4 nodes, 0.61–0.63 on uniform at 16, level on σ 100 and traffic (eager 1.10 at traffic's best W at 16); controller 0.94–1.08 of the better fixed W in every transport; F3 hold arms used the wrong release rule (all capped; Mac: PADS'19's rule is neutral beside a window, 5× slower without one); ROSS's window 1.13–1.48× ROSS, Charades ÷ ROSS 1.75–1.90 (traffic), 3.0–3.2 (dragonfly, grid edge); AB1, AB4 right, AB3 mostly, AB2, AB6 half, AB5 untested | current (F2, ROSS) / superseded (F3) |
-| 224 | 2026-11-04 | F3R (results in a later section) | F3 rerun (design): the PADS'19 hold with PADS'19's release rule (all held events go at the next GVT), cutoffs 16 / 128 / 512 buckets of 8 (0.13, 1, 4 mean delays; PADS'19's cutoffs are in buckets of width 1 over about 1,024 time units), no hold with and without the local fast path (the hold turns it off), the hold beside W B; the release loop's scan of every remaining bucket fixed (8a34d51); ROSS dragonfly window 625–5,000 ps; Mac runs at 2 × 2 (section 223's Mac table was 2 × 4, and compared the hold against no hold with the fast path on); predictions F3R1–F3R7 | design |
+| 224 | 2026-11-04 | F3R (results in a later section) | F3 rerun (design): the PADS'19 hold with PADS'19's release rule (all held events go at the next GVT), cutoffs 16 / 128 / 512 buckets of 8 (0.13, 1, 4 mean delays; PADS'19's cutoffs are in buckets of width 1 over about 1,024 time units), no hold with and without the local fast path (the hold turns it off), the hold beside W B; the release loop's scan of every remaining bucket fixed (8a34d51); ROSS dragonfly window 625–5,000 ps; Mac runs at 2 × 2 (section 223's Mac table was 2 × 4, and compared the hold against no hold with the fast path on); predictions F3R1–F3R7 | design (results in 225) |
+| 225 | 2026-11-04 | 3683036 | F3R results: the PADS'19 hold (PADS'19's release rule) never beats no hold with the fast path on by more than 2% (0.83–1.02), because it turns the fast path off (worth up to 1.33× on σ 100) and a window already does its job (hold beside W B 0.90–1.06); without a window, cutoffs up to one mean delay cost PHOLD 1.4–5.6× and gain traffic 1.09–1.10× at 4 nodes; best hold ÷ deadline htram 0.30–0.40 (PHOLD), 0.67–0.72 (traffic); ROSS's best dragonfly window is 2,500 (1 node) and 5,000 ps (4 nodes), Charades ÷ ROSS 2.98–3.05; counts and digests equal in every arm; F3R1, F3R5, F3R7 right, F3R2, F3R4, F3R6 mostly, F3R3 half | current |
 
 ## Stampede3 runs, in order
 
@@ -9674,6 +9675,70 @@ Which of these costs the half is not measured. It does not touch the paper's num
 - **F3R5:** on every workload, no hold arm beats the best arm without it (fast path on, no window or W B) by more than 2%. The hold's best is at most 0.5 of deadline htram (section 223) on σ 2,000 and uniform, and at most 0.75 on σ 100 and traffic.
 - **F3R6:** with the fast path on, no window runs at 0.90–1.02 of W B on PHOLD, and at 0.80–0.97 on traffic, which rolls back more as W grows (section 223).
 - **F3R7:** ROSS's best dragonfly window lies between 1,250 and 5,000 ps. With it, ROSS runs 1.35–1.6× faster than without one. Charades ÷ ROSS's best is 2.7–3.2 at 1 and 4 nodes.
+
+### F3R results: the PADS'19 hold never beats no hold with the fast path on by more than 2%; without a window it costs PHOLD up to 5.6× and gains traffic up to 1.10× at 4 nodes; beside a window it changes little; ROSS's best dragonfly window is 2,500–5,000 ps, and Charades ÷ ROSS is 2.98–3.05 (2026-11-04; skx-dev batch job 3683036, 16 nodes)
+
+> **Status: current.** Design and predictions in section 224. 48 minutes; gate 48/48; no run failed, hit the cap or was skipped, so every hold cutoff also ran at 16 nodes. Data, `f3r_summary.py` and `f3r_summary.txt` in `~/charades-data/abl/` (the job is in `f3r/j3683036`). All Charades arms send directly, as PADS'19 did.
+> - **Counts:** within each workload and node count, all 18 Charades runs commit the same events with the same digest, the hold included. ROSS commits the same count as Charades on dragonfly at 1 and 4 nodes.
+
+**The hold against no hold** (M committed ev/s, mean of 2 reps; higher is better). The hold turns the fast path off, so its own reference is no hold with the fast path off. W B is 400 on PHOLD and 1,000 on traffic. Cutoffs are in buckets of 8 time units: 16, 128 and 512 are 0.13, 1 and 4 mean delays.
+
+| workload | nodes | no hold, fast path on: none / W B | no hold, fast path off: none / W B | hold, no window: cutoff 16 / 128 / 512 | hold beside W B: cutoff 16 / 128 | **best hold ÷ best no hold, fast path on** | best hold ÷ deadline htram (section 223) |
+|---|---|---|---|---|---|---|---|
+| σ 100 | 4 | 80.1 / **95.7** | 61.6 / 77.4 | 11.2 / 42.3 / 60.0 | 80.1 / 76.5 | **0.84** | 0.40 |
+| σ 2,000 | 4 | 49.9 / **55.0** | 45.6 / 49.5 | 20.3 / 25.3 / 44.4 | 47.8 / 49.6 | **0.90** | 0.32 |
+| uniform | 4 | 39.2 / **40.6** | 37.3 / 39.9 | 10.1 / 12.4 / 37.6 | 36.0 / 40.2 | **0.99** | 0.30 |
+| traffic | 4 | 187.6 / **200.7** | 164.8 / 182.7 | 179.0 / 181.1 / 164.6 | 190.6 / 188.3 | **0.95** | 0.67 |
+| σ 100 | 16 | 314.8 / **373.9** | 236.6 / 303.3 | 46.9 / 98.1 / 241.6 | 311.3 / 302.2 | **0.83** | 0.38 |
+| σ 2,000 | 16 | 190.5 / **210.5** | 174.1 / 193.7 | 66.8 / 86.9 / 172.8 | 183.5 / 191.3 | **0.91** | 0.32 |
+| uniform | 16 | 129.5 / 143.9 | 131.0 / 144.6 | 35.1 / 40.8 / 128.9 | 136.9 / **146.6** | **1.02** | 0.38 |
+| traffic | 16 | 723.5 / **774.0** | 641.1 / 716.7 | 612.1 / 640.1 / 629.5 | 761.2 / 744.1 | **0.98** | 0.72 |
+
+**Ratios to the hold's own reference** (no hold, fast path off, same window; higher is better for the hold):
+
+| workload | nodes | no window: cutoff 16 / 128 / 512 | W B: cutoff 16 / 128 | events rolled back (M), no window: no hold / cutoff 16 / 128 / 512 | share of remote sends held, no window: cutoff 16 / 128 / 512 |
+|---|---|---|---|---|---|
+| σ 100 | 4 | 0.18 / 0.69 / 0.97 | 1.03 / 0.99 | 414 / 2,021 / 610 / 385 | 1.00 / 1.00 / 0.73 |
+| σ 2,000 | 4 | 0.45 / 0.56 / 0.98 | 0.96 / 1.00 | 76 / 817 / 595 / 83 | 1.00 / 0.97 / 0.05 |
+| uniform | 4 | 0.27 / 0.33 / 1.01 | 0.90 / 1.01 | 42 / 1,772 / 1,323 / 38 | 1.00 / 0.99 / 0.03 |
+| traffic | 4 | **1.09 / 1.10** / 1.00 | 1.04 / 1.03 | 744 / 576 / 544 / 726 | 1.00 / 1.00 / 0.78 |
+| σ 100 | 16 | 0.20 / 0.41 / 1.02 | 1.03 / 1.00 | 1,705 / 8,758 / 4,793 / 1,383 | 1.00 / 1.00 / 0.79 |
+| σ 2,000 | 16 | 0.38 / 0.50 / 0.99 | 0.95 / 0.99 | 352 / 4,147 / 2,853 / 370 | 1.00 / 1.00 / 0.18 |
+| uniform | 16 | 0.27 / 0.31 / 0.98 | 0.95 / 1.01 | 260 / 7,655 / 6,839 / 293 | 1.00 / 1.00 / 0.06 |
+| traffic | 16 | 0.95 / 1.00 / 0.98 | 1.06 / 1.04 | 3,009 / 3,326 / 3,015 / 3,126 | 1.00 / 1.00 / 0.85 |
+
+- **The hold never beats Charades' default** (no hold, fast path on, the better of no window and W B) by more than 2%: 0.83–1.02. Two things hold it back:
+  - **It turns the fast path off.** The fast path is worth 1.23–1.33× on σ 100 (fast path off ÷ on 0.75–0.81), 1.08–1.14× on σ 2,000 and traffic, and nothing on uniform at 16 nodes.
+  - **A window already does its job.** Beside W B, the hold is 0.90–1.06 of no hold.
+- **Without a window, on PHOLD, a cutoff of up to one mean delay costs 1.4–5.6×** (0.18–0.69) and rolls back 1.5–42× more events. Senders run far ahead of GVT, so nearly every remote event lands past the cutoff and is held. A held event goes out at the next GVT advance, to a receiver that has run ahead of it. At 4 mean delays the hold holds 3–79% of remote events and is level (0.97–1.02).
+- **On traffic without a window the hold gains 1.09–1.10× at 4 nodes** (cutoffs 16 and 128), with 23–27% fewer events rolled back. It is level at 16 nodes (0.95–1.00). It still runs at 0.90 of no hold with the fast path on at W 1,000.
+- **Against htram the hold is far behind:** its best is 0.30–0.40 of deadline htram on PHOLD and 0.67–0.72 on traffic (htram from job ABL, section 223, same engine).
+- PADS'19 reported +18% on PHOLD Combo and +70% on dragonfly. Those were non-SMP runs on Blue Waters, with other PHOLD settings. We did not run its PHOLD Combo or dragonfly configurations.
+- **Not investigated:** why holding reduces rollbacks on traffic at 4 nodes but raises them on PHOLD.
+
+**ROSS's dragonfly window** (`--max-opt-lookahead`, ps; ROSS optimistic, batch 2, GVT interval 64; M committed ev/s, mean of 2 reps, efficiency in parentheses):
+
+| nodes | none | 625 | 1,250 | 2,500 | 5,000 | best ÷ none | Charades controller | **Charades ÷ ROSS's best** |
+|---|---|---|---|---|---|---|---|---|
+| 1 | 9.84 (70.7%) | 9.89 (100%) | 12.23 (100%) | **13.70** (99.6%) | 13.09 (93.6%) | 1.39 | 41.80 | **3.05** |
+| 4 | 28.69 (63.0%) | 25.77 (100%) | 34.40 (100%) | 40.11 (99.6%) | **42.25** (96.0%) | 1.47 | 125.86 | **2.98** |
+
+- At 1 node, ROSS's best is now 2,500 ps, inside the grid. At 4 nodes it is still 5,000; section 223 found that 10,000 and above change nothing, so 7,500 is the only value left untried.
+- Below 2,500 ps ROSS slows down. At 625 and 1,250 ps every event it executes is committed (100% efficiency), but it waits at the window.
+- This job agrees with job ABL: ROSS at 5,000 ps 42.25 against 41.28, Charades' controller 125.86 against 123.67 at 4 nodes. **Charades ÷ ROSS with its window on dragonfly is 2.98–3.05** at 1 and 4 nodes. It replaces section 223's provisional 3.0–3.2.
+
+**Predictions (section 224):**
+- **F3R1 right.**
+- **F3R2 mostly right.** Fast path off ÷ on is lowest on σ 100 and highest on uniform, as predicted. σ 100 without a window (0.75–0.77) is below the range, and uniform at 16 nodes (1.00–1.01) is above it.
+- **F3R3 half right.**
+  - Cutoffs 16 and 128 run at 0.18–0.69 of no hold on PHOLD; only 2 of 6 cells at 4 nodes fall in the predicted 0.05–0.3.
+  - Events rolled back rise 1.5–42×, not at least 50×: at this scale no hold without a window already rolls back a lot.
+  - On traffic the hold gains 1.09–1.10 at 4 nodes instead of losing.
+  - At cutoff 512, the rate (0.97–1.02) is right. The held share is under 5% only on σ 2,000 and uniform at 4 nodes; it is 73–85% on σ 100 and traffic.
+- **F3R4 mostly right:** 10 of 16 cells are in 0.95–1.02. Cutoff 16 is 0.90 on uniform at 4 nodes. On σ 100 (cutoff 16) and traffic (both cutoffs) the hold is 1.03–1.06.
+- **F3R5 right:** the hold reaches at most 1.02 of the best no-hold arm. Its best is 0.30–0.38 of deadline htram on σ 2,000 and uniform, and 0.38–0.72 on σ 100 and traffic.
+- **F3R6 mostly right:** no window ÷ W B with the fast path on is 0.90–0.96 on σ 2,000 and uniform and 0.93 on traffic, in range. σ 100 is 0.84, below the range: without a window it rolls back more events than it commits.
+- **F3R7 right:** the best window is 2,500 (1 node) and 5,000 ps (4 nodes); best ÷ none is 1.39 and 1.47; Charades ÷ ROSS's best is 3.05 and 2.98.
 
 ## Baseline verification on the Mac
 
