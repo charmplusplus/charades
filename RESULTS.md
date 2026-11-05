@@ -383,9 +383,10 @@ Sections 1–128 were re-read before planning sections 129 onward.
 | 224 | 2026-11-04 | F3R (results in a later section) | F3 rerun (design): the PADS'19 hold with PADS'19's release rule (all held events go at the next GVT), cutoffs 16 / 128 / 512 buckets of 8 (0.13, 1, 4 mean delays; PADS'19's cutoffs are in buckets of width 1 over about 1,024 time units), no hold with and without the local fast path (the hold turns it off), the hold beside W B; the release loop's scan of every remaining bucket fixed (8a34d51); ROSS dragonfly window 625–5,000 ps; Mac runs at 2 × 2 (section 223's Mac table was 2 × 4, and compared the hold against no hold with the fast path on); predictions F3R1–F3R7 | design (results in 225) |
 | 225 | 2026-11-04 | 3683036 | F3R results: the PADS'19 hold (PADS'19's release rule) never beats no hold with the fast path on by more than 2% (0.83–1.02), because it turns the fast path off (worth up to 1.33× on σ 100) and a window already does its job (hold beside W B 0.90–1.06); without a window, cutoffs up to one mean delay cost PHOLD 1.4–5.6× and gain traffic 1.09–1.10× at 4 nodes; best hold ÷ deadline htram 0.30–0.40 (PHOLD), 0.67–0.72 (traffic); ROSS's best dragonfly window is 2,500 (1 node) and 5,000 ps (4 nodes), Charades ÷ ROSS 2.98–3.05; counts and digests equal in every arm; F3R1, F3R5, F3R7 right, F3R2, F3R4, F3R6 mostly, F3R3 half | current |
 | 226 | 2026-11-04 | 3679976 | VS2 at 32 nodes (big2): Charades ÷ Devastator on VLSI 1.046 (per rep 0.96–1.07; 1.19–1.37 at 1–16 nodes); from 16 to 32 nodes Charades' cycle grows 1.188 → 1.360 ms, Devastator's 1.413 → 1.423; the count wave in flight is 94% of the traced cycle's growth (0.157 ms per wave at 32 nodes, 0.106 at 16); W 2,500 varies 1.17–1.19 between reps in both engines, wider windows 1.01–1.03; the controller holds W 2,500 yet runs at 0.90–1.00 of it (cause not measured); round 3 ÷ old 1.197; Devastator 1 × 46 ÷ 2 × 23 0.80; Charades ÷ ROSS 14.9; one count in all three engines; Q1, Q2, Q5 right at 32, Q3 wrong narrowly (1.046 against at least 1.05) | current |
-| 227 | 2026-11-05 | F4: 3684492 (skx-dev) / 3684493 (skx) (results in a later section) | F4 design: Charades' fixed W grid, frozen controller and Devastator's rule in Charades (`--ctl=2` from one bucket), against Devastator's fixed W grid and its own adaptive window; job N's seven workloads at 4 and 16 nodes on the current tree (`charades-f3`, 8a34d51); W 100 and W 300 on every PHOLD workload for the single-window test; Mac change tier 63/63 with the hill climb; predictions F4-1 to F4-6 | design |
+| 227 | 2026-11-05 | F4: 3684492 (skx-dev) / 3684493 (skx) | F4 design: Charades' fixed W grid, frozen controller and Devastator's rule in Charades (`--ctl=2` from one bucket), against Devastator's fixed W grid and its own adaptive window; job N's seven workloads at 4 and 16 nodes on the current tree (`charades-f3`, 8a34d51); W 100 and W 300 on every PHOLD workload for the single-window test; Mac change tier 63/63 with the hill climb; predictions F4-1 to F4-6 | design (results in 230) |
 | 228 | 2026-11-05 | — (offline: 3679974, 3679976; PHOLD 3660089, 3660196) | Why VLSI's lead shrinks at 32 nodes, from existing data: per-wave latency 67.5 / 83.9 / 107.1 / 127.3 µs (median) at 4 / 8 / 16 / 32 nodes, all of the steady growth across processes (42 → 101 µs); from 16 to 32 nodes two thirds of the cycle's growth is slow waves (7.8% of waves, 25% of wave time), which come with the 32-node allocation (PHOLD: 0.9% in a 16-node allocation, 4.2% on 16 nodes of a 32-node one); they cluster into slow stretches that only a one-period window feels (W 2,500 0–11%, controller 3–19%, W 5,000 0–1.9% of run time); the controller has no steady cost (same fast level; 6.13–6.51 s against 6.09–6.69 s without stretches); W 5,000 is flat but 1.29–1.37× slower per cycle at 4–16 nodes (the busiest PE stops waiting, more rollbacks); the engine's own share of the 16 → 32 growth is about 2.6% of the cycle, and the GVT changes that could cut it were tried on PHOLD without gain | current |
 | 229 | 2026-11-05 | VW: 3684509 (skx) (results in a later section) | VLSI window between one and two clock periods (design): W 2,500 / 3,125 / 3,750 / 5,000 ps at 4, 8 and 16 nodes on VS2's binaries, the steady cost only (tolerance to slow advances needs a 32-node allocation, tested in F1's job only if the cost is at most 5%); predictions VW1–VW4 | design |
+| 230 | 2026-11-05 | 3684492 | F4 results: Charades' frozen controller 0.83–1.03 of the best fixed W (0.92–1.03 in 12 of 14 cells; phase-changing PHOLD at 4 nodes 0.83–0.88, where round 3 moved the best W to 75); Devastator's rule in Charades 0.11–0.84 (70–88% efficiency, windows 5–66× the best); Devastator's own window 0.09–0.83 and did not finish on phase-changing PHOLD and σ 2,000 at 4 nodes; one PHOLD window 0.52–0.55; Charades ÷ Devastator 1.13–2.01, each at its best fixed W; one count per cell in both engines; phase-changing PHOLD at 16 nodes rep 2 hit by an episode on the machine; F4-1, F4-3, F4-5, F4-6 right, F4-4 mostly, F4-2 wrong in one cell | current |
 
 ## Stampede3 runs, in order
 
@@ -9997,6 +9998,78 @@ Which of these costs the half is not measured. It does not touch the paper's num
 **What follows:**
 - If W 3,125 or W 3,750 costs at most 5% per cycle against W 2,500 at 16 nodes, F1's 32-node job runs it beside W 2,500 to measure its tolerance to slow advances.
 - Otherwise the idea closes. The paper reports VLSI's 32-node spread as section 228 describes.
+
+### F4 results: Charades' frozen controller is 0.83–1.03 of the best fixed W, with phase-changing PHOLD at 4 nodes its weakest cell; Devastator's rule in Charades falls to 0.13; Devastator's own window falls to 0.09 and does not finish on two workloads; one window for all PHOLD falls to 0.52; every cell commits one count in both engines (2026-11-05; skx-dev batch job 3684492, 16 nodes)
+
+> **Status: current.** Design and predictions in section 227.
+> - **Job:** 51 minutes; gate 63/63 (skx copy 3684493 cancelled before it started).
+>   - Every Charades run finished.
+>   - Devastator's own window did not finish within the 120 s cap on phase-changing PHOLD and σ 2,000 at 4 nodes, in both reps, so it was skipped there at 16 nodes. Every other Devastator run finished.
+> - **Data:** `~/charades-data/f4/f4227/j3684492/` (with `job.out`; `gvt_*.out` and digest files not copied); `f4_summary.py`, output `f4_summary.txt`, in `~/charades-data/f4/`.
+> - **Counts (F4-1 right):** in each of the 14 cells, every finished run of both engines commits one count, and Charades' runs share one digest.
+> - **One cell was hit by an episode on the machine:** phase-changing PHOLD at 16 nodes, rep 2, the job's last block (described below). Ratios from it are marked †, and the worst cases are given with and without it.
+
+**Each policy ÷ the best fixed W of the same engine and rep** (rep 1 / rep 2; M committed ev/s in parentheses; higher is better; mean W of Charades' controller in parentheses; fixed W in the model's time unit, dragonfly in ps):
+
+| workload | nodes | Charades' best fixed W (M ev/s) | Charades' controller (mean W) | Devastator's rule in Charades | Devastator's best fixed W (M ev/s) | Devastator's own window |
+|---|---|---|---|---|---|---|
+| phase-changing PHOLD | 4 | 75 (136.6 / 134.6) | **0.88 / 0.83** (118, 156) | 0.29 / 0.29 | 250 (99.4 / 96.8) | did not finish (< 0.09) |
+| | 16 | 100 / 75 (370.6 / 346.3) | 0.97 / 0.13† (108, 371) | 0.41 / 0.11† | 250 (273.1 / 285.4) | not run |
+| lookahead 10, σ 500 | 4 | 50 (161.2 / 162.5) | 0.96 / 0.96 (61, 61) | 0.51 / 0.41 | 200 / 100 (143.3 / 132.4) | 0.72 / 0.77 |
+| | 16 | 50 (636.1 / 628.9) | 0.98 / 0.98 (65, 62) | 0.31 / 0.29 | 200 (499.8 / 507.2) | 0.60 / 0.66 |
+| σ 100 | 4 | 300 (203.4 / 208.1) | 0.95 / 0.94 (316, 322) | 0.32 / 0.37 | 1,000 / 500 (167.7 / 168.0) | 0.70 / 0.62 |
+| | 16 | 300 / 400 (826.1 / 834.5) | 0.95 / 0.94 (366, 369) | 0.34 / 0.37 | 1,000 (658.1 / 660.4) | 0.38 / 0.40 |
+| σ 2,000 | 4 | 300 (158.1 / 156.9) | 0.95 / 0.93 (318, 315) | 0.32 / 0.41 | 1,000 (99.4 / 98.9) | did not finish (< 0.06) |
+| | 16 | 400 / 300 (612.2 / 605.0) | 0.98 / 0.99 (374, 367) | 0.17 / 0.13 | 1,000 (365.3 / 367.6) | not run |
+| uniform | 4 | 300 (136.1 / 134.9) | 0.95 / 0.94 (311, 309) | 0.23 / 0.20 | 500 (67.7 / 67.5) | 0.17 / 0.13 |
+| | 16 | 300 / 400 (388.8 / 389.0) | 0.98 / 0.98 (367, 348) | 0.23 / 0.25 | 1,000 (194.3 / 194.6) | 0.55 / 0.56 |
+| traffic | 4 | 500 (291.9 / 288.1) | 0.95 / 0.96 (548, 546) | 0.59 / 0.62 | 2,000 (233.3 / 232.0) | 0.29 / 0.37 |
+| | 16 | 750 (1,140.1 / 1,169.7) | 0.92 / 0.94 (883, 732) | 0.62 / 0.61 | 2,000 (893.0 / 910.4) | 0.09 / 0.22 |
+| dragonfly | 4 | 20,000 (120.7 / 120.9) | 1.03 / 1.03 (14,620, 14,234) | 0.84 / 0.80 | 20,000 (86.2 / 87.9) | 0.81 / 0.80 |
+| | 16 | 20,000 (409.2 / 409.4) | 1.02 / 1.03 (16,103, 14,064) | 0.82 / 0.79 | 20,000 (212.6 / 211.8) | 0.83 / 0.83 |
+
+("Did not finish (< x)": the run did not end within 120 s, so its rate is below the committed count ÷ 120 s, which is x of Devastator's best. † the episode.)
+
+**Worst case over the 28 rep-cells** (lowest; higher is better):
+
+| policy | worst case without the episode rep | with it |
+|---|---|---|
+| Charades' frozen controller | **0.83** (phase-changing PHOLD, 4 nodes) | 0.13 |
+| Devastator's rule in Charades | 0.13 (σ 2,000, 16 nodes) | 0.11 |
+| Devastator's own window | did not finish (< 0.06; σ 2,000, 4 nodes); 0.09 among runs that finished (traffic, 16 nodes) | the same |
+| one window for the five PHOLD workloads | W 100: 0.55 (σ 100, 16 nodes); W 300: 0.52 (lookahead 10, 16 nodes) | W 300: 0.26 |
+
+- **The controller is 0.92–1.03 in 12 of the 14 cells.** On phase-changing PHOLD it is 0.83–0.88 at 4 nodes, and 0.97 in the 16-node rep that the episode did not hit.
+  - At 4 nodes round 3 moved the best fixed W from 100 (job N) to 75. The controller's mean W is 118–156, and it runs below even W 150 held fixed (0.92–0.94).
+  - So, as in job N, the loss is the cost of measuring: half its periods run at a trial W, and every change of W leaves a transient.
+- **Devastator's rule in Charades** reaches 0.11–0.84.
+  - It settles at 70–88% efficiency, with mean windows 5–66× the best on PHOLD and traffic (σ 100: 3,353–12,507 against 300; dragonfly 1.3–1.4×).
+  - Its rule doubles W while efficiency is above 95% and moves it only 1% per round between 66% and 95%. Charades' best fixed windows commit 99.5–100% of the events they execute (dragonfly 92–95%), so the rule's band sits far from where Charades runs best.
+  - On dragonfly it is 0.79–0.84 at 75–79% efficiency. Its W did not run to the end time (mean 25,404–27,439 ps; final 29,032–166,744).
+- **Devastator's own window** reaches 0.09–0.83 where it finished.
+  - On lookahead 10 and σ 100 it runs to its 2⁵⁸ clamp (mean window 1.3–2.6 × 10¹⁷) at 61–85% efficiency.
+  - On uniform it stays finite (mean 570–780) at 46–74% efficiency.
+  - On phase-changing PHOLD and σ 2,000 at 4 nodes it did not finish within 120 s, where its best fixed W takes 7–11 s.
+- **Charades across engines** (each at its best fixed W, same allocation, job N's short sizes, round 3): Charades ÷ Devastator is 1.13–2.01 in all 14 cells. Charades' controller ÷ Devastator's best fixed W is 1.08–1.99 (without †), and ÷ Devastator's own window 1.49–14.3 where that window finished.
+
+**The episode (phase-changing PHOLD, 16 nodes, rep 2).** It was the job's last block, about 11:25–11:31.
+- **The waves:** every arm made extra count waves that advanced nothing: 1.07–1.56 waves per GVT advance at fixed W (2.2 for the controller). Every other fixed-W run of the job made 1.00–1.03, except W 25 on lookahead 10 (1.33 in every rep and node count) and dragonfly W 10,000 at 4 nodes in rep 1 (1.09).
+- **The windows:** the wider the window, the worse it was. W 50–100 lost 6–15% against rep 1, W 150 24%, W 250 and 300 66–72%. The controller (mean W 371 against 108 in rep 1) and the hill climb, which ran first in the block, lost most.
+- **When:** the slowness came in bursts in the middle of runs. W 300 took 8–12 s in three tenths of its advances, against 1.3 s per tenth throughout rep 1. W 250 slowed in its last four tenths.
+- **Reading:** a slow period on the machine, amplified by rollbacks at wide windows. An after-effect of the preceding hill-climb run (3.7 billion events rolled back) would have shown at the start of each run and faded instead.
+- Rep 1 of the same cell, at the job's start, ran evenly (1.00 waves per advance in every fixed-W arm).
+
+**Predictions (section 227):**
+- **F4-1 right.**
+- **F4-2 wrong in one cell:** the controller is 0.92–1.03 in 12 of 14 cells, and 0.83–0.88 on phase-changing PHOLD at 4 nodes (predicted at least 0.90). Phase-changing PHOLD is its weakest workload, as predicted. The 16-node rep 2 is the episode.
+- **F4-3 right:** the best fixed W is job N's in 12 of 14 cells. The exceptions are phase-changing PHOLD at 4 nodes (75, not 100) and traffic at 16 nodes (750, not 500; W 750 was in job N's grid). The new grid points never beat job N's best by more than 2%.
+- **F4-4 mostly right:** the hill climb's worst cell is 0.13, and it is at most 0.6 on all five PHOLD workloads. On dragonfly its W did not double to the end time: it ran at 75–79% efficiency, not above 95%.
+- **F4-5 right:** at 16 nodes Devastator's own window is at most 0.83 in all five cells where it ran. Its worst case is under 0.06, and two workloads did not finish at 4 nodes.
+- **F4-6 right:** W 100 falls to 0.55 (σ 100) and W 300 to 0.52 (lookahead 10).
+
+**What follows:**
+- **Claim 2's number changes** on the current tree: the frozen controller is 0.83–1.03 of the best fixed W, not 0.91–1.03 (jobs M and N, older tree). Its baselines' worst cases are 0.13 (Devastator's rule in Charades), did not finish (Devastator's own window) and 0.52–0.55 (any single PHOLD window).
+- **Phase-changing PHOLD at 16 nodes can be rerun** to replace the episode rep: Charades' arms only, 2–3 reps, about 10 minutes. User's decision.
 
 ## Baseline verification on the Mac
 
