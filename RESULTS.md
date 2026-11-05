@@ -384,6 +384,7 @@ Sections 1–128 were re-read before planning sections 129 onward.
 | 225 | 2026-11-04 | 3683036 | F3R results: the PADS'19 hold (PADS'19's release rule) never beats no hold with the fast path on by more than 2% (0.83–1.02), because it turns the fast path off (worth up to 1.33× on σ 100) and a window already does its job (hold beside W B 0.90–1.06); without a window, cutoffs up to one mean delay cost PHOLD 1.4–5.6× and gain traffic 1.09–1.10× at 4 nodes; best hold ÷ deadline htram 0.30–0.40 (PHOLD), 0.67–0.72 (traffic); ROSS's best dragonfly window is 2,500 (1 node) and 5,000 ps (4 nodes), Charades ÷ ROSS 2.98–3.05; counts and digests equal in every arm; F3R1, F3R5, F3R7 right, F3R2, F3R4, F3R6 mostly, F3R3 half | current |
 | 226 | 2026-11-04 | 3679976 | VS2 at 32 nodes (big2): Charades ÷ Devastator on VLSI 1.046 (per rep 0.96–1.07; 1.19–1.37 at 1–16 nodes); from 16 to 32 nodes Charades' cycle grows 1.188 → 1.360 ms, Devastator's 1.413 → 1.423; the count wave in flight is 94% of the traced cycle's growth (0.157 ms per wave at 32 nodes, 0.106 at 16); W 2,500 varies 1.17–1.19 between reps in both engines, wider windows 1.01–1.03; the controller holds W 2,500 yet runs at 0.90–1.00 of it (cause not measured); round 3 ÷ old 1.197; Devastator 1 × 46 ÷ 2 × 23 0.80; Charades ÷ ROSS 14.9; one count in all three engines; Q1, Q2, Q5 right at 32, Q3 wrong narrowly (1.046 against at least 1.05) | current |
 | 227 | 2026-11-05 | F4 (results in a later section) | F4 design: Charades' fixed W grid, frozen controller and Devastator's rule in Charades (`--ctl=2` from one bucket), against Devastator's fixed W grid and its own adaptive window; job N's seven workloads at 4 and 16 nodes on the current tree (`charades-f3`, 8a34d51); W 100 and W 300 on every PHOLD workload for the single-window test; Mac change tier 63/63 with the hill climb; predictions F4-1 to F4-6 | design |
+| 228 | 2026-11-05 | — (offline: 3679974, 3679976; PHOLD 3660089, 3660196) | Why VLSI's lead shrinks at 32 nodes, from existing data: per-wave latency 67.5 / 83.9 / 107.1 / 127.3 µs (median) at 4 / 8 / 16 / 32 nodes, all of the steady growth across processes (42 → 101 µs); from 16 to 32 nodes two thirds of the cycle's growth is slow waves (7.8% of waves, 25% of wave time), which come with the 32-node allocation (PHOLD: 0.9% in a 16-node allocation, 4.2% on 16 nodes of a 32-node one); they cluster into slow stretches that only a one-period window feels (W 2,500 0–11%, controller 3–19%, W 5,000 0–1.9% of run time); the controller has no steady cost (same fast level; 6.13–6.51 s against 6.09–6.69 s without stretches); W 5,000 is flat but 1.29–1.37× slower per cycle at 4–16 nodes (the busiest PE stops waiting, more rollbacks); the engine's own share of the 16 → 32 growth is about 2.6% of the cycle, and the GVT changes that could cut it were tried on PHOLD without gain | current |
 
 ## Stampede3 runs, in order
 
@@ -9794,7 +9795,7 @@ Which of these costs the half is not measured. It does not touch the paper's num
 - **From 16 to 32 nodes the traced cycle grows 0.111 ms, and the wave in flight grows 0.104 ms of it (94%).** The time between waves, set by node 2's busiest copy, grows 0.007 ms.
 - From 4 to 32 nodes the wave in flight grows 0.170 ms while the time between waves shrinks 0.058 ms; the waves account for more than the cycle's whole growth (0.112 ms).
 - Each wave takes 0.157 ms at 32 nodes, against 0.073 ms at 4 and 0.106 ms at 16. At W one clock period each cycle needs a GVT advance, so the wave's latency is on every cycle's path. Devastator's best window at 32 nodes is four periods (W 10,000).
-- **Not measured:** why each wave takes longer at 32 nodes. A wave is combined within each process and then across the 32 processes.
+- **Not measured here:** why each wave takes longer at 32 nodes. Section 228 answers it from this data: two thirds of the growth is slow waves that come with the 32-node allocation.
 - The untraced W 2,500 cycle grows more than the traced one (+0.172 ms against +0.111 ms from 16 to 32 nodes). The traced run is one fast run and counts only cycles 1,000–4,000; the medians include the slow reps below.
 
 **The spread at W 2,500.** At one clock period both engines vary between reps at 32 nodes: Charades 518–615 M ev/s (1.19), Devastator 454–529 M ev/s without its outlier (1.17). Their wider windows are steady (Charades W 5,000 1.03, Devastator W 10,000 1.01). At 1–16 nodes Charades' W 2,500 varied by 1.01–1.04. Our reading, not tested: at W one period each cycle waits for every PE's contribution to the wave, so a delay on any of the 32 nodes delays the cycle, and a wider window lets PEs run past it.
@@ -9803,7 +9804,7 @@ Which of these costs the half is not measured. It does not touch the paper's num
 - It holds W at 2,500 in every run (its range from the delay histogram is one bucket, as at 1–16 nodes), so it runs the same window as the W 2,500 arm.
 - **It runs at 0.90–1.00 of W 2,500 in each rep (median 0.935), slower in all five.** At 1–16 nodes it was 0.97–1.02 per rep. Arm order alternates between reps (the controller first in odd reps, last in even), so order does not explain it.
 - It adds no count waves (10,110–10,192 against 10,130–10,138 per run). Its PEs' blocked spells at the window are longer in every rep (mean 69–87 µs against 67–83 µs).
-- **Not measured:** where the controller's extra time goes.
+- **Not measured here:** where the controller's extra time goes. Section 228: slow stretches; its steady cost is nil.
 - Against the best arm at 32 nodes it is 0.930, inside claim 2's 0.91–1.03; Charades' controller ÷ Devastator is 0.973.
 
 **Predictions (section 216), now with 32 nodes:**
@@ -9886,6 +9887,88 @@ Which of these costs the half is not measured. It does not touch the paper's num
 - F4 is built from this job: for each engine and workload, each policy ÷ that engine's best fixed W, and each policy's worst case.
 - If F4-2 fails (any cell under 0.90), read the `CTL` logs for where W went before writing claim 2. The controller stays frozen.
 - If Devastator's rule in Charades does well (F4-4 wrong), the paper says so; claim 2 then rests on the worst case against Devastator's own window and any single fixed W.
+
+### Why VLSI's lead shrinks at 32 nodes, from data already taken: two thirds of the cycle's growth is slow count waves that come with the 32-node allocation, one third the waves' cross-process time; the controller has no steady cost; a wider window is immune but slower (2026-11-05; offline, no new runs; jobs VS2 a2 3679974 and big2 3679976, PHOLD jobs E16 3660089 and E 3660196)
+
+> **Status: current.** Reads section 226's data further and answers its two "not measured" items: why a wave takes longer at 32 nodes, and the controller's 0.90–1.00.
+> - **Script:** `~/charades-data/vlsi/vs2_offline228.py` (run in `vscale216/`); output `vs2_offline228.txt`.
+> - **Sources:** PE 0's wave records (`--gvt-trace=1`, cycles 1,000–4,000) and every run's progress lines (wall time every 64 GVT advances, that is 64 clock cycles). GVT code read at 8a34d51; it is unchanged since the runs' tree (ae0dbd3) apart from held-event bookkeeping, which is off by default.
+
+**How a clock cycle uses the GVT at W one period** (`src/gvt/bucketed.C`):
+- **Per advance:** one start reduction (a minimum over all PEs) and two count waves. At 32 nodes the traced run made 5,182 start reductions and 10,198 count waves for 5,000 advances.
+- **Why two:** a bucket completes only when every PE had passed it at the previous wave, and that wave's received total equals this wave's sent total.
+- **One wave:**
+  - Each PE writes its counts into its process's slot. The last of the 46 PEs combines them, and the process joins a reduction across processes: a tree with fan-out 4, so 1, 2, 2 and 3 levels at 4, 8, 16 and 32 processes (section 117).
+  - The result is broadcast back down the tree. Each PE picks it up at the top of its next scheduler pass. On VLSI the PEs sit blocked at the window during the waves, so a pass takes about 0.5 µs.
+- **One hop** is a node-level message. It runs when a PE that polls the receiving LCI device gets to it: about 4 µs on the network, the rest waiting (section 118).
+
+**Per-wave latency at PE 0** (µs, lower is better; one traced run per node count; the three middle columns are medians; the last column counts waves over 2× the median):
+
+| nodes | median | mean | inside the process (start → combined) | across processes (combined → result) | pickup | slow waves (share of wave time) |
+|---|---|---|---|---|---|---|
+| 4 | 67.5 | 73.5 | 26.4 | 41.5 | 1.9 | 0.4% (15%) |
+| 8 | 83.9 | 83.4 | 23.9 | 60.8 | 1.6 | 0.8% (4%) |
+| 16 | 107.1 | 106.4 | 22.8 | 82.5 | 1.5 | 0.9% (4%) |
+| 32 | 127.3 | 156.9 | 25.5 | 100.6 | 1.5 | **7.8% (25%)** |
+
+- **All of the steady growth is across processes:** 42 → 101 µs from 4 to 32 nodes. The part inside the process (23–26 µs) and the pickup (1.5–1.9 µs) stay flat.
+- **From 16 to 32 nodes the traced cycle grows 0.111 ms** (section 226):
+  - waves of at most twice the median add 31 µs per cycle (15 µs per wave, about 2 per cycle), as the tree gains a level;
+  - the slow waves, new at 32 nodes, add 71 µs per cycle;
+  - the time between waves adds 7 µs.
+  - So about two thirds of the growth is slow waves.
+
+**The slow waves come with the allocation, not with the node count.** PHOLD σ 100 (both jobs before `--localalloc`):
+
+| allocation | nodes in the run | slow waves (share of wave time) |
+|---|---|---|
+| 16-node skx-dev (job E16, 2 runs) | 16 | 0.9% (5–6%) |
+| 32-node skx (job E, 1 run) | 16 of the 32 | 4.2% (19%) |
+| 32-node skx (job E, 2 runs) | 32 | 4.6–10.8% (17–34%) |
+
+- Sections 154 and 162 traced these on PHOLD. Each stretched wave has one slow hop; the slow hops are spread over many node pairs, with no receive overflow and no transmit wait. `--localalloc` removed the TLB-shootdown bursts, but the slow hops remained (section 166).
+- VS2's 16-node cell ran on skx-dev and its 32-node cell on skx, so section 226's 16 → 32 comparison crosses allocations.
+
+**The slow waves cluster into slow stretches, and only a one-period window feels them.** Fast level is the 10th percentile of ms per cycle over the 64-cycle intervals; slow stretches are the intervals above 1.1× the fast level, counting only the excess (round 3; lower is better for both):
+
+| nodes | W 2,500: fast level, slow-stretch share | controller (holds W 2,500) | W 5,000 |
+|---|---|---|---|
+| 1 | 0.459–0.464, 0.0–0.2% | 0.469–0.470, 0% | 0.378–0.383, 0% |
+| 4 | 1.070–1.098, 0% | 1.081–1.097, 0.0–1.2% | 1.442–1.481, 0% |
+| 8 | 1.061–1.089, 0.0–0.2% | 1.077–1.100, 0.0–0.5% | 1.450–1.473, 0% |
+| 16 | 1.103–1.122, 0.0–2.7% | 1.105–1.123, 0% | 1.433–1.464, 0% |
+| 32 | 1.209–1.345, **0.0–11.3%** | 1.216–1.277, **3.1–19.2%** | 1.377–1.438, 0.0–1.9% |
+
+- **The controller has no steady cost.**
+  - Its fast level equals W 2,500's at every node count.
+  - At 32 nodes, with the slow stretches removed, its runs take 6.13–6.51 s against 6.09–6.69 s at W 2,500 (GVT 64 to the last progress line; with them, 6.36–7.82 s against 6.22–7.47 s).
+  - Section 226's 0.90–1.00 is slow stretches: 3–19% of its run time against 0–11% at W 2,500.
+  - Five reps cannot tell whether the controller's runs draw more stretches or met more by chance. It ran first among the Charades runs in the odd reps, where its ratios were lowest.
+- **A window two periods wide is almost immune** (0–1.9%): PEs run on while an advance is late. Devastator shows the same: at 32 nodes its W 2,500 varies 1.17× between reps (without one outlier), its W 10,000 1.01×.
+- **The slow stretches set the spread between reps** at W 2,500 (section 226: 1.19×).
+
+**Why a wider window does not fix it.** W 5,000's cycle stays at 1.38–1.48 ms from 4 to 32 nodes, as flat as Devastator's 1.37–1.45, but it is 1.29–1.37× W 2,500's at 4–16 nodes and 1.13× at 32 (median cycle):
+
+| nodes | W 2,500: rolled back (M), lowest PE's blocked share | W 5,000: the same |
+|---|---|---|
+| 4 | 8.7, 23.9% | 14.1, 1.8% |
+| 16 | 31.6, 30.5% | 36.9, 3.1% |
+| 32 | 61.9, 39.8% | 66.2, 8.0% |
+
+- At W 5,000 the busiest PE almost never waits, and more events are rolled back. From 3 nodes on, copy 2 does 1.75× the median copy's work and sets the pace in every engine (section 201). A wider window lets that copy's PEs execute further ahead, so more of its work is rolled back.
+- Not measured: how much of the extra rolled-back work lands on copy 2's PEs.
+
+**What this means:**
+- **Diagnosis needs no 32-node run.** At W one period the cycle waits for every GVT advance. Each advance takes a start reduction and two count waves, each crossing the process tree.
+- **The engine's own share of the 16 → 32-node growth is small.** Typical waves add 31 µs per cycle, about 2.6% of the cycle. Most of the growth is slow waves, a property of the 32-node allocation (PHOLD shows them on 16 nodes of such an allocation). Earlier PHOLD work found no engine-side cause for them (sections 154, 162, 166).
+- **The obvious GVT changes are already tried.**
+  - Two waves per advance follow from the four-counter rule as implemented: a PE contributes to wave k+1 only after reading wave k's result (section 49).
+  - A wider window does not change that either: W 5,000 still makes two waves per advance (9,983 for 4,995 at 32 nodes).
+  - On PHOLD, asking ahead (section 60), flat and 8-ary trees, recursive doubling, contributing at once, smaller batches and `--wave-batch` moved throughput by −12% to +6% (sections 52, 60, 118, 120, 162).
+- **What helps is tolerance:** a window wider than one period does not feel slow advances. On VLSI it costs 1.29–1.37× per cycle at 4–16 nodes and 1.13× at 32 (median cycle), because the busiest copy's PEs run ahead and roll back.
+  - Untested: whether a window between one and two periods (for example 3,750 ps) keeps most of the tolerance at less cost. Its steady cost can be measured at 4–16 nodes; its tolerance only in a 32-node allocation.
+- **A run is needed only to confirm the allocation effect on VLSI** (16 nodes inside a 32-node allocation). F1's paper-grade 32-node job can carry it at no extra cost.
+- **For the paper:** report the medians with their spread (Charades ÷ Devastator 1.05 at 32 nodes; per rep 0.96–1.07). Say that a one-period window makes each clock cycle wait for a GVT advance, and that slow advances in 32-node allocations account for the spread.
 
 ## Baseline verification on the Mac
 
