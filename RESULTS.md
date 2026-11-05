@@ -383,8 +383,9 @@ Sections 1–128 were re-read before planning sections 129 onward.
 | 224 | 2026-11-04 | F3R (results in a later section) | F3 rerun (design): the PADS'19 hold with PADS'19's release rule (all held events go at the next GVT), cutoffs 16 / 128 / 512 buckets of 8 (0.13, 1, 4 mean delays; PADS'19's cutoffs are in buckets of width 1 over about 1,024 time units), no hold with and without the local fast path (the hold turns it off), the hold beside W B; the release loop's scan of every remaining bucket fixed (8a34d51); ROSS dragonfly window 625–5,000 ps; Mac runs at 2 × 2 (section 223's Mac table was 2 × 4, and compared the hold against no hold with the fast path on); predictions F3R1–F3R7 | design (results in 225) |
 | 225 | 2026-11-04 | 3683036 | F3R results: the PADS'19 hold (PADS'19's release rule) never beats no hold with the fast path on by more than 2% (0.83–1.02), because it turns the fast path off (worth up to 1.33× on σ 100) and a window already does its job (hold beside W B 0.90–1.06); without a window, cutoffs up to one mean delay cost PHOLD 1.4–5.6× and gain traffic 1.09–1.10× at 4 nodes; best hold ÷ deadline htram 0.30–0.40 (PHOLD), 0.67–0.72 (traffic); ROSS's best dragonfly window is 2,500 (1 node) and 5,000 ps (4 nodes), Charades ÷ ROSS 2.98–3.05; counts and digests equal in every arm; F3R1, F3R5, F3R7 right, F3R2, F3R4, F3R6 mostly, F3R3 half | current |
 | 226 | 2026-11-04 | 3679976 | VS2 at 32 nodes (big2): Charades ÷ Devastator on VLSI 1.046 (per rep 0.96–1.07; 1.19–1.37 at 1–16 nodes); from 16 to 32 nodes Charades' cycle grows 1.188 → 1.360 ms, Devastator's 1.413 → 1.423; the count wave in flight is 94% of the traced cycle's growth (0.157 ms per wave at 32 nodes, 0.106 at 16); W 2,500 varies 1.17–1.19 between reps in both engines, wider windows 1.01–1.03; the controller holds W 2,500 yet runs at 0.90–1.00 of it (cause not measured); round 3 ÷ old 1.197; Devastator 1 × 46 ÷ 2 × 23 0.80; Charades ÷ ROSS 14.9; one count in all three engines; Q1, Q2, Q5 right at 32, Q3 wrong narrowly (1.046 against at least 1.05) | current |
-| 227 | 2026-11-05 | F4 (results in a later section) | F4 design: Charades' fixed W grid, frozen controller and Devastator's rule in Charades (`--ctl=2` from one bucket), against Devastator's fixed W grid and its own adaptive window; job N's seven workloads at 4 and 16 nodes on the current tree (`charades-f3`, 8a34d51); W 100 and W 300 on every PHOLD workload for the single-window test; Mac change tier 63/63 with the hill climb; predictions F4-1 to F4-6 | design |
+| 227 | 2026-11-05 | F4: 3684492 (skx-dev) / 3684493 (skx) (results in a later section) | F4 design: Charades' fixed W grid, frozen controller and Devastator's rule in Charades (`--ctl=2` from one bucket), against Devastator's fixed W grid and its own adaptive window; job N's seven workloads at 4 and 16 nodes on the current tree (`charades-f3`, 8a34d51); W 100 and W 300 on every PHOLD workload for the single-window test; Mac change tier 63/63 with the hill climb; predictions F4-1 to F4-6 | design |
 | 228 | 2026-11-05 | — (offline: 3679974, 3679976; PHOLD 3660089, 3660196) | Why VLSI's lead shrinks at 32 nodes, from existing data: per-wave latency 67.5 / 83.9 / 107.1 / 127.3 µs (median) at 4 / 8 / 16 / 32 nodes, all of the steady growth across processes (42 → 101 µs); from 16 to 32 nodes two thirds of the cycle's growth is slow waves (7.8% of waves, 25% of wave time), which come with the 32-node allocation (PHOLD: 0.9% in a 16-node allocation, 4.2% on 16 nodes of a 32-node one); they cluster into slow stretches that only a one-period window feels (W 2,500 0–11%, controller 3–19%, W 5,000 0–1.9% of run time); the controller has no steady cost (same fast level; 6.13–6.51 s against 6.09–6.69 s without stretches); W 5,000 is flat but 1.29–1.37× slower per cycle at 4–16 nodes (the busiest PE stops waiting, more rollbacks); the engine's own share of the 16 → 32 growth is about 2.6% of the cycle, and the GVT changes that could cut it were tried on PHOLD without gain | current |
+| 229 | 2026-11-05 | VW: 3684509 (skx) (results in a later section) | VLSI window between one and two clock periods (design): W 2,500 / 3,125 / 3,750 / 5,000 ps at 4, 8 and 16 nodes on VS2's binaries, the steady cost only (tolerance to slow advances needs a 32-node allocation, tested in F1's job only if the cost is at most 5%); predictions VW1–VW4 | design |
 
 ## Stampede3 runs, in order
 
@@ -9821,7 +9822,7 @@ Which of these costs the half is not measured. It does not touch the paper's num
 
 ### F4, robustness of the window policies: Charades' fixed windows, its frozen controller and Devastator's rule in Charades, against Devastator's fixed windows and its own adaptive window, on seven workloads at 4 and 16 nodes (job F4 design, 2026-11-05; written before any runs)
 
-> **Status: design.** PAPER.md item 4, figure F4. User decision 2026-11-05: prepare F4.
+> **Status: design.** PAPER.md item 4, figure F4. User decisions 2026-11-05: prepare F4; submit it. Submitted as 3684492 (skx-dev) and 3684493 (skx); the later starter is cancelled.
 > - **Script:** `$WORK/charades-runs/f4227.slurm` (copy in `~/charades-data/f4/`), skx-dev, 16 nodes, 1 h 50 min.
 > - **Code:** charades 8a34d51, tree `charades-f3` (built for job F3R): round 3 and every default since, on `charm-pads-perf`. No code change for this job.
 > - **Mac check on this code:** change tier 63/63 on Simple PHOLD, traffic and dragonfly with `ctl_hill`, `ctl_hill_shared` and `agg_ctl_measured_bucket_pp`. One Mac run of the hill climb from one bucket (PHOLD σ 100, htram PP, 2 processes × 4 PEs) commits the right count, and its window doubles from 8 to about 310 within 21 control rounds, then reaches the end time in the run's last rounds.
@@ -9969,6 +9970,33 @@ Which of these costs the half is not measured. It does not touch the paper's num
   - Untested: whether a window between one and two periods (for example 3,750 ps) keeps most of the tolerance at less cost. Its steady cost can be measured at 4–16 nodes; its tolerance only in a 32-node allocation.
 - **A run is needed only to confirm the allocation effect on VLSI** (16 nodes inside a 32-node allocation). F1's paper-grade 32-node job can carry it at no extra cost.
 - **For the paper:** report the medians with their spread (Charades ÷ Devastator 1.05 at 32 nodes; per rep 0.96–1.07). Say that a one-period window makes each clock cycle wait for a GVT advance, and that slow advances in 32-node allocations account for the spread.
+
+### A VLSI window between one and two clock periods: its steady cost at 4–16 nodes (job VW design, 2026-11-05; written before any runs)
+
+> **Status: design.** Section 228's untested idea. User decision 2026-11-05: a separate small job, apart from F4. Submitted as 3684509 (skx).
+> - **Script:** `$WORK/charades-runs/vwin229.slurm` (copy in `~/charades-data/vlsi/`), skx, 16 nodes, 40 minutes. skx rather than skx-dev, because F4 holds the skx-dev slot.
+> - **Code:** the binaries of job VS2 (tree `charades-r3`, ae0dbd3, round 3), so W 2,500 here compares directly with section 217.
+
+**Why.** At W one clock period (2,500 ps), every cycle waits for a GVT advance, and in 32-node allocations slow advances cost 0–19% of a run (section 228). At W 5,000 the slow advances do not show (0–1.9%), but each cycle is 1.29–1.37× longer at 4–16 nodes: the busiest copy's PEs run a whole period ahead and roll back. A window of 1.25 or 1.5 periods lets PEs run on into the next cycle by a quarter or a half period while an advance is late. That may keep part of the tolerance at less of the cost.
+
+**What this job measures:** only the steady cost, which 4–16 nodes show. Tolerance to slow advances needs a 32-node allocation (section 228), so it is tested only if the steady cost is small (below).
+
+**Runs** (VS2's launch and sizes: b19 × N, one copy per node, 1 × 46 PEs, `--fossil-lazy=1 --batch=32`, buckets of 2,500 ps, 5,000 cycles, direct sends):
+- W 2,500, 3,125, 3,750 and 5,000 ps; 3 reps, arm order reversed in rep 2; a warm-up run per node count.
+- 4 nodes (nodes 0–3) and 8 nodes (nodes 4–11) side by side, then 16 nodes.
+- Gate: VS2's change tier on 2 nodes (VLSI).
+
+**Measures:** M committed ev/s; ms per cycle, as the median and as the fast level (10th percentile over 64-cycle intervals, as in section 228); events rolled back; the lowest PE's blocked share; committed count and digest.
+
+**Predictions:**
+- **VW1:** every run at a node count commits VS2's count with VS2's digest (4 nodes 574,541,914; 8 nodes 1,078,843,202; 16 nodes 2,087,384,844).
+- **VW2:** W 2,500 and W 5,000 reproduce section 228 within 5%: W 5,000's cycle is 1.29–1.37× W 2,500's.
+- **VW3:** W 3,750's cycle is 1.10–1.30× W 2,500's at 4–16 nodes, and it rolls back more events than W 2,500 and fewer than W 5,000.
+- **VW4:** W 3,125's cycle is 0.97–1.10× W 2,500's.
+
+**What follows:**
+- If W 3,125 or W 3,750 costs at most 5% per cycle against W 2,500 at 16 nodes, F1's 32-node job runs it beside W 2,500 to measure its tolerance to slow advances.
+- Otherwise the idea closes. The paper reports VLSI's 32-node spread as section 228 describes.
 
 ## Baseline verification on the Mac
 
