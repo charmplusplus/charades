@@ -387,6 +387,7 @@ Sections 1–128 were re-read before planning sections 129 onward.
 | 228 | 2026-11-05 | — (offline: 3679974, 3679976; PHOLD 3660089, 3660196) | Why VLSI's lead shrinks at 32 nodes, from existing data: per-wave latency 67.5 / 83.9 / 107.1 / 127.3 µs (median) at 4 / 8 / 16 / 32 nodes, all of the steady growth across processes (42 → 101 µs); from 16 to 32 nodes two thirds of the cycle's growth is slow waves (7.8% of waves, 25% of wave time), which come with the 32-node allocation (PHOLD: 0.9% in a 16-node allocation, 4.2% on 16 nodes of a 32-node one); they cluster into slow stretches that only a one-period window feels (W 2,500 0–11%, controller 3–19%, W 5,000 0–1.9% of run time); the controller has no steady cost (same fast level; 6.13–6.51 s against 6.09–6.69 s without stretches); W 5,000 is flat but 1.29–1.37× slower per cycle at 4–16 nodes (the busiest PE stops waiting, more rollbacks); the engine's own share of the 16 → 32 growth is about 2.6% of the cycle, and the GVT changes that could cut it were tried on PHOLD without gain | current |
 | 229 | 2026-11-05 | VW: 3684509 (skx) (results in a later section) | VLSI window between one and two clock periods (design): W 2,500 / 3,125 / 3,750 / 5,000 ps at 4, 8 and 16 nodes on VS2's binaries, the steady cost only (tolerance to slow advances needs a 32-node allocation, tested in F1's job only if the cost is at most 5%); predictions VW1–VW4 | design |
 | 230 | 2026-11-05 | 3684492 | F4 results: Charades' frozen controller 0.83–1.03 of the best fixed W (0.92–1.03 in 12 of 14 cells; phase-changing PHOLD at 4 nodes 0.83–0.88, where round 3 moved the best W to 75); Devastator's rule in Charades 0.11–0.84 (70–88% efficiency, windows 5–66× the best); Devastator's own window 0.09–0.83 and did not finish on phase-changing PHOLD and σ 2,000 at 4 nodes; one PHOLD window 0.52–0.55; Charades ÷ Devastator 1.13–2.01, each at its best fixed W; one count per cell in both engines; phase-changing PHOLD at 16 nodes rep 2 hit by an episode on the machine; F4-1, F4-3, F4-5, F4-6 right, F4-4 mostly, F4-2 wrong in one cell | current |
+| 231 | 2026-11-05 | F4R: 3685047 (skx-dev) / 3685048 (skx) (results in a later section) | Rerun of F4's phase-changing PHOLD cell at 16 nodes (design): Charades' arms only, 3 reps; a rep counts as disturbed if any fixed-W run makes more than 1.03 count waves per GVT advance; predictions R1–R4 | design |
 
 ## Stampede3 runs, in order
 
@@ -10070,6 +10071,28 @@ Which of these costs the half is not measured. It does not touch the paper's num
 **What follows:**
 - **Claim 2's number changes** on the current tree: the frozen controller is 0.83–1.03 of the best fixed W, not 0.91–1.03 (jobs M and N, older tree). Its baselines' worst cases are 0.13 (Devastator's rule in Charades), did not finish (Devastator's own window) and 0.52–0.55 (any single PHOLD window).
 - **Phase-changing PHOLD at 16 nodes can be rerun** to replace the episode rep: Charades' arms only, 2–3 reps, about 10 minutes. User's decision.
+
+### F4's phase-changing PHOLD cell at 16 nodes, rerun (job F4R design, 2026-11-05; written before any runs)
+
+> **Status: design.** User decision 2026-11-05: rerun the cell whose rep 2 was hit by an episode on the machine (section 230). Submitted as 3685047 (skx-dev) and 3685048 (skx); the later starter is cancelled.
+> - **Script:** `$WORK/charades-runs/f4r231.slurm` (copy in `~/charades-data/f4/`), skx-dev plus an skx copy, 16 nodes, 30 minutes.
+> - **Code:** as in F4: tree `charades-f3` (8a34d51), job F4's launch and sizes.
+
+**Runs:** phase-changing PHOLD (lookahead 10 / mean 200 and 100 / 1,000 alternating every 8,000; remote 0.5), htram PP 512, end 1,024,000, 16 nodes. Charades' arms only:
+- W 50, 75, 100, 150, 250 and 300;
+- the frozen controller (`mb:0`);
+- Devastator's rule in Charades (`hill:8`).
+3 reps, arm order reversed in rep 2. Gate: the change tier on 2 nodes (Simple PHOLD, `ctl_hill` and `agg_ctl_measured_bucket_pp`).
+
+**Episode check, set before the runs:** a rep counts as disturbed if any fixed-W run in it makes more than 1.03 count waves per GVT advance (section 230: 1.00–1.03 in every undisturbed fixed-W run except W 25). A disturbed rep is reported, and the cell's ratios are taken from the undisturbed reps.
+
+**Predictions:**
+- **R1:** every run commits F4's count, 4,096,302,492, with one digest.
+- **R2:** no rep is disturbed.
+- **R3:** the best fixed W is 75 or 100, and the controller is 0.90–1.00 of it in every rep (F4 rep 1: 0.97; job N: 0.93–0.95).
+- **R4:** Devastator's rule in Charades is 0.3–0.5 of the best fixed W (F4 rep 1: 0.41).
+
+**What follows:** the undisturbed reps replace F4's 16-node phase-changing cell in F4 and in PAPER.md's numbers.
 
 ## Baseline verification on the Mac
 
