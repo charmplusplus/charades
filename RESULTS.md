@@ -385,10 +385,11 @@ Sections 1–128 were re-read before planning sections 129 onward.
 | 226 | 2026-11-04 | 3679976 | VS2 at 32 nodes (big2): Charades ÷ Devastator on VLSI 1.046 (per rep 0.96–1.07; 1.19–1.37 at 1–16 nodes); from 16 to 32 nodes Charades' cycle grows 1.188 → 1.360 ms, Devastator's 1.413 → 1.423; the count wave in flight is 94% of the traced cycle's growth (0.157 ms per wave at 32 nodes, 0.106 at 16); W 2,500 varies 1.17–1.19 between reps in both engines, wider windows 1.01–1.03; the controller holds W 2,500 yet runs at 0.90–1.00 of it (cause not measured); round 3 ÷ old 1.197; Devastator 1 × 46 ÷ 2 × 23 0.80; Charades ÷ ROSS 14.9; one count in all three engines; Q1, Q2, Q5 right at 32, Q3 wrong narrowly (1.046 against at least 1.05) | current |
 | 227 | 2026-11-05 | F4: 3684492 (skx-dev) / 3684493 (skx) | F4 design: Charades' fixed W grid, frozen controller and Devastator's rule in Charades (`--ctl=2` from one bucket), against Devastator's fixed W grid and its own adaptive window; job N's seven workloads at 4 and 16 nodes on the current tree (`charades-f3`, 8a34d51); W 100 and W 300 on every PHOLD workload for the single-window test; Mac change tier 63/63 with the hill climb; predictions F4-1 to F4-6 | design (results in 230) |
 | 228 | 2026-11-05 | — (offline: 3679974, 3679976; PHOLD 3660089, 3660196) | Why VLSI's lead shrinks at 32 nodes, from existing data: per-wave latency 67.5 / 83.9 / 107.1 / 127.3 µs (median) at 4 / 8 / 16 / 32 nodes, all of the steady growth across processes (42 → 101 µs); from 16 to 32 nodes two thirds of the cycle's growth is slow waves (7.8% of waves, 25% of wave time), which come with the 32-node allocation (PHOLD: 0.9% in a 16-node allocation, 4.2% on 16 nodes of a 32-node one); they cluster into slow stretches that only a one-period window feels (W 2,500 0–11%, controller 3–19%, W 5,000 0–1.9% of run time); the controller has no steady cost (same fast level; 6.13–6.51 s against 6.09–6.69 s without stretches); W 5,000 is flat but 1.29–1.37× slower per cycle at 4–16 nodes (the busiest PE stops waiting, more rollbacks); the engine's own share of the 16 → 32 growth is about 2.6% of the cycle, and the GVT changes that could cut it were tried on PHOLD without gain | current |
-| 229 | 2026-11-05 | VW: 3684509 (skx) (results in a later section) | VLSI window between one and two clock periods (design): W 2,500 / 3,125 / 3,750 / 5,000 ps at 4, 8 and 16 nodes on VS2's binaries, the steady cost only (tolerance to slow advances needs a 32-node allocation, tested in F1's job only if the cost is at most 5%); predictions VW1–VW4 | design |
+| 229 | 2026-11-05 | VW: 3684509 (skx), cancelled before it started | VLSI window between one and two clock periods (design): W 2,500 / 3,125 / 3,750 / 5,000 ps at 4, 8 and 16 nodes on VS2's binaries, the steady cost only (tolerance to slow advances needs a 32-node allocation, tested in F1's job only if the cost is at most 5%); predictions VW1–VW4 | superseded by 233 (not run) |
 | 230 | 2026-11-05 | 3684492 | F4 results: Charades' frozen controller 0.83–1.03 of the best fixed W (0.92–1.03 in 12 of 14 cells; phase-changing PHOLD at 4 nodes 0.83–0.88, where round 3 moved the best W to 75); Devastator's rule in Charades 0.11–0.84 (70–88% efficiency, windows 5–66× the best); Devastator's own window 0.09–0.83 and did not finish on phase-changing PHOLD and σ 2,000 at 4 nodes; one PHOLD window 0.52–0.55; Charades ÷ Devastator 1.13–2.01, each at its best fixed W; one count per cell in both engines; phase-changing PHOLD at 16 nodes rep 2 hit by an episode on the machine; F4-1, F4-3, F4-5, F4-6 right, F4-4 mostly, F4-2 wrong in one cell | current |
 | 231 | 2026-11-05 | F4R: 3685047 (skx-dev) / 3685048 (skx) | Rerun of F4's phase-changing PHOLD cell at 16 nodes (design): Charades' arms only, 3 reps; a rep counts as disturbed if any fixed-W run makes more than 1.03 count waves per GVT advance; predictions R1–R4 | design (results in 232) |
 | 232 | 2026-11-05 | 3685047 | F4R results: phase-changing PHOLD at 16 nodes reruns clean (fixed-W runs 1.000–1.009 waves per advance; one count and digest); best fixed W 100; controller 0.95–0.96, Devastator's rule in Charades 0.40–0.44; rep 2 ran in the disturbed rep's arm order and is clean (W 300 317.3 against 89.3), so F4's rep 2 was the machine; R1–R4 right | current |
+| 233 | 2026-11-05 | RA (results in a later section) | Where Charades' cost of running ahead goes on VLSI (design): running ahead costs only once copy 2 is in the run (W 5,000 ÷ W 2,500 run time 0.72–0.85 at 1–2 nodes, 1.24–1.35 at 4–16), where the least-blocked PE stops waiting and works 0.84 → 1.47 ms per cycle; W 2,500 / 3,750 / 5,000 × VS2's settings, `--gvt-wave-events=0`, `--fossil-lazy=0`, both, and `--batch=8` at W 5,000, at 4 and 16 nodes on VS2's binaries; `--pe-stats=1` on every run, one rep traced (`--gvt-trace=5 --comm-stats=1`); replaces VW; predictions RA1–RA7 | design |
 
 ## Stampede3 runs, in order
 
@@ -9976,7 +9977,7 @@ Which of these costs the half is not measured. It does not touch the paper's num
 
 ### A VLSI window between one and two clock periods: its steady cost at 4–16 nodes (job VW design, 2026-11-05; written before any runs)
 
-> **Status: design.** Section 228's untested idea. User decision 2026-11-05: a separate small job, apart from F4. Submitted as 3684509 (skx).
+> **Status: superseded by section 233 before it ran.** Section 228's untested idea. User decision 2026-11-05: a separate small job, apart from F4. Submitted as 3684509 (skx), cancelled before it started (user decision 2026-11-05): job RA (section 233) runs W 3,750 beside W 2,500 and 5,000 with per-PE records, and keeps this section's rule for F1.
 > - **Script:** `$WORK/charades-runs/vwin229.slurm` (copy in `~/charades-data/vlsi/`), skx, 16 nodes, 40 minutes. skx rather than skx-dev, because F4 holds the skx-dev slot.
 > - **Code:** the binaries of job VS2 (tree `charades-r3`, ae0dbd3, round 3), so W 2,500 here compares directly with section 217.
 
@@ -10130,6 +10131,88 @@ Which of these costs the half is not measured. It does not touch the paper's num
 - Devastator's rule in Charades: 0.40–0.44.
 - W 300 as the one PHOLD window: 0.86–0.87.
 - Section 230's worst cases without the episode rep stand: controller 0.83 (phase-changing PHOLD, 4 nodes), Devastator's rule in Charades 0.13, one PHOLD window 0.52.
+
+### Where Charades' cost of running ahead goes on VLSI: each PE's time at W 2,500 / 3,750 / 5,000, and three switches that could move it (job RA design, 2026-11-05; written before any runs)
+
+> **Status: design.** User decision 2026-11-05: cancel VW (3684509, cancelled before it started) and run this job instead. It carries VW's W 3,750 question (section 229); W 3,125 is dropped.
+> - **Script:** `$WORK/charades-runs/rahead233.slurm` (copy in `~/charades-data/vlsi/`), skx-dev plus an skx copy, 16 nodes, 50 minutes, `-x c455-081`.
+> - **Code:** VS2's binaries (tree `charades-r3`, ae0dbd3, round 3), so the defaults compare directly with sections 217 and 228. No code change: every switch and record below exists in that tree.
+> - **Mac check** (VLSI test `tiny.bench`, 1 × 4, W 200): the defaults, `--fossil-lazy=0 --gvt-wave-events=0`, and both with `--gvt-trace=5 --pe-stats=1 --comm-stats=1` (one at `--batch=8`) all commit 15,489 events with one digest (104b07b9…), and the traced runs write every per-PE file.
+
+**Why.** Running ahead costs Charades on VLSI only once copy 2 is in the run. Copy 2's inputs give it 1.75× the switching of every other copy (section 201), and it is on node 2 from 3 nodes up. VS2, round 3, 3 reps (in the second column, below 1 means W 5,000 is faster):
+
+| nodes | W 5,000 ÷ W 2,500, run time (per rep) | the least-blocked PE: share of the run waiting at the window, W 2,500 / W 5,000 (%) | the least-blocked PE: time not waiting per cycle, W 2,500 → W 5,000 (ms, median rep) |
+|---|---|---|---|
+| 1 (no copy 2) | 0.84–0.85 | 41–43 / 22–24 | 0.28 → 0.31 |
+| 2 (no copy 2) | 0.72–0.74 | 54 / 30 | 0.29 → 0.33 |
+| 4 | 1.33–1.35 | 24–25 / 1.8–1.9 | 0.84 → 1.47 |
+| 8 | 1.32–1.34 | 26–27 / 2.3–2.5 | 0.82 → 1.47 |
+| 16 | 1.24–1.27 | 30–33 / 3.0–3.1 | 0.83 → 1.45 |
+
+- **At 1–2 nodes** a PE that runs ahead works about 12% longer per cycle and no PE runs out of waiting, so W 5,000 is faster.
+- **From 4 nodes on** the least-blocked PE (presumably on copy 2's node; not recorded per PE) works 0.84 ms per cycle at W 2,500, three times the 1-node figure for 1.75× the copy's work. At W 5,000 it stops waiting, and its working time grows by about 0.6 ms per cycle, 75%. That PE then sets the cycle.
+- **Over the whole run** (4 nodes), W 5,000 executes 0.9% more events: rolled back 8.7 → 14.1 M, anti-messages 6.9 → 8.8 M, rollbacks caused by anti-messages 1.73 → 3.49 M. Spread over 184 PEs, that is about 6 extra events per PE per cycle, too few for +0.6 ms. On one PE it would be about 1,100 per cycle, which is enough. Section 228 had no per-PE counts.
+- **Devastator** is flat: 83.7 / 83.4 / 82.7 M ev/s at W 2,500 / 5,000 / 10,000 on 4 nodes (median of 3). It is not rerun here: it has no per-PE accounting.
+- **The payoff, if running ahead were free:** a W 5,000 cycle at the least-blocked PE's W 2,500 working time (0.84 ms) would be 1.32× W 2,500's at 4 nodes, and a window two periods wide is the one that does not feel the 32-node slow waves (section 228).
+
+**Hypotheses for the least-blocked PE's extra 0.6 ms per cycle:**
+- **H1, its own speculation:** GVT trails it by about a period, so it runs events of the next cycle before the current cycle's late inputs reach it, then rolls them back. Its executed and rolled-back counts grow.
+- **H2, costlier events:** the same events, each slower: more pending events, more anti-messages to cancel, more pushes into its input buffer. Its event-loop time per executed event grows.
+- **H3, work that W 2,500 hid in waiting:** lazy commits run on passes blocked at the window and are counted as waiting (`optimistic.C`, `collect_fossils_step`). The same goes for the cancel queue and count-wave handling. At W 5,000 this work lands on the PE's working time.
+- **H4, GVT pace:** a PE that always has work holds its count-wave contribution until it has executed 128 events (`--gvt-wave-events`, `bucketed.C` `send_counts`).
+  - My estimate before this design was about 0.4 ms per cycle.
+  - On re-reading, a PE that waits 1.8–3.1% of the run rarely waits for an advance, so its direct cost should be small.
+- **H5, pickup delay:** an input from another PE waits until the PE finishes its batch of 32. Section 209 found this ahead work to be 1–2% of a cycle's chain, but at 1 node, where running ahead is cheap.
+
+**Runs** (VS2's launch and sizes):
+- b19 × N, one copy per node, 1 × 46, buckets of 2,500 ps, 5,000 cycles, direct sends.
+- `--blocked-time=1 --commit-digest=1 --copy-stats=1`, plus `--pe-stats=1` on every run.
+- **Windows:** W 2,500, 3,750 and 5,000, each with four settings:
+  - **D:** VS2's settings (`--fossil-lazy=1 --batch=32`, `--gvt-wave-events` at its default 128).
+  - **G:** `--gvt-wave-events=0`. A PE contributes to a count wave as soon as it reads the previous result. Tests H4.
+  - **E:** `--fossil-lazy=0`. A PE commits everything below the new GVT as the GVT arrives. Tests H3's commits.
+    - Lazy commits are one chare per pass that ends short of a full batch. A PE that always fills its batch never runs them until the fourth GVT, and `--fossil-chares=40` would not change that.
+  - **GE:** both.
+- **W 5,000 only:** B8 (`--batch=8`): a PE drains its input buffer every 8 events instead of every 32. Tests H5.
+- **13 arms per rep.** Arm order is reversed in rep 2, and each node set gets a warm-up run.
+  - **4 nodes:** three untraced reps and one traced rep, each on its own 4 nodes, side by side.
+  - **16 nodes:** three untraced reps, then the traced rep.
+- **Traced rep:** `--gvt-trace=5 --comm-stats=1`.
+  - **Time in `execute()` per PE**, split into the event loop, sends, input-buffer drains, polling, the cancel queue, rollbacks and commits at GVT arrival (`exec_parts_<pe>.csv`). Lazy commit steps are not timed separately; in E runs every commit is timed.
+  - **Count-wave records:** every 4th wave, each PE's contribution, how long it held it and why (`gvt_rec_<pe>.csv`).
+  - **Send latency** between PEs of the same process (`--comm-stats`).
+  - Files are gzipped. At 16 nodes only node 2's PEs (92–137) and PE 0 keep `gvt_rec`.
+- **Gate:** VS2's change tier on 2 nodes (VLSI).
+- **About 30 minutes:** the gate 3, the 4-node runs 6, the 16-node runs 20.
+
+**Measures:**
+- Run time and M committed ev/s.
+- From `pe_stats.csv`, per PE: events executed, committed and rolled back; full and window-blocked passes; time blocked; time in `execute()` (traced rep only).
+- **The least-blocked PE** in each run: its time per cycle, split into waiting at the window, the event loop, the other parts of `execute()`, and time outside `execute()`.
+
+**Predictions:**
+- **RA1. Counts:** every run commits VS2's count with VS2's digest: 574,541,914 (0c800d36…) at 4 nodes, 2,087,384,844 (377d0771…) at 16.
+- **RA2. The defaults reproduce VS2:** W 5,000 ÷ W 2,500 run time within 5% of 1.33–1.35 (4 nodes) and 1.24–1.27 (16 nodes).
+- **RA3 (section 229's VW3):** W 3,750's run time under D is 1.10–1.30× W 2,500's, and its rolled-back count lies between theirs.
+- **RA4. Where the time goes (H1),** on the least-blocked PE, traced rep, D, W 5,000 against W 2,500:
+  - it is on node 2 in every run, and it executes at least 1.3× the mean of node 2's PEs (the layout was balanced on one copy's activity profile, and copy 2's mode need not follow it);
+  - it executes at least 15% more events per cycle, most of the increase rolled back;
+  - its event-loop time per executed event changes by less than 15% (H2 small);
+  - commits at GVT arrival, the cancel queue, polling and time outside `execute()` together are under a quarter of its extra time (H3 small).
+- **RA5. GVT pace (H4):** G is within ±5% of D at every W and node count. At W 2,500 every PE waits each cycle and already contributes at once; V2 found `--gvt-wave-events=16` at 0.99–1.00 there (section 197).
+- **RA6. Commits (H3):**
+  - E is 0.88–0.97 of D at W 2,500 (lazy commits were 1.09× at 1 node, section 204).
+  - E is within ±5% of D at W 5,000 (V5: eager at W 5,000 on 4 nodes was 0.97 of lazy, on the older tree at batch 16, section 208).
+  - GE behaves like E.
+- **RA7. Pickup (H5):** B8 is within ±5% of D at W 5,000. Shorter passes cost on VLSI at W 2,500 (batch 4: 0.87–0.90 of batch 16, section 197).
+
+**What follows:**
+- **RA4 right:** the cost of running ahead is the speculation of the PE that sets GVT. A window measured from GVT cannot hold that PE back, since its own work sets GVT. Two options would be designed separately: a narrower window for the PEs that GVT waits on, or spreading copy 2's work differently.
+- **RA4 wrong, toward H2:** profile the least-blocked PE at W 5,000 against W 2,500.
+- **RA5 wrong** (G at least 1.05× D at W 3,750 or 5,000): the 128-event rule is on VLSI's path at wider windows. It is a default for every workload. Any change must be measured on PHOLD at its best windows and land before the freeze (2026-12-07).
+- **RA6 wrong** (E at least 1.05× D at W 5,000): change the lazy rule so that a PE that always fills its batch still commits. This is VLSI-only.
+- **RA7 wrong** (B8 at least 1.05× D): end a pass early when the input buffer holds an event earlier than the next one in the heap (one of section 207's follow-ons).
+- **Section 229's rule stands:** if W 3,750 in any setting costs at most 5% against W 2,500 at 16 nodes, F1's 32-node job runs it beside W 2,500 to measure its tolerance to slow advances.
 
 ## Baseline verification on the Mac
 
