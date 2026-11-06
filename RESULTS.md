@@ -10553,7 +10553,7 @@ Which of these costs the half is not measured. It does not touch the paper's num
 
 ### F1 and F5 on the final defaults: seven jobs queued at once — ROSS's window on PHOLD, Gaussian PHOLD at 1–32 nodes, traffic and dragonfly at 1–32, VLSI at 32 (design, 2026-11-06; written before any runs)
 
-> **Status: design; queued 2026-11-06. RW done (results in section 241).** RW 3688911 (skx-dev, started at once; skx copy 3688912 cancelled), F1a 3688913 (skx) and 3689004 (skx-dev, 1:55, added at the user's request after RW; `TWIN=3688913`: the copy that starts first cancels the other, and one that starts second exits), F1b 3688914, F5a 3688915, F1-32 3688916, F5-32 3688917, V32 3688918 (all skx). Login-node checks pass for all seven submissions.
+> **Status: design; queued 2026-11-06. RW done (results in section 241).** RW 3688911 (skx-dev, started at once; skx copy 3688912 cancelled), F1a 3688913 (skx) and 3689004 (skx-dev, 1:55, added at the user's request after RW; `TWIN=3688913`: the copy that starts first cancels the other, and one that starts second exits; 3689004 started 13:24 and its guard cancelled 3688913; gate 36/36), F1b 3688914, F5a 3688915, F1-32 3688916, F5-32 3688917, V32 3688918 (all skx). Login-node checks pass for all seven submissions.
 > User decisions 2026-11-06:
 > - **No hard engine freeze;** the focus now is runs. A later engine change means rerunning the cells it touches.
 > - **F1:** all eight PHOLD workloads.
