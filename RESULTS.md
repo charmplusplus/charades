@@ -394,6 +394,7 @@ Sections 1–128 were re-read before planning sections 129 onward.
 | 235 | 2026-11-05 | VC: 3686688 (skx-dev) / 3686689 (skx) (results in a later section) | VLSI's commit setting and controller row (design; user decisions on section 234's questions: 1A, 2 yes, 3A, 4A): charades 609212b adds `--fossil-rounds=N` (default 4, unchanged) and `--fossil-finish=1`; tree `charades-r4`; L / E / R1 / F commit settings at W 5,000, L at W 2,500, the controller with buckets of 2,500 (L) and 5,000 (E, R1, F); 1, 2, 4, 8 and 16 nodes, 3 reps; today's VLSI controller row is 0.72–0.83 of the best fixed W at 1–2 nodes (VS2); predictions VC1–VC7 | design (results in 236) |
 | 236 | 2026-11-06 | 3686688 | VC results: eager commits (the engine default) at W 5,000 are VLSI's best fixed arm at 1, 2 and 16 nodes and 0.95–0.99 of it at 4 and 8 (one slow rep 0.77 at 4 nodes); against VS2's setting 1.11–1.12 at 1–2 nodes, 1.02–1.03 at 16. Lazy commits no longer pay at any node count; `--fossil-finish` 0.89–0.95 of eager, `--fossil-rounds=1` 0.82–0.85. The controller never leaves one bucket on VLSI: its trials are held inside the 1st–99th percentile of remote delay, which on VLSI is under one bucket (`controller.C:464`). Buckets of 5,000 ps hold W at 5,000 but cost 0.74–0.90 (GVT every two periods, 2–3× the rollbacks). One count and digest per node count; VC1, VC2 right, VC3, VC5 half, VC4, VC6 wrong, VC7 narrowly wrong | current |
 | 237 | 2026-11-06 | — (Mac) | The measured controller's trials reach two buckets (`--ctl-reach-buckets=2`, charades 85a2aad; user decision on section 236): the upper end of the trial range is the 0.99 quantile of delay or two buckets, whichever is larger. Trials it changed: 0 on dragonfly at F4's link settings (least 0.99 quantile 12,510 ps against 2,000), phase-changing PHOLD (3,019 against 16) and traffic (4,109 against 16); PHOLD and traffic cannot be affected at any scale. So no earlier controller result changes. On the VLSI test the window now leaves one bucket. Change tier on the measured-controller configs 132/132 | current |
+| 238 | 2026-11-06 | VS3 (results in a later section) | The paper's VLSI row with the new setting (design): tree `charades-r5` (85a2aad); Charades E W 5,000, E W 2,500, L W 2,500 and the widened controller (eager), Devastator 2 × 23 W 2,500 / 5,000 / 10,000, same allocation; 1, 2, 4, 8 and 16 nodes, 3 reps; `/proc/stat` and `/proc/interrupts` on copy 2's node around each Charades run (PE 105 on core 28) for the slow reps; predictions VS3-1 to VS3-7 | design |
 
 ## Stampede3 runs, in order
 
@@ -10447,6 +10448,46 @@ Which of these costs the half is not measured. It does not touch the paper's num
 - **So the controller results so far stand unchanged:** F4 (sections 230, 232), the 1–32-node tables, and phase-changing PHOLD. Their runs would have made the same decisions, and none is rerun. Every `--ctl=3` run from now on prints the statistic, so paper-scale runs check this themselves.
 - **On the VLSI test** the window now leaves one bucket: time-weighted mean 122 ps and final 150, against 100 throughout with `--ctl-reach-buckets=0`. Every run commits the same count (15,489).
 - **The frozen controller is now** `--ctl=3`, bracketed, with `--ctl-reach-buckets=2`. Its VLSI row is measured in the VLSI rerun job (step 2 of the plan of 2026-11-06).
+
+### The paper's VLSI row with VLSI's new setting: eager commits at W 5,000, the widened controller and Devastator in one allocation, at 1–16 nodes (job VS3 design, 2026-11-06; written before any runs)
+
+> **Status: design.** User decisions 2026-11-06 (section 236): VLSI switches to eager commits at W 5,000, the controller's trial range reaches two buckets (section 237), and the VLSI row is rerun at 1–16 nodes with Devastator in the same allocation and a check on the slow reps.
+> - **Tree:** `charades-r5` at charades 85a2aad on `charm-pads-perf` (`$WORK/charades-runs/build_r5.sh`): round 3, eager commits by default, `--ctl-reach-buckets=2`. Devastator's 2 × 23 binaries as in VS2.
+> - **Script:** `$WORK/charades-runs/vscale238.slurm` (copy in `~/charades-data/vlsi/`), skx-dev plus an skx copy, 16 nodes, 50 minutes, `-x c455-081`. Checked on the Mac against stubs for `ctl_sweep.sh`, Devastator and the node sampling: arm order, options per run, and which node is sampled.
+
+**Arms** (b19 × N, one copy per node, 5,000 cycles, direct sends):
+- **Charades,** 1 × 46, `--batch=32`, buckets of 2,500 ps, `--pe-stats=1`:
+  - **E, W 5,000:** eager commits (the new setting);
+  - **E, W 2,500;**
+  - **L, W 2,500:** lazy commits, VS2's setting from 4 nodes up, for continuity;
+  - **the controller** (`--ctl=3`, bracketed, reach 2 buckets), eager commits.
+- **Devastator** 2 × 23 at W 2,500, 5,000 and 10,000, launched as in VS2.
+- 3 reps; engines interleaved per rep, engine and arm order reversed in rep 2; a warm-up run per node set.
+- 8, 4, 2 and 1 nodes side by side (nodes 0–7 / 8–11 / 12–13 / 14), then 16 nodes. About 30 minutes.
+- **Gate:** VS2's change tier on 2 nodes (VLSI), eager commits. A gate that ran no test now fails.
+
+**The slow reps.** Four reps so far ran about 1.3× long: PE 105 (copy 2's node, rank 13) took longer per cycle with the same events (sections 234, 236).
+- `+pemap` pins rank 13 to core 28.
+- From 4 nodes up, the job reads `/proc/stat` and `/proc/interrupts` on copy 2's node before and after each Charades run: each core's user, system, interrupt and softirq time, and each interrupt's count per core.
+
+**Predictions** (Charades rates are M committed ev/s; ratios are speed, higher is better):
+- **VS3-1. Counts:** every Charades run commits VS2's count with VS2's digest at each node count, and every Devastator run commits the same count.
+- **VS3-2. Devastator reproduces VS2** within 5% at its best window: 45.3 / 85.4 / 83.8 / 149.1 / 295.5 M ev/s at 1 / 2 / 4 / 8 / 16 nodes.
+- **VS3-3. Charades' E at W 5,000 ÷ L at W 2,500** is within 5% of job VC: 1.31–1.34 (1 node), 1.52–1.55 (2), 0.95–0.97 (4), 0.97–0.99 (8), 1.02–1.03 (16).
+- **VS3-4. Charades ÷ Devastator,** each at its best fixed arm: 1.44–1.60 (1 node), 1.34–1.48 (2), 1.17–1.30 (4), 1.22–1.36 (8), 1.15–1.28 (16). That is VS2's 1.37 / 1.27 / 1.23 / 1.29 / 1.19 times VC's gain at each node count, within 5%.
+- **VS3-5. The controller:**
+  - Its trials pass the delay range ("Trials past it" above 0) in every run.
+  - Its time-weighted mean W is at least 3,750 at 1, 2 and 16 nodes.
+  - It reaches at least 0.90 of Charades' best fixed arm at 1–2 nodes (today's row: 0.64–0.75) and at least 0.95 at 4–16.
+- **VS3-6. Eager ÷ lazy commits at W 2,500:** 0.93–1.02 (section 234: 1.00–1.02 at 4 nodes, 0.93–0.96 at 16).
+- **VS3-7. Slow reps:**
+  - If a Charades run at 4–16 nodes takes at least 1.15× its arm's median, core 28 shows at least twice the system, interrupt and softirq time, or the interrupts, of that arm's other reps.
+  - If no rep is slow, the job measures only how often they occur.
+
+**What follows:**
+- **The paper's VLSI row at 1–16 nodes** becomes this job's: each engine at its best fixed arm, with Charades' controller beside it. The 32-node cell comes from F1's job, with the same arms.
+- **If VS3-5 holds,** the VLSI controller row is the frozen controller with eager commits.
+- **If VS3-7 finds a cause on core 28** (an interrupt, or another process), the fix depends on what it is, for example moving that interrupt or that rank. If it finds none, the slow reps are reported as spread between reps.
 
 ## Baseline verification on the Mac
 
