@@ -143,7 +143,7 @@ time without a reason written here first.
 5. **Engine freeze, 2026-12-07. Changed 2026-11-06 (user): no hard freeze; the paper-grade runs go now (RESULTS.md 240), and a later engine change means rerunning the cells it touches.**
    - **Defaults already set:** per-LP rollback, `--agg-pp-alloc=1`, ring input buffers, `numactl --localalloc` launch (Charades only), 23 LCI devices, `+mempool_remote_free`.
    - **Frozen 2026-11-01:** the controller (`--ctl=3`, bracketed; item 1). The pending heap fix (item 1a) is in.
-6. **Paper-grade runs: queued 2026-11-06 (RESULTS.md 240)**, not after a freeze. F1 at 1–32 nodes with ROSS's window calibrated first; F5's traffic and dragonfly at 1–32 with ROSS's window; VLSI at 32 with 16 nodes inside the 32-node allocation.
+6. **Paper-grade runs: queued 2026-11-06 (RESULTS.md 240)**, not after a freeze. F1 at 1–32 nodes with ROSS's window calibrated first (done: RESULTS.md 241); F5's traffic and dragonfly at 1–32 with ROSS's window; VLSI at 32 with 16 nodes inside the 32-node allocation.
    - F1 at 1–32 nodes, three engines; 5 reps at 32.
    - F5 cells only where a change before the freeze touched the paths they use (item 3).
    - F2 and F4 on the final defaults, if items 1–4 used earlier ones.
@@ -166,7 +166,7 @@ Ratios: Charades ÷ the other (higher is better for Charades).
   - 0.89 (σ 100), 1.04 (σ 500), 1.14 (σ 1,000), 1.24 (σ 2,000), 1.39 (σ 4,000), 1.66 (uniform);
   - lookahead 10: 0.99 (σ 500), 1.11 (σ 2,000);
   - 44 of 48 cells ahead over 1–32 nodes.
-- **Charades ÷ ROSS:** 2.4–5.3× on PHOLD, against ROSS without its window (ROSS's window is untested on PHOLD). On the applications, against ROSS with its window, at 1 and 4 nodes: traffic 1.75–1.90, dragonfly 2.98–3.05 (sections 223, 225).
+- **Charades ÷ ROSS:** 2.4–5.3× on PHOLD, against ROSS without its window. ROSS's window on PHOLD (job RW, section 241) gains only 1.00–1.04× at 4 nodes (1.23× at σ 100 on 1 node), because ROSS without it already commits 97.9–99.3% of the events it executes; F1's rerun includes it. On the applications, against ROSS with its window, at 1 and 4 nodes: traffic 1.75–1.90, dragonfly 2.98–3.05 (sections 223, 225).
 - **VLSI, Charades ÷ Devastator** (section 239; eager commits at W 5,000, the widened controller; each at its best fixed arm, ratio of medians): 1.51 / 1.40 / 1.26 / 1.30 / 1.25 at 1 / 2 / 4 / 8 / 16 nodes; with Charades' controller 1.46 / 1.33 / 1.24 / 1.32 / 1.26, the controller at 0.95–1.02 of Charades' best fixed arm. 32 nodes: 1.05 on the old setting (section 226), to be rerun in F1. From 3 nodes up one PE (copy 2's node, rank 13) sets the pace in every engine (section 234). Charades ÷ ROSS 14.9 at 32 nodes (old setting).
 - **The PADS'19 hold** (section 225): at most 1.02 of no hold with the fast path on (0.83–1.02), and 0.30–0.40 (PHOLD) and 0.67–0.72 (traffic) of deadline htram.
 - **Aggregation, deadline htram ÷ direct sends, each at its better fixed W** (job ABL, round 3; section 223): 2.11 / 2.85 / 3.31 / 1.44 at 4 nodes and 2.20 / 2.87 / 2.65 / 1.37 at 16 (σ 100 / σ 2,000 / uniform / traffic).

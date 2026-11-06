@@ -396,7 +396,8 @@ Sections 1–128 were re-read before planning sections 129 onward.
 | 237 | 2026-11-06 | — (Mac) | The measured controller's trials reach two buckets (`--ctl-reach-buckets=2`, charades 85a2aad; user decision on section 236): the upper end of the trial range is the 0.99 quantile of delay or two buckets, whichever is larger. Trials it changed: 0 on dragonfly at F4's link settings (least 0.99 quantile 12,510 ps against 2,000), phase-changing PHOLD (3,019 against 16) and traffic (4,109 against 16); PHOLD and traffic cannot be affected at any scale. So no earlier controller result changes. On the VLSI test the window now leaves one bucket. Change tier on the measured-controller configs 132/132 | current |
 | 238 | 2026-11-06 | VS3: 3688291 (skx-dev) / 3688292 (skx) (results in a later section) | The paper's VLSI row with the new setting (design): tree `charades-r5` (85a2aad); Charades E W 5,000, E W 2,500, L W 2,500 and the widened controller (eager), Devastator 2 × 23 W 2,500 / 5,000 / 10,000, same allocation; 1, 2, 4, 8 and 16 nodes, 3 reps; `/proc/stat` and `/proc/interrupts` on copy 2's node around each Charades run (PE 105 on core 28) for the slow reps; predictions VS3-1 to VS3-7 | design (results in 239) |
 | 239 | 2026-11-06 | 3688291 | VS3 results: with eager commits at W 5,000, Charades ÷ Devastator on VLSI is 1.51 / 1.40 / 1.26 / 1.30 / 1.25 at 1 / 2 / 4 / 8 / 16 nodes (each at its best fixed arm; VS2: 1.37 / 1.27 / 1.23 / 1.29 / 1.19), or 1.46 / 1.33 / 1.24 / 1.32 / 1.26 with Charades' controller. The widened controller is 0.95–1.02 of Charades' best fixed arm at every node count (before: 0.64–0.75 at 1–2 nodes), mean W 2,838–4,632. Devastator reproduces VS2 within 2%. Per-node rate 4 → 16 nodes 0.858 (Devastator 0.867). No slow rep in 36 runs at 4–16 nodes; core 28 steady. One count per node count in both engines; VS3-1 to VS3-4 and VS3-6 right, VS3-5 mostly, VS3-7 untested | current |
-| 240 | 2026-11-06 | RW 3688911, F1a 3688913, F1b 3688914, F5a 3688915, F1-32 3688916, F5-32 3688917, V32 3688918 (results in later sections) | F1 and F5 on the final defaults (design; user: no hard freeze, run now, recommendations 2–6): ROSS's window calibrated on PHOLD (RW, skx-dev); Gaussian PHOLD at 1–16 (two 16-node jobs) and 32 nodes (5 reps); traffic and dragonfly at 1–16 and 32 (16 on halves); VLSI at 32 with 16 on halves; tree `charades-r5` (85a2aad); ROSS with its window everywhere; predictions C1–C9 | design |
+| 240 | 2026-11-06 | RW 3688911, F1a 3688913, F1b 3688914, F5a 3688915, F1-32 3688916, F5-32 3688917, V32 3688918 (results in later sections) | F1 and F5 on the final defaults (design; user: no hard freeze, run now, recommendations 2–6): ROSS's window calibrated on PHOLD (RW, skx-dev); Gaussian PHOLD at 1–16 (two 16-node jobs) and 32 nodes (5 reps); traffic and dragonfly at 1–16 and 32 (16 on halves); VLSI at 32 with 16 on halves; tree `charades-r5` (85a2aad); ROSS with its window everywhere; predictions C1–C9 | design (RW results in 241) |
+| 241 | 2026-11-06 | 3688911 | RW results: ROSS's optimism window (`--max-opt-lookahead`) on PHOLD gains 1.00–1.04× at 4 nodes (1 node: 1.00–1.04, except σ 100 1.23×), because ROSS without it already commits 97.9–99.3% of executed events at 4 nodes; best windows 250 (σ 100), 500 (σ 500–2,000), 1,000 (σ 4,000), 100 (lookahead 10), none (uniform), written to `f1_240/ross_windows.txt` before F1 started; narrow windows cost up to 5%, wide ones do not bind; one count per cell; C6's first two parts wrong, the third is F1's | current |
 
 ## Stampede3 runs, in order
 
@@ -10550,9 +10551,9 @@ Which of these costs the half is not measured. It does not touch the paper's num
 - **The VLSI controller row** is the frozen controller with eager commits and `--ctl-reach-buckets=2`.
 - **The slow reps stay open.** Every 32-node run in F1 can sample copy 2's node the same way at no cost.
 
-### F1 and F5 on the final defaults: six jobs queued at once — ROSS's window on PHOLD, Gaussian PHOLD at 1–32 nodes, traffic and dragonfly at 1–32, VLSI at 32 (design, 2026-11-06; written before any runs)
+### F1 and F5 on the final defaults: seven jobs queued at once — ROSS's window on PHOLD, Gaussian PHOLD at 1–32 nodes, traffic and dragonfly at 1–32, VLSI at 32 (design, 2026-11-06; written before any runs)
 
-> **Status: design; queued 2026-11-06.** RW 3688911 (skx-dev, started at once; skx copy 3688912 cancelled), F1a 3688913, F1b 3688914, F5a 3688915, F1-32 3688916, F5-32 3688917, V32 3688918 (all skx). Login-node checks pass for all seven submissions.
+> **Status: design; queued 2026-11-06. RW done (results in section 241).** RW 3688911 (skx-dev, started at once; skx copy 3688912 cancelled), F1a 3688913, F1b 3688914, F5a 3688915, F1-32 3688916, F5-32 3688917, V32 3688918 (all skx). Login-node checks pass for all seven submissions.
 > User decisions 2026-11-06:
 > - **No hard engine freeze;** the focus now is runs. A later engine change means rerunning the cells it touches.
 > - **F1:** all eight PHOLD workloads.
@@ -10632,6 +10633,59 @@ Which of these costs the half is not measured. It does not touch the paper's num
 - **If C6 holds:** the paper's Charades ÷ ROSS on PHOLD uses ROSS with its window.
 - **If C9 holds:** the paper says the VLSI 32-node spread at W 2,500 is the allocation's. The setting at W 5,000 avoids it.
 - **A slow rep in V32:** read the copy-2-node samples, as in section 239.
+
+### RW results: ROSS's window gains PHOLD only 1.00–1.04× at 4 nodes, because ROSS without it already commits 97.9–99.3% of the events it executes; σ 100 at 1 node is the exception (1.23×) (2026-11-06; skx-dev batch job 3688911, 5 nodes)
+
+> **Status: current.** Design and predictions in section 240 (C6).
+> - **Job:** 10 minutes of runs (11:48–11:58); 96 runs, all finished. The skx copy 3688912 was cancelled before it started.
+> - **Data:** `~/charades-data/f1/rosswin240/rosswin_j3688911/`; summary `~/charades-data/f1/rosswin240_summary.py`, output `rosswin240/j3688911_summary.txt`.
+> - **Counts:** within each workload and node count, every window commits the same events.
+> - **The file F1 reads** (`$WORK/charades-runs/f1_240/ross_windows.txt`) was written before any F1 job started. It holds W 250 (σ 100), 500 (σ 500, 1,000 and 2,000), 1,000 (σ 4,000), 100 (both lookahead-10 workloads) and 0 (uniform, where no window beat none). So F1 runs one ROSS window arm on seven workloads, and none on uniform.
+
+ROSS optimistic, batch 16 / GVT interval 64, A0's run length (end time 512,000; lookahead 10: 128,000), 1 rep. Rates in M committed events/s, higher is better. Efficiency is committed ÷ executed events, in %. Gain is the best window's rate ÷ the rate without a window, higher is better.
+
+| workload | 1 node, no window: M ev/s (efficiency %) | 1 node, best window: W, M ev/s | gain, 1 node | 4 nodes, no window: M ev/s (efficiency %) | 4 nodes, best window: W, M ev/s (efficiency %) | gain, 4 nodes |
+|---|---|---|---|---|---|---|
+| σ 100 | 13.98 (93.3) | 250, 17.17 | **1.23** | 56.61 (97.9) | 250, 58.71 (99.99) | 1.04 |
+| σ 500 | 10.58 (98.9) | 2,000, 11.02 | 1.04 | 39.05 (98.9) | 500, 39.88 (99.89) | 1.02 |
+| σ 1,000 | 9.10 (99.2) | 1,000, 9.14 | 1.00 | 34.18 (99.1) | 500, 34.51 (99.95) | 1.01 |
+| σ 2,000 | 8.83 (99.3) | 500, 8.91 | 1.01 | 28.56 (99.2) | 500, 28.82 (99.97) | 1.01 |
+| σ 4,000 | 8.76 (99.3) | 1,000, 8.79 | 1.00 | 27.14 (99.2) | 1,000, 27.22 (99.25) | 1.00 |
+| uniform | 8.89 (99.2) | 4,000, 8.90 | 1.00 | 25.92 (99.3) | none (best window 1,000: 25.88) | 1.00 |
+| lookahead 10, σ 500 | 10.56 (98.3) | 100, 10.69 | 1.01 | 38.35 (98.2) | 100, 39.02 (99.53) | 1.02 |
+| lookahead 10, σ 2,000 | 8.55 (98.8) | 100, 8.68 | 1.02 | 27.87 (98.8) | 100, 28.26 (99.66) | 1.01 |
+
+**What the job shows:**
+- **A window can only remove the work ROSS rolls back, and on PHOLD there is little of it.**
+  - Without a window, ROSS commits 97.9–99.3% of the events it executes at 4 nodes. The best window raises that to 99.25–99.99%, and the rate by at most 4%.
+  - With one rep, the job cannot tell gains of 1–2% from the spread between runs.
+- **σ 100 at 1 node is the exception.** Without a window ROSS commits only 93.3% there; W 250 raises that to 99.97% and the rate 1.23×.
+  - W 250 is the lowest window tried. At 99.97% there is almost no rollback left to remove, so a narrower window could only add waiting.
+- **Narrow windows cost; wide ones do nothing.**
+  - At 4 nodes, W 250 runs at 0.95–0.98 of no window on σ 1,000 to uniform, and lookahead 10's W 50 at 0.98.
+  - W 2,000 and 4,000 run at 0.97–1.00 of no window, at about the same efficiency: they rarely bind.
+  - From 500 to 1,000 the rate is flat within 1% on σ 500–4,000, so the choice between them hardly matters.
+- **Why ROSS rolls back so little on PHOLD (not tested):**
+  - ROSS's GVT is synchronous: every PE stops for it every 64 passes of its scheduling loop, and each pass runs at most 16 events, so at most 1,024 events apart (`core/gvt/mpi_allreduce.c`, blocking `MPI_Allreduce`).
+  - That may already bound how far one PE runs ahead of the others, leaving the window little to do.
+  - On traffic and dragonfly the same window gains 1.13–1.19× and 1.35–1.48× (sections 223, 225).
+
+**Predictions (C6):**
+- **"Beats no window by 1.05–1.25× on at least five of the eight workloads at 4 nodes": wrong.**
+  - It gains 1.00–1.04× on all eight.
+  - Only σ 100 at 1 node (1.23×) falls in the range.
+  - C6 carried over the gains on traffic and dragonfly. On PHOLD, ROSS rolls back too little for that.
+- **"ROSS's best window at lookahead 100 is 1,000–4,000": wrong.** It is 250–1,000 (σ 100: 250; σ 500–2,000: 500; σ 4,000: 1,000), and no window on uniform.
+- **"Charades ÷ ROSS at its best (window included) stays at least 2.0 in every F1 cell":** F1 tests this.
+  - The old range was 2.42–3.02 at σ 100 and 2.4–5.3 overall, against ROSS without its window.
+  - At 4 nodes the window moves ROSS's best by at most 4%. At 1 node on σ 100 it moves it by up to 1.23×.
+
+**What follows:**
+- **F1's ROSS arms use these windows.** The file was in place before any of F1's six jobs started (all still pending at 12:00).
+- **In the paper,** ROSS on PHOLD is the best of optimistic, conservative and optimistic with its window, tuned per workload.
+  - That answers the fairness question for every workload: ROSS's window was tried on PHOLD, traffic, dragonfly and VLSI.
+  - On PHOLD it hardly changes ROSS's rate, except σ 100 at 1 node.
+- **Nothing to rerun.**
 
 ## Baseline verification on the Mac
 
