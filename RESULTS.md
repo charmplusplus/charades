@@ -10415,7 +10415,7 @@ Which of these costs the half is not measured. It does not touch the paper's num
   - The VLSI row of the paper (sections 217 and 226) used lazy commits and needs rerunning, with Devastator in the same allocation.
   - F1's 32-node job runs the new setting beside W 2,500 (decision 2 of section 235).
 - **The controller row on VLSI:**
-  - Its trial range could reach at least two buckets, for example `max(99th percentile of delay, 2 × bucket)`. Whether that bound would bind on the other seven workloads can be read from their controller logs before any run. It is a change to the frozen controller.
+  - Its trial range could reach at least two buckets, for example `max(99th percentile of delay, 2 × bucket)`. Whether that bound would bind on the other seven workloads needs each one's delay percentiles, which the controller logs do not print. On PHOLD and traffic, buckets of 8 sit far below delays of hundreds; dragonfly is to be checked. It is a change to the frozen controller.
   - Or the paper reports the frozen controller held at one bucket on VLSI, with the reason above.
 
 ## Baseline verification on the Mac
