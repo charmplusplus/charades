@@ -393,6 +393,7 @@ Sections 1–128 were re-read before planning sections 129 onward.
 | 234 | 2026-11-05 | 3686450 | RA results: the cost of running ahead on VLSI was the lazy commit rule. With eager commits (`--fossil-lazy=0`), W 5,000 runs at 0.97–0.99 (4 nodes) and 1.02–1.03 (16 nodes) of VS2's best (lazy, W 2,500); lazy at W 5,000 runs at 0.75–0.79. At W ≥ 3,750 the busiest PE never ends a pass short, so lazy commits wait four GVT updates, then cost twice as much per event and slow every event 24–31%. `--gvt-wave-events=0` changes nothing; `--batch=8` costs 8–17%. From 3 nodes up one PE (node 2, rank 13) runs 2,141 events per cycle, 3.3× any other node's busiest PE, rolls back 1–3 per cycle, and sets the cycle (same nets per PE in all three engines). W 3,750 rolls back the most and had 3 slow reps in 24. One count and digest per node count; RA1, RA2, RA5 right, RA3, RA4, RA6, RA7 wrong | current |
 | 235 | 2026-11-05 | VC: 3686688 (skx-dev) / 3686689 (skx) (results in a later section) | VLSI's commit setting and controller row (design; user decisions on section 234's questions: 1A, 2 yes, 3A, 4A): charades 609212b adds `--fossil-rounds=N` (default 4, unchanged) and `--fossil-finish=1`; tree `charades-r4`; L / E / R1 / F commit settings at W 5,000, L at W 2,500, the controller with buckets of 2,500 (L) and 5,000 (E, R1, F); 1, 2, 4, 8 and 16 nodes, 3 reps; today's VLSI controller row is 0.72–0.83 of the best fixed W at 1–2 nodes (VS2); predictions VC1–VC7 | design (results in 236) |
 | 236 | 2026-11-06 | 3686688 | VC results: eager commits (the engine default) at W 5,000 are VLSI's best fixed arm at 1, 2 and 16 nodes and 0.95–0.99 of it at 4 and 8 (one slow rep 0.77 at 4 nodes); against VS2's setting 1.11–1.12 at 1–2 nodes, 1.02–1.03 at 16. Lazy commits no longer pay at any node count; `--fossil-finish` 0.89–0.95 of eager, `--fossil-rounds=1` 0.82–0.85. The controller never leaves one bucket on VLSI: its trials are held inside the 1st–99th percentile of remote delay, which on VLSI is under one bucket (`controller.C:464`). Buckets of 5,000 ps hold W at 5,000 but cost 0.74–0.90 (GVT every two periods, 2–3× the rollbacks). One count and digest per node count; VC1, VC2 right, VC3, VC5 half, VC4, VC6 wrong, VC7 narrowly wrong | current |
+| 237 | 2026-11-06 | — (Mac) | The measured controller's trials reach two buckets (`--ctl-reach-buckets=2`, charades 85a2aad; user decision on section 236): the upper end of the trial range is the 0.99 quantile of delay or two buckets, whichever is larger. Trials it changed: 0 on dragonfly at F4's link settings (least 0.99 quantile 12,510 ps against 2,000), phase-changing PHOLD (3,019 against 16) and traffic (4,109 against 16); PHOLD and traffic cannot be affected at any scale. So no earlier controller result changes. On the VLSI test the window now leaves one bucket. Change tier on the measured-controller configs 132/132 | current |
 
 ## Stampede3 runs, in order
 
@@ -10417,6 +10418,35 @@ Which of these costs the half is not measured. It does not touch the paper's num
 - **The controller row on VLSI:**
   - Its trial range could reach at least two buckets, for example `max(99th percentile of delay, 2 × bucket)`. Whether that bound would bind on the other seven workloads needs each one's delay percentiles, which the controller logs do not print. On PHOLD and traffic, buckets of 8 sit far below delays of hundreds; dragonfly is to be checked. It is a change to the frozen controller.
   - Or the paper reports the frozen controller held at one bucket on VLSI, with the reason above.
+
+### The measured controller's trials reach two buckets: `--ctl-reach-buckets=2`, and checks that it changes no earlier controller result (2026-11-06; Mac)
+
+> **Status: current.** User decision 2026-11-06 (section 236): widen the controller's trial range so that it can reach W 5,000 on VLSI. This is a change to the controller frozen on 2026-11-01.
+> - **Code:** charades 85a2aad. Mac: change tier on the four measured-controller configs (`ctl_measured_bucket`, `agg_ctl_measured_bucket_pp`, `agg_ctl_measured_fast_bucket_pp`, `agg_ctl_measured_fast_nobracket_bucket_pp`) 132/132.
+> - **Runs:** on the Mac at 1 × 4, `ctl_measured_bucket` with `--ctl=3 --ctl-bracket=1`; logs not kept (session scratch), the numbers below are copied from them.
+
+**The change** (`measured_clamp`, `controller.C`):
+- **Before:** a trial window was held between the 0.01 and 0.99 quantiles of the remote-send delay, then raised to at least one bucket. On VLSI every delay is under one bucket, so every trial ran at one bucket (section 236).
+- **Now:** under bucketed GVT the upper end is the 0.99 quantile or `--ctl-reach-buckets` buckets (default 2), whichever is larger. `--ctl-reach-buckets=0` restores the old range.
+- **Why two buckets:** a window two buckets wide lets PEs run on while a GVT update is one bucket late (section 228). On VLSI two clock periods are the best fixed window at 1, 2 and 16 nodes (section 236).
+- **New statistics** at the end of a `--ctl=3` run:
+  - the least 0.99 quantile of delay that any clamp saw;
+  - how many trials the reach let past that quantile ("Trials past it"). Zero means every decision matched the old controller's.
+
+**Checks** (Mac; the trials the reach changed; any value above 0 would change a result):
+
+| workload (as in F4 unless noted) | bucket | least 0.99 quantile of delay seen | two buckets | trials changed |
+|---|---|---|---|---|
+| dragonfly, F4's link settings (16 routers per group, 10 global channels, arrival 500), end time 4,000,000 | 1,000 ps | 12,510 ps | 2,000 ps | **0** |
+| phase-changing PHOLD (test config `phases`: 10/200 and 100/1,000) | 8 | 3,019 | 16 | **0** |
+| traffic (test config `trips`, lookahead 100) | 8 | 4,109 | 16 | **0** |
+| VLSI, `tiny.bench` × 3 (test config `base`) | 100 ps | 21.9 ps | 200 ps | 3 |
+
+- **PHOLD and traffic cannot be affected**, whatever the scale. Every remote delay is at least the lookahead (10 or 100) plus an exponential draw (mean 200 or 1,000). Even at the shortest lookahead and mean, under 4% of delays fall below 16, so the 0.99 quantile stays far above two buckets of 8.
+- **Dragonfly** keeps a sixfold margin at F4's link settings. Its 16-node runs (28 routers per group, 14 global channels) use the same link delays.
+- **So the controller results so far stand unchanged:** F4 (sections 230, 232), the 1–32-node tables, and phase-changing PHOLD. Their runs would have made the same decisions, and none is rerun. Every `--ctl=3` run from now on prints the statistic, so paper-scale runs check this themselves.
+- **On the VLSI test** the window now leaves one bucket: time-weighted mean 122 ps and final 150, against 100 throughout with `--ctl-reach-buckets=0`. Every run commits the same count (15,489).
+- **The frozen controller is now** `--ctl=3`, bracketed, with `--ctl-reach-buckets=2`. Its VLSI row is measured in the VLSI rerun job (step 2 of the plan of 2026-11-06).
 
 ## Baseline verification on the Mac
 
