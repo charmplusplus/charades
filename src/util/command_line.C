@@ -91,6 +91,7 @@ void parse_command_line(int argc, char** argv) {
   kernel.register_argument("ctl-period",           "--ctl=3: controller rounds per measured period (default 8)", g_tw_ctl_period);
   kernel.register_argument("ctl-settle",           "--ctl=3: rounds left out of the measurement after each change of the window (default 2)", g_tw_ctl_settle);
   kernel.register_argument("ctl-bracket",          "--ctl=3: keep a trial only if it costs less than the base measured both before and after it - NO=0 (compare with the base before only), YES=1 (default)", g_tw_ctl_bracket);
+  kernel.register_argument("ctl-reach-buckets",    "--ctl=3, bucketed GVT: trials may reach at least this many buckets of W even when every remote delay is shorter (0 = only up to the delay histogram's 0.99 quantile, as before 2026-11-06; default 2)", g_tw_ctl_reach_buckets);
   kernel.register_argument("ctl-epsilon",          "Delay quantile rule: target share of executed events rolled back (default 0.001); with --ctl-cost=1 the share of PE time lost to rollbacks (default 0.01); uncalibrated, primary stragglers per executed event", g_tw_ctl_epsilon);
   kernel.register_argument("ctl-cost",             "Delay quantile rule: epsilon is a share of - EVENTS ROLLED BACK=0 (default), PE TIME LOST TO ROLLBACKS=1 (experimental: misses the indirect cost of rollbacks)", g_tw_ctl_cost);
   kernel.register_argument("ctl-calibrate",        "Delay quantile rule: scale the straggler bound by the events seen rolled back - NO=0, YES=1", g_tw_ctl_calibrate);

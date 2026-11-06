@@ -102,6 +102,7 @@ unsigned g_tw_ctl;
 unsigned g_tw_ctl_period;
 unsigned g_tw_ctl_settle;
 unsigned g_tw_ctl_bracket;
+unsigned g_tw_ctl_reach_buckets;
 double   g_tw_ctl_epsilon;
 unsigned g_tw_ctl_cost;
 unsigned g_tw_ctl_calibrate;
@@ -227,6 +228,7 @@ void clear_globals() {
   g_tw_ctl_period         = 8;
   g_tw_ctl_settle         = 2;
   g_tw_ctl_bracket        = 1;
+  g_tw_ctl_reach_buckets  = 2;
   g_tw_ctl_epsilon        = -1;   // set in tw_init from --ctl-cost
   g_tw_ctl_cost           = 0;
   g_tw_ctl_calibrate      = 1;

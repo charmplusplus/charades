@@ -118,7 +118,8 @@ Controller::Controller()
       m_phase(0), m_round(0), m_elapsed(0), m_committed(0), m_base_cost(0),
       m_base_window(0), m_trial_cost(0), m_trial_window(0),
       m_log_step(std::log(M_STEP_START)), m_dir(1),
-      m_rejects(0), m_trials(0), m_kept(0), m_last_cost(0) {
+      m_rejects(0), m_trials(0), m_kept(0), m_last_cost(0),
+      m_p99_least(-1), m_reach_raised(0) {
   CpvInitialize(Controller*, g_controller);
   CpvAccess(g_controller) = this;
   last_time = CmiWallTimer();
@@ -464,7 +465,18 @@ double Controller::window_waste() const {
 Time Controller::measured_clamp(double w) const {
   if (dist_total > 0) {
     w = std::max(w, inverse_cdf(Q_MIN));
-    w = std::min(w, inverse_cdf(Q_MAX));
+    // A window past every remote delay admits no more of them, but it still
+    // lets PEs run on while a GVT update is late. On VLSI every delay is
+    // under one bucket, so the 0.99 quantile alone held W at one bucket, and
+    // two clock periods run 1.17-1.38x faster at 1-2 nodes (RESULTS.md 236).
+    const double p99 = inverse_cdf(Q_MAX);
+    if (m_p99_least < 0 || p99 < m_p99_least) m_p99_least = p99;
+    double hi = p99;
+    if (g_tw_gvt_scheme == 4) {
+      hi = std::max(hi, (double)g_tw_ctl_reach_buckets * g_tw_gvt_bucket_size);
+    }
+    if (w > p99 && hi > p99) m_reach_raised++;
+    w = std::min(w, hi);
   }
   return clamp_window((Time)std::llround(std::max(1.0, w)));
 }
@@ -669,7 +681,10 @@ void Controller::finalize() {
     CkPrintf("Policy                         hill climb (Devastator)\n");
   } else if (g_tw_ctl == 3) {
     CkPrintf("Policy                         measured cost (PE time per committed event), "
-        "W within the delay histogram's %g-%g quantiles\n", Q_MIN, Q_MAX);
+        "W within the delay histogram's %g-%g quantiles, the upper end at least "
+        "%u buckets\n", Q_MIN, Q_MAX, g_tw_gvt_scheme == 4 ? g_tw_ctl_reach_buckets : 0);
+    CkPrintf("Least %g quantile of delay      %.1f\n", Q_MAX, m_p99_least);
+    CkPrintf("Trials past it (reach buckets)  %d\n", m_reach_raised);
     CkPrintf("Trials judged against          %s\n",
         g_tw_ctl_bracket ? "the base before and after" : "the base before");
     CkPrintf("Trials kept                    %d of %d\n", m_kept, m_trials);

@@ -142,6 +142,7 @@ extern unsigned g_tw_ctl;             ///< 0: fixed window, 1: delay quantile, 2
 extern unsigned g_tw_ctl_period;      ///< --ctl=3: rounds per measured period
 extern unsigned g_tw_ctl_settle;      ///< --ctl=3: rounds left out after each change of W
 extern unsigned g_tw_ctl_bracket;     ///< --ctl=3: a trial must beat the base before and after it
+extern unsigned g_tw_ctl_reach_buckets; ///< --ctl=3: trials reach at least this many buckets of W, past every remote delay
 extern double   g_tw_ctl_epsilon;     ///< quantile rule: target share of PE time lost to rollbacks (--ctl-cost=0: of executed events rolled back)
 extern unsigned g_tw_ctl_cost;        ///< quantile rule: 0 (default) epsilon is a share of events rolled back, 1 of PE time (experimental)
 extern unsigned g_tw_ctl_calibrate;   ///< quantile rule: scale the bound by the waste seen

@@ -164,6 +164,8 @@ class Controller : public CBase_Controller {
     int m_rejects;               ///< trials rejected in a row
     int m_trials, m_kept;
     double m_last_cost;
+    mutable double m_p99_least;  ///< --ctl=3: the least 0.99 quantile of delay a clamp saw (-1: none)
+    mutable int m_reach_raised;  ///< --ctl=3: clamps that --ctl-reach-buckets let past that quantile
 
     /** Fold a round's delays into the decayed histogram; true if it did */
     bool fold(const uint64_t* sum);
@@ -173,7 +175,8 @@ class Controller : public CBase_Controller {
     void measured_kept();
     void measured_dropped();
     Time measured_window(const uint64_t* sum);
-    /** clamp_window, and within the histogram's [Q_MIN, Q_MAX] quantiles */
+    /** clamp_window, and within the histogram's [Q_MIN, Q_MAX] quantiles, the
+     *  upper end at least --ctl-reach-buckets buckets */
     Time measured_clamp(double w) const;
 
     /** This PE's counter deltas since its last contribution, into v */
