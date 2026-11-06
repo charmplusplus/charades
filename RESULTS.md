@@ -26,7 +26,7 @@ Every number from every run: Stampede3 runs in order (each design, written befor
 | dragonfly | **0.94** / 1.04 / 1.29 / 1.51 / 1.80 / 2.03 | 3.80 / 3.69 / 3.94 / 4.01 / 3.94 / 4.26 | **0.56** / 0.26 / 0.50 | 689.6 / 339.2 / 161.9 |
 | traffic | 1.03 / 1.05 / 1.02 / 1.04 / 1.03 / 1.08 | 1.70 / 1.99 / 1.99 / 2.04 / 2.12 / 2.19 | **0.94** / 0.89 / 0.73 | 1,846.6 / 1,706.1 / 843.6 |
 
-(Bold: below 1 in the ratio columns; best of the three in the efficiency column.) The controller is 0.95–1.05 of Charades' best fixed W per rep at 32 nodes. VLSI (b19 × N) at 1 and 4 nodes (V5, section 208): Charades (one process per node, lazy fossils, batch 32; its best W) ÷ Devastator (2 × 23, its best W) 0.85 / 1.00 (V1, section 195: 0.51 / 0.75; ÷ ROSS 6.9 / 7.9 then). Devastator at one process per node hung on Stampede3 because PSM2 pinned all its threads to one core; with `HFI_NO_CPUAFFINITY=1` it runs at 0.87 of its 2 × 23 at 1 node (section 209), so 0.85 compares each engine at its best layout. **Round 3 (sections 213, 215, 217, 226; charades b0b4ed4): Charades ÷ Devastator on VLSI is 1.37 / 1.27 / 1.23 / 1.29 / 1.19 / 1.05 at 1 / 2 / 4 / 8 / 16 / 32 nodes** (each at its best launch; at 32 nodes 0.96–1.07 per rep). From 16 to 32 nodes Charades' clock cycle grows by 14%, almost all of it the count wave in flight; Devastator's stays flat (section 226). Before round 3 it was 0.84 / 0.91 / 0.99 / 0.97 / 0.89 (section 214). **Section 234:** with eager commits (`--fossil-lazy=0`), W 5,000 runs at 0.97–1.03 of the W 2,500 setting above at 4–16 nodes, against 0.75–0.79 with lazy commits; from 3 nodes up one PE carries copy 2's extra work and sets every cycle in every engine. **Section 236:** eager commits at W 5,000 are VLSI's best setting at every node count within 3–5% (1.11–1.12× the setting above at 1–2 nodes, 1.02–1.03× at 16); the VLSI row is to be rerun with it. Round 3 also runs PHOLD at 2 × 23 1.16–1.18× faster; the tables below predate it.
+(Bold: below 1 in the ratio columns; best of the three in the efficiency column.) The controller is 0.95–1.05 of Charades' best fixed W per rep at 32 nodes. VLSI (b19 × N) at 1 and 4 nodes (V5, section 208): Charades (one process per node, lazy fossils, batch 32; its best W) ÷ Devastator (2 × 23, its best W) 0.85 / 1.00 (V1, section 195: 0.51 / 0.75; ÷ ROSS 6.9 / 7.9 then). Devastator at one process per node hung on Stampede3 because PSM2 pinned all its threads to one core; with `HFI_NO_CPUAFFINITY=1` it runs at 0.87 of its 2 × 23 at 1 node (section 209), so 0.85 compares each engine at its best layout. **Round 3 (sections 213, 215, 217, 226; charades b0b4ed4): Charades ÷ Devastator on VLSI is 1.37 / 1.27 / 1.23 / 1.29 / 1.19 / 1.05 at 1 / 2 / 4 / 8 / 16 / 32 nodes** (each at its best launch; at 32 nodes 0.96–1.07 per rep). From 16 to 32 nodes Charades' clock cycle grows by 14%, almost all of it the count wave in flight; Devastator's stays flat (section 226). Before round 3 it was 0.84 / 0.91 / 0.99 / 0.97 / 0.89 (section 214). **Section 234:** with eager commits (`--fossil-lazy=0`), W 5,000 runs at 0.97–1.03 of the W 2,500 setting above at 4–16 nodes, against 0.75–0.79 with lazy commits; from 3 nodes up one PE carries copy 2's extra work and sets every cycle in every engine. **Section 239 (current VLSI row at 1–16 nodes):** with eager commits at W 5,000 and the widened controller (`--ctl-reach-buckets=2`), Charades ÷ Devastator is **1.51 / 1.40 / 1.26 / 1.30 / 1.25** at 1 / 2 / 4 / 8 / 16 nodes (each at its best fixed arm), or 1.46 / 1.33 / 1.24 / 1.32 / 1.26 with Charades' controller, which runs at 0.95–1.02 of Charades' best fixed arm. The 32-node cell is to be rerun in F1's job. Round 3 also runs PHOLD at 2 × 23 1.16–1.18× faster; the tables below predate it.
 
 **Paper-grade weak scaling, Charades against Devastator and ROSS, 1–32 nodes, all eight workloads** (jobs 3653803, 3654651 and 3657016, sections 142–143 and 153; long runs, 3 reps; Charades: its controller, the better htram setting at each node count, chare rollback (per-LP rollback came later, section 152); Devastator: its best of three W; ROSS: the better of optimistic batch 16 / GVT interval 64 and conservative; the same committed events in all three engines in every cell):
 
@@ -394,7 +394,8 @@ Sections 1–128 were re-read before planning sections 129 onward.
 | 235 | 2026-11-05 | VC: 3686688 (skx-dev) / 3686689 (skx) (results in a later section) | VLSI's commit setting and controller row (design; user decisions on section 234's questions: 1A, 2 yes, 3A, 4A): charades 609212b adds `--fossil-rounds=N` (default 4, unchanged) and `--fossil-finish=1`; tree `charades-r4`; L / E / R1 / F commit settings at W 5,000, L at W 2,500, the controller with buckets of 2,500 (L) and 5,000 (E, R1, F); 1, 2, 4, 8 and 16 nodes, 3 reps; today's VLSI controller row is 0.72–0.83 of the best fixed W at 1–2 nodes (VS2); predictions VC1–VC7 | design (results in 236) |
 | 236 | 2026-11-06 | 3686688 | VC results: eager commits (the engine default) at W 5,000 are VLSI's best fixed arm at 1, 2 and 16 nodes and 0.95–0.99 of it at 4 and 8 (one slow rep 0.77 at 4 nodes); against VS2's setting 1.11–1.12 at 1–2 nodes, 1.02–1.03 at 16. Lazy commits no longer pay at any node count; `--fossil-finish` 0.89–0.95 of eager, `--fossil-rounds=1` 0.82–0.85. The controller never leaves one bucket on VLSI: its trials are held inside the 1st–99th percentile of remote delay, which on VLSI is under one bucket (`controller.C:464`). Buckets of 5,000 ps hold W at 5,000 but cost 0.74–0.90 (GVT every two periods, 2–3× the rollbacks). One count and digest per node count; VC1, VC2 right, VC3, VC5 half, VC4, VC6 wrong, VC7 narrowly wrong | current |
 | 237 | 2026-11-06 | — (Mac) | The measured controller's trials reach two buckets (`--ctl-reach-buckets=2`, charades 85a2aad; user decision on section 236): the upper end of the trial range is the 0.99 quantile of delay or two buckets, whichever is larger. Trials it changed: 0 on dragonfly at F4's link settings (least 0.99 quantile 12,510 ps against 2,000), phase-changing PHOLD (3,019 against 16) and traffic (4,109 against 16); PHOLD and traffic cannot be affected at any scale. So no earlier controller result changes. On the VLSI test the window now leaves one bucket. Change tier on the measured-controller configs 132/132 | current |
-| 238 | 2026-11-06 | VS3: 3688291 (skx-dev) / 3688292 (skx) (results in a later section) | The paper's VLSI row with the new setting (design): tree `charades-r5` (85a2aad); Charades E W 5,000, E W 2,500, L W 2,500 and the widened controller (eager), Devastator 2 × 23 W 2,500 / 5,000 / 10,000, same allocation; 1, 2, 4, 8 and 16 nodes, 3 reps; `/proc/stat` and `/proc/interrupts` on copy 2's node around each Charades run (PE 105 on core 28) for the slow reps; predictions VS3-1 to VS3-7 | design |
+| 238 | 2026-11-06 | VS3: 3688291 (skx-dev) / 3688292 (skx) (results in a later section) | The paper's VLSI row with the new setting (design): tree `charades-r5` (85a2aad); Charades E W 5,000, E W 2,500, L W 2,500 and the widened controller (eager), Devastator 2 × 23 W 2,500 / 5,000 / 10,000, same allocation; 1, 2, 4, 8 and 16 nodes, 3 reps; `/proc/stat` and `/proc/interrupts` on copy 2's node around each Charades run (PE 105 on core 28) for the slow reps; predictions VS3-1 to VS3-7 | design (results in 239) |
+| 239 | 2026-11-06 | 3688291 | VS3 results: with eager commits at W 5,000, Charades ÷ Devastator on VLSI is 1.51 / 1.40 / 1.26 / 1.30 / 1.25 at 1 / 2 / 4 / 8 / 16 nodes (each at its best fixed arm; VS2: 1.37 / 1.27 / 1.23 / 1.29 / 1.19), or 1.46 / 1.33 / 1.24 / 1.32 / 1.26 with Charades' controller. The widened controller is 0.95–1.02 of Charades' best fixed arm at every node count (before: 0.64–0.75 at 1–2 nodes), mean W 2,838–4,632. Devastator reproduces VS2 within 2%. Per-node rate 4 → 16 nodes 0.858 (Devastator 0.867). No slow rep in 36 runs at 4–16 nodes; core 28 steady. One count per node count in both engines; VS3-1 to VS3-4 and VS3-6 right, VS3-5 mostly, VS3-7 untested | current |
 
 ## Stampede3 runs, in order
 
@@ -10451,7 +10452,7 @@ Which of these costs the half is not measured. It does not touch the paper's num
 
 ### The paper's VLSI row with VLSI's new setting: eager commits at W 5,000, the widened controller and Devastator in one allocation, at 1–16 nodes (job VS3 design, 2026-11-06; written before any runs)
 
-> **Status: design.** User decisions 2026-11-06 (section 236): VLSI switches to eager commits at W 5,000, the controller's trial range reaches two buckets (section 237), and the VLSI row is rerun at 1–16 nodes with Devastator in the same allocation and a check on the slow reps.
+> **Status: done; results in section 239.** User decisions 2026-11-06 (section 236): VLSI switches to eager commits at W 5,000, the controller's trial range reaches two buckets (section 237), and the VLSI row is rerun at 1–16 nodes with Devastator in the same allocation and a check on the slow reps.
 > - **Tree:** `charades-r5` at charades 85a2aad on `charm-pads-perf` (`$WORK/charades-runs/build_r5.sh`): round 3, eager commits by default, `--ctl-reach-buckets=2`. Devastator's 2 × 23 binaries as in VS2.
 > - **Script:** `$WORK/charades-runs/vscale238.slurm` (copy in `~/charades-data/vlsi/`), skx-dev plus an skx copy, 16 nodes, 50 minutes, `-x c455-081`. Login-node checks pass. Submitted 2026-11-06 as 3688291 (skx-dev) and 3688292 (skx); the copy that starts second is cancelled. Checked on the Mac against stubs for `ctl_sweep.sh`, Devastator and the node sampling: arm order, options per run, and which node is sampled.
 
@@ -10488,6 +10489,65 @@ Which of these costs the half is not measured. It does not touch the paper's num
 - **The paper's VLSI row at 1–16 nodes** becomes this job's: each engine at its best fixed arm, with Charades' controller beside it. The 32-node cell comes from F1's job, with the same arms.
 - **If VS3-5 holds,** the VLSI controller row is the frozen controller with eager commits.
 - **If VS3-7 finds a cause on core 28** (an interrupt, or another process), the fix depends on what it is, for example moving that interrupt or that rank. If it finds none, the slow reps are reported as spread between reps.
+
+### VS3 results: with eager commits at W 5,000 Charades ÷ Devastator on VLSI is 1.51 / 1.40 / 1.26 / 1.30 / 1.25 at 1–16 nodes; the widened controller runs at 0.95–1.02 of Charades' best fixed arm at every node count (before: 0.64–0.75 at 1–2 nodes); no slow rep in 36 runs (2026-11-06; skx-dev batch job 3688291, 16 nodes)
+
+> **Status: current for 1–16 nodes; 32 nodes are in F1's job.** Design and predictions in section 238. This replaces section 217's VLSI row at 1–16 nodes.
+> - **Job:** 18 minutes; gate 27/27; every run finished. The skx copy 3688292 was cancelled before it started.
+> - **Data:** `~/charades-data/vlsi/vscale238/j3688291/`; summary `~/charades-data/vlsi/vscale238_summary.py`, output `vscale238_summary.txt`.
+> - **Counts (VS3-1 right):** at every node count, every Charades run commits VS2's count with VS2's digest, and every Devastator run commits the same count (deterministic).
+
+**Rates** (M committed ev/s, median of 3; higher is better):
+
+| nodes | Charades E, W 5,000 | Charades E, W 2,500 | Charades L, W 2,500 (VS2's) | Charades controller (E) | Devastator W 2,500 | Devastator W 5,000 | Devastator W 10,000 |
+|---|---|---|---|---|---|---|---|
+| 1 | **69.06** | 51.67 | 53.42 | 66.72 | 41.45 | 44.84 | **45.69** |
+| 2 | **122.11** | 79.73 | 80.42 | 115.65 | 67.74 | 79.77 | **87.05** |
+| 4 | 102.85 | **105.96** | 104.60 | 105.13 | **84.50** | 82.47 | 82.98 |
+| 8 | 192.15 | 185.39 | 193.30 | **195.95** | 142.68 | 146.12 | **148.74** |
+| 16 | 364.54 | 338.91 | 353.24 | **369.01** | 288.42 | **292.89** | 291.03 |
+
+**Charades ÷ Devastator** (higher is better; each engine at its best fixed arm, per rep and as a ratio of medians; and Charades' controller against Devastator's best window):
+
+| nodes | best fixed ÷ best fixed, per rep | ratio of medians | VS2 (section 217) | controller ÷ Devastator's best, per rep | controller ÷ Charades' best fixed arm, per rep |
+|---|---|---|---|---|---|
+| 1 | 1.51–1.53 | **1.51** | 1.37 | 1.45–1.47 | 0.95–0.97 |
+| 2 | 1.38–1.41 | **1.40** | 1.27 | 1.33–1.34 | 0.95–0.96 |
+| 4 | 1.25–1.27 | **1.26** | 1.23 | 1.23–1.27 | 0.99–1.01 |
+| 8 | 1.30 | **1.30** | 1.29 | 1.29–1.32 | 0.99–1.01 |
+| 16 | 1.24–1.26 | **1.25** | 1.19 | 1.25–1.26 | 0.99–1.02 |
+
+- **Charades' best fixed arm** is eager commits at W 5,000 at 1, 2 and 16 nodes. At 4 and 8 nodes, W 2,500 (eager or lazy) and W 5,000 are within 3% of each other.
+  - Against VS2 (section 217) Charades' best rises 1.12× at 1 node, 1.13× at 2 and 1.04× at 16, and holds at 4 and 8.
+  - **Devastator reproduces VS2 within 2%** (VS3-2 right): 45.7 / 87.0 / 84.5 / 148.7 / 292.9 against 45.3 / 85.4 / 83.8 / 149.1 / 295.5 M ev/s.
+- **The controller:**
+  - Its trials passed the delay range in every run (54–132 per run). The least 0.99 quantile of delay was 27.8 ps, under a bucket of 2,500, as expected.
+  - Its time-weighted mean W was 3,561–4,250 at 1 node, 4,600–4,632 at 2, 2,838–4,405 at 4, 3,084–3,285 at 8 and 3,403–4,260 at 16.
+  - It is the fastest Charades arm at 8 and 16 nodes by median.
+- **Per-node rate from 4 to 16 nodes** (each at its best; 1.0 is perfect): Charades 0.858, Devastator 0.867. From 4 to 8: 0.917 and 0.886.
+- **Eager ÷ lazy commits at W 2,500:** 0.96–0.98 (1 node), 0.97–1.00 (2), 1.00–1.02 (4), 0.96 (8), 0.95–0.99 (16).
+- **No slow rep:** all 36 Charades runs at 4–16 nodes ran within 0.98–1.03 of their arm's median.
+  - PE 105's working time per cycle was steady within each arm: 1.07–1.10 ms at W 5,000, 0.78–0.80 at W 2,500 with eager commits.
+  - Core 28 on copy 2's node took 7,000–8,900 interrupts per run, mostly the local timer, and 8–12 jiffies of system time, the same in every rep.
+  - So this job learns only that the slow reps are not every-run events. Earlier jobs had 4 in about 60 runs at W ≥ 3,750, in other allocations.
+
+**Predictions (section 238):**
+- **VS3-1 right.**
+- **VS3-2 right.**
+- **VS3-3 right:** E at W 5,000 ÷ L at W 2,500 is 1.28–1.32 / 1.50–1.53 / 0.97–0.99 / 0.97–1.01 / 1.01–1.06.
+- **VS3-4 right at every node count:** 1.51–1.53 / 1.38–1.41 / 1.25–1.27 / 1.30 / 1.24–1.26 per rep.
+- **VS3-5 mostly right:**
+  - Its trials pass the delay range in every run.
+  - It reaches 0.95–0.97 of Charades' best at 1–2 nodes (at least 0.90 predicted) and 0.99–1.02 at 4–16 (at least 0.95).
+  - Its mean W reaches 3,750 in 7 of 9 runs at 1, 2 and 16 nodes, not all 9 (3,561 at 1 node rep 2, 3,403 at 16 nodes rep 3).
+- **VS3-6 right.**
+- **VS3-7:** no slow rep occurred, so the job could not test it.
+
+**What follows:**
+- **The paper's VLSI row at 1–16 nodes** is this job's. Charades ÷ Devastator is 1.51 / 1.40 / 1.26 / 1.30 / 1.25 (each at its best fixed arm), or 1.46 / 1.33 / 1.24 / 1.32 / 1.26 with Charades' controller. It was 1.37 / 1.27 / 1.23 / 1.29 / 1.19.
+- **32 nodes:** F1's job runs these four Charades arms and Devastator's three windows. The 32-node slow waves cost W 2,500 up to 11% (section 228), so W 5,000 and the controller should gain more there.
+- **The VLSI controller row** is the frozen controller with eager commits and `--ctl-reach-buckets=2`.
+- **The slow reps stay open.** Every 32-node run in F1 can sample copy 2's node the same way at no cost.
 
 ## Baseline verification on the Mac
 
