@@ -112,6 +112,8 @@ extern unsigned g_tw_agg_input_buffer;       ///< node-level receives hand items
 extern unsigned g_tw_local_fast_path; ///< events for other chares in this process go by pointer through per-PE input buffers (fastpath.h)
 extern unsigned g_tw_fossil_lazy;     ///< commit events below a new GVT a few chares per idle pass instead of all at once
 extern unsigned g_tw_fossil_chares;   ///< --fossil-lazy: chares committed per pass that ends without a full batch
+extern unsigned g_tw_fossil_rounds;   ///< --fossil-lazy: GVT updates a round of commits may stay unfinished before all are committed at once
+extern unsigned g_tw_fossil_finish;   ///< --fossil-lazy: a GVT update completes the unfinished round before starting the next
 extern unsigned g_tw_pass_loop;       ///< --pass-loop: passes per execute() message while nothing else waits for the PE
 extern unsigned g_tw_rollback_unit;   ///< a straggler rolls back 0: its whole chare, 1: only its LP (default)
 extern unsigned g_tw_event_index;     ///< remote events indexed for cancellation by 0: AVL tree, 1: hash (default)

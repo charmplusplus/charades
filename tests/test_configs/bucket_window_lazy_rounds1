@@ -1,0 +1,8 @@
+# Optimistic w/Bucketed GVT and an optimism window (as bucket_window), with
+# lazy commits that may stay unfinished for one GVT update (--fossil-rounds=1)
+sync=3
+gvt=4
+buffer-size=655360
+optimism-window=2000
+fossil-lazy=1
+fossil-rounds=1

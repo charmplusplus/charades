@@ -202,14 +202,26 @@ void OptimisticScheduler::gvt_done(Time gvt, bool lb) {
   // full batch. All at once here held every event that other PEs sent this
   // one, through the GVT update that starts the next stretch of work (VLSI:
   // ~550 events per PE once per clock cycle). At the end, before load
-  // balancing, and after 4 updates without finishing, all at once as before.
-  if (g_tw_fossil_lazy && !lb && gvt < g_tw_ts_end && fossil_rounds < 4) {
+  // balancing, and after --fossil-rounds updates without finishing (default
+  // 4), all at once as before. A PE that never ends a pass short (at a wide
+  // window, the one that sets the pace) piles up that many updates of
+  // commits, which then cost twice as much per event and slow its other
+  // work (RESULTS.md 234); --fossil-finish completes its round at the next
+  // update instead.
+  if (g_tw_fossil_lazy && !lb && gvt < g_tw_ts_end &&
+      fossil_rounds < g_tw_fossil_rounds) {
     if (fossil_lps.empty()) {
       for (int i = 0; i < next_lps.get_size(); i++) {
         fossil_lps.push_back(next_lps.as_array()[i]->lp);
       }
     }
-    if (fossil_next < fossil_lps.size()) fossil_rounds++;
+    if (fossil_next < fossil_lps.size()) {
+      if (g_tw_fossil_finish) {
+        collect_fossils_step(fossil_lps.size());  // at the round's own GVT
+      } else {
+        fossil_rounds++;
+      }
+    }
     fossil_gvt = gvt;
     fossil_next = 0;
   } else {
