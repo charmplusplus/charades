@@ -140,10 +140,10 @@ time without a reason written here first.
      - ROSS's window: 1.13–1.19× ROSS on traffic, 1.35–1.48× on dragonfly, where the best value is the grid's edge (5,000 ps; extend to 2,500 and 1,250). Charades ÷ ROSS with it: traffic 1.75–1.90, dragonfly 3.0–3.2 (1 and 4 nodes); F5's ratios were against ROSS without a window.
      - F4 designed (job F4, RESULTS.md 227; user decision 2026-11-05: prepare F4): job N's seven workloads at 4 and 16 nodes on the current tree; Charades' fixed W grid, frozen controller and Devastator's rule in Charades (`--ctl=2` from one bucket), against Devastator's fixed W grid and its own window, in one allocation. Submitted 2026-11-05 as 3684492 (skx-dev) and 3684493 (skx).
        - **Done (job F4, RESULTS.md 230).** Controller 0.83–1.03 of the best fixed W; its baselines fall to 0.13 (Devastator's rule in Charades), 0.09 or not finishing (Devastator's own window) and 0.52 (one PHOLD window). Every cell commits one count in both engines. Phase-changing PHOLD at 16 nodes, whose rep 2 was hit by an episode on the machine, was rerun clean (job F4R, RESULTS.md 232): controller 0.95–0.96, Devastator's rule in Charades 0.40–0.44.
-5. **Engine freeze, 2026-12-07.**
+5. **Engine freeze, 2026-12-07. Changed 2026-11-06 (user): no hard freeze; the paper-grade runs go now (RESULTS.md 240), and a later engine change means rerunning the cells it touches.**
    - **Defaults already set:** per-LP rollback, `--agg-pp-alloc=1`, ring input buffers, `numactl --localalloc` launch (Charades only), 23 LCI devices, `+mempool_remote_free`.
    - **Frozen 2026-11-01:** the controller (`--ctl=3`, bracketed; item 1). The pending heap fix (item 1a) is in.
-6. **Paper-grade runs, 2026-12-08 to 2027-01-05.**
+6. **Paper-grade runs: queued 2026-11-06 (RESULTS.md 240)**, not after a freeze. F1 at 1–32 nodes with ROSS's window calibrated first; F5's traffic and dragonfly at 1–32 with ROSS's window; VLSI at 32 with 16 nodes inside the 32-node allocation.
    - F1 at 1–32 nodes, three engines; 5 reps at 32.
    - F5 cells only where a change before the freeze touched the paths they use (item 3).
    - F2 and F4 on the final defaults, if items 1–4 used earlier ones.

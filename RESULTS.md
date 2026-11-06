@@ -396,6 +396,7 @@ Sections 1–128 were re-read before planning sections 129 onward.
 | 237 | 2026-11-06 | — (Mac) | The measured controller's trials reach two buckets (`--ctl-reach-buckets=2`, charades 85a2aad; user decision on section 236): the upper end of the trial range is the 0.99 quantile of delay or two buckets, whichever is larger. Trials it changed: 0 on dragonfly at F4's link settings (least 0.99 quantile 12,510 ps against 2,000), phase-changing PHOLD (3,019 against 16) and traffic (4,109 against 16); PHOLD and traffic cannot be affected at any scale. So no earlier controller result changes. On the VLSI test the window now leaves one bucket. Change tier on the measured-controller configs 132/132 | current |
 | 238 | 2026-11-06 | VS3: 3688291 (skx-dev) / 3688292 (skx) (results in a later section) | The paper's VLSI row with the new setting (design): tree `charades-r5` (85a2aad); Charades E W 5,000, E W 2,500, L W 2,500 and the widened controller (eager), Devastator 2 × 23 W 2,500 / 5,000 / 10,000, same allocation; 1, 2, 4, 8 and 16 nodes, 3 reps; `/proc/stat` and `/proc/interrupts` on copy 2's node around each Charades run (PE 105 on core 28) for the slow reps; predictions VS3-1 to VS3-7 | design (results in 239) |
 | 239 | 2026-11-06 | 3688291 | VS3 results: with eager commits at W 5,000, Charades ÷ Devastator on VLSI is 1.51 / 1.40 / 1.26 / 1.30 / 1.25 at 1 / 2 / 4 / 8 / 16 nodes (each at its best fixed arm; VS2: 1.37 / 1.27 / 1.23 / 1.29 / 1.19), or 1.46 / 1.33 / 1.24 / 1.32 / 1.26 with Charades' controller. The widened controller is 0.95–1.02 of Charades' best fixed arm at every node count (before: 0.64–0.75 at 1–2 nodes), mean W 2,838–4,632. Devastator reproduces VS2 within 2%. Per-node rate 4 → 16 nodes 0.858 (Devastator 0.867). No slow rep in 36 runs at 4–16 nodes; core 28 steady. One count per node count in both engines; VS3-1 to VS3-4 and VS3-6 right, VS3-5 mostly, VS3-7 untested | current |
+| 240 | 2026-11-06 | RW, F1a, F1b, F1-32, F5a, F5-32, V32 (results in later sections) | F1 and F5 on the final defaults (design; user: no hard freeze, run now, recommendations 2–6): ROSS's window calibrated on PHOLD (RW, skx-dev); Gaussian PHOLD at 1–16 (two 16-node jobs) and 32 nodes (5 reps); traffic and dragonfly at 1–16 and 32 (16 on halves); VLSI at 32 with 16 on halves; tree `charades-r5` (85a2aad); ROSS with its window everywhere; predictions C1–C9 | design |
 
 ## Stampede3 runs, in order
 
@@ -10548,6 +10549,88 @@ Which of these costs the half is not measured. It does not touch the paper's num
 - **32 nodes:** F1's job runs these four Charades arms and Devastator's three windows. The 32-node slow waves cost W 2,500 up to 11% (section 228), so W 5,000 and the controller should gain more there.
 - **The VLSI controller row** is the frozen controller with eager commits and `--ctl-reach-buckets=2`.
 - **The slow reps stay open.** Every 32-node run in F1 can sample copy 2's node the same way at no cost.
+
+### F1 and F5 on the final defaults: six jobs queued at once — ROSS's window on PHOLD, Gaussian PHOLD at 1–32 nodes, traffic and dragonfly at 1–32, VLSI at 32 (design, 2026-11-06; written before any runs)
+
+> **Status: design.** User decisions 2026-11-06:
+> - **No hard engine freeze;** the focus now is runs. A later engine change means rerunning the cells it touches.
+> - **F1:** all eight PHOLD workloads.
+> - **Charades:** the controller plus two fixed windows.
+> - **ROSS's window on PHOLD:** calibrated first.
+> - **The 32-node job:** carries VLSI, 16 nodes inside a 32-node allocation, and traffic and dragonfly.
+> - **Reps:** 3, and 5 at 32 nodes.
+> - **Queueing:** everything that can run in parallel now. My rule allows one job at a time in skx-dev, so only the calibration goes there (with an skx copy); the rest queue on skx.
+>
+> **Code:**
+> - **Charades:** `charades-r5`, at charades 85a2aad on `charm-pads-perf`.
+>   - It carries round 3, per-LP rollback and `--agg-pp-alloc=1`.
+>   - The frozen controller now has `--ctl-reach-buckets=2`, and VLSI runs with eager commits.
+>   - Launch: `numactl --localalloc` (Charades only), 2 × 23 PEs per node except VLSI (1 × 46).
+>   - Traffic and dragonfly are built by `build_r5_apps.sh`.
+> - **Devastator and ROSS:** the binaries of F1 and F5 (sections 141–153, 187–194, 238).
+
+**Jobs** (scripts in `$WORK/charades-runs/`, copies in `~/charades-data/f1/`; all with `-x c455-081`):
+
+| job | script | queue, nodes, limit | what |
+|---|---|---|---|
+| RW | `rosswin240.slurm` | skx-dev (and an skx copy), 5, 1:30 | ROSS on the eight PHOLD workloads, optimistic batch 16 / GVT interval 64, without a window and over a window grid (lookahead 100: 250–4,000; lookahead 10: 50–800), at 1 and 4 nodes side by side, A0's run length, 1 rep. It writes ROSS's best window per workload at 4 nodes to `f1_240/ross_windows.txt` (0 if none beats no window). |
+| F1a, F1b | `scale240.slurm a` / `b` | skx, 16, 2:30 | A1's groups a and b at 8, 4, 2 and 1 nodes side by side, then 16; 3 reps |
+| F1-32 | `scale240.slurm big` | skx, 32, 4:00 | all eight workloads at 32 nodes, 5 reps |
+| F5a | `f5scale240.slurm a` | skx, 16, 2:00 | traffic and dragonfly at 8, 4, 2 and 1 nodes side by side, then 16; 3 reps |
+| F5-32 | `f5scale240.slurm big` | skx, 32, 4:00 | traffic and dragonfly at 16 nodes on the two halves side by side (3 reps), then 32 nodes (5 reps) |
+| V32 | `vscale240.slurm` | skx, 32, 1:30 | VLSI at 16 nodes on each half side by side (3 reps each), then 32 nodes (5 reps) |
+
+**Arms:**
+- **PHOLD** (A1's workloads, sizes and htram settings, section 141; long runs):
+  - **Charades:** the controller (`--ctl=3`, bracketed, reach 2 buckets) and W 300 / 400 (lookahead 10: 50 / 100).
+  - **Devastator:** W 500 / 1,000 / 2,000 (lookahead 10: 100 / 200 / 400), plus 4,000 at 32 nodes; CLCG4.
+  - **ROSS:** optimistic batch 16 / GVT interval 64, conservative, and optimistic with the window RW chose for that workload. If RW has not finished when the arm runs, it runs two windows instead: 1,000 and 2,000, or 200 and 400 at lookahead 10.
+- **Traffic and dragonfly** (F5's sizes and Charades and Devastator arms, section 187):
+  - **ROSS now runs with its window** (sections 223, 225): traffic batch 64 / GVT interval 64 at windows 1,000 and 2,000, and conservative; dragonfly batch 2 / GVT interval 64 at windows 2,500, 5,000 and 7,500 ps.
+  - Every Charades run carries `--commit-digest`.
+- **VLSI:** VS3's arms (section 238): Charades E at W 5,000 and W 2,500, L at W 2,500, and the controller; Devastator 2 × 23 at W 2,500 / 5,000 / 10,000. Copy 2's node is sampled around every Charades run. ROSS is not rerun; its 32-node rate from job big2 (section 226) stands, since ROSS has not changed.
+- **Engines are interleaved per rep,** and in F5 and VLSI the order is reversed in even reps.
+- **Each gate is a change tier on 2 nodes** and fails if it ran no test.
+- **Checks:** every script's arm order and options were run against stubs on the Mac. ROSS's window is read from RW's file, a 0 there drops the arm, and a missing entry falls back to the pair.
+
+**Earlier numbers these replace:**
+- **F1:** the table at the top of this file (sections 142–143, 153). It ran on the paper's tree before round 3 (1.16–1.18× on PHOLD, section 215), before `--localalloc` (1.03–1.12× at 16–32 nodes, sections 164, 166) and with chare rollback.
+- **F5:** sections 188, 189 and 194, before round 3, with ROSS without its window.
+- **VLSI 32:** section 226, with lazy commits.
+
+**Predictions** ("ratio" is Charades ÷ the other engine, each at its best arm, higher is better; "old" is the table each replaces):
+- **C1. Counts:**
+  - Every cell commits the same events in all three engines.
+  - Every traffic, dragonfly and VLSI cell has one Charades digest across arms and reps.
+- **C2. PHOLD at 1–16 nodes:**
+  - Each Charades ÷ Devastator ratio is 1.10–1.30× the old one: round 3, `--localalloc` and the PP allocation help Charades only.
+  - So Charades leads in all 40 cells (old: 38).
+- **C3. PHOLD at 32 nodes:**
+  - Charades leads in all eight workloads, each at 1.05 or more (old: 0.89 at σ 100, 0.99 at lookahead 10 σ 500).
+  - The median over the eight is at least 1.3. Job N32 (section 166) found 1.65 at σ 100 and 2.46 on uniform with `--localalloc`.
+- **C4. The controller ÷ Charades' better fixed W:** at least 0.93 in every PHOLD cell at 1–16 nodes and 0.90 at 32 (jobs M and N: 0.91–1.03; N32's controller 0.94–0.95 at 32 nodes).
+- **C5. Per-node rate from 16 to 32 nodes** (each at its best): Charades at least 0.88 on the six lookahead-100 workloads (N32: 1.02 at σ 100; old: 0.72–0.87).
+- **C6. ROSS's window on PHOLD (RW):**
+  - It beats no window by 1.05–1.25× on at least five of the eight workloads at 4 nodes.
+  - ROSS's best window at lookahead 100 is 1,000–4,000.
+  - Charades ÷ ROSS at its best (window included) stays at least 2.0 in every F1 cell.
+- **C7. Traffic and dragonfly:**
+  - Charades ÷ Devastator is 0.95–1.20× F5's at each node count (dragonfly 1.80 at 16 nodes and 2.03 at 32; traffic 1.03 and 1.08).
+  - Charades ÷ ROSS, with ROSS at its window, is 2.6–3.6 on dragonfly and 1.5–2.2 on traffic.
+- **C8. VLSI at 32 nodes:**
+  - Charades ÷ Devastator at its best fixed arm is at least 1.15 (old: 1.05).
+  - The controller is at least 0.95 of Charades' best fixed arm.
+  - E at W 5,000 varies at most 1.05× between reps (W 2,500 varied 1.17–1.19×, section 226).
+- **C9. VLSI at 16 nodes inside the 32-node allocation:**
+  - At W 2,500 (L and E) it runs at least 3% slower than in VS3's 16-node allocation on at least one half.
+  - E at W 5,000 is within 3% of VS3's.
+  - This would confirm that the slow waves come with the allocation (section 228).
+
+**What follows:**
+- **If C1 holds:** F1 at 1–32 nodes and F5's three applications are paper-grade on 85a2aad. Their tables replace the old ones at the top of this file and in PAPER.md.
+- **If C6 holds:** the paper's Charades ÷ ROSS on PHOLD uses ROSS with its window.
+- **If C9 holds:** the paper says the VLSI 32-node spread at W 2,500 is the allocation's. The setting at W 5,000 avoids it.
+- **A slow rep in V32:** read the copy-2-node samples, as in section 239.
 
 ## Baseline verification on the Mac
 
