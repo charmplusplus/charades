@@ -28,6 +28,8 @@ Every number from every run: Stampede3 runs in order (each design, written befor
 
 (Bold: below 1 in the ratio columns; best of the three in the efficiency column.) The controller is 0.95–1.05 of Charades' best fixed W per rep at 32 nodes. VLSI (b19 × N) at 1 and 4 nodes (V5, section 208): Charades (one process per node, lazy fossils, batch 32; its best W) ÷ Devastator (2 × 23, its best W) 0.85 / 1.00 (V1, section 195: 0.51 / 0.75; ÷ ROSS 6.9 / 7.9 then). Devastator at one process per node hung on Stampede3 because PSM2 pinned all its threads to one core; with `HFI_NO_CPUAFFINITY=1` it runs at 0.87 of its 2 × 23 at 1 node (section 209), so 0.85 compares each engine at its best layout. **Round 3 (sections 213, 215, 217, 226; charades b0b4ed4): Charades ÷ Devastator on VLSI is 1.37 / 1.27 / 1.23 / 1.29 / 1.19 / 1.05 at 1 / 2 / 4 / 8 / 16 / 32 nodes** (each at its best launch; at 32 nodes 0.96–1.07 per rep). From 16 to 32 nodes Charades' clock cycle grows by 14%, almost all of it the count wave in flight; Devastator's stays flat (section 226). Before round 3 it was 0.84 / 0.91 / 0.99 / 0.97 / 0.89 (section 214). **Section 234:** with eager commits (`--fossil-lazy=0`), W 5,000 runs at 0.97–1.03 of the W 2,500 setting above at 4–16 nodes, against 0.75–0.79 with lazy commits; from 3 nodes up one PE carries copy 2's extra work and sets every cycle in every engine. **Section 239 (current VLSI row at 1–16 nodes):** with eager commits at W 5,000 and the widened controller (`--ctl-reach-buckets=2`), Charades ÷ Devastator is **1.51 / 1.40 / 1.26 / 1.30 / 1.25** at 1 / 2 / 4 / 8 / 16 nodes (each at its best fixed arm), or 1.46 / 1.33 / 1.24 / 1.32 / 1.26 with Charades' controller, which runs at 0.95–1.02 of Charades' best fixed arm. The 32-node cell is to be rerun in F1's job. Round 3 also runs PHOLD at 2 × 23 1.16–1.18× faster; the tables below predate it.
 
+> **Being replaced (F1 on the final defaults, section 240).** Group a at 1–16 nodes is done (section 242): Charades ÷ Devastator 1.21–1.30 (σ 100), 1.13–1.60 (σ 1,000, PP 2,048), 1.46–1.93 (σ 4,000), 1.27–1.49 (lookahead 10 σ 2,000), ahead in 20 of 20; Charades 1.09–1.22× faster than below, Devastator and ROSS unchanged. The table below is replaced when group b (F1b) and 32 nodes (F1-32) finish.
+
 **Paper-grade weak scaling, Charades against Devastator and ROSS, 1–32 nodes, all eight workloads** (jobs 3653803, 3654651 and 3657016, sections 142–143 and 153; long runs, 3 reps; Charades: its controller, the better htram setting at each node count, chare rollback (per-LP rollback came later, section 152); Devastator: its best of three W; ROSS: the better of optimistic batch 16 / GVT interval 64 and conservative; the same committed events in all three engines in every cell):
 
 | workload | Charades ÷ Devastator at 1 / 2 / 4 / 8 / 16 / 32 nodes (higher is better) | Charades ÷ ROSS | efficiency 16→32, Charades / Devastator / ROSS (1.0 is perfect) | efficiency 1→32, C / D / R | M ev/s at 32 nodes, Charades / Devastator / ROSS |
@@ -398,6 +400,7 @@ Sections 1–128 were re-read before planning sections 129 onward.
 | 239 | 2026-11-06 | 3688291 | VS3 results: with eager commits at W 5,000, Charades ÷ Devastator on VLSI is 1.51 / 1.40 / 1.26 / 1.30 / 1.25 at 1 / 2 / 4 / 8 / 16 nodes (each at its best fixed arm; VS2: 1.37 / 1.27 / 1.23 / 1.29 / 1.19), or 1.46 / 1.33 / 1.24 / 1.32 / 1.26 with Charades' controller. The widened controller is 0.95–1.02 of Charades' best fixed arm at every node count (before: 0.64–0.75 at 1–2 nodes), mean W 2,838–4,632. Devastator reproduces VS2 within 2%. Per-node rate 4 → 16 nodes 0.858 (Devastator 0.867). No slow rep in 36 runs at 4–16 nodes; core 28 steady. One count per node count in both engines; VS3-1 to VS3-4 and VS3-6 right, VS3-5 mostly, VS3-7 untested | current |
 | 240 | 2026-11-06 | RW 3688911, F1a 3688913 / 3689004 (skx-dev), F1b 3688914, F5a 3688915, F1-32 3688916, F5-32 3688917, V32 3688918 (results in later sections) | F1 and F5 on the final defaults (design; user: no hard freeze, run now, recommendations 2–6): ROSS's window calibrated on PHOLD (RW, skx-dev); Gaussian PHOLD at 1–16 (two 16-node jobs) and 32 nodes (5 reps); traffic and dragonfly at 1–16 and 32 (16 on halves); VLSI at 32 with 16 on halves; tree `charades-r5` (85a2aad); ROSS with its window everywhere; predictions C1–C9 | design (RW results in 241) |
 | 241 | 2026-11-06 | 3688911 | RW results: ROSS's optimism window (`--max-opt-lookahead`) on PHOLD gains 1.00–1.04× at 4 nodes (1 node: 1.00–1.04, except σ 100 1.23×), because ROSS without it already commits 97.9–99.3% of executed events at 4 nodes; best windows 250 (σ 100), 500 (σ 500–2,000), 1,000 (σ 4,000), 100 (lookahead 10), none (uniform), written to `f1_240/ross_windows.txt` before F1 started; narrow windows cost up to 5%, wide ones do not bind; one count per cell; C6's first two parts wrong, the third is F1's | current |
+| 242 | 2026-11-06 | 3689004 (skx-dev; skx copy 3688913 cancelled by its guard) | F1a results, PHOLD group a (σ 100, σ 1,000, σ 4,000, lookahead 10 σ 2,000) at 1–16 nodes: Charades ÷ Devastator (controller) 1.26 / 1.23 / 1.21 / 1.30 / 1.25 (σ 100), 1.13–1.60 (σ 1,000, PP 2,048), 1.46–1.93 (σ 4,000), 1.27–1.49 (lookahead 10 σ 2,000); ahead in 20 of 20; each ratio 1.06–1.25× A1a's: Charades 1.09–1.22× its A1a rate, Devastator 0.97–1.02, ROSS 0.96–1.03; controller 0.939–1.032 of the better fixed W (W 300 is a new fixed arm); Charades ÷ ROSS 2.73–5.60; per-node rate 16 ÷ 1 best in 3 of 4 (σ 100 level); one count per cell in all three engines; C1, C4, C6 (third part) right, C2 mostly (18 of 20 in range) | current |
 
 ## Stampede3 runs, in order
 
@@ -10686,6 +10689,79 @@ ROSS optimistic, batch 16 / GVT interval 64, A0's run length (end time 512,000; 
   - That answers the fairness question for every workload: ROSS's window was tried on PHOLD, traffic, dragonfly and VLSI.
   - On PHOLD it hardly changes ROSS's rate, except σ 100 at 1 node.
 - **Nothing to rerun.**
+
+### F1a results: on PHOLD group a (σ 100, σ 1,000, σ 4,000, lookahead 10 σ 2,000) Charades ÷ Devastator is 1.13–1.93 at 1–16 nodes, ahead in all 20 cells; Charades itself is 1.09–1.22× faster than in A1a while Devastator and ROSS are unchanged; the controller is 0.94–1.03 of the better fixed W (2026-11-06; skx-dev batch job 3689004, 16 nodes)
+
+> **Status: current for group a at 1–16 nodes.** Design and predictions in section 240. It replaces A1a (section 142) in the paper table. σ 1,000 also waits for F1b's PP 512 series (`g1000x`): as in A1, Charades' σ 1,000 cell takes the better htram setting at each node count.
+> - **Job:** 1 h 5 min of the 1 h 55 min limit. Gate 36/36. The guard cancelled the skx copy 3688913 when this copy started. The 8-, 4-, 2- and 1-node series ran side by side (13:28–13:58), then 16 nodes (13:58–14:29).
+> - **Runs:** 585 (Charades 225, Devastator 180, ROSS 180), none failed.
+> - **Data:** `~/charades-data/f1/scale240/a_j3689004/`; summary `~/charades-data/f1/f1_240_summary.py` (run on this job and A1a's `~/charades-data/scale32/scale32/a_j3653803`), output `scale240/a_j3689004_summary.txt`.
+> - **Counts (C1, PHOLD part):** every cell commits one count in all three engines. PHOLD runs carry no digest.
+
+**Charades ÷ Devastator** (Charades' controller at its htram setting ÷ Devastator's best W, as in the paper table; median of 3 reps; higher is better). A1a's ratio is in brackets:
+
+| workload | 1 node | 2 | 4 | 8 | 16 |
+|---|---|---|---|---|---|
+| σ 100 (PP 2,048) | 1.26 (1.10) | 1.23 (1.06) | 1.21 (1.03) | 1.30 (1.03) | 1.25 (1.04) |
+| σ 1,000 (PP 2,048) | 1.13 (0.99) | 1.30 (1.13) | 1.40 (1.21) | 1.52 (1.29) | 1.60 (1.30) |
+| σ 4,000 (PP 512) | 1.46 (1.32) | 1.90 (1.66) | 1.86 (1.67) | 1.91 (1.66) | 1.93 (1.60) |
+| lookahead 10, σ 2,000 (WPs 512; PP 512 at 16) | 1.27 (1.19) | 1.41 (1.28) | 1.38 (1.27) | 1.45 (1.28) | 1.49 (1.35) |
+
+With Charades at its best arm (controller or fixed W), the ratios are 1.00–1.07× these: 1.18–2.02.
+
+**Per workload** (rates in M committed ev/s, median of 3, higher is better; per-node rate at 16 ÷ at 1 node, 1.0 is perfect):
+
+| workload | M ev/s at 16 nodes, Charades / Devastator / ROSS | per-node rate 16 ÷ 1, Charades / Devastator / ROSS | Charades ÷ ROSS, 1–16 nodes (higher is better) | controller ÷ better fixed W, 1–16 nodes (higher is better) |
+|---|---|---|---|---|
+| σ 100 | 802.7 / 644.5 / 216.1 | 0.95 / **0.96** / 0.70 | 2.73–3.71 | 0.966–0.976 |
+| σ 1,000 | 665.6 / 415.9 / 122.4 | **0.99** / 0.70 / 0.80 | 4.37–5.44 | 0.939–0.968 |
+| σ 4,000 | 552.3 / 285.5 / 98.6 | **0.83** / 0.63 / 0.67 | 4.51–5.60 | 0.945–0.991 |
+| lookahead 10, σ 2,000 | 519.3 / 347.4 / 103.9 | **0.89** / 0.75 / 0.75 | 4.21–5.00 | 0.976–1.032 |
+
+(Bold: the best of the three engines.)
+
+**Each engine's rate ÷ its own in A1a** (same workloads, node counts and settings; Charades: its controller; 1.0 is unchanged):
+
+| workload | Charades | Devastator | ROSS |
+|---|---|---|---|
+| σ 100 | 1.15–1.22 | 0.97–1.01 | 0.96–1.02 |
+| σ 1,000 | 1.15–1.19 | 0.97–1.02 | 0.98–1.01 |
+| σ 4,000 | 1.12–1.19 | 0.97–1.02 | 0.97–1.03 |
+| lookahead 10, σ 2,000 | 1.09–1.13 | 0.98–1.02 | 0.98–1.03 |
+
+**What the job shows:**
+- **The gain is Charades' own.**
+  - Devastator and ROSS reproduce A1a within 4%, while Charades runs 1.09–1.22× faster.
+  - That is round 3 (1.16–1.18× on PHOLD, section 215), `--localalloc` and the PP allocation, which section 240 expected.
+- **Charades scales best from 1 to 16 nodes in 3 of 4 workloads.**
+  - On σ 100 it is level with Devastator (0.95 against 0.96).
+  - On σ 1,000 it keeps 0.99 of its 1-node rate per node, against Devastator's 0.70.
+  - All three engines dip at 8 nodes on σ 100 and σ 4,000. Devastator's and ROSS's 8-node rates are also their lowest against A1a (0.97–0.98), so this is likely the 8 nodes this job drew.
+- **The controller** runs at mean W 304–392 at lookahead 100 (58–70 at lookahead 10) and rolls back 0.01–0.45% of events.
+  - It trails the better fixed W by 1–6% at lookahead 100, where W 300 is the better fixed arm in 14 of 15 cells.
+  - A1's fixed arms were W 250 and 400; W 300 is new. Against W 400 the controller is ahead, for example 1.07 at σ 100 on 16 nodes.
+  - At lookahead 10, where the fixed arms did not change (W 50 and 100), it is 0.98–1.03, as in A1.
+  - What costs the 1–6% is not measured here.
+- **ROSS's window hardly matters, as RW found.**
+  - ROSS's best is conservative on σ 100 and σ 1,000 at every node count, and on σ 4,000 at 1–4 nodes; optimistic at σ 4,000 on 8–16.
+  - Only on lookahead 10 σ 2,000 is its window best (2–16 nodes), by at most 1.5% over optimistic without one.
+- **Rep spread:** the controller's runs vary at most 1.059× (max ÷ min) in a cell.
+
+**Predictions (group a only):**
+- **C1 (PHOLD): right.** One count per cell in all three engines.
+- **C2: mostly right.**
+  - Charades leads in all 20 cells (A1a: 19; σ 1,000 at 1 node was 0.99).
+  - Each ratio is 1.06–1.25× A1a's. 18 of 20 cells fall in the predicted 1.10–1.30.
+  - The two below are lookahead 10 σ 2,000 at 1 node (1.06) and 4 nodes (1.09). That workload runs WPs 512 at 1–8 nodes, where the PP allocation change does not apply. This is a possible reason only; it was not tested.
+- **C4: right.** The controller is 0.939–1.032 of the better fixed W, at least 0.93 in every cell.
+- **C6, third part: right for group a.** Charades ÷ ROSS is 2.73–5.60 (at least 2.0 predicted).
+- C3 and C5 are about 32 nodes; F1-32 tests them.
+
+**What follows:**
+- **Group a at 1–16 nodes is paper-grade.**
+  - The table at the top of this file is replaced once F1b (group b) and F1-32 finish.
+  - σ 1,000 takes the better of PP 2,048 (here) and F1b's PP 512 at each node count.
+- **Not followed up now:** the controller's 1–6% gap to W 300 at lookahead 100. It stays within C4's bound and the robustness claim, and section 240's plan has no run for it.
 
 ## Baseline verification on the Mac
 
