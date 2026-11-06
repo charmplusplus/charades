@@ -391,6 +391,7 @@ Sections 1–128 were re-read before planning sections 129 onward.
 | 232 | 2026-11-05 | 3685047 | F4R results: phase-changing PHOLD at 16 nodes reruns clean (fixed-W runs 1.000–1.009 waves per advance; one count and digest); best fixed W 100; controller 0.95–0.96, Devastator's rule in Charades 0.40–0.44; rep 2 ran in the disturbed rep's arm order and is clean (W 300 317.3 against 89.3), so F4's rep 2 was the machine; R1–R4 right | current |
 | 233 | 2026-11-05 | RA: 3686450 (skx-dev) / 3686451 (skx); first submission 3685764 ran ctl_sweep's default arms (script bug), nothing usable (results in a later section) | Where Charades' cost of running ahead goes on VLSI (design): running ahead costs only once copy 2 is in the run (W 5,000 ÷ W 2,500 run time 0.72–0.85 at 1–2 nodes, 1.24–1.35 at 4–16), where the least-blocked PE stops waiting and works 0.84 → 1.47 ms per cycle; W 2,500 / 3,750 / 5,000 × VS2's settings, `--gvt-wave-events=0`, `--fossil-lazy=0`, both, and `--batch=8` at W 5,000, at 4 and 16 nodes on VS2's binaries; `--pe-stats=1` on every run, one rep traced (`--gvt-trace=5 --comm-stats=1`); replaces VW; predictions RA1–RA7 | design (results in 234) |
 | 234 | 2026-11-05 | 3686450 | RA results: the cost of running ahead on VLSI was the lazy commit rule. With eager commits (`--fossil-lazy=0`), W 5,000 runs at 0.97–0.99 (4 nodes) and 1.02–1.03 (16 nodes) of VS2's best (lazy, W 2,500); lazy at W 5,000 runs at 0.75–0.79. At W ≥ 3,750 the busiest PE never ends a pass short, so lazy commits wait four GVT updates, then cost twice as much per event and slow every event 24–31%. `--gvt-wave-events=0` changes nothing; `--batch=8` costs 8–17%. From 3 nodes up one PE (node 2, rank 13) runs 2,141 events per cycle, 3.3× any other node's busiest PE, rolls back 1–3 per cycle, and sets the cycle (same nets per PE in all three engines). W 3,750 rolls back the most and had 3 slow reps in 24. One count and digest per node count; RA1, RA2, RA5 right, RA3, RA4, RA6, RA7 wrong | current |
+| 235 | 2026-11-05 | VC (results in a later section) | VLSI's commit setting and controller row (design; user decisions on section 234's questions: 1A, 2 yes, 3A, 4A): charades 609212b adds `--fossil-rounds=N` (default 4, unchanged) and `--fossil-finish=1`; tree `charades-r4`; L / E / R1 / F commit settings at W 5,000, L at W 2,500, the controller with buckets of 2,500 (L) and 5,000 (E, R1, F); 1, 2, 4, 8 and 16 nodes, 3 reps; today's VLSI controller row is 0.72–0.83 of the best fixed W at 1–2 nodes (VS2); predictions VC1–VC7 | design |
 
 ## Stampede3 runs, in order
 
@@ -10301,6 +10302,55 @@ Which of these costs the half is not measured. It does not touch the paper's num
   - Under (a) or (b), F1's 32-node job measures the steady rate and the slow-wave tolerance.
 - **The controller on VLSI.** It sits at one bucket (section 208). With buckets of 2,500 ps under eager commits it would run at 0.93–0.96 of lazy at 16 nodes. A W 5,000 setting needs buckets of 5,000 ps, untested on round 3.
 - **The workload.** From 3 nodes up, VLSI's cycle is one PE's 2,141 events in every engine. The paper should say so; it is a sharper form of section 201's 1.75× copy. Laying out each copy by its own activity would remove it, but changes the workload in all three engines. The user kept the workload on 2026-11-03, before this was known.
+
+### VLSI's commit setting and its controller row: lazy commits that cannot pile up, eager commits, and the controller with buckets of 5,000 ps, at 1–16 nodes (job VC design, 2026-11-05; written before any runs)
+
+> **Status: design.** User decisions 2026-11-05, on section 234's four questions:
+> 1. **A switch for how long lazy commits may wait**, tested beside eager commits.
+> 2. **F1's 32-node job runs the chosen setting at W 5,000 beside W 2,500.**
+> 3. **The VLSI controller row is tested with buckets of 5,000 ps.**
+> 4. **The workload stays.** The paper states that from 3 nodes up one PE sets VLSI's pace in every engine.
+>
+> - **Code** (charades 609212b, on GitHub):
+>   - `--fossil-rounds=N` (default 4, the constant it replaces): the GVT updates a lazy round may stay unfinished before everything below the new GVT is committed at once; 0 commits at every update.
+>   - `--fossil-finish=1` (default 0): a GVT update first completes the unfinished round, at the GVT that round started from, then starts the next. This is section 234's "commits at the next update". With `--fossil-rounds=1` the busy PE still carries two to three cycles of commits into each bulk commit, so both are tested in this one job.
+>   - Test configs `bucket_window_lazy`, `_lazy_rounds1`, `_lazy_finish`. Mac: change tier on them 99/99, one digest. A temporary print showed that the default bulk-commits at 4 unfinished rounds, `--fossil-rounds=1` at 1, and `--fossil-finish=1` never; it was then removed.
+> - **Tree:** `charades-r4` at 609212b on `charm-pads-perf`, built on the login node (`$WORK/charades-runs/build_r4.sh`). The binary links `charm-pads-perf` and holds round 3's markers.
+> - **Script:** `$WORK/charades-runs/vcommit235.slurm` (copy in `~/charades-data/vlsi/`), skx-dev plus an skx copy, 16 nodes, 45 minutes, `-x c455-081`. Checked on the Mac against a stub `ctl_sweep.sh`: each run gets its arm, bucket and commit options, and rep 2 runs in reverse.
+
+**Commit settings:**
+- **L:** lazy commits as in VS2 and RA (`--fossil-lazy=1`, 4 rounds).
+- **E:** eager commits (`--fossil-lazy=0`).
+- **R1:** lazy commits, `--fossil-rounds=1`.
+- **F:** lazy commits, `--fossil-finish=1`.
+
+**Arms** (b19 × N, one copy per node, 1 × 46, `--batch=32`, 5,000 cycles, direct sends, `--pe-stats=1`):
+- L at W 2,500 and W 5,000; E, R1 and F at W 5,000; all with buckets of 2,500 ps.
+- The frozen controller (`--ctl=3`, bracketed):
+  - with buckets of 2,500 ps under L (VS2's VLSI controller row);
+  - with buckets of 5,000 ps under E, R1 and F. Its window cannot go below one bucket, and on VLSI it stays there (section 208), so it runs at W 5,000 with GVT advancing in steps of two clock periods.
+- 9 arms, 3 reps, arm order reversed in rep 2, a warm-up run per node set.
+- 1, 2, 4 and 8 nodes side by side (nodes 0 / 1–2 / 3–6 / 7–14), then 16 nodes. About 30 minutes.
+- **Gate:** VS2's change tier on 2 nodes (VLSI) with lazy commits, and the three lazy-commit configs. An unknown flag aborts a run, so the gate also checks that the binary takes the new flags.
+
+**Why 1–2 nodes:** there W 5,000 is the best fixed window, and today's controller row (buckets of 2,500, held at W 2,500) runs at 0.83 (1 node) and 0.72 (2 nodes) of it (VS2, run time). VS2 compared the controller only with W 2,500 (0.98–1.01).
+
+**Predictions** (run-time ratios within a rep; "speed" means the inverse of run time, higher is better):
+- **VC1. Counts:** every run at a node count commits VS2's count and digest: 125,998,590 (87c11aec…), 252,049,665 (0002eae9…), 574,541,914 (0c800d36…), 1,078,843,202 (089e4484…) and 2,087,384,844 (377d0771…) at 1, 2, 4, 8 and 16 nodes.
+- **VC2. L reproduces VS2 and RA within 5%:** at 4–16 nodes W 5,000 runs at 0.75–0.79 of W 2,500's speed; at 1–2 nodes W 5,000 is the faster window (VS2: 1.17–1.39× W 2,500).
+- **VC3. E at W 5,000** runs at 0.97–1.03 of L at W 2,500 at 4–16 nodes (section 234). At 1 node it runs at 0.90–0.97 of L at W 5,000: round 1 found lazy commits 1.09× there, and its PEs wait 22–24% of the run, time that lazy commits use.
+- **VC4. F at W 5,000** is within ±3% of E at 4–16 nodes, because the busy PE then commits one cycle per update, as E does. It is within ±3% of L at W 5,000 at 1–2 nodes, where every PE finishes its rounds while it waits. So F at W 5,000 is within 3% of the best arm at every node count.
+- **VC5. R1 at W 5,000** lies between E and L at 4–16 nodes, at 0.85–0.99 of E's speed: the busy PE still commits two to three cycles at once every third update.
+- **VC6. The controller with buckets of 5,000 ps** under E or F is at least 0.93 of the best fixed arm at every node count. At 1–2 nodes that is above today's controller row (0.72–0.83). V5 (older tree, lazy) found 0.98 at 1 node and 0.91 at 4.
+- **VC7. Today's controller row** (L, buckets of 2,500) is 0.98–1.01 of L at W 2,500 at every node count (VS2).
+
+**What follows:**
+- **VLSI's setting** for F1's 32-node job and the paper:
+  - F at W 5,000 if VC4 holds: one setting at every node count;
+  - otherwise R1 if it is within 3% of E at 4–16 nodes;
+  - otherwise E at W 5,000 from 4 nodes up, with L at W 5,000 at 1–2 nodes.
+- **The VLSI controller row** uses buckets of 5,000 ps under that setting if VC6 holds. Otherwise the paper reports that the controller is bound to one bucket on VLSI and shows its row with buckets of 2,500 ps.
+- **Lazy commits stay a VLSI setting.** They cost 4–6% on Gaussian and uniform PHOLD (section 208), and nothing here changes that.
 
 ## Baseline verification on the Mac
 
