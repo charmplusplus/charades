@@ -19,6 +19,8 @@ Every number from every run: Stampede3 runs in order (each design, written befor
 
 ## Current numbers
 
+> **Being replaced (F5 on the final defaults, section 240).** 1–16 nodes are done (section 244): Charades ÷ Devastator 1.08 / 1.18 / 1.45 / 1.70 / 2.00 (dragonfly) and 1.25 / 1.22 / 1.19 / 1.20 / 1.23 (traffic), ahead in all 10 cells; Charades ÷ ROSS with its window 2.90–3.10 (dragonfly) and 1.82–2.11 (traffic). The table below is rewritten when F5-32 adds the 32-node column.
+
 **Applications, 1–32 nodes, three engines** (F5a 3673108, F5b 3673481, F5c 3673482; sections 188, 189 and 194; median of 3 reps, 5 at 32 nodes; Charades: its frozen controller; Devastator: best of three W; ROSS: best setting, **without its optimism window** (`--max-opt-lookahead`, not yet tried); one committed count per cell in all three engines):
 
 | application | Charades ÷ Devastator at 1 / 2 / 4 / 8 / 16 / 32 nodes (higher is better) | Charades ÷ ROSS at 1 / 2 / 4 / 8 / 16 / 32 | per-node rate at 32 ÷ at 1, Charades / Devastator / ROSS (1.0 is perfect) | M ev/s at 32 nodes, Charades / Devastator / ROSS |
@@ -402,6 +404,7 @@ Sections 1–128 were re-read before planning sections 129 onward.
 | 241 | 2026-11-06 | 3688911 | RW results: ROSS's optimism window (`--max-opt-lookahead`) on PHOLD gains 1.00–1.04× at 4 nodes (1 node: 1.00–1.04, except σ 100 1.23×), because ROSS without it already commits 97.9–99.3% of executed events at 4 nodes; best windows 250 (σ 100), 500 (σ 500–2,000), 1,000 (σ 4,000), 100 (lookahead 10), none (uniform), written to `f1_240/ross_windows.txt` before F1 started; narrow windows cost up to 5%, wide ones do not bind; one count per cell; C6's first two parts wrong, the third is F1's | current |
 | 242 | 2026-11-06 | 3689004 (skx-dev; skx copy 3688913 cancelled by its guard) | F1a results, PHOLD group a (σ 100, σ 1,000, σ 4,000, lookahead 10 σ 2,000) at 1–16 nodes: Charades ÷ Devastator (controller) 1.26 / 1.23 / 1.21 / 1.30 / 1.25 (σ 100), 1.13–1.60 (σ 1,000, PP 2,048), 1.46–1.93 (σ 4,000), 1.27–1.49 (lookahead 10 σ 2,000); ahead in 20 of 20; each ratio 1.06–1.25× A1a's: Charades 1.09–1.22× its A1a rate, Devastator 0.97–1.02, ROSS 0.96–1.03; controller 0.939–1.032 of the better fixed W (W 300 is a new fixed arm); Charades ÷ ROSS 2.73–5.60; per-node rate 16 ÷ 1 best in 3 of 4 (σ 100 level); one count per cell in all three engines; C1, C4, C6 (third part) right, C2 mostly (18 of 20 in range) | current |
 | 243 | 2026-11-06 | 3689513 (skx-dev; skx copy 3688914 cancelled by its guard) | F1b results and F1 at 1–16 nodes (both groups): Charades ÷ Devastator (controller) 1.08–2.25, ahead in 40 of 40 (A1: 38); each ratio 1.06–1.25× A1's (36 of 40 in the predicted 1.10–1.30); Charades 1.08–1.23× its A1 rate, Devastator 0.97–1.05, ROSS 0.96–1.04; per-node rate 16 ÷ 1 best in 6 of 8 (σ 100: Devastator; uniform: ROSS); controller 0.930–1.032 of the better fixed W (the frozen `--ctl=3` bracketed; A1 ran `--ctl=1`); Charades ÷ ROSS 2.73–5.95; ROSS's window best in 11 of 40 cells by ≤ 2.7%; one count per cell in all three engines; C1, C4, C6 (third part) right at 1–16 nodes, C2 mostly | current |
+| 244 | 2026-11-06 | 3689887 (skx-dev; skx copy 3688915 cancelled by its guard) | F5a results, traffic and dragonfly at 1–16 nodes on the final defaults: Charades ÷ Devastator dragonfly 1.08 / 1.18 / 1.45 / 1.70 / 2.00, traffic 1.25 / 1.22 / 1.19 / 1.20 / 1.23 (ahead in 10 of 10; old 9); Charades ÷ ROSS with its window 2.90–3.10 (dragonfly; was 3.69–4.03 without it) and 1.82–2.11 (traffic); Charades 1.11–1.20× its old F5a rate, Devastator unchanged, ROSS 1.11–1.50× from its window; per-node rate 16 ÷ 1 close (dragonfly ROSS 0.64 / Charades 0.61; traffic Devastator 0.96 / Charades 0.95); controller 0.93–1.06 of the best fixed W per rep; one count and one Charades digest per cell; C1 right, C7 mostly (traffic 1 node 1.21 against ≤ 1.20) | current |
 
 ## Stampede3 runs, in order
 
@@ -10839,6 +10842,72 @@ With Charades at its best arm (controller or fixed W), the ratios are 1.00–1.0
 - **PHOLD at 1–16 nodes is paper-grade** on 85a2aad: the table above replaces A1's.
 - **The table at the top of this file** is rewritten when F1-32 adds the 32-node column. Until then, the note above it points here.
 - **F5a (3688915)** is the last 16-node job; with its 1 h 55 min limit it fits skx-dev.
+
+### F5a results: traffic and dragonfly at 1–16 nodes on the final defaults. Charades leads Devastator in all 10 cells (dragonfly 1.08–2.00, traffic 1.19–1.25), and ROSS with its window by 2.90–3.10 (dragonfly) and 1.82–2.11 (traffic); one count and one Charades digest per cell (2026-11-06; skx-dev batch job 3689887, 16 nodes)
+
+> **Status: current for traffic and dragonfly at 1–16 nodes.** Design and predictions in section 240. It replaces F5a (section 188) and F5c's ROSS (section 189) in the paper table; the 32-node column comes from F5-32.
+> - **Job:** 56 min of the 1 h 55 min limit. Gate 60/60. The guard cancelled the skx copy 3688915 when this copy started. The 8-, 4-, 2- and 1-node series ran side by side (18:40–19:05), then 16 nodes (19:05–19:32).
+> - **Runs:** every run finished.
+> - **Data:** `~/charades-data/f1/scale240/f5a_j3689887/`.
+> - **Summary:** `~/charades-data/f5/f5_summary.py`, run on this job and the old F5a (`~/charades-data/f5/a_j3673108`); output `~/charades-data/f1/scale240/f5a_j3689887_summary.txt`.
+> - **Counts and digests (C1):** every cell commits one count in all three engines and has one Charades digest across arms and reps.
+
+**Charades ÷ Devastator and Charades ÷ ROSS** (Charades' controller ÷ the other engine's best arm; median of 3 reps; higher is better). The old F5a is in brackets; ROSS ran without its window there:
+
+| application, ratio | 1 node | 2 | 4 | 8 | 16 |
+|---|---|---|---|---|---|
+| dragonfly, ÷ Devastator | 1.08 (**0.94**) | 1.18 (1.04) | 1.45 (1.29) | 1.70 (1.51) | 2.00 (1.80) |
+| dragonfly, ÷ ROSS | 3.10 (3.80) | 2.90 (3.69) | 3.04 (4.03) | 3.07 (4.01) | 2.97 (3.94) |
+| traffic, ÷ Devastator | 1.25 (1.03) | 1.22 (1.05) | 1.19 (1.02) | 1.20 (1.04) | 1.23 (1.03) |
+| traffic, ÷ ROSS | 1.82 (1.70) | 1.92 (1.99) | 1.96 (1.99) | 2.01 (2.04) | 2.11 (2.12) |
+
+(Bold: below 1.)
+
+**Per application** (rates in M committed ev/s, median of 3, higher is better; per-node rate at 16 ÷ at 1 node, 1.0 is perfect):
+
+| application | M ev/s at 16 nodes, Charades / Devastator / ROSS | per-node rate 16 ÷ 1, Charades / Devastator / ROSS | controller ÷ best fixed W in its htram setting, per rep (higher is better) | best htram ÷ best direct, Charades fixed W (higher is better) |
+|---|---|---|---|---|
+| dragonfly | 427.4 / 213.9 / 144.1 | 0.61 / 0.33 / **0.64** | 0.99–1.03 | 1.08–1.13 |
+| traffic | 1,114.3 / 904.0 / 528.0 | 0.95 / **0.96** / 0.82 | 0.93–1.06 | 1.42–1.45 |
+
+(Bold: the best of the three engines.)
+
+**Each engine's best rate ÷ its own in the old F5a** (1.0 is unchanged):
+
+| application | Charades (controller) | Devastator | ROSS (now with its window) |
+|---|---|---|---|
+| dragonfly | 1.11–1.13 | 0.98–1.00 | 1.38–1.50 |
+| traffic | 1.16–1.20 | 0.98–1.02 | 1.11–1.21 |
+
+**What the job shows:**
+- **Charades leads Devastator in all 10 cells.**
+  - The old F5a trailed only on dragonfly at 1 node (0.94); it is now 1.08.
+  - Charades is 1.11–1.20× faster than in the old F5a, and Devastator is unchanged. That is round 3, `--localalloc` and per-LP rollback; the old F5a ran before all three.
+- **ROSS's window is worth what jobs ABL and F3R found** (sections 223, 225): 1.38–1.50× on dragonfly, 1.11–1.21× on traffic.
+  - So Charades ÷ ROSS on dragonfly falls from 3.69–4.03 to 2.90–3.10.
+  - On traffic it moves within ±0.12 (1.82–2.11), since Charades gained about as much as ROSS.
+  - ROSS's best window is 5,000 ps on dragonfly at 2–16 nodes (2,500 at 1 node; 7,500 is always the worst of the three), and 1,000 (1–2 nodes) or 2,000 (4–16) on traffic. Its conservative arm is never best.
+- **Per-node scaling from 1 to 16 nodes** is close between the leaders.
+  - On dragonfly, ROSS keeps 0.64 against Charades' 0.61 and Devastator's 0.33.
+  - On traffic, Devastator keeps 0.96 against Charades' 0.95.
+  - Charades' 1-node rate gained more than its 16-node rate (1.13 against 1.11 on dragonfly, 1.19 against 1.20 on traffic), so its per-node ratio is slightly lower than in the old F5a (0.62 and 0.94).
+- **The controller:**
+  - On dragonfly its mean W is 14,300–16,100 ps, between the two fixed arms (10,000 and 20,000), and it beats both at 2–16 nodes.
+  - On traffic its mean W is 504–506 at 1 node and 531–736 at 2–16; W 500 is the best fixed arm at 1–8 nodes.
+  - At 1 node it holds W 500 and still runs at 0.93–0.96 of fixed W 500 per rep: the same pattern as on PHOLD (sections 242–243), where it sits at the best fixed W's value but runs a few percent slower. What costs it is not measured.
+- **Aggregation** (best htram ÷ best direct, both at fixed W) is 1.42–1.45 on traffic and 1.08–1.13 on dragonfly (old: 1.29–1.36 and 1.03–1.12).
+- **Devastator's traffic at W 1,000 on 16 nodes:** 2 of its 3 reps ran 3.5× long (37–38 s against about 10 s), with the same executed events and almost no rollbacks. In the old F5a all three ran about 10 s. W 1,000 is not Devastator's best arm there (W 2,000, 904 M ev/s in every rep), so no ratio changes. The cause is not known.
+
+**Predictions:**
+- **C1 (traffic and dragonfly, 1–16 nodes): right.** One count per cell in all three engines, one Charades digest per cell.
+- **C7: mostly right.**
+  - Charades ÷ Devastator is 1.11–1.15× the old F5a's on dragonfly and 1.15–1.21× on traffic, against the predicted 0.95–1.20. 9 of 10 cells are in range; traffic at 1 node is just above, at 1.21.
+  - Charades ÷ ROSS with its window is 2.90–3.10 on dragonfly (2.6–3.6 predicted) and 1.82–2.11 on traffic (1.5–2.2 predicted): right.
+
+**What follows:**
+- **Traffic and dragonfly at 1–16 nodes are paper-grade** on 85a2aad: this table replaces the old F5a in the paper.
+- **The applications table at the top of this file** is rewritten when F5-32 adds the 32-node column. Until then, the note above it points here.
+- **The controller's cost at the best fixed W's value** (PHOLD and traffic) is now seen in three workloads. Its robustness numbers are unaffected, and section 240's plan has no run for it.
 
 ## Baseline verification on the Mac
 
