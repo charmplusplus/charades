@@ -407,6 +407,7 @@ Sections 1–128 were re-read before planning sections 129 onward.
 | 244 | 2026-11-06 | 3689887 (skx-dev; skx copy 3688915 cancelled by its guard) | F5a results, traffic and dragonfly at 1–16 nodes on the final defaults: Charades ÷ Devastator dragonfly 1.08 / 1.18 / 1.45 / 1.70 / 2.00, traffic 1.25 / 1.22 / 1.19 / 1.20 / 1.23 (ahead in 10 of 10; old 9); Charades ÷ ROSS with its window 2.90–3.10 (dragonfly; was 3.69–4.03 without it) and 1.82–2.11 (traffic); Charades 1.11–1.20× its old F5a rate, Devastator unchanged, ROSS 1.11–1.50× from its window; per-node rate 16 ÷ 1 close (dragonfly ROSS 0.64 / Charades 0.61; traffic Devastator 0.96 / Charades 0.95); controller 0.93–1.06 of the best fixed W per rep; one count and one Charades digest per cell; C1 right, C7 mostly (traffic 1 node 1.21 against ≤ 1.20) | current |
 | 245 | 2026-11-06 | CC: 3690326 (skx-dev) / 3690327 (skx) (results in 246) | Where the controller's 3–7% goes (design; user: one diagnostic job, no engine change): F5a's traffic traces already show the start is negligible, time at other windows costs 0.9–1.3%, and most of the gap arises at the same W (1.030–1.060× per event at W ≈ 500, 1 node); candidates H1 measuring, H2 the per-round log, H3 changing W every period, H4 trial windows; job CC: PHOLD σ 500 and traffic at 16 and 1 nodes, fixed-W grid, controller with and without log, `--ctl-period=32`, dry at the best W; predictions CC1–CC7 | design |
 | 246 | 2026-11-06 | 3690326 (skx-dev; skx copy 3690327 cancelled by its guard) | CC results: the per-round log (`--ctl-log=1`) costs the controller 2–6% (CL ÷ C 0.94–0.98 on traffic and σ 500 at 16 nodes), and F4/F4R, F5 (incl. F5a, section 244), ABL/F3R and the VLSI jobs (incl. VS3) passed it to every arm, so their controller rows are understated by about 2–6% against fixed W; F1 ran without it. Without the log the controller is 0.970–0.985 of the best fixed W: measuring 0–1.6% (traffic 16 nodes up to 6%, noisy), time at trial windows 1–3% (one step of 1.5 costs 7–24%), changing W about 0.3%; `--ctl-period=32` does not help PHOLD (0.96–1.00); corrects section 245's reading of F5a's traces (the log); CC1, CC2 right, CC3 mostly, CC7 half, CC4–CC6 wrong | current |
+| 247 | 2026-11-06 | F5a2 3690453 (skx-dev) / 3690454 (skx), VA 3690455, F5-32b 3690451, V32b 3690452 (results in later sections); F5-32 3688917 and V32 3688918 cancelled | Paper runs without diagnostics (design; user: resubmit without the log, rerun the controller rows, check every parameter): a check of every flag found four more unmeasured Charades-only diagnostics in F5 and VLSI (`--blocked-time`, `--commit-digest`, `--copy-stats`, `--pe-stats`); all leave the timing arms; check arms od/O (old set; digest check), dg/G (digest), ri/R (no GVT progress print); F5a and VS3 rerun whole at 1–16 nodes, F5-32 and V32 resubmitted; per-arm flag table; predictions D1–D5 | design |
 
 ## Stampede3 runs, in order
 
@@ -11044,6 +11045,69 @@ In both it rolls back under 0.5% of events.
   - The two 32-node jobs still pending, F5-32 (3688917) and V32 (3688918), pass `--ctl-log=1` too. What to do about them, and about the finished rows, is the user's decision.
 - **Without the log, the controller's cost against the best fixed W is 1.5–3%,** mostly the trial windows it pays to find that W. Smaller or rarer trials could cut it, but would change the engine and mean rerunning every controller arm, F1 included.
 - **The log stays off in paper runs from now on.** Per-round traces come from separate runs, as here.
+
+### Paper runs without diagnostics: F5 and VLSI rerun at 1–16 nodes and resubmitted at 32, after a check of every flag (design, 2026-11-06; written before any runs)
+
+> **Status: design.**
+> - **User decisions 2026-11-06 (section 246):**
+>   - Cancel F5-32 and V32 and resubmit them without the log.
+>   - Rerun F5a's and VS3's controller arms without the log, next to their best fixed arms.
+>   - Leave the controller as it is.
+>   - Check carefully the parameters of every run.
+> - **Done:** F5-32 (3688917) and V32 (3688918) were cancelled before they started.
+> - **Queued 2026-11-06 21:10:** F5a2 3690453 (skx-dev) / 3690454 (skx; the skx-dev copy reads 3690454 from `f5scale240_a.twin`), VA 3690455 (skx), F5-32b 3690451, V32b 3690452 (skx, 32 nodes). Login-node checks pass for all four modes; no `--ctl-log` outside comments.
+
+**The flag check.** Every flag of every arm was listed from stub runs of the scripts, for all three engines.
+- **Besides `--ctl-log`, the Charades launch of F5 and VLSI carried four more diagnostics:**
+  - `--blocked-time=1`: a timer read per blocked spell;
+  - `--commit-digest=1`: a hash per committed event;
+  - on VLSI, `--copy-stats=1` and `--pe-stats=1`: per-PE counters and end-of-run tables.
+- None had a measured cost, and Devastator and ROSS carry nothing like them. So they could bias Charades ÷ Devastator and Charades ÷ ROSS, which the log could not, because it printed only in controller arms.
+- **They all leave the timing arms.** Check arms carry them, to keep the digest check and to measure what they cost.
+- **The engine's GVT progress print** (`--report-interval`, default 64, about 180 lines a second on PE 0) is part of every Charades run so far, F1 included. It stays at its default, and one arm measures it.
+- **F5a and VS3 are rerun whole,** not only their controller arms. The ratios need every engine in the same allocation, and Charades' fixed arms lose the diagnostics too.
+- **F1-32 (3688916, still queued) is unchanged:** its runs already carry the launch only.
+
+**Flags per arm** (Charades launch for every arm: `+lci_ndevices 23 +pemap 2-46:2,3-47:2 +mempool_remote_free` under `numactl --localalloc`):
+- **`ctl_sweep.sh` adds** the arm's own `--optimism-window=W` or `--ctl=3 --ctl-bracket=1`, plus `--gvt-bucket-size`, the htram settings (`--aggregation=1 --agg-mode --agg-buffer --agg-policy=1 --agg-horizon-margin=8`; none for direct sends), and the config `bucket` (sync=3, gvt=4, buffer-size=655360).
+- **Layouts:** F5 runs 2 × 23 PEs per node, VLSI 1 × 46.
+
+| arm | Charades flags beyond the above | why |
+|---|---|---|
+| every timing arm | none; VLSI adds `--batch=32`, its L arm `--fossil-lazy=1` | timing (VLSI's settings, section 236) |
+| od (F5) / O (VLSI), every job | `--blocked-time=1 --commit-digest=1`; VLSI also `--copy-stats=1 --pe-stats=1` | the digest check (C1); per-PE stats for VLSI's slow reps; the old set's cost |
+| dg / G, 1–16 nodes only | `--commit-digest=1` | the digest's cost alone |
+| ri / R, 1–16 nodes only | `--report-interval=1000000` | the cost of the GVT progress print |
+
+- The check arms run at the best fixed W: traffic PP 2,048 W 500, dragonfly WPs 512 W 10,000, VLSI eager W 5,000.
+- **Devastator** gets model arguments, `--end-time` and `--rng=clcg4` (VLSI draws none). Its window comes from `deva_static_look_dt`, and it prints about 20 lines a run.
+- **ROSS** gets `--synch --read-buffer=1 --extramem=800000 --batch --gvt-interval`, `--max-opt-lookahead` in its window arms, model arguments and `--end`. It prints about 300 lines, mostly at the end.
+
+**Jobs** (`f5scale240.slurm`, `vscale240.slurm`, with modes; copies in `~/charades-data/f1/`, the previous versions as `*.pre247`; `-x c455-081`):
+
+| job | mode | queue, nodes, limit | what | runs (Charades / Devastator / ROSS) |
+|---|---|---|---|---|
+| F5a2 | `f5scale240.slurm a` | skx-dev and an skx copy, 16, 1:55 | F5a's arms and layout at 1–16 nodes (section 240), 3 reps, plus od, dg, ri | 245 / 90 / 90 |
+| VA | `vscale240.slurm a` | skx (an skx-dev copy when that queue is free), 16, 0:50 | VS3's arms and layout at 1–16 nodes (section 238), 3 reps, plus O, G, R | 110 / 45 / — |
+| F5-32b | `f5scale240.slurm big` | skx, 32, 4:00 | F5-32's plan (16 on halves, 3 reps; 32 nodes, 5 reps) plus od | 99 / 48 / 48 |
+| V32b | `vscale240.slurm big` | skx, 32, 1:45 | V32's plan (16 on halves, 3 reps; 32 nodes, 5 reps) plus O | 58 / 33 / — |
+
+- Run counts are from the stub runs, and match the plan in every mode.
+- A copy that starts second exits, and one that starts first cancels its twin: the guard reads `TWIN` from the environment or from `f1_240/<script>_<mode>.twin`.
+
+**Predictions:**
+- **D1. Counts:** one count per cell in every engine; one Charades digest per cell across the od/dg (O/G) arms and reps.
+- **D2. The old diagnostics cost Charades at most 2%:**
+  - od ÷ the same fixed arm is 0.98–1.00 on traffic and dragonfly, and O ÷ E at W 5,000 is 0.97–1.00 on VLSI.
+  - The digest alone is at least 0.99; without the progress print, 1.00–1.01.
+- **D3. The controller without the log ÷ the best fixed W, per rep:** traffic 0.95–1.07, dragonfly 1.00–1.06, VLSI 0.97–1.05. With the log they were 0.93–1.06, 0.99–1.03 and 0.95–1.02 (sections 244, 239).
+- **D4. Charades ÷ Devastator** with the controller is 1.00–1.08× section 244's (F5a) and 239's (VS3) at each node count, and 1.00–1.03× with Charades' best fixed arm.
+- **D5.** Devastator and ROSS reproduce sections 244 and 239 within 5%.
+- **Section 240's 32-node predictions stand:** C7 for F5; C8 and C9 for VLSI. C9 now compares the 16-node halves with VA's 16-node cell instead of VS3's.
+
+**What follows:**
+- **The paper tables:** VA and F5a2 replace sections 239 and 244 at 1–16 nodes, and F5-32b and V32b give the 32-node column.
+- **If D2 fails** (the old diagnostics cost more than 2%), earlier Charades ÷ Devastator ratios from jobs that carried them (F4, ABL, F3R) understated Charades by that much, and F4 is decided then.
 
 ## Baseline verification on the Mac
 
