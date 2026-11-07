@@ -405,6 +405,7 @@ Sections 1–128 were re-read before planning sections 129 onward.
 | 242 | 2026-11-06 | 3689004 (skx-dev; skx copy 3688913 cancelled by its guard) | F1a results, PHOLD group a (σ 100, σ 1,000, σ 4,000, lookahead 10 σ 2,000) at 1–16 nodes: Charades ÷ Devastator (controller) 1.26 / 1.23 / 1.21 / 1.30 / 1.25 (σ 100), 1.13–1.60 (σ 1,000, PP 2,048), 1.46–1.93 (σ 4,000), 1.27–1.49 (lookahead 10 σ 2,000); ahead in 20 of 20; each ratio 1.06–1.25× A1a's: Charades 1.09–1.22× its A1a rate, Devastator 0.97–1.02, ROSS 0.96–1.03; controller 0.939–1.032 of the better fixed W (W 300 is a new fixed arm); Charades ÷ ROSS 2.73–5.60; per-node rate 16 ÷ 1 best in 3 of 4 (σ 100 level); one count per cell in all three engines; C1, C4, C6 (third part) right, C2 mostly (18 of 20 in range) | current |
 | 243 | 2026-11-06 | 3689513 (skx-dev; skx copy 3688914 cancelled by its guard) | F1b results and F1 at 1–16 nodes (both groups): Charades ÷ Devastator (controller) 1.08–2.25, ahead in 40 of 40 (A1: 38); each ratio 1.06–1.25× A1's (36 of 40 in the predicted 1.10–1.30); Charades 1.08–1.23× its A1 rate, Devastator 0.97–1.05, ROSS 0.96–1.04; per-node rate 16 ÷ 1 best in 6 of 8 (σ 100: Devastator; uniform: ROSS); controller 0.930–1.032 of the better fixed W (the frozen `--ctl=3` bracketed; A1 ran `--ctl=1`); Charades ÷ ROSS 2.73–5.95; ROSS's window best in 11 of 40 cells by ≤ 2.7%; one count per cell in all three engines; C1, C4, C6 (third part) right at 1–16 nodes, C2 mostly | current |
 | 244 | 2026-11-06 | 3689887 (skx-dev; skx copy 3688915 cancelled by its guard) | F5a results, traffic and dragonfly at 1–16 nodes on the final defaults: Charades ÷ Devastator dragonfly 1.08 / 1.18 / 1.45 / 1.70 / 2.00, traffic 1.25 / 1.22 / 1.19 / 1.20 / 1.23 (ahead in 10 of 10; old 9); Charades ÷ ROSS with its window 2.90–3.10 (dragonfly; was 3.69–4.03 without it) and 1.82–2.11 (traffic); Charades 1.11–1.20× its old F5a rate, Devastator unchanged, ROSS 1.11–1.50× from its window; per-node rate 16 ÷ 1 close (dragonfly ROSS 0.64 / Charades 0.61; traffic Devastator 0.96 / Charades 0.95); controller 0.93–1.06 of the best fixed W per rep; one count and one Charades digest per cell; C1 right, C7 mostly (traffic 1 node 1.21 against ≤ 1.20) | current |
+| 245 | 2026-11-06 | CC: 3690326 (skx-dev) / 3690327 (skx) (results in a later section) | Where the controller's 3–7% goes (design; user: one diagnostic job, no engine change): F5a's traffic traces already show the start is negligible, time at other windows costs 0.9–1.3%, and most of the gap arises at the same W (1.030–1.060× per event at W ≈ 500, 1 node); candidates H1 measuring, H2 the per-round log, H3 changing W every period, H4 trial windows; job CC: PHOLD σ 500 and traffic at 16 and 1 nodes, fixed-W grid, controller with and without log, `--ctl-period=32`, dry at the best W; predictions CC1–CC7 | design |
 
 ## Stampede3 runs, in order
 
@@ -10908,6 +10909,75 @@ With Charades at its best arm (controller or fixed W), the ratios are 1.00–1.0
 - **Traffic and dragonfly at 1–16 nodes are paper-grade** on 85a2aad: this table replaces the old F5a in the paper.
 - **The applications table at the top of this file** is rewritten when F5-32 adds the 32-node column. Until then, the note above it points here.
 - **The controller's cost at the best fixed W's value** (PHOLD and traffic) is now seen in three workloads. Its robustness numbers are unaffected, and section 240's plan has no run for it.
+
+### Where the controller's 3–7% goes (job CC design, 2026-11-06; written before any runs)
+
+> **Status: design; queued 2026-11-06** as 3690326 (skx-dev) and 3690327 (skx; `TWIN=3690326`, and the skx-dev copy reads 3690327 from `f1_240/ctlcost245.twin`). Login-node checks pass; arm order and options checked on the Mac against a stub `ctl_sweep.sh` (74 calls, 110 runs). User decision 2026-11-06 (after section 244): one diagnostic job on skx-dev while the 32-node jobs wait; no engine change.
+
+**The question.** In F1 and F5a the frozen controller (`--ctl=3`, bracketed) settles at the best fixed W's value but runs 3–7% slower than that fixed W:
+- σ 500 at 16 nodes: mean W 378–402, against fixed W 400 per rep 0.965 / 0.930 / 0.921 (section 243);
+- traffic at 1 node: mean W 504–506, against fixed W 500 per rep 0.93–0.96 (section 244).
+
+In both it rolls back under 0.5% of events.
+
+**How the controller works (`controller.C`, `measured_window`):**
+- Periods alternate between a base, at the W in force, and a trial at W × step or W ÷ step.
+- Each period runs `--ctl-settle` rounds (2) unmeasured, then sums `--ctl-period` rounds (8) of PE time and committed events.
+- With the bracket, the base is measured again after the trial. A trial is kept only if it beats both bases.
+- The step starts at 1.5, grows 1.5× (in log) on a kept trial up to 2, and halves after two drops in a row, down to 1.05.
+- A round is about 0.5–2 ms, so a run makes hundreds of trials: σ 500 at 16 nodes 158 (34 kept), traffic at 1 node 562 (173 kept).
+- Every round, `decide()` sets the window, `agg_set_window` (one assignment) and `wake()` (acts only on a parked PE); `--ctl-dry=1` skips those three and keeps W fixed, but runs everything else.
+
+**What the existing traces already show** (F5a traffic, which ran with `--ctl-log=1`; the per-round W, committed events and PE time, scratch analysis):
+- **The start is negligible.** The controller sits at its starting W (one bucket) for 12–20 of 10,400–13,000 rounds.
+- **Time at windows other than the best is cheap.**
+  - Priced within the controller's own run, rounds at other windows cost 0.9–1.3% extra time in total.
+  - At 1 node, 59% of the time is at W ≈ 516 and 24% at W ≈ 413, which costs 1.012× per event.
+- **Most of the gap arises at the same W.**
+  - At 1 node, the controller's rounds within ±12% of W 500 cost 1.030–1.060× per event what the fixed W 500 run does, against 1.045–1.074× for the whole run.
+  - Each run's per-round PE time sums to its measured run time (within 0.2%), so the accounting closes.
+- **One confound:** F5a's controller runs printed two lines per round on PE 0 (`--ctl-log=1`, about 26,000 lines a run), and its fixed-W runs printed none. F1's PHOLD runs had no log and show the same gap.
+
+**Candidate causes:**
+- **H1, the measuring and reducing:** the delay record on every remote send, the counters and histogram on the count waves, `decide()`.
+- **H2, the per-round log on PE 0** (traffic in F5a only).
+- **H3, changing W every period** (every 10 rounds): GVT and the htram horizon re-settle after each change, at any W.
+- **H4, time at trial windows,** priced by the cost curve near the best W.
+
+**Job CC** (`$WORK/charades-runs/ctlcost245.slurm`, copy in `~/charades-data/f1/`):
+- **Queue:** skx-dev, 16 nodes, 50 minutes, `-x c455-081`, plus an skx copy. The copy that starts first cancels the other (the twin guard; the skx-dev copy reads the other's ID from a file written after both are submitted).
+- **Tree:** `charades-r5` (85a2aad). Gate: F1's change tier on 2 nodes.
+- **Cells:** PHOLD σ 500 (F1's settings, PP 2,048) and traffic (F5's settings, PP 2,048, `--commit-digest`), at 16 nodes, then 1 node. 3 reps, arm order reversed in rep 2.
+- **Arms per cell:**
+  - **F:** fixed W, a grid around the best: σ 500 at 200 / 300 / 400 / 600; traffic at 350 / 500 / 750 / 1,000.
+  - **C:** the controller (`mb:0`), as in F1 and F5.
+  - **CL:** C with `--ctl-log=1`.
+  - **CPL:** CL with `--ctl-period=32`: a change of W every 34 rounds instead of 10.
+  - **D:** dry at the best fixed W (`--ctl=3 --ctl-bracket=1 --ctl-dry=1 --optimism-window=W`; σ 500: W 300 at 1 node, 400 at 16; traffic: W 500).
+  - **DL:** D with `--ctl-log=1`, the per-round reference at a fixed W.
+- **Launch:** as F1 for PHOLD and F5 for traffic, except that `--ctl-log` is set per arm.
+- **About 110 runs, 30–40 minutes.**
+
+**Analysis:**
+- Rates per arm, median of 3.
+- **H1:** D ÷ F at the same W. **H2:** C ÷ CL. **H3:** CPL ÷ CL.
+- **H4 and closure:** from CL's and DL's per-round traces, the controller's extra PE time over DL's cost per event, split into rounds within ±12% of the best W and rounds outside it, and priced against F's cost curve.
+
+**Predictions:**
+- **CC1. Counts:** every arm in a cell commits the same count; every traffic run has the same digest.
+- **CC2. The gap reproduces:** C ÷ the best fixed W in the grid is 0.93–0.98 for σ 500 at 16 nodes and 0.95–0.99 at 1 node; 0.95–0.99 for traffic at 1 node; and 0.97–1.03 for traffic at 16 nodes, where W 750 is in the grid now.
+- **CC3. H1 is small:** D ÷ F at the same W is at least 0.99 in every cell.
+- **CC4. H2:** CL ÷ C is at least 0.97 in every cell. That is, the log costs at most 3%, so it explains part of traffic's gap in F5a at most.
+- **CC5. H3 is the main cause:** in every cell where C ÷ the best fixed W is below 0.97, CPL ÷ CL is at least 1.02.
+- **CC6. Closure:** at least half of CL's extra PE time over DL arises in rounds within ±12% of the best W, as in F5a's traffic traces.
+- **CC7. The cost curve:** the best fixed W is 300 (σ 500, 1 node), 400 (σ 500, 16), 500 (traffic, 1) and 750 (traffic, 16). One step of 1.5 from it costs 2–10%.
+
+**What follows:**
+- **If CC5 holds** (changing W costs):
+  - The candidate change is fewer changes once the step reaches its floor: a longer period, or a pause between trials after rejections.
+  - It would change the engine, so the controller arms of F1, F4 and F5 would be rerun (the user's decision).
+- **If CC3 fails** (the measuring costs): look at the delay record per remote send and the per-wave counters.
+- **If neither:** the per-round traces show where the time goes, and this section says so.
 
 ## Baseline verification on the Mac
 
