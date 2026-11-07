@@ -1,8 +1,10 @@
 # PADS 2027 paper: claims, figures and the work left
 
 Written for: Ritvik and the Claude sessions working on Charades. It steers the
-work until the paper is submitted. `RESULTS.md` stays the lab notebook: every
-number and job lives there, and this file points into it.
+work until the paper is submitted. The lab notebook holds every number and job:
+`RESULTS.md` (the current paper tables) and the topic files under `results/`
+(since 2026-11-07). "RESULTS.md N" here means section §N; `results/INDEX.md`
+says which file holds it.
 
 **Deadline:** SIGSIM PADS 2027, second call, 2027-01-22. 10-page ACM full
 paper, double-blind (check whether references count toward the 10 pages). The

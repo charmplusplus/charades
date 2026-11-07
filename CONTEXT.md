@@ -107,7 +107,7 @@ result) and/or a 2-page PhD colloquium abstract.
 
 ### Measurements
 
-Every run's numbers (designs with predictions, results, job IDs, status) are in [RESULTS.md](RESULTS.md), in order, with the current headline numbers at the top. Write new designs and results there, not here.
+Every run's numbers (designs with predictions, results, job IDs, status) are in topic files under [results/](results/), by section number (§N; [results/INDEX.md](results/INDEX.md) says which file holds each), with the current headline numbers on the front page, [RESULTS.md](RESULTS.md). Write new designs and results there, not here.
 
 ## Open issues
 
