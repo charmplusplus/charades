@@ -28,6 +28,7 @@ Every controller design and test: the delay-quantile rule, the aggregation bound
 | 237 | 2026-11-06 | current | The measured controller's trials reach two buckets: `--ctl-reach-buckets=2`, and checks that it changes no… |
 | 245 | 2026-11-06 | design | Where the controller's 3–7% goes |
 | 246 | 2026-11-06 | current | CC results: without its per-round log the controller runs at 0.970–0.985 of the best fixed W. The log itsel… |
+| 250 | 2026-11-07 | design | F4 rerun without diagnostics: the robustness comparison on the current tree, with F4's three flags only in… |
 | 6 | 2026-10-20 | design | Window controller |
 | 7 | 2026-10-20 | superseded | Window controller, first Stampede3 results |
 | 8 | 2026-10-20 | superseded | Waste floor, controller cost, horizon margin |
@@ -1414,6 +1415,89 @@ In both it rolls back under 0.5% of events.
   - The two 32-node jobs still pending, F5-32 (3688917) and V32 (3688918), pass `--ctl-log=1` too. What to do about them, and about the finished rows, is the user's decision.
 - **Without the log, the controller's cost against the best fixed W is 1.5–3%,** mostly the trial windows it pays to find that W. Smaller or rarer trials could cut it, but would change the engine and mean rerunning every controller arm, F1 included.
 - **The log stays off in paper runs from now on.** Per-round traces come from separate runs, as here.
+
+### §250 · F4 rerun without diagnostics: the robustness comparison on the current tree, with F4's three flags only in a check arm (job F4b design, 2026-11-07; written before any runs)
+
+> **Status: design.**
+> - **User decision 2026-11-07:** rerun F4 in full without the log (sections 246, 249).
+> - **Submitted 2026-11-07:** 3691176 (skx-dev) and 3691177 (skx; the skx-dev copy reads 3691177 from `f4b250/f4b250.twin`).
+>   - A first pair, 3691173 / 3691174, was cancelled 2 minutes after 3691173 started. Its batch node, c454-004, reported "/work2 is mounted not FULL nor IDLE", and the script's first read of the Devastator tree hung in Lustre I/O wait there.
+>   - Both copies now run with `-x c455-081,c454-004`.
+> - **Script:** `$WORK/charades-runs/f4b250.slurm` (copy in `~/charades-data/f4/`). It runs on skx-dev with an skx copy, 16 nodes, limit 1:55, about 75 minutes, `-x c455-081`.
+> - **Code:** tree `charades-r5` (85a2aad), the tree of F1, F5a2 and VA.
+>   - F4 ran 8a34d51. The engine code between the two is 609212b (`--fossil-rounds`; its default is the old rule) and 85a2aad (`--ctl-reach-buckets=2`).
+>   - The reach moved no trial on dragonfly, PHOLD or traffic on the Mac (section 237). Every controller run here prints `Trials past it (reach buckets)`, which checks that on Stampede3.
+
+**Why.** F4 passed `--blocked-time=1 --ctl-log=1 --commit-digest=1` to every Charades arm.
+- The log prints only in the controller and Devastator's rule in Charades, and it cost them 2–6% on traffic and about 2% on PHOLD at 16 nodes (sections 246, 248).
+- The other two flags cost 0–1.6% wherever they were measured (sections 248, 249), but never on PHOLD.
+- So F4's controller column (0.83–1.03), which claim 2 quotes, is low by up to a few percent. Its baselines are not affected.
+
+**Plan, as F4 (section 227).**
+- **Workloads:** job N's seven, with F4's sizes, htram settings and grids:
+  - phase-changing PHOLD, PP 512, W 50 / 75 / 100 / 150 / 250 / 300;
+  - lookahead 10 σ 500, PP 512, W 25 / 50 / 100 / 300;
+  - σ 100, PP 2,048, and σ 2,000, PP 512, each W 100 / 200 / 300 / 400;
+  - uniform, WPs 512, W 100 / 200 / 300 / 400;
+  - traffic, PP 2,048, W 500 / 750 / 1,000;
+  - dragonfly, WPs 512, W 10,000 / 20,000 / 40,000 ps.
+- **Arms:**
+  - Charades: the fixed grid, the frozen controller (`mb:0`), and Devastator's rule in Charades (`hill:<bucket>`, from one bucket).
+  - Devastator (2 × 23, CLCG4): F4's fixed grid and its own window, capped at 120 s.
+- **Layout:**
+  - 4 nodes: four streams side by side (Charades A and B, Devastator A and B).
+  - 16 nodes: Charades then Devastator in each rep, reversed in rep 2.
+- **Gate:** the change tier on 2 nodes (Simple PHOLD, traffic, dragonfly).
+
+**What changes from F4:**
+- **Timing arms carry the paper launch only.**
+- **Check arm `old`:** the controller with F4's three flags, every cell and rep, run after that rep's timing arms. It gives the digest check (one digest per cell, compared with F4's) and the flags' cost paired per rep.
+- **Reps:** 3, not 2, so every cell has a median (Devastator has had slow reps, sections 244 and 248). Arm and workload order are reversed in rep 2.
+- **Arms that hit their cap:** a Devastator window or Charades hill climb that hits its cap is skipped in later reps, and at 16 nodes if it hit it at 4. F4's adaptive window stalled in both reps on phase-changing PHOLD and σ 2,000 at 4 nodes. F4 skipped those only at 16 nodes.
+- **Warm-up:** a short run starts each stream and is not counted (F1 and F5 do the same).
+
+**Flags per arm.** Listed from a stub run of the script, in which a fake `srun` printed every command (297 Charades and 183 Devastator commands). Charades' launch for every arm:
+- `+lci_ndevices 23 +pemap 2-46:2,3-47:2 +mempool_remote_free` under `numactl --localalloc`, `srun -c 24`, with 2 × 23 PEs per node;
+- config `bucket` (sync=3, gvt=4, buffer-size=655360);
+- from `ctl_sweep.sh`: `--gvt-bucket-size` (8; dragonfly 1,000) and htram `--aggregation=1 --agg-mode --agg-buffer --agg-policy=1 --agg-horizon-margin=8`;
+- the model's settings in its config file.
+
+The GVT progress print stays at its default, as in every paper run (its cost was within the spread, section 248).
+
+| arm | Charades flags beyond the launch | why |
+|---|---|---|
+| fixed W | `--optimism-window=W` | F4's grid |
+| controller `mb:0` | `--ctl=3 --ctl-bracket=1` | the frozen controller (section 185; trial reach from section 237) |
+| Devastator's rule `hill:B` | `--optimism-window=B --ctl=2` | starts from one bucket, as in F4 |
+| check `old` | `--ctl=3 --ctl-bracket=1 --blocked-time=1 --ctl-log=1 --commit-digest=1` | F4's flags: the digest check and their cost |
+| warm-up, one per stream | `--optimism-window=300`; σ 100, PP 2,048, end 512,000 | first-run effects; not counted |
+
+- **Devastator:** `--lp-per-rank=128 --start-events=15 --rng=clcg4`, the model's arguments and `--end-time`.
+  - The window comes from `deva_static_look_dt`, which is unset for its own window.
+  - The environment is `GASNET_OFI_SPAWNER=pmi FI_PROVIDER=psm2 GASNET_BACKTRACE=1`. The backtrace setting acts only on a crash.
+  - The launch is `srun -c 24 --cpu-bind=cores -m block:block` under `stdbuf -oL`. It prints about 20 lines a run and carries no diagnostics.
+- **Runs:**
+  - Charades: 252 timing, 42 check and 3 warm-up.
+  - Devastator: 180 plus 3 warm-up, about 170 after the cap skips.
+  - F4's run times give about 17 minutes at 4 nodes and 17 per rep at 16 nodes.
+
+**Predictions** (each policy ÷ the best fixed W of the same engine and rep; median of 3 reps; higher is better):
+- **F4b-1. Counts:** every finished run commits one count per cell in both engines, the same as F4. The `old` arm's digests are one per cell and equal F4's (and F4R's on phase-changing PHOLD at 16 nodes).
+- **F4b-2. The controller without the log** is 1.00–1.06× F4's value in each cell:
+  - 0.95–1.00 on lookahead 10, σ 100, σ 2,000, uniform and traffic at 4 and 16 nodes;
+  - 1.01–1.05 on dragonfly;
+  - 0.84–0.92 on phase-changing PHOLD at 4 nodes, still its worst cell (the loss there is the cost of measuring, section 230), and 0.94–0.99 at 16.
+- **F4b-3. `old` ÷ the controller, paired per rep:** traffic 0.94–0.99, PHOLD 0.96–1.00, dragonfly 0.98–1.01.
+- **F4b-4. Devastator's rule in Charades** spans 0.10–0.90. Its worst cell is at most 0.25, and it is at most 0.65 on every PHOLD workload.
+- **F4b-5. Devastator:**
+  - Its best fixed W runs within 5% of F4's rate in each cell (compared at its fastest rep when a slow rep moves the median).
+  - Its own window does not finish within 120 s on phase-changing PHOLD and σ 2,000 at 4 nodes, and is 0.09–0.85 where it finishes.
+- **F4b-6. Charades ÷ Devastator,** each at its best fixed W, is 1.00–1.05× F4's per cell, about 1.13–2.10.
+- **F4b-7. No rep is disturbed.** Every fixed-W run makes at most 1.03 count waves per GVT advance, except W 25 on lookahead 10 (1.33 throughout F4). Every controller run reports 0 trials past the reach.
+
+**What follows:**
+- The results replace sections 230 and 232 (F4, F4R) as the robustness figure and claim 2's numbers in PAPER.md.
+- If F4b-2 holds, phase-changing PHOLD at 4 nodes stays the controller's worst cell, and the paper states it as the limit.
 
 ## Earlier
 
