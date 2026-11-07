@@ -27,10 +27,11 @@ performance available without tuning the optimism window for each workload.
    trial is judged against measurements before and after it. A histogram of
    remote-send delays, carried on the same waves, gives the starting window
    and its range. Across regimes and applications it stays near the best
-   hand-tuned window (0.83–1.03 on the current tree, RESULTS.md 230), where
-   any single fixed window (0.52), a rollback-target rule (0.31 on dragonfly),
-   Devastator's efficiency hill climb in Charades (0.13) and Devastator's own
-   window (0.09, or not finishing) fail somewhere.
+   hand-tuned window (0.92–1.03 per workload, median of 3 reps, on the current
+   tree without diagnostics, RESULTS.md 251), where any single fixed window
+   (0.51), a rollback-target rule (0.31 on dragonfly), Devastator's efficiency
+   hill climb in Charades (0.15) and Devastator's own window (0.09, or not
+   finishing: its time cap or out of memory) fail somewhere.
 3. **Evaluation at 1–32 nodes (up to 1,472 cores) against Devastator
    (PADS'24) and ROSS.** The workloads are Gaussian PHOLD and three applications
    (traffic, dragonfly, gate-level VLSI), with the same committed events in all three engines.
@@ -72,7 +73,7 @@ Status:
 | F1 | weak scaling 1–32 nodes, Gaussian PHOLD σ 100 to uniform and lookahead 10, three engines (M ev/s, and Charades ÷ each) | 3 | 142–143, 153 (A2r), 166 (N32 launch) | rerun on final defaults; 5 reps at 32 nodes (32-node runs vary ±14% between reps) |
 | F2 | aggregation ablation: direct sends, eager flush (`--agg-policy=0`), deadline flush, by σ; events per message and messages per event | 1 | 223 (job ABL, round 3, 4 and 16 nodes, PHOLD and traffic) | have: deadline ÷ direct 2.1–3.3 on PHOLD, 1.4 on traffic; eager ÷ deadline down to 0.61 (uniform, 16 nodes) |
 | F3 | the PADS'19 static hold and opportunistic (eager) aggregation as baselines | 1, 2 | 223 (eager), 225 (hold, 4 and 16 nodes) | have. Eager ÷ deadline down to 0.61; the PADS'19 hold (its own release rule; job F3R, 225) reaches at most 1.02 of no hold with the fast path on (0.83–1.02), and 0.30–0.40 (PHOLD) and 0.67–0.72 (traffic) of deadline htram |
-| F4 | robustness: each policy ÷ the best fixed W per workload (controller, best single fixed W, Devastator's rule in Charades, Devastator's own window), and each policy's worst case | 2 | 181, 185 (frozen rule, quantile rule, fixed grids; 7 workloads, 4 and 16 nodes) | have (job F4, RESULTS.md 230; 7 workloads at 4 and 16 nodes, current tree): controller 0.83–1.03 (0.92–1.03 in 12 of 14 cells); Devastator's rule in Charades 0.13–0.84; Devastator's own window 0.09–0.83, not finishing on 2 workloads; one PHOLD window 0.52–0.55. Phase-changing PHOLD at 16 nodes: rep 2 hit by an episode on the machine, replaced by job F4R (RESULTS.md 232; controller 0.95–0.96). **Rerun without diagnostics queued 2026-11-07** (job F4b, RESULTS.md 250; user decision): F4 passed `--ctl-log=1` to its controller and hill-climb arms, so its controller column is low by up to a few percent |
+| F4 | robustness: each policy ÷ the best fixed W per workload (controller, best single fixed W, Devastator's rule in Charades, Devastator's own window), and each policy's worst case | 2 | 181, 185 (frozen rule, quantile rule, fixed grids; 7 workloads, 4 and 16 nodes) | have (job F4b, RESULTS.md 251; F4's plan on the current tree without diagnostics, 3 reps; replaces F4 and F4R, 230 and 232): controller 0.92–1.03 per cell (median; 0.86–1.03 per rep), 0.96–1.03 in 13 of 14 cells, phase-changing PHOLD at 4 nodes 0.92; Devastator's rule in Charades 0.15–0.83; Devastator's own window 0.09–0.84 where it finished, not finishing on 3 cells (120 s cap on phase-changing PHOLD and σ 2,000 at 4 nodes; out of memory on lookahead 10 at 16 nodes in 2 of 3 reps); one PHOLD window 0.51–0.55; one count and digest per cell |
 | F5 | applications: traffic, dragonfly and VLSI (b19 × N) at 1–32 nodes, three engines | 3 | 168–172, 175, 177 (ports, counts, sizes); 188, 189, 194 (traffic and dragonfly, 1–32 nodes) | traffic and dragonfly have (2026-11-02; Charades ÷ Devastator 0.94–2.03 dragonfly, 1.02–1.08 traffic; ÷ ROSS 1.7–4.3, ROSS without its window); VLSI with eager commits at W 5,000 and the widened controller at 1–16 nodes (RESULTS.md 239: Charades ÷ Devastator 1.51 / 1.40 / 1.26 / 1.30 / 1.25, each at its best fixed arm; 1.46 / 1.33 / 1.24 / 1.32 / 1.26 with Charades' controller); 32 nodes to rerun in F1's job (old setting: 1.05, per rep 0.96–1.07, RESULTS.md 226) |
 | F6 | where a wider window's cost goes: blocked time and GVT wave period by W | 2, 4 | 176 (4/16 nodes), 184 (16/32 nodes) | have |
 | T2 | what scaling took: each fix and its gain | 4 | 21, 26, 24, 50, 88–90, 111, 161, 164, 152 | have; one table |
@@ -142,13 +143,14 @@ time without a reason written here first.
      - ROSS's window: 1.13–1.19× ROSS on traffic, 1.35–1.48× on dragonfly, where the best value is the grid's edge (5,000 ps; extend to 2,500 and 1,250). Charades ÷ ROSS with it: traffic 1.75–1.90, dragonfly 3.0–3.2 (1 and 4 nodes); F5's ratios were against ROSS without a window.
      - F4 designed (job F4, RESULTS.md 227; user decision 2026-11-05: prepare F4): job N's seven workloads at 4 and 16 nodes on the current tree; Charades' fixed W grid, frozen controller and Devastator's rule in Charades (`--ctl=2` from one bucket), against Devastator's fixed W grid and its own window, in one allocation. Submitted 2026-11-05 as 3684492 (skx-dev) and 3684493 (skx).
        - **Done (job F4, RESULTS.md 230).** Controller 0.83–1.03 of the best fixed W; its baselines fall to 0.13 (Devastator's rule in Charades), 0.09 or not finishing (Devastator's own window) and 0.52 (one PHOLD window). Every cell commits one count in both engines. Phase-changing PHOLD at 16 nodes, whose rep 2 was hit by an episode on the machine, was rerun clean (job F4R, RESULTS.md 232): controller 0.95–0.96, Devastator's rule in Charades 0.40–0.44.
+       - **Rerun without diagnostics (job F4b, RESULTS.md 251, 2026-11-07), replacing F4 and F4R:** controller 0.92–1.03 per cell (median of 3; 0.86–1.03 per rep); Devastator's rule in Charades 0.15; Devastator's own window 0.09 or not finishing (cap, or out of memory on lookahead 10 at 16 nodes); one PHOLD window 0.51; one count and digest per cell.
 5. **Engine freeze, 2026-12-07. Changed 2026-11-06 (user): no hard freeze; the paper-grade runs go now (RESULTS.md 240), and a later engine change means rerunning the cells it touches.**
    - **Defaults already set:** per-LP rollback, `--agg-pp-alloc=1`, ring input buffers, `numactl --localalloc` launch (Charades only), 23 LCI devices, `+mempool_remote_free`.
    - **Frozen 2026-11-01:** the controller (`--ctl=3`, bracketed; item 1). The pending heap fix (item 1a) is in.
 6. **Paper-grade runs: queued 2026-11-06 (RESULTS.md 240)**, not after a freeze. F1 at 1–32 nodes with ROSS's window calibrated first (done: RESULTS.md 241); F5's traffic and dragonfly at 1–32 with ROSS's window; VLSI at 32 with 16 nodes inside the 32-node allocation.
    - F1 at 1–32 nodes, three engines; 5 reps at 32.
    - F5 cells only where a change before the freeze touched the paths they use (item 3).
-   - F2 and F4 on the final defaults, if items 1–4 used earlier ones. F4: rerun in full on `charades-r5` without diagnostics (job F4b, RESULTS.md 250, queued 2026-11-07).
+   - F2 and F4 on the final defaults, if items 1–4 used earlier ones. F4: **done**, rerun in full on `charades-r5` without diagnostics (job F4b, RESULTS.md 250–251): controller 0.92–1.03 per cell.
 7. **Writing.**
    - Sections 1–5 in December, while the runs go.
    - Section 6 in January, finished by 2027-01-15, before the IPDPS revision.
@@ -174,8 +176,9 @@ Ratios: Charades ÷ the other (higher is better for Charades).
 - **VLSI, Charades ÷ Devastator** (§249, without diagnostics; replaces §239; eager commits at W 5,000, the widened controller; each at its best fixed arm, ratio of medians): 1.51 / 1.44 / 1.27 / 1.29 / 1.24 at 1 / 2 / 4 / 8 / 16 nodes; with Charades' controller 1.45 / 1.36 / 1.27 / 1.30 / 1.26, the controller at 0.94–1.02 of Charades' best fixed arm. 32 nodes: 1.05 on the old setting (§226), to be rerun in V32b. From 3 nodes up one PE (copy 2's node, rank 13) sets the pace in every engine (§234). Charades ÷ ROSS 14.9 at 32 nodes (old setting).
 - **The PADS'19 hold** (section 225): at most 1.02 of no hold with the fast path on (0.83–1.02), and 0.30–0.40 (PHOLD) and 0.67–0.72 (traffic) of deadline htram.
 - **Aggregation, deadline htram ÷ direct sends, each at its better fixed W** (job ABL, round 3; section 223): 2.11 / 2.85 / 3.31 / 1.44 at 4 nodes and 2.20 / 2.87 / 2.65 / 1.37 at 16 (σ 100 / σ 2,000 / uniform / traffic).
-- **Controller (frozen rule) ÷ best fixed W, 7 workloads at 4 and 16 nodes (job F4, section 230; current tree):**
-  - 0.83–1.03; 0.92–1.03 in 12 of 14 cells; phase-changing PHOLD 0.83–0.88 at 4 nodes, 0.95–0.97 at 16 (F4 rep 1 and job F4R, section 232);
-  - against, in the same job: Devastator's rule in Charades 0.13–0.84; Devastator's own window 0.09–0.83, not finishing within 120 s on phase-changing PHOLD and σ 2,000 at 4 nodes; one window for all PHOLD 0.52 (W 300) or 0.55 (W 100).
+- **Controller (frozen rule) ÷ best fixed W, 7 workloads at 4 and 16 nodes (job F4b, section 251; current tree, no diagnostics, median of 3 reps):**
+  - 0.92–1.03 per cell (0.86–1.03 per rep); 0.96–1.03 in 13 of 14 cells; phase-changing PHOLD 0.92 at 4 nodes (the cost of measuring), 0.96 at 16;
+  - against, in the same job: Devastator's rule in Charades 0.15–0.83; Devastator's own window 0.09–0.84 where it finished, and not finishing within 120 s on phase-changing PHOLD and σ 2,000 at 4 nodes, out of memory on lookahead 10 at 16 nodes in 2 of 3 reps; one window for all PHOLD 0.51 (W 300) or 0.55 (W 100).
+  - F4 (section 230) carried `--ctl-log=1`, which cost its controller up to 4%: 0.83–1.03 there.
   - Jobs M and N (sections 181, 185; older tree): 0.91–1.03; the quantile rule 0.31 on dragonfly.
-- **Charades ÷ Devastator, each at its best fixed W, on job F4's seven workloads** (round 3, short runs): 1.13–2.01 at 4 and 16 nodes.
+- **Charades ÷ Devastator, each at its best fixed W, on F4's seven workloads** (job F4b, section 251; round 3, short runs): 1.16–2.00 at 4 and 16 nodes.

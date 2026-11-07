@@ -26,8 +26,8 @@ Split on 2026-11-07 from one file of 11,400 lines and 249 sections; the text mov
 |---|---|---|
 | [results/phold.md](results/phold.md) | **PHOLD: performance and weak scaling.** Gaussian and uniform PHOLD in Charades, Devastator and ROSS: σ sweeps, full nodes, long runs, weak scaling from 1 to 32 nodes, and the paper runs F1. | 32 |
 | [results/applications.md](results/applications.md) | **Traffic and dragonfly.** The two applications ported from Charades to ROSS and Devastator (phase B), the traffic count fix, and the paper runs F5 at 1–32 nodes. | 15 |
-| [results/vlsi.md](results/vlsi.md) | **VLSI (b19 × N).** Gate-level simulation of copies of ITC'99's b19: the model and its layout, the gap to Devastator and how it closed, commits, and the paper's VLSI row. | 29 |
-| [results/controller.md](results/controller.md) | **The optimism-window controller.** Every controller design and test: the delay-quantile rule, the aggregation bound, the measured-cost rule and its freeze, where the best window lies at scale, robustness (F4), and the controller's own cost (CC). | 35 |
+| [results/vlsi.md](results/vlsi.md) | **VLSI (b19 × N).** Gate-level simulation of copies of ITC'99's b19: the model and its layout, the gap to Devastator and how it closed, commits, and the paper's VLSI row. | 30 |
+| [results/controller.md](results/controller.md) | **The optimism-window controller.** Every controller design and test: the delay-quantile rule, the aggregation bound, the measured-cost rule and its freeze, where the best window lies at scale, robustness (F4), and the controller's own cost (CC). | 37 |
 | [results/aggregation.md](results/aggregation.md) | **Aggregation through htram.** Message cost, htram's modes and buffers, the deadline flush policy, choosing htram automatically, input buffers, PP's allocation and start-up, flush timing, and F2 (htram against direct sends). | 34 |
 | [results/hold.md](results/hold.md) | **The PADS'19 hold (F3).** Mikida and Kale's hold of events past a cutoff, run as a baseline beside the window. | 2 |
 | [results/engine.md](results/engine.md) | **The engine: GVT, rollback and per-event cost.** What paces the bucketed GVT at scale, rollback depth and unit, the same-process fast path, and the rounds that closed Charades' per-event gap to Devastator. | 53 |
@@ -35,9 +35,20 @@ Split on 2026-11-07 from one file of 11,400 lines and 249 sections; the text mov
 | [results/baselines.md](results/baselines.md) | **ROSS and Devastator as baselines.** First runs and feasibility, ROSS's optimism window on PHOLD, and the Mac checks that both engines commit Charades' counts. | 3 |
 | [results/methods.md](results/methods.md) | **Methods.** How runs are made and checked: run length and warm-up, and the flag check that keeps diagnostics out of timing runs. | 3 |
 | [results/history.md](results/history.md) | The re-read of 2026-10-28 and the plan history | — |
-| [results/INDEX.md](results/INDEX.md) | Every section by number, with its date, job, status and file | 249 |
+| [results/INDEX.md](results/INDEX.md) | Every section by number, with its date, job, status and file | 252 |
 
 ## Current numbers
+
+**Robustness of the window policies** (job F4b, section 251; F4's seven workloads at 4 and 16 nodes, current tree, no diagnostics; each policy ÷ the best fixed W of the same engine and rep, median of 3 reps; higher is better):
+
+| policy | worst cell (median) | range over the 14 cells | where it fails |
+|---|---|---|---|
+| Charades' frozen controller | 0.92 | 0.92–1.03 (0.86–1.03 per rep); 0.96–1.03 in 13 of 14 | phase-changing PHOLD at 4 nodes (the cost of measuring) |
+| Devastator's rule in Charades | 0.16 | 0.16–0.81 | σ 2,000 at 16 nodes; at most 0.46 on any PHOLD workload |
+| Devastator's own window | did not finish | 0.09–0.84 where it finished | 120 s cap on phase-changing PHOLD and σ 2,000 at 4 nodes; out of memory on lookahead 10 at 16 nodes (2 of 3 reps); 0.09 on uniform at 4 nodes |
+| one fixed window for the five PHOLD workloads | 0.51 (W 300), 0.55 (W 100) | | lookahead 10 (W 300), σ 100 (W 100) |
+
+Every cell commits one count in both engines and one Charades digest, as F4. Charades ÷ Devastator, each at its best fixed W, is 1.16–2.00 on these short runs.
 
 > **Being replaced (F5 on the final defaults, sections 240, 247).** 1–16 nodes are done without diagnostics (section 248): Charades ÷ Devastator 1.08 / 1.18 / 1.46 / 1.91 / 2.04 (dragonfly; 8 nodes 1.70 against Devastator's fastest rep) and 1.27 / 1.25 / 1.24 / 1.26 / 1.28 (traffic), ahead in all 10 cells; Charades ÷ ROSS with its window 2.93–3.13 (dragonfly) and 1.85–2.21 (traffic). The table below is rewritten when F5-32b adds the 32-node column.
 

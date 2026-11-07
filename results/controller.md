@@ -21,14 +21,11 @@ Every controller design and test: the delay-quantile rule, the aggregation bound
 | 182 | 2026-11-01 | design | The measured rule's last change: a trial must beat the base on both sides of it; job N |
 | 184 | 2026-11-01 | current | Job L32 results: at 32 nodes the lowest blocked share again marks the best fixed W (W 400 for σ 100 and σ 2… |
 | 185 | 2026-11-01 | current | Job N results: the bracketed measured rule is 0.91–1.03 of the best fixed W in every cell (worst 0.91, agai… |
-| 227 | 2026-11-05 | design (results in 230) | F4, robustness of the window policies: Charades' fixed windows, its frozen controller and Devastator's rule… |
-| 230 | 2026-11-05 | current | F4 results: Charades' frozen controller is 0.83–1.03 of the best fixed W, with phase-changing PHOLD at 4 no… |
-| 231 | 2026-11-05 | design (results in 232) | F4's phase-changing PHOLD cell at 16 nodes, rerun |
-| 232 | 2026-11-05 | current | F4R results: phase-changing PHOLD at 16 nodes reruns clean; the controller is 0.95–0.96 of the best fixed W… |
 | 237 | 2026-11-06 | current | The measured controller's trials reach two buckets: `--ctl-reach-buckets=2`, and checks that it changes no… |
 | 245 | 2026-11-06 | design | Where the controller's 3–7% goes |
 | 246 | 2026-11-06 | current | CC results: without its per-round log the controller runs at 0.970–0.985 of the best fixed W. The log itsel… |
-| 250 | 2026-11-07 | design | F4 rerun without diagnostics: the robustness comparison on the current tree, with F4's three flags only in… |
+| 250 | 2026-11-07 | design (results in 251) | F4 rerun without diagnostics: the robustness comparison on the current tree, with F4's three flags only in… |
+| 251 | 2026-11-07 | current | F4b results: without diagnostics the frozen controller is 0.92–1.03 of the best fixed W per cell (median of… |
 | 6 | 2026-10-20 | design | Window controller |
 | 7 | 2026-10-20 | superseded | Window controller, first Stampede3 results |
 | 8 | 2026-10-20 | superseded | Waste floor, controller cost, horizon margin |
@@ -40,6 +37,10 @@ Every controller design and test: the delay-quantile rule, the aggregation bound
 | 32 | 2026-10-22 | superseded | Phase-changing PHOLD and traffic, results |
 | 33 | 2026-10-22 | design | Devastator's own window on phase-changing PHOLD |
 | 34 | 2026-10-22 | superseded | Devastator's own window on phase-changing PHOLD, results |
+| 227 | 2026-11-05 | design (results in 230) | F4, robustness of the window policies: Charades' fixed windows, its frozen controller and Devastator's rule… |
+| 230 | 2026-11-05 | superseded by §251 (was: current) | F4 results: Charades' frozen controller is 0.83–1.03 of the best fixed W, with phase-changing PHOLD at 4 no… |
+| 231 | 2026-11-05 | design (results in 232) | F4's phase-changing PHOLD cell at 16 nodes, rerun |
+| 232 | 2026-11-05 | superseded by §251 (was: current) | F4R results: phase-changing PHOLD at 16 nodes reruns clean; the controller is 0.95–0.96 of the best fixed W… |
 
 ## Current
 
@@ -1054,205 +1055,6 @@ The sizes are job M's. That makes 31 runs per rep and node count, 124 in all, ab
   - Devastator's own adaptive window on the PHOLD workloads;
   - the frozen rule at 32 nodes (F1's runs; section 184's W 400 question).
 
-### §227 · F4, robustness of the window policies: Charades' fixed windows, its frozen controller and Devastator's rule in Charades, against Devastator's fixed windows and its own adaptive window, on seven workloads at 4 and 16 nodes (job F4 design, 2026-11-05; written before any runs)
-
-> **Status: design.** PAPER.md item 4, figure F4. User decisions 2026-11-05: prepare F4; submit it. Submitted as 3684492 (skx-dev) and 3684493 (skx); the later starter is cancelled.
-> - **Script:** `$WORK/charades-runs/f4227.slurm` (copy in `~/charades-data/f4/`), skx-dev, 16 nodes, 1 h 50 min.
-> - **Code:** charades 8a34d51, tree `charades-f3` (built for job F3R): round 3 and every default since, on `charm-pads-perf`. No code change for this job.
-> - **Mac check on this code:** change tier 63/63 on Simple PHOLD, traffic and dragonfly with `ctl_hill`, `ctl_hill_shared` and `agg_ctl_measured_bucket_pp`. One Mac run of the hill climb from one bucket (PHOLD σ 100, htram PP, 2 processes × 4 PEs) commits the right count, and its window doubles from 8 to about 310 within 21 control rounds, then reaches the end time in the run's last rounds.
-> - **Devastator:** the binaries of the earlier comparisons (phold-gauss 2026-10-22/24, with the phase options; traffic and dragonfly 2026-11-01), 2 × 23, `--rng=clcg4`, without `numactl` (it gained nothing there, section 166).
-
-**Why all of Charades' arms run again.** Jobs M and N (sections 181, 185) measured the fixed windows and the frozen controller on the paper's older tree (e1fbdc4). Round 3 runs PHOLD 1.16–1.18× faster (section 215), so the best fixed W may have moved. Each ratio in F4 is a policy ÷ the best fixed W of the same engine, rep and allocation, so the fixed grid, the controller and Devastator's rule all run here, on the tree the paper's runs will use.
-
-**The two baselines, as each engine runs them:**
-- **Devastator's own window** (`global_status_state::update()` in `src/devastator/pdes.cxx`):
-  - It starts at 1 time unit and changes once per GVT round.
-  - The efficiency is committed ÷ executed events, summed over the last 16 GVT rounds.
-  - Below 0.33 the window is quartered, below 0.66 halved, and above 0.95 doubled.
-  - Otherwise it moves by 1%, keeping its direction while the 16-round committed total rises and reversing when it falls.
-  - It is clamped to [1, 2⁵⁸]; `deva_static_look_dt=<W>` fixes it instead.
-- **Devastator's rule in Charades** (`--ctl=2`, `hill_climb_window` in `src/scheduler/controller.C`):
-  - The same thresholds, over the same 16-round average.
-  - It changes once per control round (8 count waves).
-  - In the 1% band it steps up if this round committed more events than the last, and down if fewer.
-  - **Start:** one bucket, the smallest window the controller allows under the bucketed GVT (Devastator starts at 1).
-  - **Cadence:** deciding after every GVT update, the literal transplant, was worse in Charades (0.10–0.17 of the best fixed W, section 7; again section 15), so this job runs the per-round variant, the better of the two.
-- **Earlier results** (older stacks; F4 replaces them):
-  - Devastator's own window ÷ its best fixed W: 0.92–0.95 on traffic and dragonfly at 1 node, 0.80–0.83 on dragonfly and 0.28–0.33 on traffic at 4 nodes (section 187); 0.06–0.28 on PHOLD at σ ≥ 1,000 (an older stack); 0.70–0.77 on phase-changing PHOLD at 8 PEs per process (section 34), and on full nodes at 4 nodes it did not finish in 2 of 3 phase-changing runs (`~/charades-data/full/deva_phase_r0.5/`).
-  - The hill climb in Charades: 0.19–0.55 of the best fixed W with htram, 0.85–0.98 with direct sends (section 28).
-
-**Workloads** (job N's sizes and htram settings; Charades buckets of 8, dragonfly 1,000 ps; 128 LPs per PE or per Devastator worker, traffic 64 × 46·N intersections; Devastator runs the same models with the same parameters):
-
-| workload | Charades htram | end time | Charades fixed W | Devastator fixed W |
-|---|---|---|---|---|
-| phase-changing PHOLD (lookahead 10 / mean 200 and 100 / 1,000, alternating every 8,000; remote 0.5) | PP 512 | 1,024,000 | 50, 75, 100, 150, 250, 300 | 100, 250, 500 |
-| lookahead 10 / mean 200, σ 500 | PP 512 | 512,000 | 25, 50, 100, 300 | 100, 200, 400 |
-| σ 100 | PP 2,048 | 2,048,000 | 100, 200, 300, 400 | 500, 1,000, 2,000, 4,000 |
-| σ 2,000 | PP 512 | 2,048,000 | 100, 200, 300, 400 | 500, 1,000, 2,000 |
-| uniform | WPs 512 | 2,048,000 | 100, 200, 300, 400 | 250, 500, 1,000, 2,000 |
-| traffic (16 cars per intersection, trip radius 3) | PP 2,048 | 6,000,000 | 500, 750, 1,000 | 1,000, 2,000, 4,000 |
-| dragonfly (16 / 10 at 4 nodes, 28 / 14 at 16; arrival 500 ns, generating 150,000 ns) | WPs 512 | 160,000,000 ps | 10,000, 20,000, 40,000 | 10,000, 20,000, 40,000 |
-
-- **Charades' grids** bracket job N's best fixed W in every workload (it was at the grid's edge on dragonfly, 20,000, and on lookahead 10, 50). W 100 and W 300 run on every PHOLD workload, so one window for all five can be judged from this job.
-- **Devastator's grids** bracket its best W in jobs A2r and F5 (sections 142–143: σ 100 1,000–2,000, σ 2,000 1,000, uniform 500–1,000, lookahead 10 200; section 187: traffic 2,000, dragonfly 10,000–20,000; section 34: phase-changing 250).
-- **Policy arms:** Charades' frozen controller (`mb:0`) and Devastator's rule in Charades (`hill:<one bucket>`); Devastator's own window (`adaptive`).
-
-**Runs.** Launch as in job N: 2 × 23, pemap, 23 LCI devices, `+mempool_remote_free`, `numactl --localalloc`, `--blocked-time=1 --ctl-log=1 --commit-digest=1`. 2 reps, arm and workload order reversed in rep 2. Cap 180 s per Charades run, 120 s per Devastator run.
-1. **Gate**, 2 nodes: change tier on Simple PHOLD, traffic and dragonfly with `ctl_hill`, `agg_ctl_measured_bucket_pp` and `bucket_window`.
-2. **4 nodes**, four streams side by side:
-   - nodes 0–3: Charades on phase-changing PHOLD, lookahead 10, σ 100, σ 2,000;
-   - nodes 4–7: Charades on uniform, traffic, dragonfly;
-   - nodes 8–11 and 12–15: Devastator, the same split.
-3. **16 nodes:** per rep, every Charades arm, then every Devastator arm (Devastator first in rep 2). Devastator's adaptive window and Charades' hill climb run at 16 nodes only on workloads where every 4-node run of that arm finished.
-- About 72 runs per rep and node count (42 Charades, 30 Devastator), 288 in all; estimate 50–70 minutes.
-
-**Measures:** M committed ev/s; each policy ÷ the best fixed W of the same engine and rep; the controller's and the hill climb's mean and final W; Devastator's mean window (`window_mean`) and efficiency; blocked share; committed counts and digests.
-
-**Predictions:**
-- **F4-1 (counts):** within each workload and node count, every finished run of either engine commits the same count, and Charades' runs share one digest.
-- **F4-2:** the frozen controller is 0.90–1.03 of Charades' best fixed W in all 14 cells (job N: 0.91–1.03). Phase-changing PHOLD stays its weakest workload, at most 0.95.
-- **F4-3:** Charades' best fixed W is job N's in at least 10 of 14 cells (phase-changing 100, lookahead 10 50, the lookahead-100 PHOLD workloads 300, traffic 500, dragonfly 20,000). A new grid point beats job N's best by more than 3% in at most 3 cells.
-- **F4-4:** Devastator's rule in Charades has a worst cell of at most 0.6 of the best fixed W, and is at most 0.6 on at least three of the five PHOLD workloads.
-  - With htram, a rolled-back event costs many committed ones, so its efficiency targets (doubling above 95%) overshoot (section 28).
-  - On dragonfly, whose rollback level is about 3% at every W (section 179), its 16-round efficiency stays above 0.95, so its W doubles to the end time in every run.
-- **F4-5:** Devastator's own window is at most 0.85 of Devastator's best fixed W on at least 4 of the 7 workloads at 16 nodes. Its worst case, counting runs that do not finish within the cap, is at most 0.35. At least one workload's adaptive runs do not finish at 4 nodes.
-- **F4-6:** no single window serves the five PHOLD workloads. W 100 is at most 0.7 of the best fixed W on at least one lookahead-100 workload, and W 300 at most 0.7 on lookahead 10 or phase-changing PHOLD.
-
-**What follows:**
-- F4 is built from this job: for each engine and workload, each policy ÷ that engine's best fixed W, and each policy's worst case.
-- If F4-2 fails (any cell under 0.90), read the `CTL` logs for where W went before writing claim 2. The controller stays frozen.
-- If Devastator's rule in Charades does well (F4-4 wrong), the paper says so; claim 2 then rests on the worst case against Devastator's own window and any single fixed W.
-
-### §230 · F4 results: Charades' frozen controller is 0.83–1.03 of the best fixed W, with phase-changing PHOLD at 4 nodes its weakest cell; Devastator's rule in Charades falls to 0.13; Devastator's own window falls to 0.09 and does not finish on two workloads; one window for all PHOLD falls to 0.52; every cell commits one count in both engines (2026-11-05; skx-dev batch job 3684492, 16 nodes)
-
-> **Status: current.** Design and predictions in section 227. The episode cell (phase-changing PHOLD, 16 nodes, rep 2) is replaced by job F4R's three reps (section 232): controller 0.95–0.96, Devastator's rule in Charades 0.40–0.44.
-> - **Job:** 51 minutes; gate 63/63 (skx copy 3684493 cancelled before it started).
->   - Every Charades run finished.
->   - Devastator's own window did not finish within the 120 s cap on phase-changing PHOLD and σ 2,000 at 4 nodes, in both reps, so it was skipped there at 16 nodes. Every other Devastator run finished.
-> - **Data:** `~/charades-data/f4/f4227/j3684492/` (with `job.out`; `gvt_*.out` and digest files not copied); `f4_summary.py`, output `f4_summary.txt`, in `~/charades-data/f4/`.
-> - **Counts (F4-1 right):** in each of the 14 cells, every finished run of both engines commits one count, and Charades' runs share one digest.
-> - **One cell was hit by an episode on the machine:** phase-changing PHOLD at 16 nodes, rep 2, the job's last block (described below). Ratios from it are marked †, and the worst cases are given with and without it.
-
-**Each policy ÷ the best fixed W of the same engine and rep** (rep 1 / rep 2; M committed ev/s in parentheses; higher is better; mean W of Charades' controller in parentheses; fixed W in the model's time unit, dragonfly in ps):
-
-| workload | nodes | Charades' best fixed W (M ev/s) | Charades' controller (mean W) | Devastator's rule in Charades | Devastator's best fixed W (M ev/s) | Devastator's own window |
-|---|---|---|---|---|---|---|
-| phase-changing PHOLD | 4 | 75 (136.6 / 134.6) | **0.88 / 0.83** (118, 156) | 0.29 / 0.29 | 250 (99.4 / 96.8) | did not finish (< 0.09) |
-| | 16 | 100 / 75 (370.6 / 346.3) | 0.97 / 0.13† (108, 371) | 0.41 / 0.11† | 250 (273.1 / 285.4) | not run |
-| lookahead 10, σ 500 | 4 | 50 (161.2 / 162.5) | 0.96 / 0.96 (61, 61) | 0.51 / 0.41 | 200 / 100 (143.3 / 132.4) | 0.72 / 0.77 |
-| | 16 | 50 (636.1 / 628.9) | 0.98 / 0.98 (65, 62) | 0.31 / 0.29 | 200 (499.8 / 507.2) | 0.60 / 0.66 |
-| σ 100 | 4 | 300 (203.4 / 208.1) | 0.95 / 0.94 (316, 322) | 0.32 / 0.37 | 1,000 / 500 (167.7 / 168.0) | 0.70 / 0.62 |
-| | 16 | 300 / 400 (826.1 / 834.5) | 0.95 / 0.94 (366, 369) | 0.34 / 0.37 | 1,000 (658.1 / 660.4) | 0.38 / 0.40 |
-| σ 2,000 | 4 | 300 (158.1 / 156.9) | 0.95 / 0.93 (318, 315) | 0.32 / 0.41 | 1,000 (99.4 / 98.9) | did not finish (< 0.06) |
-| | 16 | 400 / 300 (612.2 / 605.0) | 0.98 / 0.99 (374, 367) | 0.17 / 0.13 | 1,000 (365.3 / 367.6) | not run |
-| uniform | 4 | 300 (136.1 / 134.9) | 0.95 / 0.94 (311, 309) | 0.23 / 0.20 | 500 (67.7 / 67.5) | 0.17 / 0.13 |
-| | 16 | 300 / 400 (388.8 / 389.0) | 0.98 / 0.98 (367, 348) | 0.23 / 0.25 | 1,000 (194.3 / 194.6) | 0.55 / 0.56 |
-| traffic | 4 | 500 (291.9 / 288.1) | 0.95 / 0.96 (548, 546) | 0.59 / 0.62 | 2,000 (233.3 / 232.0) | 0.29 / 0.37 |
-| | 16 | 750 (1,140.1 / 1,169.7) | 0.92 / 0.94 (883, 732) | 0.62 / 0.61 | 2,000 (893.0 / 910.4) | 0.09 / 0.22 |
-| dragonfly | 4 | 20,000 (120.7 / 120.9) | 1.03 / 1.03 (14,620, 14,234) | 0.84 / 0.80 | 20,000 (86.2 / 87.9) | 0.81 / 0.80 |
-| | 16 | 20,000 (409.2 / 409.4) | 1.02 / 1.03 (16,103, 14,064) | 0.82 / 0.79 | 20,000 (212.6 / 211.8) | 0.83 / 0.83 |
-
-("Did not finish (< x)": the run did not end within 120 s, so its rate is below the committed count ÷ 120 s, which is x of Devastator's best. † the episode.)
-
-**Worst case over the 28 rep-cells** (lowest; higher is better):
-
-| policy | worst case without the episode rep | with it |
-|---|---|---|
-| Charades' frozen controller | **0.83** (phase-changing PHOLD, 4 nodes) | 0.13 |
-| Devastator's rule in Charades | 0.13 (σ 2,000, 16 nodes) | 0.11 |
-| Devastator's own window | did not finish (< 0.06; σ 2,000, 4 nodes); 0.09 among runs that finished (traffic, 16 nodes) | the same |
-| one window for the five PHOLD workloads | W 100: 0.55 (σ 100, 16 nodes); W 300: 0.52 (lookahead 10, 16 nodes) | W 300: 0.26 |
-
-- **The controller is 0.92–1.03 in 12 of the 14 cells.** On phase-changing PHOLD it is 0.83–0.88 at 4 nodes, and 0.97 in the 16-node rep that the episode did not hit.
-  - At 4 nodes round 3 moved the best fixed W from 100 (job N) to 75. The controller's mean W is 118–156, and it runs below even W 150 held fixed (0.92–0.94).
-  - So, as in job N, the loss is the cost of measuring: half its periods run at a trial W, and every change of W leaves a transient.
-- **Devastator's rule in Charades** reaches 0.11–0.84.
-  - It settles at 70–88% efficiency, with mean windows 5–66× the best on PHOLD and traffic (σ 100: 3,353–12,507 against 300; dragonfly 1.3–1.4×).
-  - Its rule doubles W while efficiency is above 95% and moves it only 1% per round between 66% and 95%. Charades' best fixed windows commit 99.5–100% of the events they execute (dragonfly 92–95%), so the rule's band sits far from where Charades runs best.
-  - On dragonfly it is 0.79–0.84 at 75–79% efficiency. Its W did not run to the end time (mean 25,404–27,439 ps; final 29,032–166,744).
-- **Devastator's own window** reaches 0.09–0.83 where it finished.
-  - On lookahead 10 and σ 100 it runs to its 2⁵⁸ clamp (mean window 1.3–2.6 × 10¹⁷) at 61–85% efficiency.
-  - On uniform it stays finite (mean 570–780) at 46–74% efficiency.
-  - On phase-changing PHOLD and σ 2,000 at 4 nodes it did not finish within 120 s, where its best fixed W takes 7–11 s.
-- **Charades across engines** (each at its best fixed W, same allocation, job N's short sizes, round 3): Charades ÷ Devastator is 1.13–2.01 in all 14 cells. Charades' controller ÷ Devastator's best fixed W is 1.08–1.99 (without †), and ÷ Devastator's own window 1.49–14.3 where that window finished.
-
-**The episode (phase-changing PHOLD, 16 nodes, rep 2).** It was the job's last block, about 11:25–11:31.
-- **The waves:** every arm made extra count waves that advanced nothing: 1.07–1.56 waves per GVT advance at fixed W (2.2 for the controller). Every other fixed-W run of the job made 1.00–1.03, except W 25 on lookahead 10 (1.33 in every rep and node count) and dragonfly W 10,000 at 4 nodes in rep 1 (1.09).
-- **The windows:** the wider the window, the worse it was. W 50–100 lost 6–15% against rep 1, W 150 24%, W 250 and 300 66–72%. The controller (mean W 371 against 108 in rep 1) and the hill climb, which ran first in the block, lost most.
-- **When:** the slowness came in bursts in the middle of runs. W 300 took 8–12 s in three tenths of its advances, against 1.3 s per tenth throughout rep 1. W 250 slowed in its last four tenths.
-- **Reading:** a slow period on the machine, amplified by rollbacks at wide windows. An after-effect of the preceding hill-climb run (3.7 billion events rolled back) would have shown at the start of each run and faded instead.
-- Rep 1 of the same cell, at the job's start, ran evenly (1.00 waves per advance in every fixed-W arm).
-
-**Predictions (section 227):**
-- **F4-1 right.**
-- **F4-2 wrong in one cell:** the controller is 0.92–1.03 in 12 of 14 cells, and 0.83–0.88 on phase-changing PHOLD at 4 nodes (predicted at least 0.90). Phase-changing PHOLD is its weakest workload, as predicted. The 16-node rep 2 is the episode.
-- **F4-3 right:** the best fixed W is job N's in 12 of 14 cells. The exceptions are phase-changing PHOLD at 4 nodes (75, not 100) and traffic at 16 nodes (750, not 500; W 750 was in job N's grid). The new grid points never beat job N's best by more than 2%.
-- **F4-4 mostly right:** the hill climb's worst cell is 0.13, and it is at most 0.6 on all five PHOLD workloads. On dragonfly its W did not double to the end time: it ran at 75–79% efficiency, not above 95%.
-- **F4-5 right:** at 16 nodes Devastator's own window is at most 0.83 in all five cells where it ran. Its worst case is under 0.06, and two workloads did not finish at 4 nodes.
-- **F4-6 right:** W 100 falls to 0.55 (σ 100) and W 300 to 0.52 (lookahead 10).
-
-**What follows:**
-- **Claim 2's number changes** on the current tree: the frozen controller is 0.83–1.03 of the best fixed W, not 0.91–1.03 (jobs M and N, older tree). Its baselines' worst cases are 0.13 (Devastator's rule in Charades), did not finish (Devastator's own window) and 0.52–0.55 (any single PHOLD window).
-- **Phase-changing PHOLD at 16 nodes was rerun** (job F4R, section 232): 0.95–0.96 for the controller in three clean reps.
-
-### §231 · F4's phase-changing PHOLD cell at 16 nodes, rerun (job F4R design, 2026-11-05; written before any runs)
-
-> **Status: design.** User decision 2026-11-05: rerun the cell whose rep 2 was hit by an episode on the machine (section 230). Submitted as 3685047 (skx-dev) and 3685048 (skx); the later starter is cancelled.
-> - **Script:** `$WORK/charades-runs/f4r231.slurm` (copy in `~/charades-data/f4/`), skx-dev plus an skx copy, 16 nodes, 30 minutes.
-> - **Code:** as in F4: tree `charades-f3` (8a34d51), job F4's launch and sizes.
-
-**Runs:** phase-changing PHOLD (lookahead 10 / mean 200 and 100 / 1,000 alternating every 8,000; remote 0.5), htram PP 512, end 1,024,000, 16 nodes. Charades' arms only:
-- W 50, 75, 100, 150, 250 and 300;
-- the frozen controller (`mb:0`);
-- Devastator's rule in Charades (`hill:8`).
-3 reps, arm order reversed in rep 2. Gate: the change tier on 2 nodes (Simple PHOLD, `ctl_hill` and `agg_ctl_measured_bucket_pp`).
-
-**Episode check, set before the runs:** a rep counts as disturbed if any fixed-W run in it makes more than 1.03 count waves per GVT advance (section 230: 1.00–1.03 in every undisturbed fixed-W run except W 25). A disturbed rep is reported, and the cell's ratios are taken from the undisturbed reps.
-
-**Predictions:**
-- **R1:** every run commits F4's count, 4,096,302,492, with one digest.
-- **R2:** no rep is disturbed.
-- **R3:** the best fixed W is 75 or 100, and the controller is 0.90–1.00 of it in every rep (F4 rep 1: 0.97; job N: 0.93–0.95).
-- **R4:** Devastator's rule in Charades is 0.3–0.5 of the best fixed W (F4 rep 1: 0.41).
-
-**What follows:** the undisturbed reps replace F4's 16-node phase-changing cell in F4 and in PAPER.md's numbers.
-
-### §232 · F4R results: phase-changing PHOLD at 16 nodes reruns clean; the controller is 0.95–0.96 of the best fixed W (W 100) and Devastator's rule in Charades 0.40–0.44; F4's disturbed rep was the machine (2026-11-05; skx-dev batch job 3685047, 16 nodes)
-
-> **Status: current.** Design and predictions in section 231.
-> - **Job:** 10 minutes; gate 12/12. The skx copy 3685048 was cancelled before it started.
-> - **Data:** `~/charades-data/f4/f4r231/j3685047/`; `f4r_summary.py`, output `f4r_summary.txt`, in `~/charades-data/f4/`.
-
-**Phase-changing PHOLD, 16 nodes** (M committed ev/s; ÷ the best fixed W of the same rep, higher is better; count waves per GVT advance, lower is better):
-
-| arm | rep 1 | rep 2 | rep 3 | waves per advance |
-|---|---|---|---|---|
-| W 50 | 338.2 (0.90) | 332.7 (0.91) | 336.9 (0.92) | 1.000 |
-| W 75 | 371.1 (0.99) | 358.8 (0.98) | 363.8 (0.99) | 1.000–1.002 |
-| **W 100** | **374.8** | **367.4** | **366.0** | 1.000 |
-| W 150 | 358.8 (0.96) | 363.3 (0.99) | 346.6 (0.95) | 1.000–1.009 |
-| W 250 | 332.5 (0.89) | 334.1 (0.91) | 332.9 (0.91) | 1.000 |
-| W 300 | 322.8 (0.86) | 317.3 (0.86) | 316.8 (0.87) | 1.000 |
-| controller (mean W) | 358.6 (**0.96**; 107) | 349.1 (**0.95**; 112) | 349.8 (**0.96**; 102) | 1.026–1.043 |
-| Devastator's rule in Charades (efficiency) | 150.9 (0.40; 75.1%) | 146.6 (0.40; 73.9%) | 161.1 (0.44; 76.5%) | 1.053–1.080 |
-
-- **Counts (R1 right):** all 24 runs commit 4,096,302,492, F4's count, with one digest (c8e86881…).
-- **No rep is disturbed (R2 right):** every fixed-W run makes 1.000–1.009 waves per advance.
-- **It reproduces F4's undisturbed rep 1** within 1–2%: W 100 367–375 against 370.6, the controller 349–359 against 358.9 (0.97).
-- **The disturbed rep was the machine, not the run order.** Rep 2 here ran its arms in the order of F4's disturbed rep 2: the hill climb first (1.4 billion events rolled back), then the controller, W 300 and W 250. It is clean. W 300 ran at 317.3 M ev/s against 89.3, and W 250 at 334.1 against 112.2.
-
-**Predictions (section 231):**
-- **R1 right.**
-- **R2 right.**
-- **R3 right:** the best fixed W is 100 in every rep; the controller is 0.95–0.96.
-- **R4 right:** Devastator's rule in Charades is 0.40–0.44.
-
-**What follows: F4's 16-node phase-changing cell** is F4's rep 1 and these three reps.
-- Controller: 0.95–0.97 of the best fixed W.
-- Devastator's rule in Charades: 0.40–0.44.
-- W 300 as the one PHOLD window: 0.86–0.87.
-- Section 230's worst cases without the episode rep stand: controller 0.83 (phase-changing PHOLD, 4 nodes), Devastator's rule in Charades 0.13, one PHOLD window 0.52.
-
 ### §237 · The measured controller's trials reach two buckets: `--ctl-reach-buckets=2`, and checks that it changes no earlier controller result (2026-11-06; Mac)
 
 > **Status: current.** User decision 2026-11-06 (section 236): widen the controller's trial range so that it can reach W 5,000 on VLSI. This is a change to the controller frozen on 2026-11-01.
@@ -1418,7 +1220,7 @@ In both it rolls back under 0.5% of events.
 
 ### §250 · F4 rerun without diagnostics: the robustness comparison on the current tree, with F4's three flags only in a check arm (job F4b design, 2026-11-07; written before any runs)
 
-> **Status: design.**
+> **Status: design (results in 251).**
 > - **User decision 2026-11-07:** rerun F4 in full without the log (sections 246, 249).
 > - **Submitted 2026-11-07:** 3691176 (skx-dev) and 3691177 (skx; the skx-dev copy reads 3691177 from `f4b250/f4b250.twin`).
 >   - A first pair, 3691173 / 3691174, was cancelled 2 minutes after 3691173 started. Its batch node, c454-004, reported "/work2 is mounted not FULL nor IDLE", and the script's first read of the Devastator tree hung in Lustre I/O wait there.
@@ -1499,6 +1301,103 @@ The GVT progress print stays at its default, as in every paper run (its cost was
 **What follows:**
 - The results replace sections 230 and 232 (F4, F4R) as the robustness figure and claim 2's numbers in PAPER.md.
 - If F4b-2 holds, phase-changing PHOLD at 4 nodes stays the controller's worst cell, and the paper states it as the limit.
+
+### §251 · F4b results: without diagnostics the frozen controller is 0.92–1.03 of the best fixed W per cell (median of 3 reps; 0.86–1.03 per rep), and 0.96–1.03 everywhere but phase-changing PHOLD at 4 nodes; its baselines fail as in F4: Devastator's rule in Charades falls to 0.15, Devastator's own window to 0.09 or does not finish (now also out of memory), one PHOLD window to 0.51; one count and one digest per cell (2026-11-07; skx-dev batch job 3691176, 16 nodes)
+
+> **Status: current.** Design and predictions in section 250. Replaces sections 230 and 232 (F4, F4R).
+> - **Job:** 66 minutes (07:36:53–08:42:51).
+>   - The gate passed, and the skx copy (3691177) was cancelled by the guard.
+>   - Every Charades timing and check run finished.
+>   - Devastator's own window is the only Devastator arm that failed (below).
+> - **Data:** `~/charades-data/f4/f4b250/j3691176/` (with `job.out`; digest files not copied). The summary is `f4b_summary.py` (arguments: this job, F4, F4R), with output in `f4b_summary.txt`, in `~/charades-data/f4/`. The departures below are also in `f4b250_notes.txt`.
+> - **Two departures from section 250:**
+>   - **The two 4-node Charades warm-ups failed** ("Argument parse error"). Both streams wrote the same config file at once, so every key appeared twice; the script gave the warm-up one name for both streams. Those two streams therefore started cold, as in F4. Timing runs were not affected, since each workload has its own directory.
+>   - **At 07:44:59 I removed the cap marker for Devastator's own window on uniform.** It had hit the 120 s cap at 4 nodes in rep 1, but it finished that cell in both F4 reps. Without the marker, the rule would also have dropped it in reps 2–3 and at 16 nodes. The cap rule was meant for windows that never finish (phase-changing PHOLD and σ 2,000 in F4).
+
+**Counts (F4b-1 right).** In each of the 14 cells, every finished run of both engines commits F4's count. Charades' `old` runs give one digest per cell, equal to F4's (F4R's on phase-changing PHOLD at 16 nodes).
+
+**Each policy ÷ the best fixed W of the same engine and rep.** Median of 3 reps, range in parentheses, F4's mean in brackets (F4R's on phase-changing PHOLD at 16 nodes). Fixed W is in the model's time unit, dragonfly in ps. Rates are M committed ev/s, medians. Higher is better.
+
+| workload | nodes | Charades' best fixed W (M ev/s) | Charades' controller | Devastator's rule in Charades | Devastator's best fixed W (M ev/s) | Devastator's own window | Charades ÷ Devastator, each at its best fixed W [F4] |
+|---|---|---|---|---|---|---|---|
+| phase-changing PHOLD | 4 | 75 (135.2) | **0.92** (0.86–0.93) [0.85] | 0.31 (0.29–0.32) | 250 (98.2) | did not finish in 120 s (< 0.09), rep 1; then skipped | 1.38 [1.38] |
+| | 16 | 75 / 100 (364.3) | 0.96 (0.96–0.99) [0.95] | 0.41 (0.41–0.42) | 250 (285.8) | not run (did not finish at 4 nodes) | 1.27 [1.32] |
+| lookahead 10, σ 500 | 4 | 50 (165.3) | 0.97 (0.97–0.98) [0.96] | 0.46 (0.40–0.49) | 200 (142.1) | 0.72 (0.68–0.73) | 1.16 [1.17] |
+| | 16 | 50 (641.5) | 1.00 (1.00–1.01) [0.98] | 0.27 (0.27–0.30) | 200 (510.9) | out of memory in reps 1 and 2; 0.62 in rep 3 | 1.26 [1.26] |
+| σ 100 | 4 | 300 (211.9) | 0.97 (0.95–0.98) [0.95] | 0.32 (0.32) | 500 (168.4) | 0.66 (0.52–0.71) | 1.26 [1.23] |
+| | 16 | 300 (837.0) | 0.96 (0.95–0.97) [0.95] | 0.33 (0.29–0.43) | 1,000 (661.8) | 0.41 (0.35–0.42) | 1.26 [1.26] |
+| σ 2,000 | 4 | 300 (161.3) | 0.97 (0.96–0.97) [0.94] | 0.30 (0.26–0.31) | 1,000 (99.9) | did not finish in 120 s (< 0.06), rep 1; then skipped | 1.61 [1.59] |
+| | 16 | 300 / 400 (614.1) | 0.99 (0.99–1.00) [0.98] | 0.16 (0.15–0.16) | 1,000 (371.1) | not run | 1.65 [1.66] |
+| uniform | 4 | 300 (136.5) | 0.96 (0.96–0.98) [0.94] | 0.18 (0.16–0.35) | 500 (68.3) | 0.09 in reps 2–3 (115–117 s); rep 1 hit the 120 s cap | 2.00 [2.00] |
+| | 16 | 300 (387.7) | 0.99 (0.98–1.00) [0.98] | 0.24 (0.20–0.26) | 1,000 (195.7) | 0.61 (0.56–0.62) | 1.98 [2.00] |
+| traffic | 4 | 500 (299.5) | 0.96 (0.95–0.97) [0.95] | 0.61 (0.56–0.61) | 2,000 (233.6) | 0.28 (0.25–0.49) | 1.28 [1.25] |
+| | 16 | 750 (1,185.0) | 0.98 (0.97–1.01) [0.93] | 0.60 (0.60–0.62) | 2,000 (912.7) | 0.19 (0.18–0.22) | 1.30 [1.28] |
+| dragonfly | 4 | 20,000 (122.7) | 1.03 (1.03) [1.03] | 0.81 (0.79–0.83) | 20,000 (88.2) | 0.80 (0.77–0.81) | 1.39 [1.39] |
+| | 16 | 20,000 (416.0) | 1.01 (1.01–1.02) [1.03] | 0.79 (0.79–0.82) | 20,000 (214.8) | 0.84 (0.83–0.84) | 1.94 [1.93] |
+
+("< x": the run did not end within 120 s, so its rate is below the committed count ÷ 120 s, which is x of Devastator's best. "Out of memory": `std::bad_alloc` on several processes after 74–76 s.)
+
+**Worst case of each policy** (lowest; higher is better):
+
+| policy | worst rep | worst cell (median) | F4 (section 230) |
+|---|---|---|---|
+| Charades' frozen controller | 0.86 (phase-changing PHOLD, 4 nodes, rep 3) | **0.92** (phase-changing PHOLD, 4 nodes); 0.96–1.03 in the other 13 | 0.83 |
+| Devastator's rule in Charades | 0.15 (σ 2,000, 16 nodes) | 0.16 (σ 2,000, 16 nodes) | 0.13 |
+| Devastator's own window | did not finish: the cap on phase-changing PHOLD and σ 2,000 at 4 nodes (< 0.06–0.09), out of memory on lookahead 10 at 16 nodes in 2 of 3 reps; 0.09 among runs that finished (uniform, 4 nodes) | the same | did not finish (< 0.06); 0.09 among finished runs |
+| one window for the five PHOLD workloads | W 100: 0.55 (σ 100, 16 nodes); W 300: 0.51 (lookahead 10, 4 nodes) | | 0.55; 0.52 |
+
+**What F4's flags cost.** Each check run is the controller with F4's three flags, paired with the clean controller run of the same rep (median; higher means the flags cost less):
+
+| | phase-changing PHOLD | lookahead 10 | σ 100 | σ 2,000 | uniform | traffic | dragonfly |
+|---|---|---|---|---|---|---|---|
+| 4 nodes | 0.989 | 0.976 | 0.965 | 0.991 | 0.990 | 0.960 | 0.997 |
+| 16 nodes | 0.996 | 0.988 | 0.981 | 0.978 | 0.991 | 0.971 | 1.007 |
+
+- **The controller column moved, the fixed windows barely did.**
+  - Against F4, the controller's per-cell ratio is 0.98–1.08× F4's, and 1.01–1.05× in 11 of 14 cells.
+  - Charades' best fixed W runs at 0.986–1.033× F4's rate. The fixed arms lost `--blocked-time` and `--commit-digest`, and these runs are in another allocation.
+  - Devastator's best fixed W runs at 1.001–1.031× F4's.
+- **Phase-changing PHOLD at 4 nodes** rose from 0.85 to 0.92 (1.08×), more than the flags' cost there (0.989). Its reps spread 1.08: F4's 0.83 was its low rep, and this job's low rep is 0.86.
+- **Traffic at 16 nodes** rose from 0.93 to 0.98, in line with the flags' 0.971 plus F4's lower rep.
+
+**Devastator's own window.**
+- **Lookahead 10 at 16 nodes:** out of memory in 2 of 3 reps. In F4 it finished at 0.60–0.66 after running to its 2⁵⁸ clamp; here rep 3 finished at 0.62. Its window runs far ahead on that workload, and how far it gets before memory runs out varies from run to run.
+- **Uniform at 4 nodes:** 115–120 s, about 0.09 of its best (F4: 0.13–0.17).
+
+**Checks:**
+- **No rep is disturbed.** Two W 100 runs at 16 nodes in rep 1 made 1.05 count waves per GVT advance: uniform 1.049 and σ 100 1.053 (F4: 1.034 on σ 100). They ran at their other reps' rate (280.1 against 279.0–280.0 M ev/s, and 460.4 against 462.2–462.3), so at W 100 the 1.03 threshold is too tight. W 25 on lookahead 10 made 1.33, as in F4.
+- **Spread between reps:**
+  - Charades' best fixed W: 1.04 or less.
+  - The controller: 1.05 or less, except phase-changing PHOLD at 4 nodes (1.08).
+  - Devastator's best fixed W: 1.04 or less.
+- **The trial reach (section 237):** all 84 controller runs (timing and check) report 0 trials past it, so the reach changed no decision on these workloads.
+- **Devastator's rule in Charades** settles at 72–89% efficiency, with mean windows 1.3–113× the best fixed W, as in F4.
+
+**Predictions (section 250):**
+- **F4b-1 right.**
+- **F4b-2 mostly right:**
+  - Every cell is in its predicted range:
+    - lookahead 10, σ 100, σ 2,000, uniform and traffic 0.96–1.00;
+    - dragonfly 1.03 and 1.01;
+    - phase-changing PHOLD 0.92 at 4 nodes (the top of 0.84–0.92) and 0.96 at 16.
+  - The ratio to F4 falls outside 1.00–1.06 in two cells: phase-changing PHOLD at 4 nodes (1.08) and dragonfly at 16 nodes (0.98).
+- **F4b-3 right:** traffic 0.960 and 0.971; PHOLD 0.965–0.996; dragonfly 0.997 and 1.007.
+- **F4b-4 right:** 0.15–0.83. The worst cell is 0.16, and no PHOLD rep exceeds 0.49.
+- **F4b-5 mostly right:**
+  - Devastator's best fixed W is within 3.1% of F4's in every cell.
+  - Its own window did not finish on phase-changing PHOLD and σ 2,000 at 4 nodes, as predicted, and is 0.09–0.84 where it finished.
+  - Not predicted: out of memory on lookahead 10 at 16 nodes, and the cap in one uniform rep at 4 nodes.
+- **F4b-6 mostly right:** Charades ÷ Devastator is 1.16–2.00, and 0.96–1.03× F4's per cell (predicted 1.00–1.05×). Five cells are lower by at most 1%. Phase-changing PHOLD at 16 nodes is 0.96× F4's; F4's Charades rate there comes from F4R, another allocation.
+- **F4b-7 mostly right:** no rep is disturbed, but two W 100 runs exceed the threshold at normal rates. The reach changed no trial.
+
+**What follows:**
+- **Claim 2's numbers** (PAPER.md; replaces section 230):
+  - The frozen controller is 0.92–1.03 of the best fixed W per cell (median of 3 reps; 0.86–1.03 per rep), and 0.96–1.03 in 13 of 14 cells.
+  - Its weakest cell is phase-changing PHOLD at 4 nodes, where the loss is the cost of measuring. The paper states it as the limit.
+  - Its baselines' worst cases: Devastator's rule in Charades 0.15; Devastator's own window 0.09 or not finishing (the 120 s cap on two workloads, out of memory on a third); any one PHOLD window 0.51–0.55.
+- **Charades ÷ Devastator on these seven workloads** (each at its best fixed W, short runs) is 1.16–2.00, unchanged from F4 within 4%.
+- **F4's flags** (`--blocked-time --ctl-log --commit-digest`) cost the controller up to 4% (traffic and σ 100 at 4 nodes), consistent with sections 246 and 248.
+- **The script's warm-up bug:** if `f4b250.slurm` is reused, the warm-up needs a name per stream.
 
 ## Earlier
 
@@ -1946,3 +1845,206 @@ These reproduce job 3628935 (46.1 and 38.1; 1.08) within 1–2%.
 - **The controller's claim holds against the fair baseline.** On the same workload, each engine's adaptive policy against its own best fixed W: our controller is 1.09–1.10, Devastator's window 0.70–0.77. Its window leaves 1.3–1.4× on the table; ours gains 9–10% over any fixed W.
 - **Absolute throughput still favours Devastator** at its best fixed W (1.27–1.46× our controller). Its adaptive window, as shipped, is beaten by Charades' controller only at remote 1.0.
 - **Next, if the framing goes this way:** port the controller into Devastator (`global_status_state::update()`). It would need Devastator's own ε, since its best W runs at 94.5–98.5% efficiency where Charades' runs at about 99.7%. If it recovers most of the 1.3–1.4×, that is the cleanest evidence for the controller, independent of engine.
+
+### §227 · F4, robustness of the window policies: Charades' fixed windows, its frozen controller and Devastator's rule in Charades, against Devastator's fixed windows and its own adaptive window, on seven workloads at 4 and 16 nodes (job F4 design, 2026-11-05; written before any runs)
+
+> **Status: design.** PAPER.md item 4, figure F4. User decisions 2026-11-05: prepare F4; submit it. Submitted as 3684492 (skx-dev) and 3684493 (skx); the later starter is cancelled.
+> - **Script:** `$WORK/charades-runs/f4227.slurm` (copy in `~/charades-data/f4/`), skx-dev, 16 nodes, 1 h 50 min.
+> - **Code:** charades 8a34d51, tree `charades-f3` (built for job F3R): round 3 and every default since, on `charm-pads-perf`. No code change for this job.
+> - **Mac check on this code:** change tier 63/63 on Simple PHOLD, traffic and dragonfly with `ctl_hill`, `ctl_hill_shared` and `agg_ctl_measured_bucket_pp`. One Mac run of the hill climb from one bucket (PHOLD σ 100, htram PP, 2 processes × 4 PEs) commits the right count, and its window doubles from 8 to about 310 within 21 control rounds, then reaches the end time in the run's last rounds.
+> - **Devastator:** the binaries of the earlier comparisons (phold-gauss 2026-10-22/24, with the phase options; traffic and dragonfly 2026-11-01), 2 × 23, `--rng=clcg4`, without `numactl` (it gained nothing there, section 166).
+
+**Why all of Charades' arms run again.** Jobs M and N (sections 181, 185) measured the fixed windows and the frozen controller on the paper's older tree (e1fbdc4). Round 3 runs PHOLD 1.16–1.18× faster (section 215), so the best fixed W may have moved. Each ratio in F4 is a policy ÷ the best fixed W of the same engine, rep and allocation, so the fixed grid, the controller and Devastator's rule all run here, on the tree the paper's runs will use.
+
+**The two baselines, as each engine runs them:**
+- **Devastator's own window** (`global_status_state::update()` in `src/devastator/pdes.cxx`):
+  - It starts at 1 time unit and changes once per GVT round.
+  - The efficiency is committed ÷ executed events, summed over the last 16 GVT rounds.
+  - Below 0.33 the window is quartered, below 0.66 halved, and above 0.95 doubled.
+  - Otherwise it moves by 1%, keeping its direction while the 16-round committed total rises and reversing when it falls.
+  - It is clamped to [1, 2⁵⁸]; `deva_static_look_dt=<W>` fixes it instead.
+- **Devastator's rule in Charades** (`--ctl=2`, `hill_climb_window` in `src/scheduler/controller.C`):
+  - The same thresholds, over the same 16-round average.
+  - It changes once per control round (8 count waves).
+  - In the 1% band it steps up if this round committed more events than the last, and down if fewer.
+  - **Start:** one bucket, the smallest window the controller allows under the bucketed GVT (Devastator starts at 1).
+  - **Cadence:** deciding after every GVT update, the literal transplant, was worse in Charades (0.10–0.17 of the best fixed W, section 7; again section 15), so this job runs the per-round variant, the better of the two.
+- **Earlier results** (older stacks; F4 replaces them):
+  - Devastator's own window ÷ its best fixed W: 0.92–0.95 on traffic and dragonfly at 1 node, 0.80–0.83 on dragonfly and 0.28–0.33 on traffic at 4 nodes (section 187); 0.06–0.28 on PHOLD at σ ≥ 1,000 (an older stack); 0.70–0.77 on phase-changing PHOLD at 8 PEs per process (section 34), and on full nodes at 4 nodes it did not finish in 2 of 3 phase-changing runs (`~/charades-data/full/deva_phase_r0.5/`).
+  - The hill climb in Charades: 0.19–0.55 of the best fixed W with htram, 0.85–0.98 with direct sends (section 28).
+
+**Workloads** (job N's sizes and htram settings; Charades buckets of 8, dragonfly 1,000 ps; 128 LPs per PE or per Devastator worker, traffic 64 × 46·N intersections; Devastator runs the same models with the same parameters):
+
+| workload | Charades htram | end time | Charades fixed W | Devastator fixed W |
+|---|---|---|---|---|
+| phase-changing PHOLD (lookahead 10 / mean 200 and 100 / 1,000, alternating every 8,000; remote 0.5) | PP 512 | 1,024,000 | 50, 75, 100, 150, 250, 300 | 100, 250, 500 |
+| lookahead 10 / mean 200, σ 500 | PP 512 | 512,000 | 25, 50, 100, 300 | 100, 200, 400 |
+| σ 100 | PP 2,048 | 2,048,000 | 100, 200, 300, 400 | 500, 1,000, 2,000, 4,000 |
+| σ 2,000 | PP 512 | 2,048,000 | 100, 200, 300, 400 | 500, 1,000, 2,000 |
+| uniform | WPs 512 | 2,048,000 | 100, 200, 300, 400 | 250, 500, 1,000, 2,000 |
+| traffic (16 cars per intersection, trip radius 3) | PP 2,048 | 6,000,000 | 500, 750, 1,000 | 1,000, 2,000, 4,000 |
+| dragonfly (16 / 10 at 4 nodes, 28 / 14 at 16; arrival 500 ns, generating 150,000 ns) | WPs 512 | 160,000,000 ps | 10,000, 20,000, 40,000 | 10,000, 20,000, 40,000 |
+
+- **Charades' grids** bracket job N's best fixed W in every workload (it was at the grid's edge on dragonfly, 20,000, and on lookahead 10, 50). W 100 and W 300 run on every PHOLD workload, so one window for all five can be judged from this job.
+- **Devastator's grids** bracket its best W in jobs A2r and F5 (sections 142–143: σ 100 1,000–2,000, σ 2,000 1,000, uniform 500–1,000, lookahead 10 200; section 187: traffic 2,000, dragonfly 10,000–20,000; section 34: phase-changing 250).
+- **Policy arms:** Charades' frozen controller (`mb:0`) and Devastator's rule in Charades (`hill:<one bucket>`); Devastator's own window (`adaptive`).
+
+**Runs.** Launch as in job N: 2 × 23, pemap, 23 LCI devices, `+mempool_remote_free`, `numactl --localalloc`, `--blocked-time=1 --ctl-log=1 --commit-digest=1`. 2 reps, arm and workload order reversed in rep 2. Cap 180 s per Charades run, 120 s per Devastator run.
+1. **Gate**, 2 nodes: change tier on Simple PHOLD, traffic and dragonfly with `ctl_hill`, `agg_ctl_measured_bucket_pp` and `bucket_window`.
+2. **4 nodes**, four streams side by side:
+   - nodes 0–3: Charades on phase-changing PHOLD, lookahead 10, σ 100, σ 2,000;
+   - nodes 4–7: Charades on uniform, traffic, dragonfly;
+   - nodes 8–11 and 12–15: Devastator, the same split.
+3. **16 nodes:** per rep, every Charades arm, then every Devastator arm (Devastator first in rep 2). Devastator's adaptive window and Charades' hill climb run at 16 nodes only on workloads where every 4-node run of that arm finished.
+- About 72 runs per rep and node count (42 Charades, 30 Devastator), 288 in all; estimate 50–70 minutes.
+
+**Measures:** M committed ev/s; each policy ÷ the best fixed W of the same engine and rep; the controller's and the hill climb's mean and final W; Devastator's mean window (`window_mean`) and efficiency; blocked share; committed counts and digests.
+
+**Predictions:**
+- **F4-1 (counts):** within each workload and node count, every finished run of either engine commits the same count, and Charades' runs share one digest.
+- **F4-2:** the frozen controller is 0.90–1.03 of Charades' best fixed W in all 14 cells (job N: 0.91–1.03). Phase-changing PHOLD stays its weakest workload, at most 0.95.
+- **F4-3:** Charades' best fixed W is job N's in at least 10 of 14 cells (phase-changing 100, lookahead 10 50, the lookahead-100 PHOLD workloads 300, traffic 500, dragonfly 20,000). A new grid point beats job N's best by more than 3% in at most 3 cells.
+- **F4-4:** Devastator's rule in Charades has a worst cell of at most 0.6 of the best fixed W, and is at most 0.6 on at least three of the five PHOLD workloads.
+  - With htram, a rolled-back event costs many committed ones, so its efficiency targets (doubling above 95%) overshoot (section 28).
+  - On dragonfly, whose rollback level is about 3% at every W (section 179), its 16-round efficiency stays above 0.95, so its W doubles to the end time in every run.
+- **F4-5:** Devastator's own window is at most 0.85 of Devastator's best fixed W on at least 4 of the 7 workloads at 16 nodes. Its worst case, counting runs that do not finish within the cap, is at most 0.35. At least one workload's adaptive runs do not finish at 4 nodes.
+- **F4-6:** no single window serves the five PHOLD workloads. W 100 is at most 0.7 of the best fixed W on at least one lookahead-100 workload, and W 300 at most 0.7 on lookahead 10 or phase-changing PHOLD.
+
+**What follows:**
+- F4 is built from this job: for each engine and workload, each policy ÷ that engine's best fixed W, and each policy's worst case.
+- If F4-2 fails (any cell under 0.90), read the `CTL` logs for where W went before writing claim 2. The controller stays frozen.
+- If Devastator's rule in Charades does well (F4-4 wrong), the paper says so; claim 2 then rests on the worst case against Devastator's own window and any single fixed W.
+
+### §230 · F4 results: Charades' frozen controller is 0.83–1.03 of the best fixed W, with phase-changing PHOLD at 4 nodes its weakest cell; Devastator's rule in Charades falls to 0.13; Devastator's own window falls to 0.09 and does not finish on two workloads; one window for all PHOLD falls to 0.52; every cell commits one count in both engines (2026-11-05; skx-dev batch job 3684492, 16 nodes)
+
+> **Superseded (2026-11-07):** the robustness figure and claim 2's numbers now come from §251 (job F4b: F4's plan on the current tree, without diagnostics, 3 reps). This section's controller column carried `--ctl-log=1`, which cost it up to 4%; its baselines and counts stand.
+
+> **Status: current.** Design and predictions in section 227. The episode cell (phase-changing PHOLD, 16 nodes, rep 2) is replaced by job F4R's three reps (section 232): controller 0.95–0.96, Devastator's rule in Charades 0.40–0.44.
+> - **Job:** 51 minutes; gate 63/63 (skx copy 3684493 cancelled before it started).
+>   - Every Charades run finished.
+>   - Devastator's own window did not finish within the 120 s cap on phase-changing PHOLD and σ 2,000 at 4 nodes, in both reps, so it was skipped there at 16 nodes. Every other Devastator run finished.
+> - **Data:** `~/charades-data/f4/f4227/j3684492/` (with `job.out`; `gvt_*.out` and digest files not copied); `f4_summary.py`, output `f4_summary.txt`, in `~/charades-data/f4/`.
+> - **Counts (F4-1 right):** in each of the 14 cells, every finished run of both engines commits one count, and Charades' runs share one digest.
+> - **One cell was hit by an episode on the machine:** phase-changing PHOLD at 16 nodes, rep 2, the job's last block (described below). Ratios from it are marked †, and the worst cases are given with and without it.
+
+**Each policy ÷ the best fixed W of the same engine and rep** (rep 1 / rep 2; M committed ev/s in parentheses; higher is better; mean W of Charades' controller in parentheses; fixed W in the model's time unit, dragonfly in ps):
+
+| workload | nodes | Charades' best fixed W (M ev/s) | Charades' controller (mean W) | Devastator's rule in Charades | Devastator's best fixed W (M ev/s) | Devastator's own window |
+|---|---|---|---|---|---|---|
+| phase-changing PHOLD | 4 | 75 (136.6 / 134.6) | **0.88 / 0.83** (118, 156) | 0.29 / 0.29 | 250 (99.4 / 96.8) | did not finish (< 0.09) |
+| | 16 | 100 / 75 (370.6 / 346.3) | 0.97 / 0.13† (108, 371) | 0.41 / 0.11† | 250 (273.1 / 285.4) | not run |
+| lookahead 10, σ 500 | 4 | 50 (161.2 / 162.5) | 0.96 / 0.96 (61, 61) | 0.51 / 0.41 | 200 / 100 (143.3 / 132.4) | 0.72 / 0.77 |
+| | 16 | 50 (636.1 / 628.9) | 0.98 / 0.98 (65, 62) | 0.31 / 0.29 | 200 (499.8 / 507.2) | 0.60 / 0.66 |
+| σ 100 | 4 | 300 (203.4 / 208.1) | 0.95 / 0.94 (316, 322) | 0.32 / 0.37 | 1,000 / 500 (167.7 / 168.0) | 0.70 / 0.62 |
+| | 16 | 300 / 400 (826.1 / 834.5) | 0.95 / 0.94 (366, 369) | 0.34 / 0.37 | 1,000 (658.1 / 660.4) | 0.38 / 0.40 |
+| σ 2,000 | 4 | 300 (158.1 / 156.9) | 0.95 / 0.93 (318, 315) | 0.32 / 0.41 | 1,000 (99.4 / 98.9) | did not finish (< 0.06) |
+| | 16 | 400 / 300 (612.2 / 605.0) | 0.98 / 0.99 (374, 367) | 0.17 / 0.13 | 1,000 (365.3 / 367.6) | not run |
+| uniform | 4 | 300 (136.1 / 134.9) | 0.95 / 0.94 (311, 309) | 0.23 / 0.20 | 500 (67.7 / 67.5) | 0.17 / 0.13 |
+| | 16 | 300 / 400 (388.8 / 389.0) | 0.98 / 0.98 (367, 348) | 0.23 / 0.25 | 1,000 (194.3 / 194.6) | 0.55 / 0.56 |
+| traffic | 4 | 500 (291.9 / 288.1) | 0.95 / 0.96 (548, 546) | 0.59 / 0.62 | 2,000 (233.3 / 232.0) | 0.29 / 0.37 |
+| | 16 | 750 (1,140.1 / 1,169.7) | 0.92 / 0.94 (883, 732) | 0.62 / 0.61 | 2,000 (893.0 / 910.4) | 0.09 / 0.22 |
+| dragonfly | 4 | 20,000 (120.7 / 120.9) | 1.03 / 1.03 (14,620, 14,234) | 0.84 / 0.80 | 20,000 (86.2 / 87.9) | 0.81 / 0.80 |
+| | 16 | 20,000 (409.2 / 409.4) | 1.02 / 1.03 (16,103, 14,064) | 0.82 / 0.79 | 20,000 (212.6 / 211.8) | 0.83 / 0.83 |
+
+("Did not finish (< x)": the run did not end within 120 s, so its rate is below the committed count ÷ 120 s, which is x of Devastator's best. † the episode.)
+
+**Worst case over the 28 rep-cells** (lowest; higher is better):
+
+| policy | worst case without the episode rep | with it |
+|---|---|---|
+| Charades' frozen controller | **0.83** (phase-changing PHOLD, 4 nodes) | 0.13 |
+| Devastator's rule in Charades | 0.13 (σ 2,000, 16 nodes) | 0.11 |
+| Devastator's own window | did not finish (< 0.06; σ 2,000, 4 nodes); 0.09 among runs that finished (traffic, 16 nodes) | the same |
+| one window for the five PHOLD workloads | W 100: 0.55 (σ 100, 16 nodes); W 300: 0.52 (lookahead 10, 16 nodes) | W 300: 0.26 |
+
+- **The controller is 0.92–1.03 in 12 of the 14 cells.** On phase-changing PHOLD it is 0.83–0.88 at 4 nodes, and 0.97 in the 16-node rep that the episode did not hit.
+  - At 4 nodes round 3 moved the best fixed W from 100 (job N) to 75. The controller's mean W is 118–156, and it runs below even W 150 held fixed (0.92–0.94).
+  - So, as in job N, the loss is the cost of measuring: half its periods run at a trial W, and every change of W leaves a transient.
+- **Devastator's rule in Charades** reaches 0.11–0.84.
+  - It settles at 70–88% efficiency, with mean windows 5–66× the best on PHOLD and traffic (σ 100: 3,353–12,507 against 300; dragonfly 1.3–1.4×).
+  - Its rule doubles W while efficiency is above 95% and moves it only 1% per round between 66% and 95%. Charades' best fixed windows commit 99.5–100% of the events they execute (dragonfly 92–95%), so the rule's band sits far from where Charades runs best.
+  - On dragonfly it is 0.79–0.84 at 75–79% efficiency. Its W did not run to the end time (mean 25,404–27,439 ps; final 29,032–166,744).
+- **Devastator's own window** reaches 0.09–0.83 where it finished.
+  - On lookahead 10 and σ 100 it runs to its 2⁵⁸ clamp (mean window 1.3–2.6 × 10¹⁷) at 61–85% efficiency.
+  - On uniform it stays finite (mean 570–780) at 46–74% efficiency.
+  - On phase-changing PHOLD and σ 2,000 at 4 nodes it did not finish within 120 s, where its best fixed W takes 7–11 s.
+- **Charades across engines** (each at its best fixed W, same allocation, job N's short sizes, round 3): Charades ÷ Devastator is 1.13–2.01 in all 14 cells. Charades' controller ÷ Devastator's best fixed W is 1.08–1.99 (without †), and ÷ Devastator's own window 1.49–14.3 where that window finished.
+
+**The episode (phase-changing PHOLD, 16 nodes, rep 2).** It was the job's last block, about 11:25–11:31.
+- **The waves:** every arm made extra count waves that advanced nothing: 1.07–1.56 waves per GVT advance at fixed W (2.2 for the controller). Every other fixed-W run of the job made 1.00–1.03, except W 25 on lookahead 10 (1.33 in every rep and node count) and dragonfly W 10,000 at 4 nodes in rep 1 (1.09).
+- **The windows:** the wider the window, the worse it was. W 50–100 lost 6–15% against rep 1, W 150 24%, W 250 and 300 66–72%. The controller (mean W 371 against 108 in rep 1) and the hill climb, which ran first in the block, lost most.
+- **When:** the slowness came in bursts in the middle of runs. W 300 took 8–12 s in three tenths of its advances, against 1.3 s per tenth throughout rep 1. W 250 slowed in its last four tenths.
+- **Reading:** a slow period on the machine, amplified by rollbacks at wide windows. An after-effect of the preceding hill-climb run (3.7 billion events rolled back) would have shown at the start of each run and faded instead.
+- Rep 1 of the same cell, at the job's start, ran evenly (1.00 waves per advance in every fixed-W arm).
+
+**Predictions (section 227):**
+- **F4-1 right.**
+- **F4-2 wrong in one cell:** the controller is 0.92–1.03 in 12 of 14 cells, and 0.83–0.88 on phase-changing PHOLD at 4 nodes (predicted at least 0.90). Phase-changing PHOLD is its weakest workload, as predicted. The 16-node rep 2 is the episode.
+- **F4-3 right:** the best fixed W is job N's in 12 of 14 cells. The exceptions are phase-changing PHOLD at 4 nodes (75, not 100) and traffic at 16 nodes (750, not 500; W 750 was in job N's grid). The new grid points never beat job N's best by more than 2%.
+- **F4-4 mostly right:** the hill climb's worst cell is 0.13, and it is at most 0.6 on all five PHOLD workloads. On dragonfly its W did not double to the end time: it ran at 75–79% efficiency, not above 95%.
+- **F4-5 right:** at 16 nodes Devastator's own window is at most 0.83 in all five cells where it ran. Its worst case is under 0.06, and two workloads did not finish at 4 nodes.
+- **F4-6 right:** W 100 falls to 0.55 (σ 100) and W 300 to 0.52 (lookahead 10).
+
+**What follows:**
+- **Claim 2's number changes** on the current tree: the frozen controller is 0.83–1.03 of the best fixed W, not 0.91–1.03 (jobs M and N, older tree). Its baselines' worst cases are 0.13 (Devastator's rule in Charades), did not finish (Devastator's own window) and 0.52–0.55 (any single PHOLD window).
+- **Phase-changing PHOLD at 16 nodes was rerun** (job F4R, section 232): 0.95–0.96 for the controller in three clean reps.
+
+### §231 · F4's phase-changing PHOLD cell at 16 nodes, rerun (job F4R design, 2026-11-05; written before any runs)
+
+> **Status: design.** User decision 2026-11-05: rerun the cell whose rep 2 was hit by an episode on the machine (section 230). Submitted as 3685047 (skx-dev) and 3685048 (skx); the later starter is cancelled.
+> - **Script:** `$WORK/charades-runs/f4r231.slurm` (copy in `~/charades-data/f4/`), skx-dev plus an skx copy, 16 nodes, 30 minutes.
+> - **Code:** as in F4: tree `charades-f3` (8a34d51), job F4's launch and sizes.
+
+**Runs:** phase-changing PHOLD (lookahead 10 / mean 200 and 100 / 1,000 alternating every 8,000; remote 0.5), htram PP 512, end 1,024,000, 16 nodes. Charades' arms only:
+- W 50, 75, 100, 150, 250 and 300;
+- the frozen controller (`mb:0`);
+- Devastator's rule in Charades (`hill:8`).
+3 reps, arm order reversed in rep 2. Gate: the change tier on 2 nodes (Simple PHOLD, `ctl_hill` and `agg_ctl_measured_bucket_pp`).
+
+**Episode check, set before the runs:** a rep counts as disturbed if any fixed-W run in it makes more than 1.03 count waves per GVT advance (section 230: 1.00–1.03 in every undisturbed fixed-W run except W 25). A disturbed rep is reported, and the cell's ratios are taken from the undisturbed reps.
+
+**Predictions:**
+- **R1:** every run commits F4's count, 4,096,302,492, with one digest.
+- **R2:** no rep is disturbed.
+- **R3:** the best fixed W is 75 or 100, and the controller is 0.90–1.00 of it in every rep (F4 rep 1: 0.97; job N: 0.93–0.95).
+- **R4:** Devastator's rule in Charades is 0.3–0.5 of the best fixed W (F4 rep 1: 0.41).
+
+**What follows:** the undisturbed reps replace F4's 16-node phase-changing cell in F4 and in PAPER.md's numbers.
+
+### §232 · F4R results: phase-changing PHOLD at 16 nodes reruns clean; the controller is 0.95–0.96 of the best fixed W (W 100) and Devastator's rule in Charades 0.40–0.44; F4's disturbed rep was the machine (2026-11-05; skx-dev batch job 3685047, 16 nodes)
+
+> **Superseded (2026-11-07):** the robustness figure and claim 2's numbers now come from §251 (job F4b: F4's plan on the current tree, without diagnostics, 3 reps). This section's controller column carried `--ctl-log=1`, which cost it up to 4%; its baselines and counts stand.
+
+> **Status: current.** Design and predictions in section 231.
+> - **Job:** 10 minutes; gate 12/12. The skx copy 3685048 was cancelled before it started.
+> - **Data:** `~/charades-data/f4/f4r231/j3685047/`; `f4r_summary.py`, output `f4r_summary.txt`, in `~/charades-data/f4/`.
+
+**Phase-changing PHOLD, 16 nodes** (M committed ev/s; ÷ the best fixed W of the same rep, higher is better; count waves per GVT advance, lower is better):
+
+| arm | rep 1 | rep 2 | rep 3 | waves per advance |
+|---|---|---|---|---|
+| W 50 | 338.2 (0.90) | 332.7 (0.91) | 336.9 (0.92) | 1.000 |
+| W 75 | 371.1 (0.99) | 358.8 (0.98) | 363.8 (0.99) | 1.000–1.002 |
+| **W 100** | **374.8** | **367.4** | **366.0** | 1.000 |
+| W 150 | 358.8 (0.96) | 363.3 (0.99) | 346.6 (0.95) | 1.000–1.009 |
+| W 250 | 332.5 (0.89) | 334.1 (0.91) | 332.9 (0.91) | 1.000 |
+| W 300 | 322.8 (0.86) | 317.3 (0.86) | 316.8 (0.87) | 1.000 |
+| controller (mean W) | 358.6 (**0.96**; 107) | 349.1 (**0.95**; 112) | 349.8 (**0.96**; 102) | 1.026–1.043 |
+| Devastator's rule in Charades (efficiency) | 150.9 (0.40; 75.1%) | 146.6 (0.40; 73.9%) | 161.1 (0.44; 76.5%) | 1.053–1.080 |
+
+- **Counts (R1 right):** all 24 runs commit 4,096,302,492, F4's count, with one digest (c8e86881…).
+- **No rep is disturbed (R2 right):** every fixed-W run makes 1.000–1.009 waves per advance.
+- **It reproduces F4's undisturbed rep 1** within 1–2%: W 100 367–375 against 370.6, the controller 349–359 against 358.9 (0.97).
+- **The disturbed rep was the machine, not the run order.** Rep 2 here ran its arms in the order of F4's disturbed rep 2: the hill climb first (1.4 billion events rolled back), then the controller, W 300 and W 250. It is clean. W 300 ran at 317.3 M ev/s against 89.3, and W 250 at 334.1 against 112.2.
+
+**Predictions (section 231):**
+- **R1 right.**
+- **R2 right.**
+- **R3 right:** the best fixed W is 100 in every rep; the controller is 0.95–0.96.
+- **R4 right:** Devastator's rule in Charades is 0.40–0.44.
+
+**What follows: F4's 16-node phase-changing cell** is F4's rep 1 and these three reps.
+- Controller: 0.95–0.97 of the best fixed W.
+- Devastator's rule in Charades: 0.40–0.44.
+- W 300 as the one PHOLD window: 0.86–0.87.
+- Section 230's worst cases without the episode rep stand: controller 0.83 (phase-changing PHOLD, 4 nodes), Devastator's rule in Charades 0.13, one PHOLD window 0.52.
