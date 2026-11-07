@@ -10882,7 +10882,7 @@ With Charades at its best arm (controller or fixed W), the ratios are 1.00–1.0
 **What the job shows:**
 - **Charades leads Devastator in all 10 cells.**
   - The old F5a trailed only on dragonfly at 1 node (0.94); it is now 1.08.
-  - Charades is 1.11–1.20× faster than in the old F5a, and Devastator is unchanged. That is round 3, `--localalloc` and per-LP rollback; the old F5a ran before all three.
+  - Charades is 1.11–1.20× faster than in the old F5a, and Devastator is unchanged. The old F5a (2026-11-02) already had `--localalloc` and per-LP rollback; round 3 (sections 213–217) came after it.
 - **ROSS's window is worth what jobs ABL and F3R found** (sections 223, 225): 1.38–1.50× on dragonfly, 1.11–1.21× on traffic.
   - So Charades ÷ ROSS on dragonfly falls from 3.69–4.03 to 2.90–3.10.
   - On traffic it moves within ±0.12 (1.82–2.11), since Charades gained about as much as ROSS.
