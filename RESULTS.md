@@ -19,7 +19,7 @@ Every number from every run: Stampede3 runs in order (each design, written befor
 
 ## Current numbers
 
-> **Being replaced (F5 on the final defaults, section 240).** 1–16 nodes are done (section 244): Charades ÷ Devastator 1.08 / 1.18 / 1.45 / 1.70 / 2.00 (dragonfly) and 1.25 / 1.22 / 1.19 / 1.20 / 1.23 (traffic), ahead in all 10 cells; Charades ÷ ROSS with its window 2.90–3.10 (dragonfly) and 1.82–2.11 (traffic). The table below is rewritten when F5-32 adds the 32-node column.
+> **Being replaced (F5 on the final defaults, sections 240, 247).** 1–16 nodes are done without diagnostics (section 248): Charades ÷ Devastator 1.08 / 1.18 / 1.46 / 1.91 / 2.04 (dragonfly; 8 nodes 1.70 against Devastator's fastest rep) and 1.27 / 1.25 / 1.24 / 1.26 / 1.28 (traffic), ahead in all 10 cells; Charades ÷ ROSS with its window 2.93–3.13 (dragonfly) and 1.85–2.21 (traffic). The table below is rewritten when F5-32b adds the 32-node column.
 
 **Applications, 1–32 nodes, three engines** (F5a 3673108, F5b 3673481, F5c 3673482; sections 188, 189 and 194; median of 3 reps, 5 at 32 nodes; Charades: its frozen controller; Devastator: best of three W; ROSS: best setting, **without its optimism window** (`--max-opt-lookahead`, not yet tried); one committed count per cell in all three engines):
 
@@ -408,6 +408,7 @@ Sections 1–128 were re-read before planning sections 129 onward.
 | 245 | 2026-11-06 | CC: 3690326 (skx-dev) / 3690327 (skx) (results in 246) | Where the controller's 3–7% goes (design; user: one diagnostic job, no engine change): F5a's traffic traces already show the start is negligible, time at other windows costs 0.9–1.3%, and most of the gap arises at the same W (1.030–1.060× per event at W ≈ 500, 1 node); candidates H1 measuring, H2 the per-round log, H3 changing W every period, H4 trial windows; job CC: PHOLD σ 500 and traffic at 16 and 1 nodes, fixed-W grid, controller with and without log, `--ctl-period=32`, dry at the best W; predictions CC1–CC7 | design |
 | 246 | 2026-11-06 | 3690326 (skx-dev; skx copy 3690327 cancelled by its guard) | CC results: the per-round log (`--ctl-log=1`) costs the controller 2–6% (CL ÷ C 0.94–0.98 on traffic and σ 500 at 16 nodes), and F4/F4R, F5 (incl. F5a, section 244), ABL/F3R and the VLSI jobs (incl. VS3) passed it to every arm, so their controller rows are understated by about 2–6% against fixed W; F1 ran without it. Without the log the controller is 0.970–0.985 of the best fixed W: measuring 0–1.6% (traffic 16 nodes up to 6%, noisy), time at trial windows 1–3% (one step of 1.5 costs 7–24%), changing W about 0.3%; `--ctl-period=32` does not help PHOLD (0.96–1.00); corrects section 245's reading of F5a's traces (the log); CC1, CC2 right, CC3 mostly, CC7 half, CC4–CC6 wrong | current |
 | 247 | 2026-11-06 | F5a2 3690453 (skx-dev) / 3690454 (skx), VA 3690455, F5-32b 3690451, V32b 3690452 (results in later sections); F5-32 3688917 and V32 3688918 cancelled | Paper runs without diagnostics (design; user: resubmit without the log, rerun the controller rows, check every parameter): a check of every flag found four more unmeasured Charades-only diagnostics in F5 and VLSI (`--blocked-time`, `--commit-digest`, `--copy-stats`, `--pe-stats`); all leave the timing arms; check arms od/O (old set; digest check), dg/G (digest), ri/R (no GVT progress print); F5a and VS3 rerun whole at 1–16 nodes, F5-32 and V32 resubmitted; per-arm flag table; predictions D1–D5 | design |
+| 248 | 2026-11-06 | 3690453 (skx-dev; skx copy 3690454 cancelled by its guard) | F5a2 results: traffic and dragonfly at 1–16 nodes without diagnostics; Charades ÷ Devastator (controller) traffic 1.27 / 1.25 / 1.24 / 1.26 / 1.28, dragonfly 1.08 / 1.18 / 1.46 / 1.91 (1.70 against Devastator's fastest rep; 2 of its 3 W 20,000 reps ran 2.2× long) / 2.04; ÷ ROSS 1.85–2.21 and 2.93–3.13; dropping the log raised traffic's controller 1.01–1.04× (dragonfly 0.99–1.01); the other diagnostics cost 0–1.6%; one count and digest per cell (digests as section 244); D1, D2 right, D3–D5 mostly | current |
 
 ## Stampede3 runs, in order
 
@@ -11108,6 +11109,84 @@ In both it rolls back under 0.5% of events.
 **What follows:**
 - **The paper tables:** VA and F5a2 replace sections 239 and 244 at 1–16 nodes, and F5-32b and V32b give the 32-node column.
 - **If D2 fails** (the old diagnostics cost more than 2%), earlier Charades ÷ Devastator ratios from jobs that carried them (F4, ABL, F3R) understated Charades by that much, and F4 is decided then.
+
+### F5a2 results: traffic and dragonfly at 1–16 nodes without diagnostics. Charades ÷ Devastator (controller) is 1.24–1.28 on traffic and 1.08–2.04 on dragonfly; dropping the log raised traffic's controller 1.01–1.04×, and the other diagnostics cost 0–1.6% (2026-11-06; skx-dev batch job 3690453, 16 nodes)
+
+> **Status: current for traffic and dragonfly at 1–16 nodes.** Design and predictions in section 247. This replaces section 244 in the paper table.
+> - **Job:** 1 h 4 min of the 1 h 55 min limit. Gate 60/60. The guard cancelled the skx copy 3690454 when this copy started.
+> - **Runs:** 245 Charades, 90 Devastator, 90 ROSS; none failed.
+> - **Data:** `~/charades-data/f1/scale240/f5a_j3690453/`.
+> - **Summary:** `~/charades-data/f1/f5_247_summary.py`, run on this job and section 244's (`scale240/f5a_j3689887`); output `scale240/f5a_j3690453_summary.txt`.
+>   - It keeps the check arms out of every timing comparison.
+>   - It recomputes section 244's ratios from the same rate column, so they differ from that section by at most 0.01.
+> - **Counts and digests (D1, right):** one count per cell in all three engines; one Charades digest per cell across the od and dg arms and reps, the same digests as section 244.
+
+**Charades ÷ Devastator and Charades ÷ ROSS** (Charades' controller ÷ the other engine's best arm; median of 3 reps; higher is better). Section 244, with the log, is in brackets:
+
+| application, ratio | 1 node | 2 | 4 | 8 | 16 |
+|---|---|---|---|---|---|
+| dragonfly, ÷ Devastator | 1.08 (1.08) | 1.18 (1.18) | 1.46 (1.45) | 1.91 (1.70) | 2.04 (2.00) |
+| dragonfly, ÷ ROSS | 3.11 (3.10) | 2.93 (2.91) | 3.04 (3.04) | 3.13 (3.07) | 3.03 (2.97) |
+| traffic, ÷ Devastator | 1.27 (1.25) | 1.25 (1.22) | 1.24 (1.19) | 1.26 (1.19) | 1.28 (1.23) |
+| traffic, ÷ ROSS | 1.85 (1.82) | 1.97 (1.92) | 2.04 (1.96) | 2.09 (2.01) | 2.21 (2.11) |
+
+**Dragonfly at 8 nodes:** Devastator's W 20,000 ran 53–54 s in 2 of its 3 reps instead of about 24 s, with the same executed events. So its median there falls to 62 M ev/s, and its best arm by median becomes W 10,000 (122.1). Against its fastest W 20,000 rep (137.1), Charades ÷ Devastator is 1.70, as in section 244.
+
+**Per application** (M committed ev/s, median of 3, higher is better; per-node rate at 16 ÷ at 1 node, 1.0 is perfect):
+
+| application | M ev/s at 16 nodes, Charades / Devastator / ROSS | per-node rate 16 ÷ 1, Charades / Devastator / ROSS | controller ÷ best fixed W in its htram setting, per rep (higher is better) |
+|---|---|---|---|
+| dragonfly | 433.2 / 212.8 / 142.8 | 0.61 / 0.33 / **0.63** | 0.985–0.995 at 1 node; 1.015–1.063 at 2–16 |
+| traffic | 1,161.1 / 904.9 / 526.5 | **0.96** / 0.95 / 0.80 | 0.956–1.005 at 1–8 nodes; 1.034–1.078 at 16 |
+
+(Bold: the best of the three engines.)
+
+**Check arms ÷ the same fixed arm** (traffic PP 2,048 W 500, dragonfly WPs 512 W 10,000; paired per rep; the range of the per-node-count medians, with the per-rep range in brackets; higher means the flag costs less):
+
+| arm | flags | dragonfly | traffic |
+|---|---|---|---|
+| od | `--blocked-time=1 --commit-digest=1` (the old set) | 0.987–1.002 (0.979–1.018) | 0.984–0.999 (0.980–1.011) |
+| dg | `--commit-digest=1` | 0.995–1.007 (0.976–1.019) | 0.989–0.996 (0.983–1.016) |
+| ri | `--report-interval=1000000` | 0.993–1.009 (0.985–1.026) | 0.998–1.007 (0.979–1.012) |
+
+**Each engine's rate ÷ its own in section 244's job** (1.0 is unchanged):
+- **Charades' controller:** dragonfly 0.99–1.01, traffic 1.01–1.04.
+- **Charades' best fixed arm:** 0.98–1.02.
+- **Devastator:** 0.98–1.02, except dragonfly at 8 nodes (0.90, the slow reps above).
+- **ROSS:** 0.98–1.02.
+
+**What the job shows:**
+- **Dropping the log helped traffic's controller.**
+  - It ran 1.01–1.04× faster, while the fixed arms ran 0.98–1.02×. On dragonfly, which makes fewer controller rounds a second, the controller ran 0.99–1.01×. This matches section 246.
+  - So Charades ÷ Devastator on traffic rises from 1.19–1.25 to 1.24–1.28.
+- **The other diagnostics cost little.**
+  - With them on, the fixed arms ran at 0.984–1.002 (medians), the most on traffic at 16 nodes (0.984–0.987 per rep). The digest alone and the GVT progress print are within the spread between reps.
+  - So the earlier jobs that carried them understated Charades against the other engines by at most about 1.5%.
+- **The controller:**
+  - On traffic it runs at 0.956–1.005 of W 500 at 1–8 nodes (section 246: 0.977 at 1 node) and 1.034–1.078 at 16 nodes, where the best W is above 500 (section 246: 750).
+  - On dragonfly it runs at 1.015–1.063 at 2–16 nodes and 0.985–0.995 at 1 node.
+- **Per-node rate from 1 to 16 nodes:** Charades is best on traffic now (0.96 against Devastator's 0.95), and second to ROSS on dragonfly (0.61 against 0.63).
+- **Devastator's slow reps** now appear in two cells: traffic W 1,000 at 16 nodes in section 244, and dragonfly W 20,000 at 8 nodes here. Each time 2 of 3 reps ran 2.2–3.5× long with the same executed events. The cause is not known. Every engine's cells use medians, and where this hits Devastator's best arm the table also gives the ratio against its fastest rep.
+
+**Predictions:**
+- **D1: right.**
+- **D2: right within the spread.**
+  - The old set costs 0–1.6% (predicted at most 2%).
+  - The digest alone is 0.989–0.996 on traffic, at the predicted 0.99 bound.
+  - Without the progress print, 0.993–1.009, against the predicted 1.00–1.01.
+- **D3: mostly right.**
+  - Traffic 0.956–1.078 against 0.95–1.07: 16 nodes rep 2 is above.
+  - Dragonfly 0.985–1.063 against 1.00–1.06: 1 node is below, 16 nodes rep 1 above.
+- **D4: mostly right.**
+  - Charades ÷ Devastator (controller) is 1.02–1.06× section 244's on traffic and 1.00–1.02× on dragonfly, inside the predicted 1.00–1.08.
+  - The exception is dragonfly at 8 nodes, 1.12×, from Devastator's slow reps.
+  - With Charades' best fixed arm, 0.99–1.02× except that cell.
+- **D5: mostly right.** ROSS is within 2% and Devastator within 2%, except dragonfly at 8 nodes (0.90).
+
+**What follows:**
+- **The paper's traffic and dragonfly rows at 1–16 nodes** come from this job. At dragonfly 8 nodes the table gives both ratios (1.91 by median, 1.70 against Devastator's fastest rep).
+- **The fixed-W, Devastator and ROSS results of F4, ABL and F3R stand,** within the 1.5% above. Their controller rows carry the log's cost: up to 6% where controller rounds are frequent (traffic; PHOLD at 16 nodes), 0–1% on dragonfly.
+- **F4** is decided once VA shows the effect on VLSI.
 
 ## Baseline verification on the Mac
 
