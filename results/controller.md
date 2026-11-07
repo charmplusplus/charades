@@ -1422,7 +1422,8 @@ In both it rolls back under 0.5% of events.
 > - **User decision 2026-11-07:** rerun F4 in full without the log (sections 246, 249).
 > - **Submitted 2026-11-07:** 3691176 (skx-dev) and 3691177 (skx; the skx-dev copy reads 3691177 from `f4b250/f4b250.twin`).
 >   - A first pair, 3691173 / 3691174, was cancelled 2 minutes after 3691173 started. Its batch node, c454-004, reported "/work2 is mounted not FULL nor IDLE", and the script's first read of the Devastator tree hung in Lustre I/O wait there.
->   - Both copies now run with `-x c455-081,c454-004`.
+>   - Both copies now run with `-x c455-081,c454-004`. 3691176 started at 07:36:53. Its batch node, c454-002, printed the same message, and its checks took about 3 minutes before it went on. So /work2 was slow on the compute nodes at the time, and c454-004 was probably not at fault.
+>   - Rates come from each engine's own timers, not from wall time, so slow file reads at startup do not enter them.
 > - **Script:** `$WORK/charades-runs/f4b250.slurm` (copy in `~/charades-data/f4/`). It runs on skx-dev with an skx copy, 16 nodes, limit 1:55, about 75 minutes, `-x c455-081`.
 > - **Code:** tree `charades-r5` (85a2aad), the tree of F1, F5a2 and VA.
 >   - F4 ran 8a34d51. The engine code between the two is 609212b (`--fossil-rounds`; its default is the old rule) and 85a2aad (`--ctl-reach-buckets=2`).
