@@ -21,10 +21,10 @@ Gaussian and uniform PHOLD in Charades, Devastator and ROSS: σ sweeps, full nod
 | 130 | 2026-10-28 | current | The other five workloads on long runs, results: Charades ahead in 14 of 15 cells (level in the 15th), scale… |
 | 140 | 2026-10-28 | design | Paper-grade scaling, 1–32 nodes: the plan; A0, ROSS tuning |
 | 141 | 2026-10-28 | current / design | A0, ROSS tuning, results; A1 and A2, paper-grade weak scaling |
-| 153 | 2026-10-29 | current | A2r, 32 nodes, results: Charades leads in 6 of 8 but loses more per node from 16 to 32 nodes than Devastato… |
 | 240 | 2026-11-06 | design (RW results in 241) | F1 and F5 on the final defaults: seven jobs queued at once — ROSS's window on PHOLD, Gaussian PHOLD at 1–32… |
 | 242 | 2026-11-06 | current | F1a results: on PHOLD group a (σ 100, σ 1,000, σ 4,000, lookahead 10 σ 2,000) Charades ÷ Devastator is 1.13… |
 | 243 | 2026-11-06 | current | F1b results, and F1 at 1–16 nodes: Charades leads Devastator in all 40 PHOLD cells (1.08–2.25), each ratio… |
+| 252 | 2026-11-07 | current | F1-32 results, and F1 at 1–32 nodes: Charades leads Devastator in all 48 PHOLD cells, 1.26–2.01 at 32 nodes… |
 | 1 | 2026-10-19 | historical | First Stampede3 measurements |
 | 2 | 2026-10-19 | historical | Optimism window sweep |
 | 11 | 2026-10-21 | design | Gaussian PHOLD σ sweep |
@@ -36,6 +36,7 @@ Gaussian and uniform PHOLD in Charades, Devastator and ROSS: σ sweeps, full nod
 | 142 | 2026-10-28 | superseded by §242 (was: current) | A1a, weak scaling 1–16 nodes, group a (σ 100, σ 1,000, σ 4,000, lookahead 10 σ 2,000), results |
 | 143 | 2026-10-28 | superseded by §243 (was: current) | A1b, weak scaling 1–16 nodes, group b (σ 500, σ 2,000, uniform, lookahead 10 σ 500) and σ 1,000 with both h… |
 | 144 | 2026-10-29 | not for use / design | A2, 32 nodes: a noisy allocation, so the 32-node point is rerun |
+| 153 | 2026-10-29 | superseded by §252 (was: current) | A2r, 32 nodes, results: Charades leads in 6 of 8 but loses more per node from 16 to 32 nodes than Devastato… |
 
 ## Current
 
@@ -651,52 +652,6 @@ With section 124, this completes the long-run version of the 8-workload table, t
 - **P6.** Charades ÷ ROSS (ROSS's better arm) is ≥ 3 at every node count on σ ≥ 1,000 and uniform, and ≥ 2.5 at σ 100.
 - **P7.** Charades leads Devastator in at least 42 of the 48 workload × node-count cells.
 
-### §153 · A2r, 32 nodes, results: Charades leads in 6 of 8 but loses more per node from 16 to 32 nodes than Devastator everywhere; a start-up transient at σ 100, per-wave work on uniform (2026-10-29; skx batch job 3657016, 32 nodes)
-
-> **Status: current.** Design and predictions in section 144.
-> - **Allocation:** 32 nodes (c477-094 to c506-094, 13 racks), 18:45–20:01 (1 h 16 min), gate 30/30.
-> - **Runs:** Charades 90 (plus 30 controller runs at the end of each block, `_qlast`), Devastator 72, ROSS 48, all ok. Every cell has the same committed events in all three engines.
-> - **Traced block:** six runs, at 16 nodes (the first 16 of the allocation) and 32.
-> - **Data:** `~/charades-data/scale32/scale32/n32_j3657016/`, with `combined_1_32.txt` (`combine_a2r.py`: A1a + A1b + A2r) and `trace_summary.txt` (`trace32_summary.py`).
-> - **Corrected in section 154:** the traced block's "response" included the cross-process reduction (`handled_s` is when a process sent its counts). That inflates T3 and the uniform "+261 µs" line. The start-up transient is in the reduction, not in the processes' work.
-
-**All eight workloads, 1–32 nodes:** the table at the top of Current numbers (from `combine_a2r.py`).
-
-**Predictions:**
-- **P1 right.** Same committed events in every 32-node cell.
-- **P4 wrong for Charades, right for Devastator.** Per-node rate at 32 ÷ at 16 (A1):
-  - Charades 0.81–0.87 on the Gaussian workloads; only σ 2,000 (0.87) reaches the predicted 0.85. Uniform is 0.72, which is ≤ 0.85 as predicted.
-  - Devastator 0.93–0.98 on the Gaussian workloads (≥ 0.88 as predicted) and 0.80 on uniform.
-- **P5 wrong at 32 nodes.** The controller is 0.93–0.95 of its better fixed W on the five lookahead-100 Gaussian workloads apart from σ 4,000 (0.97), and 0.95 on uniform. It holds W near 300 (the κ bound), while W 400 is best here. Lookahead 10: 0.99 and 1.06.
-- **P6 right.** Charades ÷ ROSS at 32 nodes: 3.02 at σ 100, 4.14–4.52 at σ ≥ 1,000 and uniform.
-- **P7 right.** Charades leads Devastator in 44 of 48 cells.
-  - Of the narrower prediction: ahead at σ ≥ 500, uniform and lookahead 10 σ 2,000 (1.04–1.66), right.
-  - Lookahead 10 σ 500 at 0.99 is within 0.90–1.10, right; σ 100 at 0.89 is just outside it.
-- **Q2 right apart from single slow reps.** Median rep spread 1.04 (Charades arms) and 1.08 (Devastator). Some cells have one slow rep (Devastator σ 2,000, W 500: 603, 152, 597 M ev/s), which the median of 3 absorbs. Lookahead 10 σ 2,000 is the noisiest workload (Charades arms 1.34–2.17).
-- **Q3: no position effect.** The controller's last run in a block ÷ its first: median 1.005, within ±5% in 22 of 30 blocks; the outliers (0.81–1.27) are in uniform and lookahead 10 σ 2,000. A2's "0 of 10 fast" (section 144) was noise.
-- **Traced block (T1–T4), with a caveat.** Tracing (`--gvt-trace=2 --pe-stats=1`) cost 12–15% at σ 100 and 35–41% on uniform against untraced W 400 runs, and the 16-node σ 2,000 traced run was an outlier (first 10% of waves 3.6 s of 11.2 s). The traced ratios track the untraced ones: 16→32 per node at W 400, σ 100 0.88 traced against 0.90 untraced; uniform 0.69 against 0.77.
-  - **T1 wrong.** At σ 100 the steady wave period grows 20% (169 to 203 µs), but events per wave per node also grow 15% (fewer waves).
-  - **T2 wrong at σ 100, right on uniform.** At σ 100 the first 10% of waves hold all (110%) of the lost time. On uniform they hold 8%.
-  - **T3 wrong.** The median process's response to a GVT result grows about as much as the wave (σ 100: +34 µs of +34; uniform: +261 of +291 µs). The spread between the median and the slowest process grows less (+21 and +80 µs).
-  - **T4 just wrong.** Uniform events per htram message fall 1.50× (12.5 to 8.3), not ≥ 1.6×.
-
-**Mean wave period by tenth of a traced run** (µs, PE 0's view; lower is better):
-
-| run | 1st | 2nd | 3rd | 4th | 5th | 6th | 7th | 8th | 9th | 10th |
-|---|---|---|---|---|---|---|---|---|---|---|
-| σ 100, 16 nodes | 209 | 204 | 202 | 172 | 147 | 159 | 154 | 153 | 153 | 252 |
-| σ 100, 32 nodes | **557** | **367** | 168 | 200 | 183 | 192 | 179 | 178 | 176 | 171 |
-| uniform, 16 nodes | 446 | 386 | 350 | 365 | 439 | 370 | 449 | 341 | 317 | 987 |
-| uniform, 32 nodes | 615 | 1,507 | 460 | 254 | 400 | 769 | 1,061 | 570 | 437 | 415 |
-
-**What it says:**
-- **Charades still leads at 32 nodes in 6 of 8 workloads, but its lead shrinks from 16 to 32 nodes everywhere,** by 0.11–0.24 in Charades ÷ Devastator (σ 100: 1.04 to 0.89; σ 2,000: 1.35 to 1.24; uniform: 1.84 to 1.66; lookahead 10 σ 2,000: 1.35 to 1.11). This is the scaling gap to close.
-- **Three parts are visible:**
-  - **A start-up transient that grows with node count.** At σ 100 on 32 nodes the first fifth of the waves take 2–3× their later period; at 16 nodes the first tenths are about 1.3× it. Section 122 found the same from 4 to 16 nodes and that 4× longer runs amortize it. At 32 nodes even these long runs (end time 2,048,000) last only about 6 s. The cause is still unknown: warm-up pings did nothing (section 122).
-  - **On uniform, every process's work per wave grows** (median response +261 µs, 1.75×) as each process serves twice the destinations with thinner messages. Sections 125–132 found this from 4 to 16 nodes. The traced uniform run is too erratic for more detail.
-  - **The controller stays near W 300** while W 400 is better at 32 nodes: it is 3–7% below W 400 on the lookahead-100 workloads, against within ±4% at 1–16 nodes. Per-LP rollback (section 152) makes wider W cheaper, so the κ bound can be revisited.
-- **Next:** find the start-up transient (it is the largest part at σ 100 and a cost that grows with node count), and measure per-LP rollback with the controller at 32 nodes.
-
 ### §240 · F1 and F5 on the final defaults: seven jobs queued at once — ROSS's window on PHOLD, Gaussian PHOLD at 1–32 nodes, traffic and dragonfly at 1–32, VLSI at 32 (design, 2026-11-06; written before any runs)
 
 > **Status: design; queued 2026-11-06. RW done (results in section 241).** RW 3688911 (skx-dev, started at once; skx copy 3688912 cancelled), F1a 3688913 (skx) and 3689004 (skx-dev, 1:55, added at the user's request after RW; `TWIN=3688913`: the copy that starts first cancels the other, and one that starts second exits; 3689004 started 13:24 and its guard cancelled 3688913; gate 36/36), F1b 3688914 (skx) and 3689513 (skx-dev, 1:55, added at the user's request after F1a; `TWIN=3688914`), F5a 3688915 (skx) and 3689887 (skx-dev, 1:55, added at the user's request after F1b; `TWIN=3688915`; the guard added to `f5scale240.slurm`), F1-32 3688916, F5-32 3688917, V32 3688918 (all skx). Login-node checks pass for all seven submissions.
@@ -928,6 +883,92 @@ With Charades at its best arm (controller or fixed W), the ratios are 1.00–1.0
 - **PHOLD at 1–16 nodes is paper-grade** on 85a2aad: the table above replaces A1's.
 - **The table at the top of this file** is rewritten when F1-32 adds the 32-node column. Until then, the note above it points here.
 - **F5a (3688915)** is the last 16-node job; with its 1 h 55 min limit it fits skx-dev.
+
+### §252 · F1-32 results, and F1 at 1–32 nodes: Charades leads Devastator in all 48 PHOLD cells, 1.26–2.01 at 32 nodes (old: 0.89–1.66); from 16 to 32 nodes it keeps 0.82–1.00 of its per-node rate (old: 0.72–0.87); Charades ÷ ROSS 2.73–6.08; the controller is 0.94–1.07 of the best fixed W at 32 nodes (median of 5 reps), but on σ 100 it stays at W ≈ 290 in 2 of 5 reps (0.79–0.80) (2026-11-07; skx batch job 3688916, 32 nodes)
+
+> **Status: current.** Design and predictions in section 240. With sections 242–243 (1–16 nodes), it replaces A1 and A2r (sections 142–143 and 153) in the paper's PHOLD table.
+> - **Job:** 2 h 19 min (08:56–11:15), 32 nodes. The gate passed.
+>   - 5 reps of all eight workloads, as in A2r's layout.
+>   - Charades 150 runs, Devastator 150, ROSS 115. None failed.
+> - **Launch:** F1's launch carries no diagnostics (section 247's check), so no rate here carries a flag's cost.
+> - **Data:** `~/charades-data/f1/scale240/big_j3688916/` (with `scale240_3688916.out`). The summaries are in `~/charades-data/f1/scale240/`:
+>   - `f1_240_summary.py`, run on this job against A2r (`~/charades-data/scale32/scale32/n32_j3657016`), output in `big_j3688916_summary.txt`;
+>   - `f1_240_combine32.py` (F1a + F1b + F1-32 against A1a + A1b + A2r), output in `combined_1_32_summary.txt`.
+> - **Counts (C1, PHOLD part):** every cell commits one count in all three engines.
+
+**Charades ÷ Devastator, 1–32 nodes** (Charades' controller at the better htram setting ÷ Devastator's best W; medians, 3 reps at 1–16 nodes and 5 at 32; old table in parentheses; higher is better):
+
+| workload | 1 | 2 | 4 | 8 | 16 | 32 |
+|---|---|---|---|---|---|---|
+| σ 100 | 1.26 (1.10) | 1.23 (1.06) | 1.21 (1.03) | 1.30 (1.03) | 1.25 (1.04) | 1.26 (**0.89**) |
+| σ 500 | 1.19 (1.03) | 1.19 (1.03) | 1.23 (1.08) | 1.46 (1.20) | 1.35 (1.19) | 1.46 (1.04) |
+| σ 1,000 | 1.20 (1.07) | 1.30 (1.13) | 1.40 (1.22) | 1.55 (1.33) | 1.60 (1.30) | 1.58 (1.14) |
+| σ 2,000 | 1.44 (1.27) | 1.55 (1.37) | 1.52 (1.34) | 1.61 (1.38) | 1.63 (1.35) | 1.66 (1.24) |
+| σ 4,000 | 1.46 (1.32) | 1.90 (1.66) | 1.86 (1.67) | 1.91 (1.66) | 1.93 (1.60) | 1.98 (1.39) |
+| uniform | 1.57 (1.38) | 2.03 (1.87) | 2.25 (1.99) | 2.14 (1.94) | 2.01 (1.84) | 2.01 (1.66) |
+| lookahead 10, σ 500 | 1.08 (**0.95**) | 1.09 (**0.97**) | 1.15 (1.02) | 1.30 (1.15) | 1.31 (1.14) | 1.31 (**0.99**) |
+| lookahead 10, σ 2,000 | 1.27 (1.19) | 1.41 (1.28) | 1.38 (1.27) | 1.45 (1.28) | 1.49 (1.35) | 1.51 (1.11) |
+
+(Bold: below 1.) At 32 nodes each ratio is 1.21–1.43× the old one.
+
+**At 32 nodes** (medians of 5 reps; per-node rate as a share of perfect scaling, each engine at its own best, Charades at its controller):
+
+| workload | M ev/s, Charades / Devastator / ROSS | per-node rate 16→32, C / D / R | per-node rate 1→32, C / D / R | Charades ÷ ROSS at 1–32 nodes | controller ÷ best fixed W (median; per rep) |
+|---|---|---|---|---|---|
+| σ 100 | 1,532.3 / 1,216.0 / 378.3 | 0.95 / 0.94 / 0.88 | 0.91 / 0.91 / 0.61 | 2.73–4.05 | 0.94 (0.79–1.06) |
+| σ 500 | 1,358.5 / 927.5 / 272.9 | 1.00 / 0.92 / 0.94 | 0.92 / 0.75 / 0.74 | 4.04–4.98 | 0.95 (0.92–0.97) |
+| σ 1,000 | 1,279.7 / 810.2 / 234.6 | 0.96 / 0.97 / 0.96 | 0.90 / 0.69 / 0.77 | 4.62–5.46 | 0.97 (0.90–0.99) |
+| σ 2,000 | 1,163.5 / 699.5 / 195.8 | 0.98 / 0.96 / 0.93 | 0.86 / 0.74 / 0.66 | 4.60–5.94 | 0.95 (0.85–0.97) |
+| σ 4,000 | 1,067.6 / 540.2 / 175.6 | 0.97 / 0.95 / 0.89 | 0.80 / 0.59 / 0.59 | 4.51–6.08 | 0.96 (0.92–0.97) |
+| uniform | 627.8 / 312.4 / 162.4 | 0.82 / 0.82 / 0.89 | 0.43 / 0.33 / 0.54 | 3.87–5.95 | 0.98 (0.97–0.99) |
+| lookahead 10, σ 500 | 1,222.4 / 930.8 / 269.4 | 0.95 / 0.95 / 0.94 | 0.92 / 0.75 / 0.80 | 3.95–4.54 | 1.07 (0.97–1.06) |
+| lookahead 10, σ 2,000 | 1,012.8 / 669.6 / 195.6 | 0.98 / 0.96 / 0.94 | 0.86 / 0.73 / 0.70 | 4.21–5.18 | 1.05 (0.94–1.06) |
+
+(The median ratio is the ratio of medians, so it can lie outside the per-rep range: on lookahead 10, σ 500 the controller's median rate is 1.07× the fixed W's.)
+
+- **From 16 to 32 nodes,** Charades now keeps 0.82–1.00 of its per-node rate against Devastator's 0.82–0.97. It keeps more than Devastator in 6 of 8 workloads; it is level on uniform (0.82 each) and just behind on σ 1,000 (0.96 against 0.97). In the old table it lost more in every workload (0.72–0.87 against 0.80–0.98).
+  - From 1 to 32 nodes, Charades scales best of the three in 7 of 8 workloads; it is level with Devastator on σ 100 (0.908 against 0.906).
+  - On uniform, ROSS scales best from 1 to 32 (0.54 against 0.43); Charades still runs 3.87× ROSS there.
+  - The old table's 16 → 32 loss was mostly automatic NUMA balancing (sections 164, 166). The launch has avoided it since (`numactl --localalloc`), and round 3 and per-LP rollback added to Charades' rate.
+- **ROSS** is best with its window on six workloads, best conservative on σ 100, and best optimistic without a window on uniform (job RW's windows, section 241).
+- **Best fixed W.** Charades' best fixed W at 32 nodes is the grid's widest: W 400 on every lookahead-100 workload and W 100 on lookahead 10, σ 500.
+  - The controller's mean W is 316–442 on lookahead-100 workloads, apart from σ 100's two low reps. So the best fixed W may lie a little above 400, and "÷ best fixed W" may be slightly high.
+  - Devastator's best W is inside its grid: 1,000 at lookahead 100, and 200 at lookahead 10.
+
+**The controller at 32 nodes, per rep** (÷ the best fixed W of the same rep; mean W):
+- **σ 100 is bimodal.**
+  - In reps 1, 2 and 5 the controller moves to a mean W of 433–438 and runs at 0.96–1.06.
+  - In reps 3 and 4 it stays at 290–292 and runs at 0.79–0.80. That is also below fixed W 300 in those reps (1,303–1,305 against 1,508–1,513 M ev/s), and it makes 3,941–3,954 rounds against 2,912–3,053.
+  - So in those reps it neither moved up nor matched the fixed window it sat at. These runs carry no per-round log (the paper launch), so which trials it rejected is not known.
+  - Section 173 found that σ 100 at 32 nodes wants W 400–600.
+- **Elsewhere** it is 0.85–1.06 per rep.
+- **Lookahead 10, σ 2,000 at PP 512, rep 5:** 0.59 at a mean W of 180, where the other reps sat at 68–76. The table takes WPs 512 there (the better setting), where every rep is 0.94–1.06.
+
+**Spread between reps** (max ÷ min, best arm):
+- **Devastator:** σ 4,000 had two slow reps (430–437 against 540–558 M ev/s, 1.30), and σ 100 spread 1.13. The other six spread at most 1.07.
+  - Against Devastator's fastest rep, Charades' controller is still 1.19–2.00 ahead (σ 100 1.19, σ 4,000 1.91).
+- **ROSS:** 1.41 on σ 4,000, 1.26 on σ 100 and 1.23 on uniform.
+- **No rep was disturbed.** Every fixed-W run made 1.00–1.05 count waves per GVT advance.
+
+**Predictions (section 240):**
+- **C1 (PHOLD, 32 nodes): right.**
+- **C3: right.**
+  - Charades leads in all eight at 32 nodes, each at 1.26 or more (predicted at least 1.05). The median is 1.55 (predicted at least 1.3).
+  - It also holds against Devastator's fastest rep (1.19–2.00).
+- **C4 at 32 nodes: right on medians, not in every rep.** The median per cell is 0.94–1.07 (predicted at least 0.90), but σ 100 falls to 0.79–0.80 in 2 of 5 reps.
+- **C5: mostly right.**
+  - Charades' per-node rate from 16 to 32 nodes at its best arm is 0.95–1.01 on five lookahead-100 workloads.
+  - On uniform it is 0.83 (predicted at least 0.88), where Devastator has 0.82.
+- **C6, third part: right at 32 nodes.** Charades ÷ ROSS is 3.87–6.08.
+
+**What follows:**
+- **The paper's PHOLD table** is F1 at 1–32 nodes (sections 242, 243 and this one). It replaces the table on the front page and A2r (section 153).
+  - Charades leads in 48 of 48 cells (old: 44).
+  - Charades ÷ Devastator is 1.08–2.25, and 1.26–2.01 at 32 nodes.
+  - Charades ÷ ROSS is 2.73–6.08.
+- **Claim 3's scaling sentence changes.** Charades no longer loses more per node than Devastator from 16 to 32 nodes.
+- **σ 100's low controller reps are reported, not explained** (user decision 2026-11-07: report slow reps, keep the controller). A 32-node check run with the per-round log on σ 100 would show which trials it rejects there.
+- **A fixed W above 400 at 32 nodes** was not run.
 
 ## Earlier
 
@@ -1635,3 +1676,51 @@ M committed ev/s, higher is better; C÷D and C÷R are Charades' controller ÷ th
   - **T2.** Unlike 4→16 nodes on long runs, most of the 16→32 loss is steady: the first 10% of waves hold at most 40% of it.
   - **T3.** The growth is in the spread between the first and the last process to contribute to a wave, not in the reduction: the spread grows by at least as much as the advance.
   - **T4.** On uniform, events per htram message (WPs 512) fall by at least 1.6× (twice the destinations).
+
+### §153 · A2r, 32 nodes, results: Charades leads in 6 of 8 but loses more per node from 16 to 32 nodes than Devastator everywhere; a start-up transient at σ 100, per-wave work on uniform (2026-10-29; skx batch job 3657016, 32 nodes)
+
+> **Superseded (2026-11-07):** the paper's 32-node PHOLD column now comes from §252 (job F1-32: the final defaults, `numactl --localalloc`, 5 reps). There Charades leads in all eight workloads (1.26–2.01) and keeps 0.82–1.00 of its per-node rate from 16 to 32 nodes.
+
+> **Status: current.** Design and predictions in section 144.
+> - **Allocation:** 32 nodes (c477-094 to c506-094, 13 racks), 18:45–20:01 (1 h 16 min), gate 30/30.
+> - **Runs:** Charades 90 (plus 30 controller runs at the end of each block, `_qlast`), Devastator 72, ROSS 48, all ok. Every cell has the same committed events in all three engines.
+> - **Traced block:** six runs, at 16 nodes (the first 16 of the allocation) and 32.
+> - **Data:** `~/charades-data/scale32/scale32/n32_j3657016/`, with `combined_1_32.txt` (`combine_a2r.py`: A1a + A1b + A2r) and `trace_summary.txt` (`trace32_summary.py`).
+> - **Corrected in section 154:** the traced block's "response" included the cross-process reduction (`handled_s` is when a process sent its counts). That inflates T3 and the uniform "+261 µs" line. The start-up transient is in the reduction, not in the processes' work.
+
+**All eight workloads, 1–32 nodes:** the table at the top of Current numbers (from `combine_a2r.py`).
+
+**Predictions:**
+- **P1 right.** Same committed events in every 32-node cell.
+- **P4 wrong for Charades, right for Devastator.** Per-node rate at 32 ÷ at 16 (A1):
+  - Charades 0.81–0.87 on the Gaussian workloads; only σ 2,000 (0.87) reaches the predicted 0.85. Uniform is 0.72, which is ≤ 0.85 as predicted.
+  - Devastator 0.93–0.98 on the Gaussian workloads (≥ 0.88 as predicted) and 0.80 on uniform.
+- **P5 wrong at 32 nodes.** The controller is 0.93–0.95 of its better fixed W on the five lookahead-100 Gaussian workloads apart from σ 4,000 (0.97), and 0.95 on uniform. It holds W near 300 (the κ bound), while W 400 is best here. Lookahead 10: 0.99 and 1.06.
+- **P6 right.** Charades ÷ ROSS at 32 nodes: 3.02 at σ 100, 4.14–4.52 at σ ≥ 1,000 and uniform.
+- **P7 right.** Charades leads Devastator in 44 of 48 cells.
+  - Of the narrower prediction: ahead at σ ≥ 500, uniform and lookahead 10 σ 2,000 (1.04–1.66), right.
+  - Lookahead 10 σ 500 at 0.99 is within 0.90–1.10, right; σ 100 at 0.89 is just outside it.
+- **Q2 right apart from single slow reps.** Median rep spread 1.04 (Charades arms) and 1.08 (Devastator). Some cells have one slow rep (Devastator σ 2,000, W 500: 603, 152, 597 M ev/s), which the median of 3 absorbs. Lookahead 10 σ 2,000 is the noisiest workload (Charades arms 1.34–2.17).
+- **Q3: no position effect.** The controller's last run in a block ÷ its first: median 1.005, within ±5% in 22 of 30 blocks; the outliers (0.81–1.27) are in uniform and lookahead 10 σ 2,000. A2's "0 of 10 fast" (section 144) was noise.
+- **Traced block (T1–T4), with a caveat.** Tracing (`--gvt-trace=2 --pe-stats=1`) cost 12–15% at σ 100 and 35–41% on uniform against untraced W 400 runs, and the 16-node σ 2,000 traced run was an outlier (first 10% of waves 3.6 s of 11.2 s). The traced ratios track the untraced ones: 16→32 per node at W 400, σ 100 0.88 traced against 0.90 untraced; uniform 0.69 against 0.77.
+  - **T1 wrong.** At σ 100 the steady wave period grows 20% (169 to 203 µs), but events per wave per node also grow 15% (fewer waves).
+  - **T2 wrong at σ 100, right on uniform.** At σ 100 the first 10% of waves hold all (110%) of the lost time. On uniform they hold 8%.
+  - **T3 wrong.** The median process's response to a GVT result grows about as much as the wave (σ 100: +34 µs of +34; uniform: +261 of +291 µs). The spread between the median and the slowest process grows less (+21 and +80 µs).
+  - **T4 just wrong.** Uniform events per htram message fall 1.50× (12.5 to 8.3), not ≥ 1.6×.
+
+**Mean wave period by tenth of a traced run** (µs, PE 0's view; lower is better):
+
+| run | 1st | 2nd | 3rd | 4th | 5th | 6th | 7th | 8th | 9th | 10th |
+|---|---|---|---|---|---|---|---|---|---|---|
+| σ 100, 16 nodes | 209 | 204 | 202 | 172 | 147 | 159 | 154 | 153 | 153 | 252 |
+| σ 100, 32 nodes | **557** | **367** | 168 | 200 | 183 | 192 | 179 | 178 | 176 | 171 |
+| uniform, 16 nodes | 446 | 386 | 350 | 365 | 439 | 370 | 449 | 341 | 317 | 987 |
+| uniform, 32 nodes | 615 | 1,507 | 460 | 254 | 400 | 769 | 1,061 | 570 | 437 | 415 |
+
+**What it says:**
+- **Charades still leads at 32 nodes in 6 of 8 workloads, but its lead shrinks from 16 to 32 nodes everywhere,** by 0.11–0.24 in Charades ÷ Devastator (σ 100: 1.04 to 0.89; σ 2,000: 1.35 to 1.24; uniform: 1.84 to 1.66; lookahead 10 σ 2,000: 1.35 to 1.11). This is the scaling gap to close.
+- **Three parts are visible:**
+  - **A start-up transient that grows with node count.** At σ 100 on 32 nodes the first fifth of the waves take 2–3× their later period; at 16 nodes the first tenths are about 1.3× it. Section 122 found the same from 4 to 16 nodes and that 4× longer runs amortize it. At 32 nodes even these long runs (end time 2,048,000) last only about 6 s. The cause is still unknown: warm-up pings did nothing (section 122).
+  - **On uniform, every process's work per wave grows** (median response +261 µs, 1.75×) as each process serves twice the destinations with thinner messages. Sections 125–132 found this from 4 to 16 nodes. The traced uniform run is too erratic for more detail.
+  - **The controller stays near W 300** while W 400 is better at 32 nodes: it is 3–7% below W 400 on the lookahead-100 workloads, against within ±4% at 1–16 nodes. Per-LP rollback (section 152) makes wider W cheaper, so the κ bound can be revisited.
+- **Next:** find the start-up transient (it is the largest part at σ 100 and a cost that grows with node count), and measure per-LP rollback with the controller at 32 nodes.
