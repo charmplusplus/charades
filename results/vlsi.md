@@ -22,15 +22,16 @@ Gate-level simulation of copies of ITC'99's b19: the model and its layout, the g
 | 209 | 2026-11-03 | current | Devastator's 1 × 46 hang was PSM2 pinning every thread to core 0; at the same layout the engines are level… |
 | 212 | 2026-11-03 | design | VLSI at 1–32 nodes in three engines, each at its best launch |
 | 214 | 2026-11-03 | current (1–16) | VS results at 1–16 nodes: Charades ÷ Devastator 0.84 / 0.91 / 0.99 / 0.97 / 0.89; one count per cell; from… |
-| 226 | 2026-11-04 | current | VS2 at 32 nodes (big2): Charades ÷ Devastator on VLSI falls to 1.05 (per rep 0.96–1.07); from 16 to 32 node… |
-| 228 | 2026-11-05 | current | Why VLSI's lead shrinks at 32 nodes, from data already taken: two thirds of the cycle's growth is slow coun… |
+| 228 | 2026-11-05 | superseded in part by §254 (was: current) | Why VLSI's lead shrinks at 32 nodes, from data already taken: two thirds of the cycle's growth is slow coun… |
 | 233 | 2026-11-05 | design (results in 234) | Where Charades' cost of running ahead goes on VLSI: each PE's time at W 2,500 / 3,750 / 5,000, and three sw… |
 | 234 | 2026-11-05 | current | RA results: the cost of running ahead on VLSI was the lazy commit rule; with eager commits W 5,000 runs at… |
 | 235 | 2026-11-05 | design (results in 236) | VLSI's commit setting and its controller row: lazy commits that cannot pile up, eager commits, and the cont… |
 | 236 | 2026-11-06 | current | VC results: eager commits at W 5,000 are VLSI's best setting at 1, 2 and 16 nodes and within 3–5% of it at… |
 | 249 | 2026-11-07 | current | VA results: VLSI at 1–16 nodes without diagnostics. Charades ÷ Devastator is 1.51 / 1.44 / 1.27 / 1.29 / 1.… |
+| 254 | 2026-11-07 | current | V32b results: VLSI at 32 nodes without diagnostics; Charades ÷ Devastator 1.26 with its best fixed arm and… |
 | 216 | 2026-11-03 | design (results in 217, 226) | VLSI at 1–32 nodes with round 3, a cycle-time trace per node count, and one process against two per node on… |
 | 217 | 2026-11-03 | superseded by §239 at 1–16 nodes (was: current (1–16; 32 nodes in 226)) | VS2 results at 1–16 nodes: with round 3 Charades ÷ Devastator is 1.37 / 1.27 / 1.23 / 1.29 / 1.19; the coun… |
+| 226 | 2026-11-04 | superseded by §254 (was: current) | VS2 at 32 nodes (big2): Charades ÷ Devastator on VLSI falls to 1.05 (per rep 0.96–1.07); from 16 to 32 node… |
 | 229 | 2026-11-05 | superseded by 233 (not run) | A VLSI window between one and two clock periods: its steady cost at 4–16 nodes |
 | 238 | 2026-11-06 | design (results in 239) | The paper's VLSI row with VLSI's new setting: eager commits at W 5,000, the widened controller and Devastat… |
 | 239 | 2026-11-06 | superseded by §249 (was: current) | VS3 results: with eager commits at W 5,000 Charades ÷ Devastator on VLSI is 1.51 / 1.40 / 1.26 / 1.30 / 1.2… |
@@ -980,83 +981,9 @@ The per-node rate at 4 nodes ÷ at 1 is 0.55 for Charades and 0.47 for Devastato
 - Section 212's S6 rule applies already: `--gvt-trace=1` cycle times at 4 and 16–32 nodes, to split Charades' growing cycle time into GVT advance and execution. One process per node with W at one clock period makes each cycle wait for a GVT round. That is a GVT-pace question, as on PHOLD at 32 nodes (sections 78–84), not a per-event one.
 - Round 3 (section 213) is measured separately; its 3% rule for rerunning the Charades cells stands.
 
-### §226 · VS2 at 32 nodes (big2): Charades ÷ Devastator on VLSI falls to 1.05 (per rep 0.96–1.07); from 16 to 32 nodes Charades' clock cycle grows by 14%, almost all of it the count wave in flight, while Devastator's cycle stays flat (2026-11-04; skx batch job 3679976, 32 nodes)
-
-> **Status: current.** Design and predictions in section 216; 1–16 nodes in section 217.
-> - **Job:** 53 minutes; gate 27/27; no run failed or hit the cap. One old-tree run (W 2,500, rep 4) took 142 s of wall time against about 25 s, with a normal execution time (9.82 s): the delay came before the simulation started. Devastator 2 × 23 at W 2,500, rep 1, ran 34.2 s against 7.8–9.0 s in the other reps; it stays in the median, which it does not move.
-> - **Data:** `~/charades-data/vlsi/vscale216/big2_j3679976/` (with `job.out`). `vscale216_summary.py` now also prints per-rep ratios; output for 1–32 nodes (this job, a2 and job a) in `vscale216_big2_summary.txt`.
-> - **Counts (Q1 right):** 4,104,430,712 committed events in all three engines, both Devastator layouts and both Charades trees. Round 3 and the old tree share the digest (6331beff…).
-
-**Every arm at 32 nodes** (M committed ev/s, median of 5 reps, higher is better; max ÷ min over the reps, 1.00 is no spread):
-
-| engine | arm | M ev/s | max ÷ min |
-|---|---|---|---|
-| Charades, round 3 (1 × 46) | W 2,500 | **603.59** | 1.19 |
-| | the controller (holds W 2,500) | 561.48 | 1.21 |
-| | W 5,000 | 550.93 | 1.03 |
-| Charades, old tree (1 × 46) | W 5,000 | 504.23 | 1.09 |
-| | the controller | 448.08 | 1.02 |
-| | W 2,500 | 431.59 | 1.08 |
-| Devastator 2 × 23 | W 10,000 | **576.93** | 1.01 |
-| | W 5,000 | 565.77 | 1.08 |
-| | W 2,500 | 467.08 | 4.41 (1.17 without rep 1) |
-| Devastator 1 × 46 | W 10,000 | 462.69 | 1.04 |
-| ROSS | batch 8, GVT interval 64, window 2,500 ps | 40.50 (efficiency 75%) | 1.02 |
-
-**VLSI at 1–32 nodes, each engine at its best arm** (M committed ev/s, median of 3 reps, 5 at 32; Charades round 3 at 1 × 46, Devastator 2 × 23 in the same allocation; ratios higher is better for Charades; ms per clock cycle lower is better):
-
-| nodes | Charades | Devastator | **Charades ÷ Devastator** (ratio of medians) | Charades ÷ Devastator per rep | Charades' controller ÷ Devastator | ms per cycle, Charades / Devastator |
-|---|---|---|---|---|---|---|
-| 1 | 61.76 (W 5,000) | 45.26 (W 10,000) | **1.365** | 1.358–1.381 | 1.136 | 0.408 / 0.557 |
-| 2 | 108.18 (W 5,000) | 85.43 (W 10,000) | **1.266** | 1.263–1.277 | 0.908 | 0.466 / 0.590 |
-| 4 | 103.33 (W 2,500) | 83.75 (W 2,500) | **1.234** | 1.215–1.234 | 1.210 | 1.112 / 1.372 |
-| 8 | 192.31 (W 2,500) | 149.05 (W 10,000) | **1.290** | 1.274–1.293 | 1.272 | 1.122 / 1.448 |
-| 16 | 351.41 (the controller) | 295.49 (W 5,000) | **1.189** | 1.175–1.197 | 1.189 | 1.188 / 1.413 |
-| 32 | 603.59 (W 2,500) | 576.93 (W 10,000) | **1.046** | 0.958–1.065 | 0.973 | 1.360 / 1.423 |
-
-- **At 32 nodes the engines are level:** Charades ÷ Devastator is 0.958 / 1.058 / 1.044 / 0.972 / 1.065 in reps 1–5 (engines interleaved in each rep). Charades leads by 1.19–1.37 at 1–16 nodes.
-- **From 16 to 32 nodes Charades' cycle grows from 1.188 to 1.360 ms (+14%); Devastator's from 1.413 to 1.423 ms (+0.7%).** Per-node rate from 16 to 32 nodes (1.0 is perfect): Charades 0.859, Devastator 0.976. From 4 to 32 nodes: Charades 0.730, Devastator 0.861. (The old tree: 0.951 from 16 to 32 and 0.764 from 4 to 32, its 16-node cell from job a.)
-- **Round 3 ÷ the old tree at 32 nodes: 1.197** (each at its best arm, same allocation).
-- **Devastator 1 × 46 ÷ 2 × 23: 0.80** at 32 nodes.
-- **Charades ÷ ROSS: 14.9** (ROSS's best of three settings, with its window).
-
-**The cycle split** (`--gvt-trace=1`, W 2,500, cycles 1,000–4,000; about two count waves per cycle; one run per node count; the 32-node traced run ran at 609 M ev/s, among the fast reps):
-
-| nodes | ms per cycle | count wave in flight, ms per cycle | ms per wave | between waves, ms per cycle |
-|---|---|---|---|---|
-| 4 | 1.172 | 0.149 (12.7%) | 0.073 | 1.023 |
-| 8 | 1.111 | 0.169 (15.2%) | 0.083 | 0.941 |
-| 16 | 1.173 | 0.215 (18.3%) | 0.106 | 0.958 |
-| 32 | 1.284 | 0.319 (24.8%) | 0.157 | 0.965 |
-
-- **From 16 to 32 nodes the traced cycle grows 0.111 ms, and the wave in flight grows 0.104 ms of it (94%).** The time between waves, set by node 2's busiest copy, grows 0.007 ms.
-- From 4 to 32 nodes the wave in flight grows 0.170 ms while the time between waves shrinks 0.058 ms; the waves account for more than the cycle's whole growth (0.112 ms).
-- Each wave takes 0.157 ms at 32 nodes, against 0.073 ms at 4 and 0.106 ms at 16. At W one clock period each cycle needs a GVT advance, so the wave's latency is on every cycle's path. Devastator's best window at 32 nodes is four periods (W 10,000).
-- **Not measured here:** why each wave takes longer at 32 nodes. Section 228 answers it from this data: two thirds of the growth is slow waves that come with the 32-node allocation.
-- The untraced W 2,500 cycle grows more than the traced one (+0.172 ms against +0.111 ms from 16 to 32 nodes). The traced run is one fast run and counts only cycles 1,000–4,000; the medians include the slow reps below.
-
-**The spread at W 2,500.** At one clock period both engines vary between reps at 32 nodes: Charades 518–615 M ev/s (1.19), Devastator 454–529 M ev/s without its outlier (1.17). Their wider windows are steady (Charades W 5,000 1.03, Devastator W 10,000 1.01). At 1–16 nodes Charades' W 2,500 varied by 1.01–1.04. Our reading, not tested: at W one period each cycle waits for every PE's contribution to the wave, so a delay on any of the 32 nodes delays the cycle, and a wider window lets PEs run past it.
-
-**The controller at 32 nodes.**
-- It holds W at 2,500 in every run (its range from the delay histogram is one bucket, as at 1–16 nodes), so it runs the same window as the W 2,500 arm.
-- **It runs at 0.90–1.00 of W 2,500 in each rep (median 0.935), slower in all five.** At 1–16 nodes it was 0.97–1.02 per rep. Arm order alternates between reps (the controller first in odd reps, last in even), so order does not explain it.
-- It adds no count waves (10,110–10,192 against 10,130–10,138 per run). Its PEs' blocked spells at the window are longer in every rep (mean 69–87 µs against 67–83 µs).
-- **Not measured here:** where the controller's extra time goes. Section 228: slow stretches; its steady cost is nil.
-- Against the best arm at 32 nodes it is 0.930, inside claim 2's 0.91–1.03; Charades' controller ÷ Devastator is 0.973.
-
-**Predictions (section 216), now with 32 nodes:**
-- **Q1 right** at 32 nodes as well.
-- **Q2 five of six:** round 3 ÷ the old tree at 32 nodes is 1.197, inside 1.15–1.50.
-- **Q3 wrong at 32 nodes, narrowly:** 1.046, not at least 1.05; per rep 0.96–1.07. Right at 1–16 nodes.
-- **Q4** covered 4 → 16 nodes only. From 4 to 32 nodes Charades' per-node rate is 0.730 against Devastator's 0.861.
-- **Q5 right at 32 nodes:** from 16 to 32 the count wave's growth is 94% of the traced cycle's growth, and from 4 to 32 it is more than all of it. From 4 to 16 (section 217) the split was within the trace's noise.
-
-**What follows:**
-- **F5's VLSI row is complete:** Charades ÷ Devastator 1.37 / 1.27 / 1.23 / 1.29 / 1.19 / 1.05 at 1 / 2 / 4 / 8 / 16 / 32 nodes, one committed count per cell in all three engines.
-- **The paper says where VLSI's scaling stops:** at W one clock period Charades needs a GVT advance every cycle, and from 16 to 32 nodes the count wave's latency is what grows. Section 216 named this as the design limit; this job measures it.
-- Making the wave faster at 32 nodes and beyond (the user's 64–256-node goal) would start with why a wave takes 0.157 ms. Not scheduled: the user's decision.
-
 ### §228 · Why VLSI's lead shrinks at 32 nodes, from data already taken: two thirds of the cycle's growth is slow count waves that come with the 32-node allocation, one third the waves' cross-process time; the controller has no steady cost; a wider window is immune but slower (2026-11-05; offline, no new runs; jobs VS2 a2 3679974 and big2 3679976, PHOLD jobs E16 3660089 and E 3660196)
+
+> **Superseded in part (2026-11-07):** this explains big2's 32-node loss at W 2,500, which the paper no longer uses. At W 5,000 Charades keeps its per-node rate from 16 to 32 nodes (§254), and V32b's 16-node halves ran as fast as a 16-node allocation, so C9 found no slow waves there.
 
 > **Status: current.** Reads section 226's data further and answers its two "not measured" items: why a wave takes longer at 32 nodes, and the controller's 0.90–1.00.
 > - **Script:** `~/charades-data/vlsi/vs2_offline228.py` (run in `vscale216/`); output `vs2_offline228.txt`.
@@ -1477,6 +1404,60 @@ The per-node rate at 4 nodes ÷ at 1 is 0.55 for Charades and 0.47 for Devastato
 - **The paper's VLSI row at 1–16 nodes** comes from this job. The 32-node column comes from V32b (3690452, queued).
 - **C9 (§240)** compares V32b's 16-node halves with this job's 16-node cell.
 
+### §254 · V32b results: VLSI at 32 nodes without diagnostics; Charades ÷ Devastator 1.26 with its best fixed arm and with its controller (old: 1.05); per-node rate from 16 to 32 nodes 1.00 for Charades' best fixed arm, 0.98 for Devastator; the 16-node halves run as fast as VA's 16-node allocation; one slow rep of E at W 5,000 (2026-11-07; skx batch job 3690452, 32 nodes)
+
+> **Status: current.** Design and predictions in sections 240 (C8, C9) and 247. With section 249 (1–16 nodes), it gives the paper's VLSI row at 1–32 nodes, and replaces section 226 (big2, lazy commits at W 2,500).
+> - **Job:** 23 minutes (15:59–16:22), 32 nodes. The gate passed.
+>   - First 16 nodes on each half side by side (A and B, 3 reps each), then 32 nodes (5 reps).
+>   - No run failed.
+> - **Arms:** VA's (section 249): Charades 1 × 46 eager at W 5,000 (E W 5,000) and W 2,500, lazy at W 2,500 (L), and the controller (eager, buckets of 2,500 ps). Plus the `O` check arm (old diagnostics) in every rep. Devastator 2 × 23 at W 2,500 / 5,000 / 10,000.
+> - **Data:** `~/charades-data/vlsi/vlsi32_j3690452/` (with `job.out`; copy 2's node was sampled around every Charades run, in `*.snap0`/`*.snap1`, not read here). The summary is `~/charades-data/vlsi/vscale32_summary.py` (against VA, `vlsia_j3691150`, and big2, `vscale216/big2_j3679976`), with output in `vlsi32_j3690452_summary.txt`.
+> - **Counts (C1, D1):** each cell commits one count in both engines. Charades' `O` runs give one digest per cell, and the 16-node digest equals VA's.
+
+**Each engine at its best** (medians; M committed ev/s; higher is better):
+
+| cell | Charades E W 5,000 / E W 2,500 / L W 2,500 / controller | Devastator W 2,500 / 5,000 / 10,000 | Charades best fixed ÷ Devastator best | Charades controller ÷ Devastator best | controller ÷ best fixed, per rep |
+|---|---|---|---|---|---|
+| 32 nodes | 734.4 / 622.4 / 658.2 / 731.7 | 532.4 / 580.0 / 582.1 | **1.26** (1.26 against its fastest rep) | **1.26** | 0.958–1.089 |
+| 16 nodes, half A | 373.2 / 342.0 / 345.5 / 375.8 | 289.5 / 292.6 / 290.7 | 1.28 | 1.28 | 0.999–1.007 |
+| 16 nodes, half B | 369.1 / 337.7 / 351.4 / 370.1 | 286.4 / 291.3 / 286.2 | 1.27 | 1.27 | 0.997–1.060 |
+| 16 nodes, VA (section 249) | 367.7 / 343.8 / 353.3 / 374.8 | 290.2 / 287.6 / 297.4 | 1.24 | 1.26 | 0.995–1.021 |
+
+**The VLSI row at 1–32 nodes** (Charades ÷ Devastator, each at its best fixed arm; controller in parentheses): 1.51 / 1.44 / 1.27 / 1.29 / 1.24 / **1.26** (1.45 / 1.36 / 1.27 / 1.30 / 1.26 / **1.26**).
+- Charades ÷ ROSS at 32 nodes is 18.1. ROSS was not rerun; its best 32-node rate is from big2 (40.5 M ev/s), since ROSS has not changed.
+
+**Against big2 (section 226), the same 32 nodes at the old setting:**
+- **Charades:** its best fixed arm is 1.22× big2's (eager at W 5,000, 734.4, against lazy at W 2,500, 603.6). Devastator is 1.01× its own.
+- **The ratio:** Charades ÷ Devastator rises from 1.05 to 1.26.
+- **Scaling:** from 16 to 32 nodes Charades' best fixed arm now keeps its per-node rate (0.999 against VA's 16-node cell), as does Devastator (0.979). At W 2,500 in big2, Charades' clock cycle grew 14% from 16 to 32 nodes.
+- **W 2,500 here:** it still loses at 32 nodes. E W 2,500 runs at 0.85 of E W 5,000, and L W 2,500 at 0.90; at 16 nodes they run at 0.92–0.96 of it. W 5,000 avoids that cost, as section 236 intended.
+
+**Spread between reps:**
+- **At 32 nodes:**
+  - Charades' controller 1.07, L W 2,500 1.03, E W 2,500 1.17.
+  - E W 5,000 1.29, from one slow rep: 590 M ev/s in rep 3, against 731–759 in the other four (within 1.04).
+  - Devastator 1.02–1.04.
+- **On the halves:** Charades 1.01–1.08. Devastator had one slow rep, 58 M ev/s at W 5,000 on half B in rep 2 against 291, a fifth of its rate.
+- **Slow reps are reported, not investigated** (user decision 2026-11-07). Copy 2's node samples for E W 5,000 rep 3 are in the data.
+
+**The old diagnostics** (`O` ÷ E W 5,000, paired per rep) cost 0.999 at 16 nodes (range 0.977–1.057) and 0.998 at 32 (0.963–1.244; the high end is E's slow rep 3).
+
+**Predictions:**
+- **C1, D1: right.**
+- **C8: two parts right, one wrong.**
+  - Right: Charades ÷ Devastator at the best fixed arm is 1.26 (predicted at least 1.15).
+  - Right: the controller is 0.958–1.089 of the best fixed arm per rep, and 0.996 on medians (at least 0.95).
+  - Wrong: E at W 5,000 varies 1.29× between reps (at most 1.05 predicted). That is one slow rep; the other four are within 1.04.
+- **C9: half right.**
+  - Wrong: at W 2,500 the halves run at 0.978–0.995 of VA's 16-node cell, not at least 3% slower on one half. So this allocation shows no slow waves at 16 nodes, and section 228's reading (slow waves come with the 32-node allocation) gets no new support.
+  - Right: E at W 5,000 is within 3% (1.004 and 1.015).
+- **D2: right.** The old diagnostics cost 0–0.2% on medians.
+- **D5: right.** Devastator on the halves runs at 0.98 of VA's cell, and at 32 nodes at 1.01× big2.
+
+**What follows:**
+- **The paper's VLSI row** is complete at 1–32 nodes on the final setting (sections 249 and this one). Charades leads at every node count: 1.24–1.51 at its best fixed arm, 1.26–1.45 with its controller.
+- **Section 226 is superseded;** section 228 is superseded in part. Its explanation of big2's 32-node loss was for W 2,500, which the paper no longer uses, and C9 found no slow waves on this allocation's halves.
+
 ## Earlier
 
 Superseded or historical sections, in the order they were written. Their numbers came from an older stack, launch or setting, or a later section replaced them; each says which.
@@ -1575,6 +1556,84 @@ Superseded or historical sections, in the order they were written. Their numbers
 - big2 adds the 32-node cell (all three engines, both Charades trees).
 - **The VLSI row of the paper's table uses round 3** (Charades ÷ Devastator 1.19–1.37 at 1–16 nodes).
 - **The paper's other tables** were measured on the paper's tree. Round 3 is 1.16–1.18× on PHOLD at 2 × 23 (section 215), and the launch stays 2 × 23. Rerunning them on round 3 is the user's decision.
+
+### §226 · VS2 at 32 nodes (big2): Charades ÷ Devastator on VLSI falls to 1.05 (per rep 0.96–1.07); from 16 to 32 nodes Charades' clock cycle grows by 14%, almost all of it the count wave in flight, while Devastator's cycle stays flat (2026-11-04; skx batch job 3679976, 32 nodes)
+
+> **Superseded (2026-11-07):** the paper's 32-node VLSI cell now comes from §254 (job V32b: eager commits at W 5,000, no diagnostics): Charades ÷ Devastator 1.26, and Charades keeps its per-node rate from 16 to 32 nodes.
+
+> **Status: current.** Design and predictions in section 216; 1–16 nodes in section 217.
+> - **Job:** 53 minutes; gate 27/27; no run failed or hit the cap. One old-tree run (W 2,500, rep 4) took 142 s of wall time against about 25 s, with a normal execution time (9.82 s): the delay came before the simulation started. Devastator 2 × 23 at W 2,500, rep 1, ran 34.2 s against 7.8–9.0 s in the other reps; it stays in the median, which it does not move.
+> - **Data:** `~/charades-data/vlsi/vscale216/big2_j3679976/` (with `job.out`). `vscale216_summary.py` now also prints per-rep ratios; output for 1–32 nodes (this job, a2 and job a) in `vscale216_big2_summary.txt`.
+> - **Counts (Q1 right):** 4,104,430,712 committed events in all three engines, both Devastator layouts and both Charades trees. Round 3 and the old tree share the digest (6331beff…).
+
+**Every arm at 32 nodes** (M committed ev/s, median of 5 reps, higher is better; max ÷ min over the reps, 1.00 is no spread):
+
+| engine | arm | M ev/s | max ÷ min |
+|---|---|---|---|
+| Charades, round 3 (1 × 46) | W 2,500 | **603.59** | 1.19 |
+| | the controller (holds W 2,500) | 561.48 | 1.21 |
+| | W 5,000 | 550.93 | 1.03 |
+| Charades, old tree (1 × 46) | W 5,000 | 504.23 | 1.09 |
+| | the controller | 448.08 | 1.02 |
+| | W 2,500 | 431.59 | 1.08 |
+| Devastator 2 × 23 | W 10,000 | **576.93** | 1.01 |
+| | W 5,000 | 565.77 | 1.08 |
+| | W 2,500 | 467.08 | 4.41 (1.17 without rep 1) |
+| Devastator 1 × 46 | W 10,000 | 462.69 | 1.04 |
+| ROSS | batch 8, GVT interval 64, window 2,500 ps | 40.50 (efficiency 75%) | 1.02 |
+
+**VLSI at 1–32 nodes, each engine at its best arm** (M committed ev/s, median of 3 reps, 5 at 32; Charades round 3 at 1 × 46, Devastator 2 × 23 in the same allocation; ratios higher is better for Charades; ms per clock cycle lower is better):
+
+| nodes | Charades | Devastator | **Charades ÷ Devastator** (ratio of medians) | Charades ÷ Devastator per rep | Charades' controller ÷ Devastator | ms per cycle, Charades / Devastator |
+|---|---|---|---|---|---|---|
+| 1 | 61.76 (W 5,000) | 45.26 (W 10,000) | **1.365** | 1.358–1.381 | 1.136 | 0.408 / 0.557 |
+| 2 | 108.18 (W 5,000) | 85.43 (W 10,000) | **1.266** | 1.263–1.277 | 0.908 | 0.466 / 0.590 |
+| 4 | 103.33 (W 2,500) | 83.75 (W 2,500) | **1.234** | 1.215–1.234 | 1.210 | 1.112 / 1.372 |
+| 8 | 192.31 (W 2,500) | 149.05 (W 10,000) | **1.290** | 1.274–1.293 | 1.272 | 1.122 / 1.448 |
+| 16 | 351.41 (the controller) | 295.49 (W 5,000) | **1.189** | 1.175–1.197 | 1.189 | 1.188 / 1.413 |
+| 32 | 603.59 (W 2,500) | 576.93 (W 10,000) | **1.046** | 0.958–1.065 | 0.973 | 1.360 / 1.423 |
+
+- **At 32 nodes the engines are level:** Charades ÷ Devastator is 0.958 / 1.058 / 1.044 / 0.972 / 1.065 in reps 1–5 (engines interleaved in each rep). Charades leads by 1.19–1.37 at 1–16 nodes.
+- **From 16 to 32 nodes Charades' cycle grows from 1.188 to 1.360 ms (+14%); Devastator's from 1.413 to 1.423 ms (+0.7%).** Per-node rate from 16 to 32 nodes (1.0 is perfect): Charades 0.859, Devastator 0.976. From 4 to 32 nodes: Charades 0.730, Devastator 0.861. (The old tree: 0.951 from 16 to 32 and 0.764 from 4 to 32, its 16-node cell from job a.)
+- **Round 3 ÷ the old tree at 32 nodes: 1.197** (each at its best arm, same allocation).
+- **Devastator 1 × 46 ÷ 2 × 23: 0.80** at 32 nodes.
+- **Charades ÷ ROSS: 14.9** (ROSS's best of three settings, with its window).
+
+**The cycle split** (`--gvt-trace=1`, W 2,500, cycles 1,000–4,000; about two count waves per cycle; one run per node count; the 32-node traced run ran at 609 M ev/s, among the fast reps):
+
+| nodes | ms per cycle | count wave in flight, ms per cycle | ms per wave | between waves, ms per cycle |
+|---|---|---|---|---|
+| 4 | 1.172 | 0.149 (12.7%) | 0.073 | 1.023 |
+| 8 | 1.111 | 0.169 (15.2%) | 0.083 | 0.941 |
+| 16 | 1.173 | 0.215 (18.3%) | 0.106 | 0.958 |
+| 32 | 1.284 | 0.319 (24.8%) | 0.157 | 0.965 |
+
+- **From 16 to 32 nodes the traced cycle grows 0.111 ms, and the wave in flight grows 0.104 ms of it (94%).** The time between waves, set by node 2's busiest copy, grows 0.007 ms.
+- From 4 to 32 nodes the wave in flight grows 0.170 ms while the time between waves shrinks 0.058 ms; the waves account for more than the cycle's whole growth (0.112 ms).
+- Each wave takes 0.157 ms at 32 nodes, against 0.073 ms at 4 and 0.106 ms at 16. At W one clock period each cycle needs a GVT advance, so the wave's latency is on every cycle's path. Devastator's best window at 32 nodes is four periods (W 10,000).
+- **Not measured here:** why each wave takes longer at 32 nodes. Section 228 answers it from this data: two thirds of the growth is slow waves that come with the 32-node allocation.
+- The untraced W 2,500 cycle grows more than the traced one (+0.172 ms against +0.111 ms from 16 to 32 nodes). The traced run is one fast run and counts only cycles 1,000–4,000; the medians include the slow reps below.
+
+**The spread at W 2,500.** At one clock period both engines vary between reps at 32 nodes: Charades 518–615 M ev/s (1.19), Devastator 454–529 M ev/s without its outlier (1.17). Their wider windows are steady (Charades W 5,000 1.03, Devastator W 10,000 1.01). At 1–16 nodes Charades' W 2,500 varied by 1.01–1.04. Our reading, not tested: at W one period each cycle waits for every PE's contribution to the wave, so a delay on any of the 32 nodes delays the cycle, and a wider window lets PEs run past it.
+
+**The controller at 32 nodes.**
+- It holds W at 2,500 in every run (its range from the delay histogram is one bucket, as at 1–16 nodes), so it runs the same window as the W 2,500 arm.
+- **It runs at 0.90–1.00 of W 2,500 in each rep (median 0.935), slower in all five.** At 1–16 nodes it was 0.97–1.02 per rep. Arm order alternates between reps (the controller first in odd reps, last in even), so order does not explain it.
+- It adds no count waves (10,110–10,192 against 10,130–10,138 per run). Its PEs' blocked spells at the window are longer in every rep (mean 69–87 µs against 67–83 µs).
+- **Not measured here:** where the controller's extra time goes. Section 228: slow stretches; its steady cost is nil.
+- Against the best arm at 32 nodes it is 0.930, inside claim 2's 0.91–1.03; Charades' controller ÷ Devastator is 0.973.
+
+**Predictions (section 216), now with 32 nodes:**
+- **Q1 right** at 32 nodes as well.
+- **Q2 five of six:** round 3 ÷ the old tree at 32 nodes is 1.197, inside 1.15–1.50.
+- **Q3 wrong at 32 nodes, narrowly:** 1.046, not at least 1.05; per rep 0.96–1.07. Right at 1–16 nodes.
+- **Q4** covered 4 → 16 nodes only. From 4 to 32 nodes Charades' per-node rate is 0.730 against Devastator's 0.861.
+- **Q5 right at 32 nodes:** from 16 to 32 the count wave's growth is 94% of the traced cycle's growth, and from 4 to 32 it is more than all of it. From 4 to 16 (section 217) the split was within the trace's noise.
+
+**What follows:**
+- **F5's VLSI row is complete:** Charades ÷ Devastator 1.37 / 1.27 / 1.23 / 1.29 / 1.19 / 1.05 at 1 / 2 / 4 / 8 / 16 / 32 nodes, one committed count per cell in all three engines.
+- **The paper says where VLSI's scaling stops:** at W one clock period Charades needs a GVT advance every cycle, and from 16 to 32 nodes the count wave's latency is what grows. Section 216 named this as the design limit; this job measures it.
+- Making the wave faster at 32 nodes and beyond (the user's 64–256-node goal) would start with why a wave takes 0.157 ms. Not scheduled: the user's decision.
 
 ### §229 · A VLSI window between one and two clock periods: its steady cost at 4–16 nodes (job VW design, 2026-11-05; written before any runs)
 
