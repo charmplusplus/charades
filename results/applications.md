@@ -16,9 +16,9 @@ The two applications ported from Charades to ROSS and Devastator (phase B), the 
 | 187 | 2026-11-02 | current / design | F5 calibration results: every engine commits the same events; aggregation gains 1.36–1.38× on traffic throu… |
 | 194 | 2026-11-02 | current | F5b results, 32 nodes: one count per cell in all three engines; on dragonfly Charades ÷ Devastator reaches… |
 | 248 | 2026-11-06 | current | F5a2 results: traffic and dragonfly at 1–16 nodes without diagnostics. Charades ÷ Devastator (controller) i… |
-| 188 | 2026-11-02 | superseded | F5a results, 1–16 nodes: every cell commits one count in all three engines; on dragonfly Charades' lead ove… |
-| 189 | 2026-11-02 | superseded | F5c results: ROSS's best on dragonfly is batch 2 / GVT interval 64; batch 1 and GVT interval 16 are slower;… |
-| 244 | 2026-11-06 | superseded | F5a results: traffic and dragonfly at 1–16 nodes on the final defaults. Charades leads Devastator in all 10… |
+| 188 | 2026-11-02 | superseded by §244, then §248 (was: current / design) | F5a results, 1–16 nodes: every cell commits one count in all three engines; on dragonfly Charades' lead ove… |
+| 189 | 2026-11-02 | superseded by §244 (was: current) | F5c results: ROSS's best on dragonfly is batch 2 / GVT interval 64; batch 1 and GVT interval 16 are slower;… |
+| 244 | 2026-11-06 | superseded by §248 (was: current) | F5a results: traffic and dragonfly at 1–16 nodes on the final defaults. Charades leads Devastator in all 10… |
 
 ## Current
 

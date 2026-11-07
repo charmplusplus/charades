@@ -33,8 +33,8 @@ Gaussian and uniform PHOLD in Charades, Devastator and ROSS: σ sweeps, full nod
 | 20 | 2026-10-21 | superseded | Three engines: the gaps filled |
 | 27 | 2026-10-22 | design | Gaussian PHOLD σ sweep on the fast stack |
 | 28 | 2026-10-22 | superseded | Gaussian PHOLD σ sweep on the fast stack, results |
-| 142 | 2026-10-28 | superseded | A1a, weak scaling 1–16 nodes, group a (σ 100, σ 1,000, σ 4,000, lookahead 10 σ 2,000), results |
-| 143 | 2026-10-28 | superseded | A1b, weak scaling 1–16 nodes, group b (σ 500, σ 2,000, uniform, lookahead 10 σ 500) and σ 1,000 with both h… |
+| 142 | 2026-10-28 | superseded by §242 (was: current) | A1a, weak scaling 1–16 nodes, group a (σ 100, σ 1,000, σ 4,000, lookahead 10 σ 2,000), results |
+| 143 | 2026-10-28 | superseded by §243 (was: current) | A1b, weak scaling 1–16 nodes, group b (σ 500, σ 2,000, uniform, lookahead 10 σ 500) and σ 1,000 with both h… |
 | 144 | 2026-10-29 | not for use / design | A2, 32 nodes: a noisy allocation, so the 32-node point is rerun |
 
 ## Current
