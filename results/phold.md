@@ -25,6 +25,7 @@ Gaussian and uniform PHOLD in Charades, Devastator and ROSS: σ sweeps, full nod
 | 242 | 2026-11-06 | current | F1a results: on PHOLD group a (σ 100, σ 1,000, σ 4,000, lookahead 10 σ 2,000) Charades ÷ Devastator is 1.13… |
 | 243 | 2026-11-06 | current | F1b results, and F1 at 1–16 nodes: Charades leads Devastator in all 40 PHOLD cells (1.08–2.25), each ratio… |
 | 252 | 2026-11-07 | current | F1-32 results, and F1 at 1–32 nodes: Charades leads Devastator in all 48 PHOLD cells, 1.26–2.01 at 32 nodes… |
+| 255 | 2026-11-07 | current | How each engine slows as events go to other processes, and its GVT pace, from F1's data: Charades keeps 0.4… |
 | 1 | 2026-10-19 | historical | First Stampede3 measurements |
 | 2 | 2026-10-19 | historical | Optimism window sweep |
 | 11 | 2026-10-21 | design | Gaussian PHOLD σ sweep |
@@ -969,6 +970,68 @@ With Charades at its best arm (controller or fixed W), the ratios are 1.00–1.0
 - **Claim 3's scaling sentence changes.** Charades no longer loses more per node than Devastator from 16 to 32 nodes.
 - **σ 100's low controller reps are reported, not explained** (user decision 2026-11-07: report slow reps, keep the controller). A 32-node check run with the per-round log on σ 100 would show which trials it rejects there.
 - **A fixed W above 400 at 32 nodes** was not run.
+
+### §255 · How each engine slows as events go to other processes, and its GVT pace, from F1's data: Charades keeps 0.41–0.76 of its σ 100 rate from σ 2,000 to uniform at 32 nodes, Devastator 0.26–0.58; Devastator's time per GVT advance grows 4.6× from σ 100 to uniform, Charades' 2.4×, but in both it follows the event rate (2026-11-07; offline, no runs)
+
+> **Status: current.** Analysis of F1's PHOLD runs (sections 242, 243, 252; jobs 3689004, 3689513, 3688916) for the user's question: does Charades lose less than Devastator as communication becomes remote, and does that answer the future work Devastator's authors name ("with so many messages flying around, the asynchronous GVT algorithm is slower to complete and the adaptive moving time window is slow to adapt")?
+> - **Scripts:** `~/charades-data/f1/gvt_vs_remote.py`, output `gvt_vs_remote.txt`. The rate table comes from `f1_240_summary.py`'s cells.
+> - **Remote share** is the share of executed events whose sends go to another process: Charades' `Events Through htram` ÷ executed events, in its controller runs. The local fast path keeps same-process events out of htram (section 222). It is the same at every node count from 4 up (weak scaling), apart from uniform: 87.5% at 4 nodes, 96.8% at 16, 98.4% at 32. At 1 node it caps at 50% (two processes).
+
+**Each engine's rate as a share of its own σ 100 rate, 32 nodes** (medians of 5 reps; each engine at its best arm as in F1's table; higher means it loses less):
+
+| workload | events sent to another process | Charades | Devastator | ROSS | Charades ÷ Devastator |
+|---|---|---|---|---|---|
+| σ 100 | 2.7% | 1.00 | 1.00 | 1.00 | 1.26 |
+| σ 500 | 13.5% | 0.89 | 0.76 | 0.72 | 1.46 |
+| σ 1,000 | 27% | 0.84 | 0.67 | 0.62 | 1.58 |
+| σ 2,000 | 50% | 0.76 | 0.58 | 0.52 | 1.66 |
+| σ 4,000 | 72% | 0.70 | 0.44 | 0.46 | 1.98 |
+| uniform | 98% | 0.41 | 0.26 | 0.43 | 2.01 |
+
+- **At 4 and 16 nodes the order is the same.**
+  - At 16 nodes: Charades 0.74 / 0.69 / 0.48 at σ 2,000 / σ 4,000 / uniform, Devastator 0.57 / 0.44 / 0.30.
+  - At 4 nodes: Charades 0.75 / 0.70 / 0.74, Devastator 0.59 / 0.46 / 0.40.
+- **At 1 node,** where "remote" means the node's other process, Charades loses more at σ 500–1,000 (0.79–0.88 against Devastator's 0.88–0.93) and less from σ 2,000 up (0.79–0.87 against 0.68–0.70).
+- **Devastator stays ahead of ROSS everywhere** (Devastator ÷ ROSS on uniform: 3.1 at 1 node, 1.92 at 32). The crossover the Devastator paper reports on Frontera (ROSS 8.7× faster at 2 nodes, σ 10⁴) does not appear on this system with these settings. Devastator's lead over ROSS does shrink as remote traffic grows (3.2 at σ 100, 32 nodes).
+
+**Why uniform drops most for Charades: events per htram message** (controller runs, rep 1):
+
+| workload | 4 nodes | 16 nodes | 32 nodes |
+|---|---|---|---|
+| σ 100 (PP 2,048) | 34.6 | 34.4 | 32.9 |
+| σ 2,000 (PP 512) | 64.9 | 62.8 | 56.7 |
+| σ 4,000 (PP 512) | 60.8 | 52.9 | 49.8 |
+| uniform (PP 512) | 102.0 | 14.5 | 8.4 |
+
+- **Uniform sends to every process.** Each destination's buffer fills slowly before its deadline flush, so the bundling that carries Charades elsewhere thins out from 16 nodes up.
+- **Gaussian destinations stay within a bounded neighbourhood,** so messages keep 50–65 events at every node count.
+
+**GVT pace** (per GVT advance; Charades at its controller, Devastator at its best fixed W, 1,000 at lookahead 100; medians):
+
+| workload | Charades: wall ms per advance, 32 nodes | Devastator: wall ms per advance, 32 nodes | Devastator ÷ Charades, 4 / 16 / 32 nodes |
+|---|---|---|---|
+| σ 100 | 0.154 | 0.719 | 2.2 / 4.4 / 4.7 |
+| σ 2,000 | 0.192 | 1.445 | 7.6 / 8.1 / 7.5 |
+| σ 4,000 | 0.209 | 1.897 | 9.6 / 9.6 / 9.1 |
+| uniform | 0.370 | 3.310 | 6.8 / 10.1 / 9.0 |
+
+- **How the advances are counted:**
+  - Devastator's advances are its window updates: `global_status.update` runs only when an epoch advances GVT (`pdes.cxx:896`), and the bench prints the count. Its window is fixed in these runs.
+  - Charades makes one count wave per GVT advance (1.00) in every fixed-W run at every remote share, so none of its waves is wasted when traffic is heavy.
+- **What each advance covers:** Charades advances about 80 time units per GVT at 32 nodes (W 400) and commits 220–240 k events. Devastator advances 300–366 (W 1,000) and commits 850–1,034 k.
+- **From σ 100 to uniform at 32 nodes,** Devastator's time per advance grows 4.6× and Charades' 2.4×.
+- **Both track the event rate:** committed events per advance stay nearly constant in each engine (Charades 221–239 k, Devastator 850–1,034 k), so the time per advance grows as the rate falls.
+- **So this data cannot separate "GVT is slower to complete" from "events are slower".** Telling them apart would take traces inside Devastator. The paper should not claim a faster GVT; it can say Charades' GVT advances 4.7–9.1× as often at 32 nodes and wastes no wave.
+
+**What this supports for the paper:**
+- **Supported:**
+  - Charades loses less than Devastator as communication becomes remote, from 4 nodes up, so its lead grows with the remote share (1.26 to 2.01 at 32 nodes).
+  - Its window controller stays within 1–4% of the best fixed W on uniform and σ 2,000 (section 251), where Devastator's window fell to 0.09 or did not finish. That answers "slow to adapt".
+- **Not supported:**
+  - A fix for the Devastator paper's ROSS crossover, which does not appear here.
+  - A faster GVT, which was not measured apart from the event rate.
+  - Behaviour beyond 32 nodes. Uniform's message size is already falling at 32 (job AG32, section 256, measures what bundling still buys there).
+- **Wording:** "Charades loses less than Devastator as communication becomes remote", not "solves".
 
 ## Earlier
 

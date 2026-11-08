@@ -35,6 +35,7 @@ Message cost, htram's modes and buffers, the deadline flush policy, choosing htr
 | 161 | 2026-10-30 | current | Job P16 results: allocating PP's shared buffers at their own limit removes most of PP's start-up ramp and g… |
 | 222 | 2026-11-04 | design | F2 and F3 on PHOLD and traffic, and ROSS's window on traffic and dragonfly |
 | 223 | 2026-11-04 | current (F2, ROSS) / superseded (F3) | ABL results: htram's deadline flush is 2.1–3.3× direct sends on PHOLD and 1.4× on traffic; eager flush lose… |
+| 256 | 2026-11-07 | design | Bundling at 32 nodes on the remote-heavy end, and fixed windows past F1's and F5's grids |
 | 3 | 2026-10-20 | historical | Per-message cost and scaling |
 | 4 | 2026-10-20 | superseded | Aggregation through htram |
 | 5 | 2026-10-20 | historical | Deadline flush policy |
@@ -1034,6 +1035,61 @@ This is a diagnosis; neither setting is a candidate for the paper's launch (sect
 - **AB4 right in 23 of 24 cells;** eager uniform at 16 nodes is 1.08, above the range.
 - **AB5 not tested** (wrong release rule; rerun).
 - **AB6 half:** the window gains 1.13–1.19 on traffic (in range) and 1.35–1.48 on dragonfly (above it). Charades ÷ ROSS stays at least 1.5 on traffic and at least 3 on dragonfly (3.00 at 4 nodes, the edge).
+
+### §256 · Bundling at 32 nodes on the remote-heavy end, and fixed windows past F1's and F5's grids (job AG32 design, 2026-11-07; written before any runs)
+
+> **Status: design.**
+> - **User decision 2026-11-07:** do the free analysis (section 255) and run 1, and add the wider fixed windows to it.
+> - **Submitted 2026-11-07:** 3692756 (skx, 32 nodes; pending on resources).
+> - **Script:** `$WORK/charades-runs/ag32_256.slurm` (copy in `~/charades-data/f1/`). It runs on skx (32 nodes exceeds skx-dev), limit 2:30, about 70–80 minutes, `-x c455-081`.
+> - **Code:** tree `charades-r5` (85a2aad), as F1. Charades only: the other engines' 32-node rates are in sections 252–253.
+
+**Why.**
+- **Part A:** on uniform, F1's 32-node runs carried 8.4 events per htram message, against 102 at 4 nodes (section 255). Bundling's gain over direct sends was measured only at 4 and 16 nodes (job ABL, section 223: uniform 3.31 and 2.65). At 32 nodes it is unknown, and claim 1 needs it.
+- **Part B:** at 32 nodes F1's and F5's best fixed W was the grid's widest (W 400 at lookahead 100, traffic W 1,000). On lookahead 10 the controller beat both fixed W (1.05–1.07), which points to a best W between the grid points.
+
+**Runs** (32 nodes, 5 reps; per rep part A then part B, with workload and arm order reversed in even reps; one warm-up run first):
+- **Part A:** uniform and σ 4,000 × {direct sends, PP 512, PP 2,048, WPs 512, WPs 2,048} × {W 300, 400, 500, 600, the controller}. That is 50 runs per rep.
+- **Part B:**
+  - σ 100, σ 500, σ 1,000 (PP 2,048) and σ 2,000 (PP 512): W 400 / 500 / 600 and the controller;
+  - lookahead 10 σ 500 (PP 2,048): W 50 / 75 / 100 / 150 and the controller;
+  - lookahead 10 σ 2,000 (WPs 512): W 50 / 75 / 100 and the controller;
+  - traffic (PP 2,048; F5's size): W 1,000 / 1,500 / 2,000 and the controller.
+  - That is 29 runs per rep.
+- **Gate:** F1's change-tier set on 2 nodes, plus Traffic.
+
+**Flags per arm** (from a stub run with a fake `srun`: 396 commands, as planned). Every run carries the paper launch only:
+- `+lci_ndevices 23 +pemap 2-46:2,3-47:2 +mempool_remote_free` under `numactl --localalloc`, `srun -c 24`, 2 × 23 PEs per node;
+- config `bucket`, `--gvt-bucket-size=8`.
+
+| arm | Charades flags beyond the launch | why |
+|---|---|---|
+| fixed W, bundled | `--optimism-window=W --aggregation=1 --agg-mode=M --agg-buffer=B --agg-policy=1 --agg-horizon-margin=8` | the window and the htram setting under test |
+| fixed W, direct sends | `--optimism-window=W` | no aggregation flags; the same-process fast path stays on, as in every run |
+| controller | `--ctl=3 --ctl-bracket=1`, plus the htram flags when bundled | the frozen controller |
+| warm-up | W 300, σ 100, PP 2,048, end 512,000 | first-run effects; not counted |
+
+No log, stats, trace or digest flag appears in any command. PHOLD runs carry no digest, as in F1.
+
+**Predictions:**
+- **AG-1. Counts:** one committed count per workload across all arms and reps, equal to F1's 32-node counts (traffic: F5-32b's).
+- **AG-2. Bundling's gain at 32 nodes:** the best htram run ÷ the best direct-send run (each over W 300–600 and the controller, medians) is 1.5–2.5 on uniform and 2.0–3.0 on σ 4,000.
+- **AG-3. Message size on uniform:**
+  - Buffer 2,048 changes events per message by less than 20% against 512, since flushes are driven by the deadline, not by full buffers.
+  - W 600 carries at least 1.3× W 300's events per message.
+  - The best PP and WPs runs are within 10% of each other in rate.
+- **AG-4. Best fixed W:** 400–500 for htram on uniform and σ 4,000. Direct sends' best W is no wider than htram's.
+- **AG-5. Wider windows elsewhere:**
+  - On σ 100–2,000, W 500 is within ±3% of W 400, and W 600 is below W 500.
+  - On traffic, W 1,500 is within ±3% of W 1,000, and W 2,000 is lower.
+  - On lookahead 10, W 75 is the best fixed W on both workloads, by at least 2% over W 50 and W 100.
+- **AG-6. The controller ÷ the best fixed W over the widened grid** is 0.93–1.02 per cell (F1-32 on its grid: 0.94–1.07).
+- **AG-7. Spread between reps:** at most 1.15 for every arm, apart from at most one slow rep per arm.
+
+**What follows:**
+- **If AG-2 holds,** claim 1 quotes bundling's gain at 32 nodes on the remote-heavy end. If it falls well below 1.5 on uniform, the paper says bundling's advantage fades for all-to-all traffic at scale.
+- **If a setting raises uniform's message size and rate by more than 5%,** F1's uniform cell at 32 nodes gets that setting in a later job.
+- **If a wider W beats F1's or F5's best fixed W by more than 3%,** those tables' "best fixed W" and the controller ratios take the new value.
 
 ## Earlier
 
