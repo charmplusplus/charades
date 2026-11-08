@@ -7,6 +7,7 @@ How runs are made and checked: run length and warm-up, and the flag check that k
 | 121 | 2026-10-27 | design | Closure check: 78% of σ 2,000's 4→16-node loss is in the first 10% of waves, which sections 116–120 left ou… |
 | 122 | 2026-10-27 | current | Warm-up and long runs, results: in 4× longer runs σ 2,000 scales at 0.96–0.97 and σ 4,000's loss is all sta… |
 | 247 | 2026-11-06 | design | Paper runs without diagnostics: F5 and VLSI rerun at 1–16 nodes and resubmitted at 32, after a check of eve… |
+| 263 | 2026-11-08 | current | A config file that opens but cannot be read runs on the defaults: job V8's gate failed on a /work2 stall, n… |
 
 ## Current
 
@@ -166,3 +167,28 @@ The short warm-up-0 cell's second 4-node rep (116.9) is slow; without it the sho
 **What follows:**
 - **The paper tables:** VA and F5a2 replace sections 239 and 244 at 1–16 nodes, and F5-32b and V32b give the 32-node column.
 - **If D2 fails** (the old diagnostics cost more than 2%), earlier Charades ÷ Devastator ratios from jobs that carried them (F4, ABL, F3R) understated Charades by that much, and F4 is decided then.
+
+### §263 · A config file that opens but cannot be read runs on the defaults: job V8's gate failed on a /work2 stall, no recorded run was affected, V8 resubmitted (2026-11-08; skx-dev batch job 3696078, 9 nodes)
+
+> **Status: current.**
+> - **Job:** V8's first copy (section 262), 3696078 on skx-dev. It started at 17:22:58, cancelled its skx twin 3696077, and stopped at its gate, before any timing run. Its script took 2 min 49 s to reach its first `git log` on /work2.
+> - **Resubmitted** with the gate retry below: 3696169 (skx) and 3696170 (skx-dev; running at 17:41). P64 and A64 (3696079, 3696080) were left in the queue as submitted.
+
+**What failed.** The gate passed 26 of 27 tests. VLSI `agg_ctl_measured_fast_bucket_pp` on one process of 4 PEs aborted on every PE with "Lookahead violation" from the conservative scheduler's assertion (`event.C:380`). Its log printed the engine's defaults: "Synch Protocol 2" (conservative), lookahead 5, GVT interval 16, buffer 65,536. The test's config sets `sync=3`, `gvt=4`, `buffer-size=655360`, the controller and htram PP. The model's own config (`tiny.bench`, 3 copies) was applied. Conservative VLSI at lookahead 5 aborts, so the abort itself is expected once the defaults are in force.
+
+**Why.**
+- **Mechanism.** `parse_command_line` (`src/util/command_line.C`) aborts if a config file cannot be opened. If it opens and the read then fails, `std::getline` ends the loop and the run goes on with whatever was parsed so far. `tw_init` sets every kernel option to its default (`clear_globals`) before parsing, so a failed read leaves the defaults.
+- **Perturbation (Mac):** PHOLD given a directory as its config file (it opens, every read fails) printed "Synch Protocol 2" and ran, with no error.
+- **The stall.** The test before it (1 PE) reached "Simulation Starting" at 17:25:51.9, normal. The failed run took 9.5 s to get there (normally about 0.3 s) and the next one (2 × 2 PEs, same config) 16 s, and that one passed. From 17:26:19 runs started at normal speed. So for about 26 s file reads on the node stalled, and in that window one read of the test config came back empty.
+- **Ruled out:** a race between PE threads at startup (`clear_globals` and the parse run in each process's `tw_init`) would not hold startup for 9.5 s, and the same config passed seconds before and after.
+
+**No recorded run was affected.**
+- Timing runs pass two files through `ctl_sweep.sh`: the workload's config and the GVT config (`tests/test_configs/bucket`: `sync=3`, `gvt=4`, `buffer-size=655360`). Every other setting is on the command line.
+- If the workload file read failed, the committed count would differ, and every analysis checks one count per cell.
+- If the GVT file read failed, the run would be conservative with the default GVT and record a rate with no error. Its signature is no count waves (the `count_waves` column).
+- **Scan of `~/charades-data`:** 14,094 Charades runs with status ok in 5,020 CSVs. Every optimistic run with a `count_waves` column has count waves; the 90 runs without are the deliberate blocking-GVT arms (`blk:0`). VLSI's CSVs (345 files) have no such column, but a defaulted VLSI run aborts as this one did; it cannot record a rate.
+
+**Changes.**
+- **V8's gate** (`v8_262.slurm`) reruns once if every failed test shows an I/O error or the default protocol line, which no gate config uses; F1's gate already reran on I/O errors, and this failure printed none. Checked against this job's gate output: it would have rerun.
+- **P64 and A64:** their analyses drop and report any Charades run without count waves (and any VLSI run that fails), so a defaulted timing run cannot enter a table. Their gates rerun only on I/O errors (Slurm keeps the script as submitted); a gate failure stops the job before any timing run.
+- **Not changed:** the paper's tree `charades-r5` (85a2aad); the pending jobs check its commit and binaries. A parser that aborts when a read fails (checking `ferror` or reading the whole file first) belongs on `main`.

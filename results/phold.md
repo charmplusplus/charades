@@ -1196,6 +1196,7 @@ The load ran 15 Devastator 4-node runs and 9 Charades 2-node runs across the thr
 > **Status: design.**
 > - **User decision 2026-11-08:** queue the VLSI job and the 64-node jobs.
 > - **Submitted 2026-11-08:** V8 3696077 (skx) and 3696078 (skx-dev; twin file written after both); P64 3696079 and A64 3696080 (skx, 64 nodes each). All pending at submission (skx: 1,152 of 1,160 nodes allocated).
+> - **V8's first copy (3696078) stopped at its gate** on a /work2 stall that left one test on the engine's defaults (section 263); no timing run ran. Resubmitted with a gate that reruns once on such failures: 3696169 (skx) and 3696170 (skx-dev). The analyses of P64 and A64 drop and report any Charades run without count waves (section 263).
 > - **Scripts:** `$WORK/charades-runs/v8_262.slurm` (copy in `~/charades-data/vlsi/`) and `$WORK/charades-runs/s64_262.slurm`, modes `p` and `a` (copy in `~/charades-data/f1/`). Flag audit: `~/charades-data/s64_262/audit.py` and `audit.txt`.
 > - **Code:** tree `charades-r5` (85a2aad), as F1, F5, VA and V32b. Devastator's 64-node builds (`p128w23`, built 2026-11-07, PAPER.md item 6) and ROSS's mvapich builds, as before.
 > - **Allocation:** V8 on skx-dev with an skx copy (twin guard), 9 nodes, limit 0:45, about 20 minutes. P64 on skx, 64 nodes, limit 4:30, about 3.1 hours. A64 on skx, 64 nodes, limit 2:45, about 1.6 hours. About 300 node-hours in all; the project had 2,157 SUs on 2026-11-08.

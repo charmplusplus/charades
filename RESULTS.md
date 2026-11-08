@@ -33,9 +33,9 @@ Split on 2026-11-07 from one file of 11,400 lines and 249 sections; the text mov
 | [results/engine.md](results/engine.md) | **The engine: GVT, rollback and per-event cost.** What paces the bucketed GVT at scale, rollback depth and unit, the same-process fast path, and the rounds that closed Charades' per-event gap to Devastator. | 53 |
 | [results/runtime.md](results/runtime.md) | **Runtime, transport and the machine.** Reconverse builds and settings, native psm2 through LCI, LCI devices, the late-rank investigation, the message pool, NUMA balancing, shared memory between processes, and the slow node. | 43 |
 | [results/baselines.md](results/baselines.md) | **ROSS and Devastator as baselines.** First runs and feasibility, ROSS's optimism window on PHOLD, and the Mac checks that both engines commit Charades' counts. | 3 |
-| [results/methods.md](results/methods.md) | **Methods.** How runs are made and checked: run length and warm-up, and the flag check that keeps diagnostics out of timing runs. | 3 |
+| [results/methods.md](results/methods.md) | **Methods.** How runs are made and checked: run length and warm-up, and the flag check that keeps diagnostics out of timing runs. | 4 |
 | [results/history.md](results/history.md) | The re-read of 2026-10-28 and the plan history | — |
-| [results/INDEX.md](results/INDEX.md) | Every section by number, with its date, job, status and file | 263 |
+| [results/INDEX.md](results/INDEX.md) | Every section by number, with its date, job, status and file | 264 |
 
 ## Current numbers
 
