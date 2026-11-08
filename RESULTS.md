@@ -24,7 +24,7 @@ Split on 2026-11-07 from one file of 11,400 lines and 249 sections; the text mov
 
 | file | what | sections |
 |---|---|---|
-| [results/phold.md](results/phold.md) | **PHOLD: performance and weak scaling.** Gaussian and uniform PHOLD in Charades, Devastator and ROSS: σ sweeps, full nodes, long runs, weak scaling from 1 to 32 nodes, and the paper runs F1. | 36 |
+| [results/phold.md](results/phold.md) | **PHOLD: performance and weak scaling.** Gaussian and uniform PHOLD in Charades, Devastator and ROSS: σ sweeps, full nodes, long runs, weak scaling from 1 to 32 nodes, and the paper runs F1. | 37 |
 | [results/applications.md](results/applications.md) | **Traffic and dragonfly.** The two applications ported from Charades to ROSS and Devastator (phase B), the traffic count fix, and the paper runs F5 at 1–32 nodes. | 16 |
 | [results/vlsi.md](results/vlsi.md) | **VLSI (b19 × N).** Gate-level simulation of copies of ITC'99's b19: the model and its layout, the gap to Devastator and how it closed, commits, and the paper's VLSI row. | 31 |
 | [results/controller.md](results/controller.md) | **The optimism-window controller.** Every controller design and test: the delay-quantile rule, the aggregation bound, the measured-cost rule and its freeze, where the best window lies at scale, robustness (F4), the grid check (GC), and the controller's own cost (CC). | 39 |
@@ -35,7 +35,7 @@ Split on 2026-11-07 from one file of 11,400 lines and 249 sections; the text mov
 | [results/baselines.md](results/baselines.md) | **ROSS and Devastator as baselines.** First runs and feasibility, ROSS's optimism window on PHOLD, and the Mac checks that both engines commit Charades' counts. | 3 |
 | [results/methods.md](results/methods.md) | **Methods.** How runs are made and checked: run length and warm-up, and the flag check that keeps diagnostics out of timing runs. | 3 |
 | [results/history.md](results/history.md) | The re-read of 2026-10-28 and the plan history | — |
-| [results/INDEX.md](results/INDEX.md) | Every section by number, with its date, job, status and file | 262 |
+| [results/INDEX.md](results/INDEX.md) | Every section by number, with its date, job, status and file | 263 |
 
 ## Current numbers
 

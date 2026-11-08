@@ -28,6 +28,7 @@ Gaussian and uniform PHOLD in Charades, Devastator and ROSS: σ sweeps, full nod
 | 255 | 2026-11-07 | current | How each engine slows as events go to other processes, and its GVT pace, from F1's data: Charades keeps 0.4… |
 | 260 | 2026-11-08 | design (results in 261) | The 8-node columns of F1 and F5 rerun with the batch host idle, GC's four 1-node cells off node 0, and whet… |
 | 261 | 2026-11-08 | current | R8 results: with the batch host idle, Devastator runs 3–10% faster at 8 nodes and Charades ÷ Devastator the… |
+| 262 | 2026-11-08 | design | VLSI's 8-node column rerun with the batch host idle (job V8), and the paper's tables at 64 nodes (jobs P64… |
 | 1 | 2026-10-19 | historical | First Stampede3 measurements |
 | 2 | 2026-10-19 | historical | Optimism window sweep |
 | 11 | 2026-10-21 | design | Gaussian PHOLD σ sweep |
@@ -1189,6 +1190,89 @@ The load ran 15 Devastator 4-node runs and 9 Charades 2-node runs across the thr
 - **F5's applications table** takes dragonfly 1.69 and traffic 1.26 at 8 nodes, with Charades ÷ ROSS 3.14 and 2.13 (dragonfly's range becomes 2.93–3.14).
 - **The layout rule** stays: node 0 runs nothing while streams run side by side. Multi-node streams side by side on other nodes are fine.
 - **Still open:** VLSI's 8-node column (the same layout; 1.30).
+
+### §262 · VLSI's 8-node column rerun with the batch host idle (job V8), and the paper's tables at 64 nodes (jobs P64 and A64) (design, 2026-11-08; written before any runs)
+
+> **Status: design.**
+> - **User decision 2026-11-08:** queue the VLSI job and the 64-node jobs.
+> - **Scripts:** `$WORK/charades-runs/v8_262.slurm` (copy in `~/charades-data/vlsi/`) and `$WORK/charades-runs/s64_262.slurm`, modes `p` and `a` (copy in `~/charades-data/f1/`). Flag audit: `~/charades-data/s64_262/audit.py` and `audit.txt`.
+> - **Code:** tree `charades-r5` (85a2aad), as F1, F5, VA and V32b. Devastator's 64-node builds (`p128w23`, built 2026-11-07, PAPER.md item 6) and ROSS's mvapich builds, as before.
+> - **Allocation:** V8 on skx-dev with an skx copy (twin guard), 9 nodes, limit 0:45, about 20 minutes. P64 on skx, 64 nodes, limit 4:30, about 3.1 hours. A64 on skx, 64 nodes, limit 2:45, about 1.6 hours. About 300 node-hours in all; the project had 2,157 SUs on 2026-11-08.
+
+**Why.**
+- **V8:** job VA (section 249) ran VLSI's 8-node stream on nodes 0–7 beside three other streams. Job R8 (section 261) showed that this layout cost Devastator 3–10% at 8 nodes on PHOLD, traffic and dragonfly. VLSI's 8-node value (1.30) is the last table value from that layout.
+- **P64 and A64:** the paper's tables stop at 32 nodes. 64 nodes is the user's goal, and the question a reader asks next: does Charades' lead hold, and does bundling keep paying as htram's messages shrink (uniform: 102, 14.5 and 8 events per message at 4, 16 and 32 nodes, section 257)?
+
+**V8 (9 nodes; node 0 runs nothing; one stream on nodes 1–8; 5 reps).** VA's 8-node timing arms:
+- Charades, one process of 46 PEs per node, `--batch=32`, buckets of 2,500 ps: eager commits at W 5,000 and W 2,500, lazy commits (`--fossil-lazy=1`) at W 2,500, and the controller.
+- Devastator, 2 × 23: W 2,500 / 5,000 / 10,000.
+- VA's check arms (O, G, R) are left out: the digest at 8 nodes was checked in VA.
+- Engines and arms in reverse order in even reps. A short warm-up run of each engine starts the stream and is not counted.
+
+**P64 (64 nodes, one stream, 5 reps).** F1's eight PHOLD workloads and σ 1,000 with PP 512 (Charades only), with F1's arms (scale240.slurm) and these changes:
+- **Charades fixed W 300 / 400 / 500 (lookahead 10: 50 / 75 / 100)** beside the controller, at F1's htram settings. F1 had W 300 / 400 and 50 / 100. At 32 nodes the best fixed W was 400 (W 500 0.91–0.95 of it) and 75 on lookahead 10 (section 257); the best W grew from 300 at 16 nodes to 400 at 32, so W 500 guards the grid's edge at 64.
+- **Direct sends at W 300 and 400 on uniform and σ 4,000:** bundling at 64 nodes. At 32 nodes direct sends were flat over W 300–600 (best W 300, section 257).
+- **Devastator:** W 500 / 1,000 / 2,000 / 4,000 (lookahead 10: 100 / 200 / 400), as F1-32. Its best at 32 nodes was W 1,000 in all six lookahead-100 workloads.
+- **ROSS:** optimistic, conservative, and optimistic with the window job RW chose (none on uniform), as F1.
+- Workload, engine and arm order reversed in even reps.
+
+**A64 (64 nodes, one stream, 5 reps).** Traffic and dragonfly with F5's arms (f5scale240.slurm) and VLSI with V32b's (vscale240.slurm), with these changes:
+- **Dragonfly's 64-node shape: a = 46 routers per group, h = 22 global channels** (1,013 groups, 46,598 routers, 15.83 routers per PE, most-loaded PE ÷ mean 1.011, h/a 0.48, 419,382 LPs). It was chosen by the rules of section 175: h even, 14.0–15.9 routers per PE (32 nodes: a = 36, h = 18, 15.9), h/a between 0.31 and 0.63, the least imbalance, and fewer than 2^20 LPs. The model's 16-bit fields hold group numbers (1,013) and channel indices, not router numbers.
+- **Charades dragonfly W 15,000** beside W 10,000 and 20,000 (job GC: W 15,000 is 4.5–4.8% over W 20,000 at 4 and 16 nodes, section 259); **traffic W 1,500** beside W 500 and 1,000 (W 1,000 was best at 32 nodes, section 257).
+- **Check arms:** `dg` (`--commit-digest=1`) at F5's W (dragonfly WPs 512 W 10,000, traffic PP 2,048 W 500) and VLSI `G:w5000`, for the digest check. F5's `od` and `ri` and V32b's `O` and `R` are left out. V32b's `/proc` samples of copy 2's node are left out (slow reps are reported, not investigated).
+- The three applications run in reverse order in even reps, as the engines and arms do.
+
+**Both 64-node jobs:**
+- **Gates:** the change tier on 2 nodes, as F1 (PHOLD) and as F5 and VA (dragonfly, traffic, VLSI).
+- **First runs at 64 nodes:** Devastator's `p128w23` builds and ROSS at 2,944 ranks have never run. A warm-up run of each engine starts the job. If Charades' fails, the job stops; if Devastator's or ROSS's fails, that engine is dropped from the job and the log says so.
+- **Caps:** an arm of Devastator or ROSS that hits its cap in rep 1 is skipped after. Caps: Devastator 200 s on PHOLD and 400 s on the applications; ROSS 480 s on PHOLD and 400 s on the applications (F1 and F5: 200, 360 and 300 s). The longest 32-node run took 147 s.
+- **Layout:** one 64-node stream at a time, as F1-32, F5-32b and V32b ran their 32-node streams, so the batch host carries one stream's `srun` client and polling loop.
+
+**Flags per arm** (stub runs with a fake `srun`: P64 508 commands, as planned (Charades 241, Devastator 151, ROSS 116); A64 174 (97, 46, 31); V8 37 (21, 16)):
+- No log, stats, trace or report-interval flag appears in any command.
+- `--commit-digest=1` appears only on the check arms: 15 commands in A64 (5 each of `df_dg`, `tr_dg` and VLSI `G`), none in P64 or V8.
+- Every Devastator run sets its window in the environment (`deva_static_look_dt`), and none runs adaptive.
+
+| engine, arm | flags beyond the launch | source |
+|---|---|---|
+| Charades PHOLD, fixed W | `--optimism-window=W --gvt-bucket-size=8 --aggregation=1 --agg-mode=M --agg-buffer=N --agg-policy=1 --agg-horizon-margin=8` (M 2 = PP, 0 = WPs); direct sends: `--optimism-window=W --gvt-bucket-size=8` only | F1 |
+| Charades PHOLD, controller | `--ctl=3 --ctl-bracket=1` and the htram flags | F1 |
+| Charades dragonfly and traffic | as F5: dragonfly WPs 512, buckets of 1,000 ps, workload `dragonfly_46_22_4_1_500_300000`; traffic PP 2,048 or WPs 512, buckets of 8; direct sends at W 10,000 / 20,000 (dragonfly) and W 500 (traffic); `dg` adds `--commit-digest=1` | F5 |
+| Charades VLSI | one process of 46 PEs per node (`-c 48`), `--gvt-bucket-size=2500 --batch=32`, W or `--ctl=3 --ctl-bracket=1`; L adds `--fossil-lazy=1`; G adds `--commit-digest=1` | VA, V32b |
+| launch, every Charades run | `+lci_ndevices 23 +pemap 2-46:2,3-47:2 +mempool_remote_free`, through `numactl --localalloc` | F1, F5 |
+| Devastator PHOLD | `--lp-per-rank=128 --start-events=15 --lookahead=L --mean=M --sigma=S --end-time=E --rng=clcg4` (uniform also `--remote=1.0`); `-N 64 -n 128 --ntasks-per-node=2 -c 24` | F1 |
+| Devastator traffic, dragonfly, VLSI | traffic `--num-x=64 --num-y=2944 --total-cars=3014656 --lookahead=100 --mean=1000 --trip-radius=3`; dragonfly `--routers-per-group=46 --global-channels=22 --terminals-per-router=4 --traffic=1 --routing=0 --arrive-rate=500 --gen-time=300000`; `--rng=clcg4`; VLSI `--copies=64 --span=1 --chunk=512` (V8: `--copies=8`, `-N 8 -n 16`) | F5, V32b |
+| ROSS PHOLD | `--synch=3 --batch=16 --gvt-interval=64` (optimistic), `--synch=2 --batch=16 --gvt-interval=16` (conservative), optimistic with `--max-opt-lookahead=X`; `--read-buffer=1 --extramem=800000 --num-lps=376832`, 46 ranks per node | F1 |
+| ROSS traffic, dragonfly | optimistic `--batch=64` (traffic) or `--batch=2` (dragonfly) `--gvt-interval=64 --max-opt-lookahead=X`; traffic conservative; the model arguments above | F5 |
+| warm-ups | P64: Charades σ 100 PP 2,048 W 300 end 512,000, Devastator σ 100 W 1,000, ROSS σ 100 optimistic; A64: Charades traffic W 500 end 1,000,000 and VLSI W 2,500 end 1,250,000, Devastator and ROSS traffic; V8: Charades W 2,500 end 1,250,000, Devastator W 2,500 | not counted |
+
+**Predictions** (rates are M committed events/s, medians of 5; ratios are Charades ÷ the other, each engine as in the paper's tables):
+- **V8-1. Counts:** one committed count in both engines, equal to VA's (1,078,843,202).
+- **V8-2. Rates ÷ VA's 8-node rates** (Charades controller 197.3, Devastator W 10,000 151.7): Devastator 1.00–1.05, Charades 0.98–1.02. Less than R8's 3–10% because VLSI's pace is set by copy 2's node (the third of the run, section 234), not by node 0: a node 0 slowed by 10–15% is still not the busiest.
+- **V8-3. Charades ÷ Devastator at 8 nodes:** 1.24–1.31 with the controller (VA 1.30), 1.23–1.30 with the best fixed arm (VA 1.29).
+- **V8-4.** The controller runs at 0.97–1.03 of Charades' best fixed arm (VA: 0.993–1.011 per rep).
+- **P64-1. Counts:** one committed count per workload over all three engines and every arm.
+- **P64-2. Engines at 64 nodes:** all three pass their warm-up, and no run hits its cap.
+- **P64-3. Per-node rate 32 → 64:** Charades 0.80–1.00 per workload, Devastator 0.75–1.00, ROSS 0.80–1.00 (16 → 32: 0.82–1.00, 0.82–0.97, 0.88–0.96); Charades' at least Devastator's in 6 of 8 workloads.
+- **P64-4. Charades ÷ Devastator at 64 nodes:** ahead in all 8 workloads; 1.2–2.3 (32 nodes: 1.26–2.01), each within −0.10 to +0.20 of its 32-node value.
+- **P64-5. Charades ÷ ROSS:** 2.7–7.0 (32 nodes: 3.87–6.08).
+- **P64-6. Charades' windows:** the best fixed W is 400 or 500 at lookahead 100 and 75 at lookahead 10. The controller is 0.92–1.00 of the best fixed W (median of 5) in at least 7 of the 9 Charades cells.
+- **P64-7. Bundling** (best htram fixed W ÷ best direct fixed W): uniform 1.7–2.3 (32 nodes: 2.29), with 4–6 events per htram message (32 nodes: 8); σ 4,000 2.6–3.3 (32 nodes: 3.14).
+- **P64-8. Devastator's best W** is 1,000 in at least 5 of the 6 lookahead-100 workloads; W 4,000 is never the best.
+- **A64-1. Counts and digests:** one committed count per application over every engine and arm, and one digest per application over Charades' check runs.
+- **A64-2. Dragonfly:** Charades ÷ Devastator 1.9–2.6 (32 nodes: 2.17); per-node rate 32 → 64 Charades 0.80–0.95, Devastator 0.70–0.90 (16 → 32: 0.86, 0.81).
+- **A64-3. Traffic:** Charades ÷ Devastator 1.25–1.55 (32 nodes: 1.38).
+- **A64-4. VLSI:** Charades ÷ Devastator 1.15–1.35 (32 nodes: 1.26); per-node rate 32 → 64 0.90–1.00 in both engines (16 → 32: 0.98 in both).
+- **A64-5. The controller** is 0.93–1.02 of Charades' best fixed W (median of 5) on each application.
+- **A64-6. Charades ÷ ROSS:** dragonfly 2.7–3.5 (32 nodes: 3.05), traffic 2.0–2.6 (2.27).
+- **A64-7. Best fixed W:** traffic 1,000 (W 1,500 below it); dragonfly 15,000 or 20,000.
+- **A64-8. htram ÷ direct sends:** dragonfly 1.10–1.30 (32 nodes: 1.17), traffic 1.15–1.35 (1.24).
+
+**What follows:**
+- **V8:** VLSI's 8-node value in the applications table comes from this job, and the note that it was not rerun goes.
+- **P64 and A64:** the PHOLD, applications and bundling tables gain a 64-node column, and the per-node columns gain 32 → 64. Claim 3 is then stated at 1–64 nodes.
+- **If an engine fails at 64 nodes,** it is debugged in an interactive allocation before any resubmission, and the paper keeps 1–32 nodes for that engine.
+- **If Charades trails in a cell at 64 nodes,** the cell is reported as measured; a diagnosis waits until after the writing starts.
 
 ## Earlier
 
