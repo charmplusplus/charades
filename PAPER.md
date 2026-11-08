@@ -157,7 +157,7 @@ time without a reason written here first.
      - Claim 2: on a finer grid the controller is 0.960–0.987 of the best fixed W in F4b's 12 steady cells, so the range becomes 0.92–0.99.
      - Claim 3: Devastator's finer grid gains at most 1.4% on F1's 14 cells at 1–8 nodes, and Charades stays ahead in every cell (closest 1.07).
      - Found: a stream on the batch host (node 0) runs slow when streams run side by side (Devastator 0.81–0.92 of its F1 rate on 1 node, Charades 0.94–0.97). F1's, F5's and VLSI's 8-node columns ran that way; uniform at 8 nodes rerun alone gave Devastator 1.085× its F1 rate, so those ratios may be up to about 7% high.
-     - **Open:** rerun the 8-node columns (and GC's four node-0 cells) with node 0 idle. From now on no side-by-side stream runs on node 0.
+     - **Rerun queued (user decision 2026-11-08; job R8, RESULTS.md 260, 3695259):** F1's and F5's 8-node columns and GC's four node-0 cells with node 0 idle, plus a check of whether other streams' traffic slows an 8-node run. VLSI's 8-node column is not included. From now on no side-by-side stream runs on node 0.
    - F2 and F4 on the final defaults, if items 1–4 used earlier ones. F4: **done**, rerun in full on `charades-r5` without diagnostics (job F4b, RESULTS.md 250–251): controller 0.92–1.03 per cell.
 6a. **Decisions 2026-11-07 (user), after F4b (RESULTS.md 251):**
    - **Writing:** later; not started now.

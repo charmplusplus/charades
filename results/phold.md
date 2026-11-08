@@ -26,6 +26,7 @@ Gaussian and uniform PHOLD in Charades, Devastator and ROSS: σ sweeps, full nod
 | 243 | 2026-11-06 | current | F1b results, and F1 at 1–16 nodes: Charades leads Devastator in all 40 PHOLD cells (1.08–2.25), each ratio… |
 | 252 | 2026-11-07 | superseded in part by §257 (was: current) | F1-32 results, and F1 at 1–32 nodes: Charades leads Devastator in all 48 PHOLD cells, 1.26–2.01 at 32 nodes… |
 | 255 | 2026-11-07 | current | How each engine slows as events go to other processes, and its GVT pace, from F1's data: Charades keeps 0.4… |
+| 260 | 2026-11-08 | design | The 8-node columns of F1 and F5 rerun with the batch host idle, GC's four 1-node cells off node 0, and whet… |
 | 1 | 2026-10-19 | historical | First Stampede3 measurements |
 | 2 | 2026-10-19 | historical | Optimism window sweep |
 | 11 | 2026-10-21 | design | Gaussian PHOLD σ sweep |
@@ -1033,6 +1034,71 @@ With Charades at its best arm (controller or fixed W), the ratios are 1.00–1.0
   - A faster GVT, which was not measured apart from the event rate.
   - Behaviour beyond 32 nodes. Uniform's message size is already falling at 32 (job AG32, section 256, measures what bundling still buys there).
 - **Wording:** "Charades loses less than Devastator as communication becomes remote", not "solves".
+
+### §260 · The 8-node columns of F1 and F5 rerun with the batch host idle, GC's four 1-node cells off node 0, and whether other streams' traffic slows an 8-node run (job R8 design, 2026-11-08; written before any runs)
+
+> **Status: design.**
+> - **User decision 2026-11-08:** rerun those columns (F1's and F5's 8-node columns and GC's four node-0 cells; VLSI's 8-node column not included).
+> - **Submitted 2026-11-08:** 3695259 (skx) and 3695260 (skx-dev). The skx copy started at once and cancelled the skx-dev copy. Its script began about 3 minutes after the job did (14:18 → 14:20:54): the batch node's login profile waited on /work2 ("mounted not FULL nor IDLE"). The gate passed 63/63.
+> - **Script:** `$WORK/charades-runs/r8_260.slurm` (copy in `~/charades-data/f1/`). It runs on skx-dev with an skx copy (twin guard), 15 nodes, limit 1:58, about 95 minutes, `-x c455-081`.
+> - **Code:** tree `charades-r5` (85a2aad), Devastator's and ROSS's builds as in F1 and F5.
+
+**Why.**
+- Job GC (section 259) found that a run on node 0, the batch host, is slowed while several streams run side by side, Devastator more than Charades. Node 0 runs the job script and every stream's `srun` clients and polling loops.
+- F1's and F5's 8-node streams ran on nodes 0–7 beside three other streams. Uniform at 8 nodes, run alone in GC, gave Devastator 1.085× its F1 rate and Charades 1.011×, so the 8-node ratios may overstate Charades' lead by up to about 7%.
+- GC's four 1-node cells on node 0 (σ 100, 500, 1,000 and 2,000) could not be used.
+- GC could not tell whether the batch host or the other streams' network traffic cost the 8-node runs. If it was the traffic, the 2- and 4-node columns, which also ran beside other streams, are suspect too.
+
+**Runs:**
+1. **S8, nodes 1–8, 3 reps:**
+   - **F1's 8-node column** with F1's arms (scale240.slurm): the eight PHOLD workloads and σ 1,000 with PP 512.
+     - Charades: the controller and W 300 / 400 (lookahead 10: 50 / 100) at F1's htram settings.
+     - Devastator: W 500 / 1,000 / 2,000 (lookahead 10: 100 / 200 / 400).
+     - ROSS: optimistic, conservative, and optimistic with the window job RW chose (none on uniform).
+   - **F5's 8-node column** with F5's timing arms (f5scale240.slurm): dragonfly and traffic. F5's check arms `od`, `dg` and `ri` are left out.
+     - Charades: dragonfly WPs 512 (the controller, W 10,000 and 20,000) and direct sends at W 10,000 and 20,000; traffic PP 2,048 (the controller, W 500 and 1,000), WPs 512 at W 500 and direct sends at W 500.
+     - Devastator: dragonfly W 10,000 / 20,000 / 40,000, traffic W 1,000 / 2,000 / 4,000.
+     - ROSS: dragonfly optimistic at windows 2,500 / 5,000 / 7,500; traffic optimistic at windows 1,000 / 2,000, and conservative.
+   - Workload order is reversed in even reps, and in F5 so is the order of engines and arms.
+2. **S1, node 9, beside S8, 5 reps:** GC's four 1-node cells as in section 258: Devastator's finer grid, and Charades' controller at F1's htram settings. 1-node runs do not use the network.
+3. **Check, nodes 1–8, after S1 and S8, 3 reps:**
+   - Uniform at 8 nodes: Devastator at W 500 and 1,000, and Charades' controller (PP 512).
+   - Each rep runs them alone and with load streams on nodes 9–14, in alternating order. The load is Devastator uniform at 4 nodes (W 500) and Charades uniform at 2 nodes (controller), each repeating until the measured runs end.
+   - The check is skipped if less than 18 minutes of the limit remain.
+- **Node 0 runs nothing** throughout.
+
+**Flags per arm** (stub run with a fake `srun`: 444 commands, as planned; 165 Charades, 192 Devastator, 87 ROSS):
+- No log, stats, trace, digest or report-interval flag appears in any command.
+- **Devastator:** for three workloads, the command line in the stub's output header equals F1's word for word, apart from job name and node list. Every Devastator run sets its window in the environment, and none runs adaptive.
+- **Charades:** its config files are byte-identical to F1's (four workloads checked) and F5's (traffic and dragonfly).
+
+| engine, arm | flags beyond the launch | source |
+|---|---|---|
+| Charades, fixed W | `--optimism-window=W --gvt-bucket-size=B --aggregation=1 --agg-mode=M --agg-buffer=N --agg-policy=1 --agg-horizon-margin=8` (B 8, dragonfly 1,000 ps; M 2 = PP, 0 = WPs); direct sends: `--optimism-window=W --gvt-bucket-size=B` only | F1, F5 |
+| Charades, controller | `--ctl=3 --ctl-bracket=1` and the htram flags | F1, F5 |
+| Devastator, PHOLD | `deva_static_look_dt=W` (environment, through `run_phold.sh`); `--lp-per-rank=128 --start-events=15 --lookahead=L --mean=M --sigma=S --end-time=E --rng=clcg4` (uniform also `--remote=1.0`) | F1 |
+| Devastator, traffic and dragonfly | `deva_static_look_dt=W`; F5's model arguments at 8 nodes (traffic `--num-y=368 --total-cars=376832`; dragonfly 22 routers per group, 12 global channels), `--rng=clcg4` | F5 |
+| ROSS, PHOLD | `--synch=3 --batch=16 --gvt-interval=64` (optimistic), `--synch=2 --batch=16 --gvt-interval=16` (conservative), optimistic with `--max-opt-lookahead=X`; `--read-buffer=1 --extramem=800000`, 46 ranks per node | F1 |
+| ROSS, traffic and dragonfly | optimistic `--batch=64` (traffic) or `--batch=2` (dragonfly) `--gvt-interval=64 --max-opt-lookahead=X`; traffic conservative | F5 |
+| warm-ups | Charades σ 100, PP 2,048, W 300, end 512,000; Devastator σ 100, W 1,000 | not counted |
+
+**Predictions:**
+- **R8-1. Counts:** one committed count per cell over every engine and arm, equal to F1's, F5's and GC's.
+- **R8-2. Rates at 8 nodes, each engine's best arm, this job ÷ F1 or F5:** Devastator 1.03–1.10; Charades 1.00–1.03; ROSS 1.00–1.05.
+- **R8-3. Charades ÷ Devastator at 8 nodes** falls by 2–8% per PHOLD workload and stays at 1.20 or more in each. σ 100 and σ 500 lose their bump at 8 nodes: each lands within 0.05 of the range between its 4- and 16-node values.
+- **R8-4. Dragonfly and traffic** (F5: 1.91 and 1.26 at 8 nodes): Charades ÷ Devastator falls by 2–8%.
+- **R8-5. The four 1-node cells:**
+  - Devastator at F1's best W runs at 0.97–1.03 of its F1 rate, with reps spread 1.05 or less;
+  - its finer grid gains at most 3%;
+  - Charades ÷ Devastator is within 0.05 of F1's (1.26, 1.19, 1.20, 1.44).
+- **R8-6. Check:** Devastator at 8 nodes with load on other nodes runs at 0.97 or more of its rate alone (paired per rep, median), and Charades at 0.98 or more. So GC's 8.5% came from the batch host, not from other streams' traffic.
+- **R8-7. Spread between reps:** at most 1.10 per arm, apart from at most one slow rep per arm.
+
+**What follows:**
+- **F1's and F5's tables take this job's 8-node column** for all three engines. The per-node 1 → 32 columns use 1 and 32 nodes and do not change.
+- **GC's part D** takes the four 1-node cells from here.
+- **If R8-6 fails** (with load below 0.97 of alone), the 2- and 4-node columns of F1 and F5, which ran beside the 8-node stream, need the same rerun, and the layout rule becomes one multi-node stream at a time.
+- **VLSI's 8-node column** used the same layout and stays unchecked.
 
 ## Earlier
 
