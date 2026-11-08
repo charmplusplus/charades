@@ -27,7 +27,7 @@ Every controller design and test: the delay-quantile rule, the aggregation bound
 | 250 | 2026-11-07 | design (results in 251) | F4 rerun without diagnostics: the robustness comparison on the current tree, with F4's three flags only in… |
 | 251 | 2026-11-07 | superseded in part by §259 (was: current) | F4b results: without diagnostics the frozen controller is 0.92–1.03 of the best fixed W per cell (median of… |
 | 258 | 2026-11-08 | design (results in 259) | Grid check: the fixed-window grids behind claims 2 and 3, refined where a window between grid points may be… |
-| 259 | 2026-11-08 | current | Grid check results: on a finer grid the controller is 0.96–0.99 of the best fixed W (it was above 1 only wh… |
+| 259 | 2026-11-08 | superseded in part by §261 (was: current) | Grid check results: on a finer grid the controller is 0.96–0.99 of the best fixed W (it was above 1 only wh… |
 | 6 | 2026-10-20 | design | Window controller |
 | 7 | 2026-10-20 | superseded | Window controller, first Stampede3 results |
 | 8 | 2026-10-20 | superseded | Waste floor, controller cost, horizon margin |
@@ -1514,6 +1514,7 @@ Phase-changing PHOLD is left out: its grid already runs in steps of 25 around it
 ### §259 · Grid check results: on a finer grid the controller is 0.96–0.99 of the best fixed W (it was above 1 only where the grid had a gap); Devastator's finer grid gains at most 1.4%, and Charades stays ahead in every cell; runs on the batch host are slowed when streams run side by side, which may overstate the 8-node ratios (2026-11-08; skx-dev batch job 3694715, 16 nodes)
 
 > **Status: current.** Design and predictions in section 258.
+> - **Superseded in part (2026-11-08, section 261):** the four 1-node cells on node 0. Rerun on node 9 (job R8), Devastator's finer grid gains at most 0.2% there, and Charades ÷ Devastator is 1.28 / 1.20 / 1.21 / 1.44 (σ 100 / 500 / 1,000 / 2,000), within 0.02 of F1's.
 > - **Job:** 49 minutes (12:01–12:51), gate 126/126; the skx copy (3694714) was cancelled by the guard. All 420 Charades and 305 Devastator timing runs and the 13 warm-ups finished `ok`.
 > - **Data:** `~/charades-data/gc/j3694715` (digests and per-round GVT files not copied). `~/charades-data/gc/gc_258.py` writes `gc_259_summary.txt` there.
 > - **Counts:** one committed count per cell over every arm and both engines, equal to F4b's (part C) and F1's (part D).

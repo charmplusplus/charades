@@ -14,7 +14,7 @@ The two applications ported from Charades to ROSS and Devastator (phase B), the 
 | 183 | 2026-11-01 | current | Traffic's varying count: the pending heap reordered equal-timestamp events after an erase; fixed |
 | 186 | 2026-11-02 | current (design) | The applications at 1–32 nodes in three engines (F5): the plan, and a calibration job at 1 and 4 nodes |
 | 187 | 2026-11-02 | current / design | F5 calibration results: every engine commits the same events; aggregation gains 1.36–1.38× on traffic throu… |
-| 248 | 2026-11-06 | current | F5a2 results: traffic and dragonfly at 1–16 nodes without diagnostics. Charades ÷ Devastator (controller) i… |
+| 248 | 2026-11-06 | superseded in part by §261 (was: current) | F5a2 results: traffic and dragonfly at 1–16 nodes without diagnostics. Charades ÷ Devastator (controller) i… |
 | 253 | 2026-11-07 | current | F5-32b results, and F5 at 1–32 nodes: at 32 nodes Charades ÷ Devastator is 2.17 on dragonfly (old 2.03) and… |
 | 188 | 2026-11-02 | superseded by §244, then §248 (was: current / design) | F5a results, 1–16 nodes: every cell commits one count in all three engines; on dragonfly Charades' lead ove… |
 | 189 | 2026-11-02 | superseded by §244 (was: current) | F5c results: ROSS's best on dragonfly is batch 2 / GVT interval 64; batch 1 and GVT interval 16 are slower;… |
@@ -528,6 +528,7 @@ The sequential scheduler commits 30,302,829 events. That is the count of every r
 ### §248 · F5a2 results: traffic and dragonfly at 1–16 nodes without diagnostics. Charades ÷ Devastator (controller) is 1.24–1.28 on traffic and 1.08–2.04 on dragonfly; dropping the log raised traffic's controller 1.01–1.04×, and the other diagnostics cost 0–1.6% (2026-11-06; skx-dev batch job 3690453, 16 nodes)
 
 > **Status: current for traffic and dragonfly at 1–16 nodes.** Design and predictions in section 247. This replaces section 244 in the paper table.
+> - **Superseded in part (2026-11-08, section 261):** the 8-node column. Its series ran on nodes 0–7 beside three other streams, and node 0, the batch host, slows runs placed on it (section 259). Rerun with node 0 idle (job R8), Charades ÷ Devastator there is 1.69 on dragonfly (mostly because this section's median took two slow Devastator reps at W 20,000) and 1.26 on traffic. The other node counts stand.
 > - **Job:** 1 h 4 min of the 1 h 55 min limit. Gate 60/60. The guard cancelled the skx copy 3690454 when this copy started.
 > - **Runs:** 245 Charades, 90 Devastator, 90 ROSS; none failed.
 > - **Data:** `~/charades-data/f1/scale240/f5a_j3690453/`.

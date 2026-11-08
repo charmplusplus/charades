@@ -22,11 +22,12 @@ Gaussian and uniform PHOLD in Charades, Devastator and ROSS: σ sweeps, full nod
 | 140 | 2026-10-28 | design | Paper-grade scaling, 1–32 nodes: the plan; A0, ROSS tuning |
 | 141 | 2026-10-28 | current / design | A0, ROSS tuning, results; A1 and A2, paper-grade weak scaling |
 | 240 | 2026-11-06 | design (RW results in 241) | F1 and F5 on the final defaults: seven jobs queued at once — ROSS's window on PHOLD, Gaussian PHOLD at 1–32… |
-| 242 | 2026-11-06 | current | F1a results: on PHOLD group a (σ 100, σ 1,000, σ 4,000, lookahead 10 σ 2,000) Charades ÷ Devastator is 1.13… |
-| 243 | 2026-11-06 | current | F1b results, and F1 at 1–16 nodes: Charades leads Devastator in all 40 PHOLD cells (1.08–2.25), each ratio… |
+| 242 | 2026-11-06 | superseded in part by §261 (was: current) | F1a results: on PHOLD group a (σ 100, σ 1,000, σ 4,000, lookahead 10 σ 2,000) Charades ÷ Devastator is 1.13… |
+| 243 | 2026-11-06 | superseded in part by §261 (was: current) | F1b results, and F1 at 1–16 nodes: Charades leads Devastator in all 40 PHOLD cells (1.08–2.25), each ratio… |
 | 252 | 2026-11-07 | superseded in part by §257 (was: current) | F1-32 results, and F1 at 1–32 nodes: Charades leads Devastator in all 48 PHOLD cells, 1.26–2.01 at 32 nodes… |
 | 255 | 2026-11-07 | current | How each engine slows as events go to other processes, and its GVT pace, from F1's data: Charades keeps 0.4… |
-| 260 | 2026-11-08 | design | The 8-node columns of F1 and F5 rerun with the batch host idle, GC's four 1-node cells off node 0, and whet… |
+| 260 | 2026-11-08 | design (results in 261) | The 8-node columns of F1 and F5 rerun with the batch host idle, GC's four 1-node cells off node 0, and whet… |
+| 261 | 2026-11-08 | current | R8 results: with the batch host idle, Devastator runs 3–10% faster at 8 nodes and Charades ÷ Devastator the… |
 | 1 | 2026-10-19 | historical | First Stampede3 measurements |
 | 2 | 2026-10-19 | historical | Optimism window sweep |
 | 11 | 2026-10-21 | design | Gaussian PHOLD σ sweep |
@@ -740,6 +741,7 @@ With section 124, this completes the long-run version of the 8-workload table, t
 ### §242 · F1a results: on PHOLD group a (σ 100, σ 1,000, σ 4,000, lookahead 10 σ 2,000) Charades ÷ Devastator is 1.13–1.93 at 1–16 nodes, ahead in all 20 cells; Charades itself is 1.09–1.22× faster than in A1a while Devastator and ROSS are unchanged; the controller is 0.94–1.03 of the better fixed W (2026-11-06; skx-dev batch job 3689004, 16 nodes)
 
 > **Status: current for group a at 1–16 nodes.** Design and predictions in section 240. It replaces A1a (section 142) in the paper table. σ 1,000 also waits for F1b's PP 512 series (`g1000x`): as in A1, Charades' σ 1,000 cell takes the better htram setting at each node count.
+> - **Superseded in part (2026-11-08, section 261):** the 8-node column. Its series ran on nodes 0–7 beside three other streams, and node 0, the batch host, slows runs placed on it (section 259). Rerun with node 0 idle (job R8), Devastator ran 3–10% faster at 8 nodes, and Charades ÷ Devastator there is 1.22 (σ 100), 1.48 (σ 1,000), 1.82 (σ 4,000) and 1.46 (lookahead 10 σ 2,000). The other node counts stand: other streams' network traffic does not slow a run (section 261's check).
 > - **Job:** 1 h 5 min of the 1 h 55 min limit. Gate 36/36. The guard cancelled the skx copy 3688913 when this copy started. The 8-, 4-, 2- and 1-node series ran side by side (13:28–13:58), then 16 nodes (13:58–14:29).
 > - **Runs:** 585 (Charades 225, Devastator 180, ROSS 180), none failed.
 > - **Data:** `~/charades-data/f1/scale240/a_j3689004/`; summary `~/charades-data/f1/f1_240_summary.py` (run on this job and A1a's `~/charades-data/scale32/scale32/a_j3653803`), output `scale240/a_j3689004_summary.txt`.
@@ -813,6 +815,7 @@ With Charades at its best arm (controller or fixed W), the ratios are 1.00–1.0
 ### §243 · F1b results, and F1 at 1–16 nodes: Charades leads Devastator in all 40 PHOLD cells (1.08–2.25), each ratio 1.06–1.25× A1's; Charades ÷ ROSS 2.73–5.95; the controller is 0.930–1.032 of the better fixed W (2026-11-06; skx-dev batch job 3689513, 16 nodes)
 
 > **Status: current for PHOLD at 1–16 nodes.** Design and predictions in section 240; group a in section 242. This and section 242 replace A1 (sections 142–143) in the paper table; the 32-node column comes from F1-32.
+> - **Superseded in part (2026-11-08, section 261):** the 8-node column. Its series ran on nodes 0–7 beside three other streams, and node 0, the batch host, slows runs placed on it (section 259). Rerun with node 0 idle (job R8), Devastator ran 3–10% faster at 8 nodes, and Charades ÷ Devastator there is 1.32 (σ 500), 1.58 (σ 2,000), 1.99 (uniform) and 1.20 (lookahead 10 σ 500). The other node counts stand.
 > - **Job:** 1 h 4 min of the 1 h 55 min limit. Gate 36/36. The guard cancelled the skx copy 3688914 when this copy started. The 8-, 4-, 2- and 1-node series ran side by side (15:15–15:44), then 16 nodes (15:44–16:15).
 > - **Runs:** 615 (Charades 270, Devastator 180, ROSS 165; uniform has no ROSS window arm), none failed.
 > - **Data:** `~/charades-data/f1/scale240/b_j3689513/`.
@@ -1099,6 +1102,93 @@ With Charades at its best arm (controller or fixed W), the ratios are 1.00–1.0
 - **GC's part D** takes the four 1-node cells from here.
 - **If R8-6 fails** (with load below 0.97 of alone), the 2- and 4-node columns of F1 and F5, which ran beside the 8-node stream, need the same rerun, and the layout rule becomes one multi-node stream at a time.
 - **VLSI's 8-node column** used the same layout and stays unchecked.
+
+### §261 · R8 results: with the batch host idle, Devastator runs 3–10% faster at 8 nodes and Charades ÷ Devastator there is 1.20–1.99 on PHOLD (F1: 1.30–2.14), 1.69 on dragonfly (F5's median caught two slow Devastator reps) and 1.26 on traffic; other streams' network traffic does not slow an 8-node run; GC's four 1-node cells match F1 (2026-11-08; skx batch job 3695259, 15 nodes)
+
+> **Status: current.** Design and predictions in section 260.
+> - **Job:** 90 minutes (14:18–15:49; the script from 14:20:54). The skx-dev copy (3695260) was cancelled by the guard; gate 63/63. Every run finished; none failed or stalled.
+> - **Nodes:** node 0 (c476-034) ran nothing. Node 9 (c479-081) held the 1-node cells.
+> - **Data:** `~/charades-data/f1/r8_260/j3695259` (digests and per-round GVT files not copied). `~/charades-data/f1/r8_261.py` writes `r8_260/r8_261_summary.txt`.
+> - **Counts:** one committed count per cell over every engine and arm, equal to F1's and F5's; the check's uniform runs commit phase 1's count.
+
+**PHOLD at 8 nodes** (M committed ev/s, median of 3 reps; F1's definitions: Charades = its controller at the better htram setting, Devastator = its best W, ROSS = its best arm; ratios Charades ÷ other, higher is better; F1's value in brackets):
+
+| workload | Charades | Devastator, best W | ROSS, best arm | this job ÷ F1: Charades / Devastator / ROSS | Charades ÷ Devastator | Charades ÷ ROSS |
+|---|---|---|---|---|---|---|
+| σ 100 | 404.6 | 332.7 (W 500) | 116.4 | 1.027 / 1.095 / 1.027 | **1.22** [1.30] | 3.48 [3.47] |
+| σ 500 | 357.4 | 270.4 (W 1,000) | 76.3 | 1.001 / 1.102 / 0.998 | **1.32** [1.46] | 4.68 [4.67] |
+| σ 1,000 | 337.9 | 228.3 (W 1,000) | 63.9 | 1.020 / 1.065 / 1.018 | **1.48** [1.55] | 5.29 [5.28] |
+| σ 2,000 | 304.0 | 192.9 (W 1,000) | 53.6 | 1.004 / 1.028 / 0.987 | **1.58** [1.61] | 5.67 [5.58] |
+| σ 4,000 | 278.4 | 153.2 (W 1,000) | 50.9 | 1.043 / 1.097 / 1.006 | **1.82** [1.91] | 5.47 [5.28] |
+| uniform | 229.0 | 115.4 (W 1,000) | 46.8 | 1.007 / 1.087 / 0.972 | **1.99** [2.14] | 4.90 [4.73] |
+| lookahead 10, σ 500 | 321.1 | 267.3 (W 200) | 72.6 | 0.992 / 1.074 / 0.988 | **1.20** [1.30] | 4.42 [4.41] |
+| lookahead 10, σ 2,000 | 260.8 | 179.1 (W 200) | 52.7 | 1.027 / 1.025 / 1.011 | **1.46** [1.45] | 4.95 [4.87] |
+
+**Traffic and dragonfly at 8 nodes** (F5's definitions; F5's value in brackets):
+
+| application | Charades | Devastator, best W | ROSS, best arm | this job ÷ F5: Charades / Devastator / ROSS | Charades ÷ Devastator | Charades ÷ ROSS |
+|---|---|---|---|---|---|---|
+| dragonfly | 234.5 | 138.7 (W 20,000 ps) | 74.7 (window 5,000) | 1.006 / 1.135 / 1.003 | **1.69** [1.91] | 3.14 [3.13] |
+| traffic | 574.9 | 455.9 (W 2,000) | 270.1 (window 2,000) | 1.025 / 1.022 / 1.008 | **1.26** [1.26] | 2.13 [2.09] |
+
+**The check: uniform at 8 nodes beside load streams on nodes 9–14** (each run with load ÷ the same arm alone in the same rep; higher means the load cost less):
+
+| arm | rep 1 / rep 2 / rep 3 | median |
+|---|---|---|
+| Devastator, W 500 | 1.002 / 1.003 / 1.008 | 1.003 |
+| Devastator, W 1,000 | 1.002 / 0.995 / 1.011 | 1.002 |
+| Charades' controller | 1.012 / 1.006 / 0.998 | 1.006 |
+
+The load ran 15 Devastator 4-node runs and 9 Charades 2-node runs across the three load phases.
+
+**GC's four 1-node cells, on node 9** (5 reps):
+
+| workload | Devastator's best W on GC's grid (÷ best at F1's points) | this job ÷ F1: Charades / Devastator | Charades ÷ Devastator [F1] |
+|---|---|---|---|
+| σ 100 | 1,400 (1.002) | 0.966 / 0.946 | 1.28 [1.26] |
+| σ 500 | 700 (1.000; W 500 level) | 0.964 / 0.956 | 1.20 [1.19] |
+| σ 1,000 | 1,000 (1.000) | 0.965 / 0.954 | 1.21 [1.20] |
+| σ 2,000 | 500 (1.000) | 0.952 / 0.953 | 1.44 [1.44] |
+
+- **The batch host was the cause.**
+  - With node 0 idle, Devastator's best 8-node rate is 1.03–1.10× F1's on all eight PHOLD workloads, against 0.99–1.04× for Charades and 0.97–1.03× for ROSS.
+  - Beside load streams on other nodes, both engines ran at 1.00 of their rate alone (0.995–1.012 per rep). Other streams' network traffic does not slow an 8-node run.
+  - So F1's and F5's 1-, 2- and 4-node columns, which never ran on node 0, stand.
+- **Charades ÷ Devastator at 8 nodes** is 1.20–1.99 on PHOLD, 0.91–1.00× F1's value, and Charades stays ahead in every cell.
+  - The closest 8-node cell is lookahead 10 σ 500 (1.20); the table's closest cell is still the same workload at 1 node (1.08).
+  - σ 100's and σ 500's bump at 8 nodes is gone: σ 100 is 1.21 / 1.22 / 1.25 at 4 / 8 / 16 nodes, σ 500 1.23 / 1.32 / 1.35.
+- **Dragonfly's 1.91 → 1.69 is mostly F5's slow reps, not the batch host.**
+  - In F5, Devastator at W 20,000 ran two of three reps at 62 M ev/s against 137, so the median picked W 10,000 (122.1).
+  - Here W 20,000 ran at 138.5–139.1 in all three reps. F5's ratio against Devastator's fastest rep was 1.70.
+  - Traffic is unchanged (1.26).
+- **Charades ÷ ROSS at 8 nodes** moves by at most 0.19 (σ 4,000 5.28 → 5.47, uniform 4.73 → 4.90) and stays inside each workload's 1–32-node range.
+- **Devastator's slow reps also happen off the batch host:** 4 of its 90 timing runs at 8 nodes ran 2–4× slower with the same events (dragonfly at W 10,000 and W 40,000, lookahead 10 σ 2,000 at W 100 and W 200, once each). The medians of 3 absorb them.
+- **Dragonfly's controller** is 1.031 of Charades' best fixed W at 8 nodes (F5: 1.036). F5's grid lacks W 15,000 ps, which section 259 found best at 4 and 16 nodes.
+- **GC's four 1-node cells:**
+  - Devastator's finer grid gains at most 0.2%, and its reps spread 1.01–1.05 (on node 0 in GC: 1.12–1.37).
+  - Both engines ran at 0.95–0.97 of their F1 rates on this node, so Charades ÷ Devastator matches F1's within 0.02.
+  - With these cells, GC's part D is complete: Devastator's finer grid gains at most 1.4% in all 14 cells, and Charades leads in all.
+
+**Predictions (section 260):**
+- **R8-1 right.**
+- **R8-2 mostly right:**
+  - Devastator 1.025–1.102, in range in 5 of 8 and within 0.005 of it in the other three;
+  - Charades 0.992–1.043, in range in 6 of 8;
+  - ROSS 0.972–1.027, in range in 4 of 8; the other four are 0.97–1.00.
+- **R8-3 mostly right:**
+  - The ratio falls by 2.4–7.7% in 6 of 8 workloads. σ 500 falls by 9.2%, and lookahead 10 σ 2,000 does not fall (1.003×).
+  - Every workload stays at 1.20 or more (lookahead 10 σ 500: 1.201).
+  - The σ 100 and σ 500 bumps are gone.
+- **R8-4 wrong in size:** traffic does not fall, and dragonfly falls by 11.5%, mostly from F5's slow reps.
+- **R8-5 mostly right:** the finer grid gains at most 0.2%, reps spread at most 1.05, and the ratios are within 0.02 of F1's. But Devastator ran at 0.95–0.96 of its F1 rate, not 0.97–1.03; so did Charades, on this node.
+- **R8-6 right:** 1.002–1.006.
+- **R8-7 right:** 4 of 102 arms spread above 1.10, each from one slow Devastator rep (1.00–1.03 without it).
+
+**What follows:**
+- **F1's PHOLD table** takes this job's 8-node column: 1.22 / 1.32 / 1.48 / 1.58 / 1.82 / 1.99 / 1.20 / 1.46. Its range (1.08–2.25) and "ahead in all 48 cells" stand. The Charades ÷ ROSS ranges and the per-node columns do not change.
+- **F5's applications table** takes dragonfly 1.69 and traffic 1.26 at 8 nodes, with Charades ÷ ROSS 3.14 and 2.13 (dragonfly's range becomes 2.93–3.14).
+- **The layout rule** stays: node 0 runs nothing while streams run side by side. Multi-node streams side by side on other nodes are fine.
+- **Still open:** VLSI's 8-node column (the same layout; 1.30).
 
 ## Earlier
 
