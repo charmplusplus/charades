@@ -35,7 +35,8 @@ Message cost, htram's modes and buffers, the deadline flush policy, choosing htr
 | 161 | 2026-10-30 | current | Job P16 results: allocating PP's shared buffers at their own limit removes most of PP's start-up ramp and g… |
 | 222 | 2026-11-04 | design | F2 and F3 on PHOLD and traffic, and ROSS's window on traffic and dragonfly |
 | 223 | 2026-11-04 | current (F2, ROSS) / superseded (F3) | ABL results: htram's deadline flush is 2.1–3.3× direct sends on PHOLD and 1.4× on traffic; eager flush lose… |
-| 256 | 2026-11-07 | design | Bundling at 32 nodes on the remote-heavy end, and fixed windows past F1's and F5's grids |
+| 256 | 2026-11-07 | design (results in 257) | Bundling at 32 nodes on the remote-heavy end, and fixed windows past F1's and F5's grids |
+| 257 | 2026-11-08 | current | AG32 results: at 32 nodes bundling is 2.29× direct sends on uniform and 3.14× on σ 4,000; W 400 and traffic… |
 | 3 | 2026-10-20 | historical | Per-message cost and scaling |
 | 4 | 2026-10-20 | superseded | Aggregation through htram |
 | 5 | 2026-10-20 | historical | Deadline flush policy |
@@ -1038,9 +1039,9 @@ This is a diagnosis; neither setting is a candidate for the paper's launch (sect
 
 ### §256 · Bundling at 32 nodes on the remote-heavy end, and fixed windows past F1's and F5's grids (job AG32 design, 2026-11-07; written before any runs)
 
-> **Status: design.**
+> **Status: design (results in section 257).**
 > - **User decision 2026-11-07:** do the free analysis (section 255) and run 1, and add the wider fixed windows to it.
-> - **Submitted 2026-11-07:** 3692756 (skx, 32 nodes; pending on resources).
+> - **Submitted 2026-11-07:** 3692756 (skx, 32 nodes); it ran 2026-11-08 06:03–07:21.
 > - **Script:** `$WORK/charades-runs/ag32_256.slurm` (copy in `~/charades-data/f1/`). It runs on skx (32 nodes exceeds skx-dev), limit 2:30, about 70–80 minutes, `-x c455-081`.
 > - **Code:** tree `charades-r5` (85a2aad), as F1. Charades only: the other engines' 32-node rates are in sections 252–253.
 
@@ -1090,6 +1091,116 @@ No log, stats, trace or digest flag appears in any command. PHOLD runs carry no 
 - **If AG-2 holds,** claim 1 quotes bundling's gain at 32 nodes on the remote-heavy end. If it falls well below 1.5 on uniform, the paper says bundling's advantage fades for all-to-all traffic at scale.
 - **If a setting raises uniform's message size and rate by more than 5%,** F1's uniform cell at 32 nodes gets that setting in a later job.
 - **If a wider W beats F1's or F5's best fixed W by more than 3%,** those tables' "best fixed W" and the controller ratios take the new value.
+
+### §257 · AG32 results: at 32 nodes bundling is 2.29× direct sends on uniform and 3.14× on σ 4,000; W 400 and traffic's W 1,000 stay the best fixed windows; on lookahead 10, W 75 is 8–15% faster than W 50 and W 100 (2026-11-08; skx batch job 3692756, 32 nodes)
+
+> **Status: current.** Design and predictions in section 256.
+> - **Job:** 32 nodes, 78 minutes (2026-11-08 06:03–07:21), gate 72/72. All 395 timing runs and the warm-up finished `ok`.
+> - **Data:** `~/charades-data/f1/ag32_256/j3692756` (digests and per-round GVT files not copied). `~/charades-data/f1/ag32_257.py` writes `ag32_256/ag32_257_summary.txt`.
+> - **Counts:** every run commits its workload's count from F1-32 (traffic: F5-32b's), whatever the transport, htram setting or window.
+> - **Against F1-32 and F5-32b:** the 25 arms those jobs also ran agree within 0.95–1.04 (this job's median ÷ theirs), apart from the lookahead 10 σ 500 controller (0.90; two slow reps, below). σ 100–2,000 ran 1–4% faster here; uniform and traffic were within 2%.
+
+**Part A: bundling on the remote-heavy end** (M committed ev/s, median of 5 reps, higher is better; bold: the row's best):
+
+| workload | transport | W 300 | W 400 | W 500 | W 600 | controller | controller's mean W |
+|---|---|---|---|---|---|---|---|
+| uniform | direct sends | **280.4** | 279.4 | 269.3 | 276.3 | 270.1 | 351 |
+| uniform | PP 512 | 504.7 | 515.4 | 499.9 | 468.3 | **531.0** | 390 |
+| uniform | PP 2,048 | 504.6 | 516.9 | 489.6 | 470.6 | **525.1** | 396 |
+| uniform | WPs 512 | 625.3 | **643.0** | 613.4 | 576.7 | 627.6 | 406 |
+| uniform | WPs 2,048 | 625.3 | **638.9** | 608.5 | 574.0 | 632.7 | 413 |
+| σ 4,000 | direct sends | **344.6** | 344.4 | 339.3 | 334.8 | 329.8 | 356 |
+| σ 4,000 | PP 512 | **1,080.6** | 1,060.6 | 1,027.3 | 935.7 | **1,080.6** | 413 |
+| σ 4,000 | PP 2,048 | 862.1 | 923.1 | **946.5** | 901.7 | 895.4 | 560 |
+| σ 4,000 | WPs 512 | 1,012.8 | **1,049.3** | 960.4 | 874.1 | 1,030.3 | 415 |
+| σ 4,000 | WPs 2,048 | 1,012.1 | **1,049.2** | 960.0 | 889.3 | 1,013.1 | 409 |
+
+**htram events per message** (median of 5 reps; higher means fewer messages):
+
+| workload | htram setting | W 300 | W 400 | W 500 | W 600 | controller |
+|---|---|---|---|---|---|---|
+| uniform | PP 512 | 8.6 | 8.3 | 8.4 | 8.5 | 8.3 |
+| uniform | PP 2,048 | 8.6 | 8.3 | 8.4 | 8.5 | 8.3 |
+| uniform | WPs 512 | 8.6 | 8.2 | 8.3 | 8.4 | 8.2 |
+| uniform | WPs 2,048 | 8.6 | 8.2 | 8.3 | 8.4 | 8.2 |
+| σ 4,000 | PP 512 | 57.6 | 49.5 | 50.5 | 53.8 | 48.8 |
+| σ 4,000 | PP 2,048 | 58.9 | 53.2 | 44.1 | 38.5 | 36.0 |
+| σ 4,000 | WPs 512 | 30.2 | 28.4 | 27.8 | 28.2 | 27.3 |
+| σ 4,000 | WPs 2,048 | 30.3 | 28.3 | 27.3 | 27.7 | 27.4 |
+
+**Bundling's gain by node count** (htram ÷ direct sends, higher is better for htram; 4 and 16 nodes from job ABL, section 223, which ran W 250/400 with diagnostics on both sides; 32 nodes from this job, W 300–600 without them; uniform with WPs 512, σ 2,000 and σ 4,000 with PP 512):
+
+| workload | comparison | 4 nodes | 16 nodes | 32 nodes |
+|---|---|---|---|---|
+| uniform | each at its best fixed W | 3.31 | 2.65 | 2.29 |
+| uniform | controller against controller | 3.30 | 2.68 | 2.32 |
+| uniform | htram events per message (F1's controller runs, section 255; this job) | 102 | 14.5 | 8.2 |
+| σ 2,000 | each at its best fixed W | 2.85 | 2.87 | — |
+| σ 4,000 | each at its best fixed W | — | — | 3.14 |
+| σ 4,000 | controller against controller | — | — | 3.28 |
+
+- **Bundling still pays at 32 nodes:**
+  - On uniform, htram's messages carry 8 events, and the best htram run is 2.29× the best direct-send run (WPs 512 at W 400, against direct sends at W 300); controller against controller, 2.32.
+  - On σ 4,000, with 27–59 events per message, the gain is 3.14 (3.28 controller against controller).
+- **On uniform the gain shrinks with node count but stays above 2:** 3.31 → 2.65 → 2.29 from 4 to 32 nodes, while the messages shrink from 102 to 8 events.
+- **Neither the buffer nor the window changes uniform's message size:**
+  - Buffer 2,048 carries the same events per message as 512 (0.99–1.00 in every arm, both modes), and W 600 the same as W 300 (0.98–1.00).
+  - On σ 4,000 a wider W gives smaller messages (W 600 ÷ W 300: 0.65–0.93).
+  - What sets 8 events per message on uniform at 32 nodes is not tested here.
+- **WPs is 1.21× PP on uniform** (643.0 against 531.0, each at its best arm) at the same message size. On σ 4,000 PP 512 is level with WPs (1.03) with about twice the events per message. F1 already uses the best setting here on each (WPs 512 on uniform, PP 512 on σ 4,000).
+- **Direct sends** do best at W 300 on both workloads, but vary by at most 4% over W 300–600.
+
+**Part B: fixed windows past F1's and F5's grids** (the best fixed W with its rate in M committed ev/s, median of 5; every other W as a fraction of it, higher is better; the controller ÷ the best fixed W in this job; uniform and σ 4,000 from part A at F1's htram settings):
+
+| workload | htram | best fixed W (M ev/s) | other W ÷ best | controller ÷ best fixed | controller's mean W |
+|---|---|---|---|---|---|
+| σ 100 | PP 2,048 | W 400 (1,662.1) | W 500 0.94, W 600 0.83 | 0.96 | 439 |
+| σ 500 | PP 2,048 | W 400 (1,460.6) | W 500 0.91, W 600 0.81 | 0.96 | 446 |
+| σ 1,000 | PP 2,048 | W 400 (1,372.3) | W 500 0.95, W 600 0.84 | 0.95 | 451 |
+| σ 2,000 | PP 512 | W 400 (1,244.2) | W 500 0.92, W 600 0.83 | 0.95 | 418 |
+| σ 4,000 | PP 512 | W 300 (1,080.6) | W 400 0.98, W 500 0.95, W 600 0.87 | 1.00 | 413 |
+| uniform | WPs 512 | W 400 (643.0) | W 300 0.97, W 500 0.95, W 600 0.90 | 0.98 | 406 |
+| lookahead 10, σ 500 | PP 2,048 | W 75 (1,270.9) | W 50 0.93, W 100 0.92, W 150 0.76 | 0.87 | 71 |
+| lookahead 10, σ 2,000 | WPs 512 | W 75 (1,047.2) | W 50 0.89, W 100 0.87 | 0.98 | 74 |
+| traffic | PP 2,048 | W 1,000 (2,288.1) | W 1,500 0.85, W 2,000 0.70 | 0.99 | 879 |
+
+- **W 400 stays the best fixed W at lookahead 100.** W 500 is 0.91–0.95 of it and W 600 0.81–0.84 (σ 100–2,000); on σ 4,000, W 300 is 2% ahead of W 400. F1's best fixed W there stands, and so do F1-32's controller ratios (0.94–0.98).
+- **Traffic's best fixed W stays 1,000:** W 1,500 is 0.85 of it and W 2,000 0.70.
+- **On lookahead 10 the best fixed W is 75,** 8–15% faster than W 50 and W 100 (F1's grid).
+  - Against it the controller is 0.98 (σ 2,000) and 0.87 (σ 500) in this job.
+  - F1-32's controller ÷ this job's W 75 is 0.96 (σ 500) and 0.97 (σ 2,000). These are different jobs; their matched arms agree within ±4%.
+  - So F1-32's 1.05–1.07 on lookahead 10 came from the missing W 75.
+  - At 1–16 nodes F1's lookahead-10 grid also lacked W 75. The controller was 0.97–1.03 of the grid's best there; W 75 was not run.
+- **The controller's slow runs** (reported, not investigated; user decision 2026-11-07):
+  - Lookahead 10 σ 500: reps 1 and 3 ran at 790 and 751 M ev/s, against 1,100–1,272 in the other three, with a mean W of 91–99 against 60–71. Fixed W 100 runs at 0.92 of W 75 in this job, so the wider window accounts for little of the loss.
+  - In 3 of the 30 controller runs at F1's settings on lookahead 100 (σ 1,000 rep 2, σ 2,000 reps 2 and 5), the mean W was 324–365 instead of 385–463. Those runs were 0.90–0.94 of their cell's median.
+  - F1-32's σ 100 cell had the same pattern (W ≈ 290, 0.79–0.80). This job's σ 100 controller stayed at W 435–460 in all five reps.
+- **Spread between reps** (fastest ÷ slowest rep):
+  - The median is 1.08; 18 of 79 arms are above 1.15.
+  - Rep 3 (06:37–06:52) holds 15 of the 28 runs that fell below 0.9 of their arm's median.
+  - Without its slowest rep every arm is at 1.15 or less, apart from three on lookahead 10 (σ 500 controller 1.61, σ 500 W 75 1.17, σ 2,000 W 100 1.22).
+  - The largest single drops were σ 4,000 WPs 2,048's controller at 0.50 of its median (rep 4) and σ 4,000 PP 512 at W 300 at 0.65 (rep 3).
+
+**Predictions (section 256):**
+- **AG-1 right:** one count per workload over 395 runs, equal to F1-32's and F5-32b's.
+- **AG-2 right on uniform** (2.29; range 1.5–2.5) **and just above the range on σ 4,000** (3.14; range 2.0–3.0).
+- **AG-3 mostly wrong:**
+  - buffer 2,048 carries the same events per message as 512 on uniform: right;
+  - W 600 carries 0.98–1.00 of W 300's events per message, not at least 1.3×: wrong;
+  - PP ÷ WPs at their best is 0.83 on uniform (wrong) and 1.03 on σ 4,000 (right).
+- **AG-4 mostly right:** W 400 for every htram setting on uniform; on σ 4,000, W 400 (WPs), W 500 (PP 2,048) and W 300 (PP 512, 2% over W 400). Direct sends' best (W 300) is no wider than htram's on either workload.
+- **AG-5 half right:**
+  - W 600 below W 500, and traffic's W 2,000 below W 1,500: right.
+  - W 500 within ±3% of W 400 (it is 0.91–0.95), and traffic's W 1,500 within ±3% of W 1,000 (0.85): wrong. The window past the best costs more than predicted.
+  - W 75 the best fixed W on both lookahead 10 workloads by at least 2% (8–15%): right.
+- **AG-6 right in 15 of 17 cells** (0.93–1.02). Outside: lookahead 10 σ 500 (0.87, the two slow controller reps) and uniform PP 512 (1.03).
+- **AG-7 wrong:** 18 of 79 arms spread above 1.15. Dropping the slowest rep brings all but three lookahead 10 arms to 1.15 or less.
+
+**What follows:**
+- **Claim 1 can quote 32 nodes:** bundling is 2.29× direct sends on uniform and 3.14× on σ 4,000, each at its best fixed W. On uniform it falls from 3.31 at 4 nodes but stays above 2. This job ran without diagnostics; F2's 4- and 16-node runs carried them on both sides.
+- **No setting raises uniform's message size or rate by more than 5%,** so F1's uniform cell keeps WPs 512, which is the best setting here.
+- **The lookahead 10 rows take W 75 as the best fixed W at 32 nodes.** The front page's 32-node controller range becomes 0.94–0.98 (F1-32's controller; lookahead 10 against this job's W 75). W 400 at lookahead 100 and W 1,000 on traffic stand.
+- **Not run:** W 75 on lookahead 10 at 1–16 nodes; what sets uniform's 8 events per message at 32 nodes; why the controller sometimes settles at a narrower W (lookahead 100) or a wider one (lookahead 10 σ 500) in a slow run.
 
 ## Earlier
 

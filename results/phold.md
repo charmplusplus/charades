@@ -24,7 +24,7 @@ Gaussian and uniform PHOLD in Charades, Devastator and ROSS: σ sweeps, full nod
 | 240 | 2026-11-06 | design (RW results in 241) | F1 and F5 on the final defaults: seven jobs queued at once — ROSS's window on PHOLD, Gaussian PHOLD at 1–32… |
 | 242 | 2026-11-06 | current | F1a results: on PHOLD group a (σ 100, σ 1,000, σ 4,000, lookahead 10 σ 2,000) Charades ÷ Devastator is 1.13… |
 | 243 | 2026-11-06 | current | F1b results, and F1 at 1–16 nodes: Charades leads Devastator in all 40 PHOLD cells (1.08–2.25), each ratio… |
-| 252 | 2026-11-07 | current | F1-32 results, and F1 at 1–32 nodes: Charades leads Devastator in all 48 PHOLD cells, 1.26–2.01 at 32 nodes… |
+| 252 | 2026-11-07 | superseded in part by §257 (was: current) | F1-32 results, and F1 at 1–32 nodes: Charades leads Devastator in all 48 PHOLD cells, 1.26–2.01 at 32 nodes… |
 | 255 | 2026-11-07 | current | How each engine slows as events go to other processes, and its GVT pace, from F1's data: Charades keeps 0.4… |
 | 1 | 2026-10-19 | historical | First Stampede3 measurements |
 | 2 | 2026-10-19 | historical | Optimism window sweep |
@@ -888,6 +888,7 @@ With Charades at its best arm (controller or fixed W), the ratios are 1.00–1.0
 ### §252 · F1-32 results, and F1 at 1–32 nodes: Charades leads Devastator in all 48 PHOLD cells, 1.26–2.01 at 32 nodes (old: 0.89–1.66); from 16 to 32 nodes it keeps 0.82–1.00 of its per-node rate (old: 0.72–0.87); Charades ÷ ROSS 2.73–6.08; the controller is 0.94–1.07 of the best fixed W at 32 nodes (median of 5 reps), but on σ 100 it stays at W ≈ 290 in 2 of 5 reps (0.79–0.80) (2026-11-07; skx batch job 3688916, 32 nodes)
 
 > **Status: current.** Design and predictions in section 240. With sections 242–243 (1–16 nodes), it replaces A1 and A2r (sections 142–143 and 153) in the paper's PHOLD table.
+> - **Superseded in part (2026-11-08, section 257):** at 32 nodes on lookahead 10 the best fixed W is 75, which this job did not run (8–15% faster than W 50 and W 100 in job AG32). Against it this job's controller is 0.96–0.97, not 1.05–1.07, so the 32-node controller range is 0.94–0.98. W 400 at lookahead 100 stays the best fixed W (W 500 and 600 are slower), and the Charades ÷ Devastator ratios, which use the controller, are unchanged.
 > - **Job:** 2 h 19 min (08:56–11:15), 32 nodes. The gate passed.
 >   - 5 reps of all eight workloads, as in A2r's layout.
 >   - Charades 150 runs, Devastator 150, ROSS 115. None failed.

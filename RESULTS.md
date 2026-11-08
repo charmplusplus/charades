@@ -24,18 +24,18 @@ Split on 2026-11-07 from one file of 11,400 lines and 249 sections; the text mov
 
 | file | what | sections |
 |---|---|---|
-| [results/phold.md](results/phold.md) | **PHOLD: performance and weak scaling.** Gaussian and uniform PHOLD in Charades, Devastator and ROSS: σ sweeps, full nodes, long runs, weak scaling from 1 to 32 nodes, and the paper runs F1. | 33 |
+| [results/phold.md](results/phold.md) | **PHOLD: performance and weak scaling.** Gaussian and uniform PHOLD in Charades, Devastator and ROSS: σ sweeps, full nodes, long runs, weak scaling from 1 to 32 nodes, and the paper runs F1. | 34 |
 | [results/applications.md](results/applications.md) | **Traffic and dragonfly.** The two applications ported from Charades to ROSS and Devastator (phase B), the traffic count fix, and the paper runs F5 at 1–32 nodes. | 16 |
 | [results/vlsi.md](results/vlsi.md) | **VLSI (b19 × N).** Gate-level simulation of copies of ITC'99's b19: the model and its layout, the gap to Devastator and how it closed, commits, and the paper's VLSI row. | 31 |
 | [results/controller.md](results/controller.md) | **The optimism-window controller.** Every controller design and test: the delay-quantile rule, the aggregation bound, the measured-cost rule and its freeze, where the best window lies at scale, robustness (F4), and the controller's own cost (CC). | 37 |
-| [results/aggregation.md](results/aggregation.md) | **Aggregation through htram.** Message cost, htram's modes and buffers, the deadline flush policy, choosing htram automatically, input buffers, PP's allocation and start-up, flush timing, and F2 (htram against direct sends). | 34 |
+| [results/aggregation.md](results/aggregation.md) | **Aggregation through htram.** Message cost, htram's modes and buffers, the deadline flush policy, choosing htram automatically, input buffers, PP's allocation and start-up, flush timing, and F2 (htram against direct sends), and bundling at 32 nodes (AG32). | 36 |
 | [results/hold.md](results/hold.md) | **The PADS'19 hold (F3).** Mikida and Kale's hold of events past a cutoff, run as a baseline beside the window. | 2 |
 | [results/engine.md](results/engine.md) | **The engine: GVT, rollback and per-event cost.** What paces the bucketed GVT at scale, rollback depth and unit, the same-process fast path, and the rounds that closed Charades' per-event gap to Devastator. | 53 |
 | [results/runtime.md](results/runtime.md) | **Runtime, transport and the machine.** Reconverse builds and settings, native psm2 through LCI, LCI devices, the late-rank investigation, the message pool, NUMA balancing, shared memory between processes, and the slow node. | 43 |
 | [results/baselines.md](results/baselines.md) | **ROSS and Devastator as baselines.** First runs and feasibility, ROSS's optimism window on PHOLD, and the Mac checks that both engines commit Charades' counts. | 3 |
 | [results/methods.md](results/methods.md) | **Methods.** How runs are made and checked: run length and warm-up, and the flag check that keeps diagnostics out of timing runs. | 3 |
 | [results/history.md](results/history.md) | The re-read of 2026-10-28 and the plan history | — |
-| [results/INDEX.md](results/INDEX.md) | Every section by number, with its date, job, status and file | 255 |
+| [results/INDEX.md](results/INDEX.md) | Every section by number, with its date, job, status and file | 258 |
 
 ## Current numbers
 
@@ -90,9 +90,25 @@ Every cell commits one count in both engines and one Charades digest, as F4. Cha
 - **Per-node rate from 16 to 32 nodes:** Charades keeps 0.82–1.00, against 0.72–0.87 in the old table, and more than Devastator in 6 of 8 workloads (level on uniform, 0.96 against 0.97 on σ 1,000). From 1 to 32 nodes it scales best of the three in 7 of 8 workloads.
 - **The controller:**
   - At 1–16 nodes it is 0.930–1.032 of the better fixed W.
-  - At 32 nodes it is 0.94–1.07 (median of 5 reps).
+  - At 32 nodes it is 0.94–0.98 (median of 5 reps). On lookahead 10 that is against W 75 from job AG32 (section 257), which is 8–15% faster than F1's W 50 and W 100; against F1's own grid it was 1.05–1.07 there.
+  - In AG32's own runs it is 0.95–1.00 of the best fixed W, and 0.87 on lookahead 10 σ 500, where two of its five reps ran at 0.6× the other three (section 257).
   - On σ 100 at 32 nodes it stayed at W ≈ 290 in 2 of 5 reps and ran at 0.79–0.80 there (section 252).
-- **Fixed windows at 32 nodes:** the best is the grid's widest (W 400); wider ones were not run.
+- **Fixed windows at 32 nodes** (job AG32, section 257): W 400 stays the best at lookahead 100 (W 500 is 0.91–0.95 of it, W 600 0.81–0.84), and W 1,000 on traffic (W 1,500 0.85). On lookahead 10 the best is W 75.
+
+**Bundling: htram ÷ direct sends, 4–32 nodes** (each at its best fixed W; higher is better for htram. 4 and 16 nodes: job ABL, section 223, W 250/400, mean of 2 reps, diagnostics on both sides. 32 nodes: job AG32, section 257, W 300–600, median of 5 reps, no diagnostics. σ 100 with PP 2,048; σ 2,000 and σ 4,000 with PP 512; uniform with WPs 512):
+
+| workload | 4 nodes | 16 nodes | 32 nodes |
+|---|---|---|---|
+| σ 100 | 2.11 | 2.20 | — |
+| σ 2,000 | 2.85 | 2.87 | — |
+| σ 4,000 | — | — | 3.14 |
+| uniform | 3.31 | 2.65 | 2.29 |
+
+- **On uniform the gain shrinks as the messages do, but stays above 2.**
+  - htram's messages carry 102, 14.5 and 8 events at 4, 16 and 32 nodes (F1's controller runs, sections 255 and 257).
+  - At 32 nodes neither buffer 2,048 nor a wider W (up to 600) makes them bigger.
+- **Controller against controller** (the paper's configuration): uniform 3.30 / 2.68 / 2.32 at 4 / 16 / 32 nodes; σ 4,000 3.28 at 32 nodes.
+- **Applications at 32 nodes:** 1.17 on dragonfly and 1.24 on traffic (section 253; see the applications table above).
 
 > **Launch change, 2026-10-30:** every Stampede3 run now goes through `numactl --localalloc` (`ctl_sweep.sh`'s `NUMA_WRAP`), so the kernel's automatic NUMA balancing skips our processes (section 164). At 16 nodes it gains 1.024–1.049×, and at 32 nodes 1.060× (σ 100), 1.124× (σ 2,000) and 1.028× (uniform), removing a dip 1.5–2.0 s after the clock starts (sections 164 and 166). The tables from here down used the default (balancing on), and so did Devastator and ROSS; the robustness, applications and PHOLD tables above use `--localalloc` for Charades. Devastator does not gain from it (section 166), so each engine keeps its better launch.
 
