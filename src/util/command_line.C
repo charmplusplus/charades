@@ -1,9 +1,40 @@
 #include "command_line.h"
 
 #include "globals.h"
-#include <fstream>
+#include <cerrno>
+#include <cstdio>
+#include <cstring>
+#include <sstream>
 
 AggregateParser command_line_parser;
+
+// Reads a configuration file whole. A file that opens but cannot be read (a
+// directory, or a read error on a shared file system) must not parse as
+// empty: the run would go on with the defaults and pass (RESULTS.md 263).
+// std::ifstream cannot tell a read error from the end of the file, so this
+// uses stdio and checks ferror.
+static std::string read_config_file(const std::string& path) {
+  FILE* f = fopen(path.c_str(), "r");
+  if (f == NULL) {
+    CkPrintf("Error: %s is not a valid configuration file\n", path.c_str());
+    CkAbort("Argument parse error\n");
+  }
+  std::string text;
+  char buf[4096];
+  size_t n;
+  while ((n = fread(buf, 1, sizeof(buf), f)) > 0) {
+    text.append(buf, n);
+  }
+  int err = errno;
+  bool failed = ferror(f) != 0;
+  fclose(f);
+  if (failed) {
+    CkPrintf("Error: could not read configuration file %s: %s\n",
+        path.c_str(), err != 0 ? strerror(err) : "read error");
+    CkAbort("Argument parse error\n");
+  }
+  return text;
+}
 
 void tw_add_arguments(ArgumentSet* args) {
   command_line_parser.add_parser(args);
@@ -144,23 +175,17 @@ void parse_command_line(int argc, char** argv) {
         CkAbort("Argument parse error\n");
       }
     } else {
-      std::ifstream file(argument);
-      if (!file.good()) {
-        CkPrintf("Error: %s is not a valid configuration file\n",
-            argument.c_str());
-        CkAbort("Argument parse error\n");
-      } else {
-        std::string line;
-        while(std::getline(file, line)) {
-          if (line.find("//") == 0 || line.find("#") == 0) {
-            continue;
-          } else if (line.find_first_not_of("\t\r\n ") == std::string::npos) {
-            continue;
-          } else if (!command_line_parser.parse(line)) {
-            CkPrintf("Error: %s in file %s is an unrecognized option\n",
-                line.c_str(), argument.c_str());
-            CkAbort("Argument parse error\n");
-          }
+      std::istringstream file(read_config_file(argument));
+      std::string line;
+      while(std::getline(file, line)) {
+        if (line.find("//") == 0 || line.find("#") == 0) {
+          continue;
+        } else if (line.find_first_not_of("\t\r\n ") == std::string::npos) {
+          continue;
+        } else if (!command_line_parser.parse(line)) {
+          CkPrintf("Error: %s in file %s is an unrecognized option\n",
+              line.c_str(), argument.c_str());
+          CkAbort("Argument parse error\n");
         }
       }
     }
