@@ -26,6 +26,7 @@ Every controller design and test: the delay-quantile rule, the aggregation bound
 | 246 | 2026-11-06 | current | CC results: without its per-round log the controller runs at 0.970–0.985 of the best fixed W. The log itsel… |
 | 250 | 2026-11-07 | design (results in 251) | F4 rerun without diagnostics: the robustness comparison on the current tree, with F4's three flags only in… |
 | 251 | 2026-11-07 | current | F4b results: without diagnostics the frozen controller is 0.92–1.03 of the best fixed W per cell (median of… |
+| 258 | 2026-11-08 | design | Grid check: the fixed-window grids behind claims 2 and 3, refined where a window between grid points may be… |
 | 6 | 2026-10-20 | design | Window controller |
 | 7 | 2026-10-20 | superseded | Window controller, first Stampede3 results |
 | 8 | 2026-10-20 | superseded | Waste floor, controller cost, horizon margin |
@@ -1398,6 +1399,115 @@ The GVT progress print stays at its default, as in every paper run (its cost was
 - **Charades ÷ Devastator on these seven workloads** (each at its best fixed W, short runs) is 1.16–2.00, unchanged from F4 within 4%.
 - **F4's flags** (`--blocked-time --ctl-log --commit-digest`) cost the controller up to 4% (traffic and σ 100 at 4 nodes), consistent with sections 246 and 248.
 - **The script's warm-up bug:** if `f4b250.slurm` is reused, the warm-up needs a name per stream.
+
+### §258 · Grid check: the fixed-window grids behind claims 2 and 3, refined where a window between grid points may be faster (job GC design, 2026-11-08; written before any runs)
+
+> **Status: design.**
+> - **User decision 2026-11-08:** do the grid check (after section 257).
+> - **Submitted 2026-11-08:** 3694714 (skx) and 3694715 (skx-dev, with the twin guard); whichever starts first cancels the other.
+> - **Script:** `$WORK/charades-runs/gc258.slurm` (copy in `~/charades-data/gc/`). It runs on skx-dev with an skx copy (twin guard), 16 nodes, limit 1:55, about 70 minutes, `-x c455-081`.
+> - **Code:** tree `charades-r5` (85a2aad), as F1, F4b and AG32. Devastator's binaries and launch as in F1.
+
+**Why.**
+- Job AG32 (section 257) found W 75 on lookahead 10 at 32 nodes 8–15% faster than W 50 and W 100, the grid F1 ran. The controller's apparent lead there (1.05–1.07) was the grid's gap.
+- Claim 2's ratios (F4b, section 251) use Charades grids with gaps of the same kind:
+  - lookahead 10: W 25 / 50 / 100 / 300, best 50, while the controller's mean W was 57–64;
+  - σ 100, σ 2,000 and uniform: steps of 100, best 300, while the controller's mean W was 309–390;
+  - traffic: W 500 / 750 / 1,000, and at 4 nodes the best is the grid's bottom;
+  - dragonfly: W 10,000 / 20,000 / 40,000 ps, and the controller (mean W 13,700–15,200) is 1.01–1.03 of the best.
+- Claim 3's ratios (F1, sections 242–243 and 252) use Devastator's grid W 500 / 1,000 / 2,000 (lookahead 10: 100 / 200 / 400).
+  - Its best was the grid's end in 11 of 48 cells, all at 1–8 nodes.
+  - In the closest cell, lookahead 10 σ 500 at 1 node (Charades ahead 1.08), its W 100 and W 200 ran level, and W 150 was never run.
+- A finer grid can only lower the controller ratios (claim 2) and Charades ÷ Devastator (claim 3).
+
+**Runs** (5 reps; arm and cell order reversed in even reps, and in part D which engine goes first; a warm-up run of each engine starts each stream and is not counted).
+
+**Part C, claim 2:** F4b's cells, Charades only, F4b's sizes and htram settings. Every cell also runs the controller. 320 runs.
+
+| workload (htram) | nodes | F4b's grid, and its best | this job's fixed W |
+|---|---|---|---|
+| lookahead 10, σ 500 (PP 512) | 4, 16 | 25 / 50 / 100 / 300; 50 at both | 40 / 50 / 60 / 75 / 100 |
+| σ 100 (PP 2,048) | 4 | 100 / 200 / 300 / 400; 300 | 250 / 300 / 350 / 400 |
+| | 16 | the same; 300 | 250 / 300 / 350 / 400 / 450 |
+| σ 2,000 (PP 512) | 4 | 100 / 200 / 300 / 400; 300 | 250 / 300 / 350 / 400 |
+| | 16 | the same; 300 and 400 level | 250 / 300 / 350 / 400 / 450 |
+| uniform (WPs 512) | 4, 16 | 100 / 200 / 300 / 400; 300 at both | 250 / 300 / 350 / 400 |
+| traffic (PP 2,048) | 4 | 500 / 750 / 1,000; 500 | 350 / 425 / 500 / 600 |
+| | 16 | the same; 750 | 600 / 675 / 750 / 875 |
+| dragonfly (WPs 512) | 4, 16 | 10,000 / 20,000 / 40,000 ps; 20,000 at both | 12,500 / 15,000 / 17,500 / 20,000 |
+
+Phase-changing PHOLD is left out: its grid already runs in steps of 25 around its best (W 75; 75 and 100 level at 16 nodes).
+
+**Part D, claim 3:** F1's cells where Devastator's best was the grid's end or Charades led by less than 1.20.
+- **Devastator's grid:** steps of √2 around F1's best W, with that W. It reaches one octave past the best where the best was the grid's end, and 1.5 octaves where the next W ran at 0.90 of the best or below.
+- **Charades:** its controller runs beside each cell at F1's htram settings (σ 1,000: PP 2,048 and PP 512; uniform and lookahead 10 σ 2,000: PP 512 and WPs 512; otherwise F1's one setting), and the better one counts, as in F1.
+- **Size:** 305 Devastator runs and 100 Charades runs.
+
+| cell | F1: Devastator's best W (next W ÷ best); Charades ÷ Devastator | this job's Devastator W |
+|---|---|---|
+| σ 100, 1 node | 2,000, the top (1,000 level); 1.26 | 1,000 / 1,400 / 2,000 / 2,800 / 4,000 |
+| σ 500, 1 node | 500, the bottom (1,000 at 0.99); 1.19 | 250 / 350 / 500 / 700 / 1,000 |
+| σ 500, 2 nodes | 1,000 (0.97); 1.19 | 700 / 1,000 / 1,400 |
+| σ 1,000, 1 node | 1,000 (0.98); 1.13 | 700 / 1,000 / 1,400 |
+| σ 2,000, 1 node | 500, the bottom (0.92); 1.44 | 250 / 350 / 500 / 700 |
+| σ 4,000, 1 node | 500, the bottom (0.89); 1.46 | 175 / 250 / 350 / 500 / 700 |
+| σ 4,000, 2 nodes | 500, the bottom (0.94); 1.90 | 250 / 350 / 500 / 700 |
+| uniform, 1 node | 500, the bottom (0.84); 1.57 | 175 / 250 / 350 / 500 / 700 |
+| uniform, 2 nodes | 500, the bottom (0.90); 2.03 | 175 / 250 / 350 / 500 / 700 |
+| uniform, 4 nodes | 500, the bottom (0.92); 2.25 | 250 / 350 / 500 / 700 |
+| uniform, 8 nodes | 500, the bottom (1,000 at 0.99); 2.14 | 250 / 350 / 500 / 700 / 1,000 |
+| lookahead 10 σ 500, 1 node | 100, the bottom (200 level); 1.08 | 50 / 70 / 100 / 140 / 200 |
+| lookahead 10 σ 500, 2 nodes | 200 (0.96); 1.09 | 140 / 200 / 280 |
+| lookahead 10 σ 2,000, 1 node | 100, the bottom (0.86); 1.27 | 35 / 50 / 70 / 100 / 140 |
+
+**Layout:**
+1. Gate on 2 nodes: the change tier on Simple PHOLD, traffic and dragonfly.
+2. Side by side: part D's 1-node cells in two streams (nodes 0 and 1), 2-node cells (nodes 2–3) and uniform at 4 nodes (nodes 4–7); part C at 4 nodes in two streams (nodes 8–11 and 12–15).
+3. Part D's uniform at 8 nodes (nodes 0–7).
+4. Part C at 16 nodes.
+
+**Flags per arm** (from a stub run with a fake `srun`: 738 commands, as planned):
+- part C 320, part D 305 Devastator and 100 Charades, and 13 warm-ups;
+- Charades' config files are byte-identical to F4b's (traffic and dragonfly checked) and in F1's form;
+- every Devastator run sets its window in the environment (checked in the stub's output headers), and none runs adaptive.
+
+| arm | flags beyond the launch | why |
+|---|---|---|
+| Charades, fixed W | `--optimism-window=W --gvt-bucket-size=B --aggregation=1 --agg-mode=M --agg-buffer=N --agg-policy=1 --agg-horizon-margin=8` (B 8, dragonfly 1,000 ps; M 2 = PP, 0 = WPs) | the window under test and F4b's or F1's htram setting |
+| Charades, controller | `--ctl=3 --ctl-bracket=1` and the same htram flags | the frozen controller |
+| Devastator, fixed W | `deva_static_look_dt=W` (environment, set by `run_phold.sh`); `--lp-per-rank=128 --start-events=15 --lookahead=L --mean=M --sigma=S --end-time=E --rng=clcg4` (uniform also `--remote=1.0`) | F1's launch and sizes |
+| warm-ups | Charades σ 100, PP 2,048, W 300, end 512,000; Devastator σ 100, W 1,000, full size | first-run effects; not counted |
+
+- **Launch, Charades:** `srun -c 24`, 2 × 23 PEs per node, `numactl --localalloc`, `+lci_ndevices 23 +pemap 2-46:2,3-47:2 +mempool_remote_free`, config `bucket`.
+- **Launch, Devastator:** `run_phold.sh` (F1's path): `srun --mpi=pmi2 -n 2N --ntasks-per-node=2 -c 24 --cpu-bind=cores -m block:block`, GASNet's ofi conduit over psm2, binary `phold-gauss-p<2N>w23`.
+- No log, stats, trace or digest flag appears in any command.
+
+**Predictions:**
+- **GC-1. Counts:** one committed count per cell over every arm and both engines, equal to F4b's (part C) and F1's (part D).
+- **GC-2. Charades' best on the refined grid ÷ its best at F4b's grid points, both in this job** (above 1 means the gap mattered):
+  - lookahead 10: best W 60 or 75 at both node counts, 1.02–1.08;
+  - dragonfly: best W 15,000 or 17,500, 1.01–1.04;
+  - traffic: best 425 or 500 at 4 nodes, 1.00–1.04; best 675 or 750 at 16 nodes, 1.00–1.03;
+  - σ 100, σ 2,000 and uniform: best 300 or 350 at 4 nodes and 300–400 at 16, 1.00–1.03.
+- **GC-3. The controller ÷ the refined best fixed W:** 0.92–1.00 per cell (F4b on its grid: 0.96–1.03), none above 1.01. With phase-changing PHOLD from F4b (0.92 and 0.96), claim 2's range becomes about 0.92–1.00.
+- **GC-4. Devastator's refined best ÷ its best at F1's grid points, both in this job:** at most 1.06 in every cell. Above 1.03 only where the next W ran at 0.92 or below (σ 2,000 and σ 4,000 at 1 node, uniform at 1–4 nodes, lookahead 10 σ 2,000 at 1 node), with the best moving to W 250–350 (lookahead 10: 50–70).
+- **GC-5. Charades ÷ Devastator** (Charades' controller at the better F1 setting ÷ Devastator's refined best, both in this job): above 1.00 in all 14 cells; lookahead 10 σ 500 at 1 node 1.00–1.08; every cell within 0.07 of F1's.
+- **GC-6. Charades' controller in part D** runs within ±5% of its F1 median in every cell.
+- **GC-7. Spread between reps:** at most 1.10 per arm, apart from at most one slow rep per arm.
+
+**What follows:**
+- **Claim 2:**
+  - The robustness table's controller column takes this job's ratios (the controller ÷ the refined best fixed W, both in this job) for its 12 cells; phase-changing PHOLD keeps F4b's.
+  - The baselines' columns (Devastator's rule in Charades, Devastator's own window, one fixed window) are scaled by each cell's refined-best ÷ grid-best factor, and the table says so.
+  - The paper states Charades' grid: steps of at most 25% around the best.
+- **Claim 3:**
+  - For each part D cell where Devastator's refined best beats its best F1 grid point by more than 3% in this job, F1's table takes this job's paired Charades ÷ Devastator for that cell, with a note.
+  - If a cell falls to 1.00 or below, "ahead in all 48 cells" becomes the count.
+  - If Devastator's best is still the grid's end in a cell, the paper says so for that cell.
+- **Not covered:**
+  - Devastator at 16 and 32 nodes, where its best W lies inside the grid and Charades leads by 1.25 or more;
+  - F1's lookahead-10 controller column at 1–16 nodes (W 75 was never run at F1's htram settings there);
+  - phase-changing PHOLD.
 
 ## Earlier
 

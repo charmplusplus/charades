@@ -151,6 +151,7 @@ time without a reason written here first.
    - F1 at 1–32 nodes, three engines; 5 reps at 32. **Done** (RESULTS.md 242, 243, 252): ahead in all 48 cells.
    - F5 cells only where a change before the freeze touched the paths they use (item 3). **Done:** F5 rerun whole at 1–32 nodes without diagnostics (RESULTS.md 248, 253) and VLSI at 1–32 (249, 254).
    - **AG32 (user decision 2026-11-07, after the remote-communication analysis, RESULTS.md 255): done** (RESULTS.md 256–257, job 3692756). Bundling at 32 nodes on uniform and σ 4,000, and fixed windows past F1's and F5's grids. Bundling is 2.29× direct sends on uniform and 3.14× on σ 4,000; the best fixed W is 400 at lookahead 100, 1,000 on traffic and 75 on lookahead 10.
+   - **Grid check GC (user decision 2026-11-08; RESULTS.md 258, submitted as 3694714 / 3694715):** AG32 showed a window between grid points can be 8–15% faster. GC refines Charades' grid on F4b's cells (claim 2) and Devastator's grid on F1's 14 cells at 1–8 nodes where its best was the grid's end or Charades led by less than 1.20 (claim 3). Both can only lower our ratios.
    - F2 and F4 on the final defaults, if items 1–4 used earlier ones. F4: **done**, rerun in full on `charades-r5` without diagnostics (job F4b, RESULTS.md 250–251): controller 0.92–1.03 per cell.
 6a. **Decisions 2026-11-07 (user), after F4b (RESULTS.md 251):**
    - **Writing:** later; not started now.
