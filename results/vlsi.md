@@ -27,8 +27,9 @@ Gate-level simulation of copies of ITC'99's b19: the model and its layout, the g
 | 234 | 2026-11-05 | current | RA results: the cost of running ahead on VLSI was the lazy commit rule; with eager commits W 5,000 runs at… |
 | 235 | 2026-11-05 | design (results in 236) | VLSI's commit setting and its controller row: lazy commits that cannot pile up, eager commits, and the cont… |
 | 236 | 2026-11-06 | current | VC results: eager commits at W 5,000 are VLSI's best setting at 1, 2 and 16 nodes and within 3–5% of it at… |
-| 249 | 2026-11-07 | current | VA results: VLSI at 1–16 nodes without diagnostics. Charades ÷ Devastator is 1.51 / 1.44 / 1.27 / 1.29 / 1.… |
+| 249 | 2026-11-07 | superseded in part by §264 (was: current) | VA results: VLSI at 1–16 nodes without diagnostics. Charades ÷ Devastator is 1.51 / 1.44 / 1.27 / 1.29 / 1.… |
 | 254 | 2026-11-07 | current | V32b results: VLSI at 32 nodes without diagnostics; Charades ÷ Devastator 1.26 with its best fixed arm and… |
+| 264 | 2026-11-08 | current | V8 results: with the batch host idle, VLSI's 8-node cell barely moves; Charades ÷ Devastator is 1.29 with t… |
 | 216 | 2026-11-03 | design (results in 217, 226) | VLSI at 1–32 nodes with round 3, a cycle-time trace per node count, and one process against two per node on… |
 | 217 | 2026-11-03 | superseded by §239 at 1–16 nodes (was: current (1–16; 32 nodes in 226)) | VS2 results at 1–16 nodes: with round 3 Charades ÷ Devastator is 1.37 / 1.27 / 1.23 / 1.29 / 1.19; the coun… |
 | 226 | 2026-11-04 | superseded by §254 (was: current) | VS2 at 32 nodes (big2): Charades ÷ Devastator on VLSI falls to 1.05 (per rep 0.96–1.07); from 16 to 32 node… |
@@ -1351,6 +1352,7 @@ The per-node rate at 4 nodes ÷ at 1 is 0.55 for Charades and 0.47 for Devastato
 ### §249 · VA results: VLSI at 1–16 nodes without diagnostics. Charades ÷ Devastator is 1.51 / 1.44 / 1.27 / 1.29 / 1.24 at its best fixed arm and 1.45 / 1.36 / 1.27 / 1.30 / 1.26 with its controller; the diagnostics, the log included, cost VLSI at most 1.6% (2026-11-07; skx-dev batch job 3691150, 16 nodes)
 
 > **Status: current for VLSI at 1–16 nodes.** Design and predictions in §247 (methods.md). This replaces §239 (VS3) in the paper's VLSI row.
+> - **Superseded in part (2026-11-08, section 264):** the 8-node cell. Its stream ran on nodes 0–7 beside three other streams, with node 0, the batch host, busy (section 259). Rerun with node 0 idle (job V8), Devastator's best window ran at this job's rate, and Charades ÷ Devastator at 8 nodes is 1.29 with the controller (here 1.30) and 1.28 with the best fixed arm (here 1.29). The other node counts stand.
 > - **Job:** 21 min of the 50 min limit. Gate 27/27. The guard cancelled the skx copy 3690455 when this copy started. The 8-, 4-, 2- and 1-node series ran side by side, then 16 nodes.
 > - **Runs:** 110 Charades, 45 Devastator; none failed.
 > - **Data:** `~/charades-data/vlsi/vlsia_j3691150/`.
@@ -1457,6 +1459,42 @@ The per-node rate at 4 nodes ÷ at 1 is 0.55 for Charades and 0.47 for Devastato
 **What follows:**
 - **The paper's VLSI row** is complete at 1–32 nodes on the final setting (sections 249 and this one). Charades leads at every node count: 1.24–1.51 at its best fixed arm, 1.26–1.45 with its controller.
 - **Section 226 is superseded;** section 228 is superseded in part. Its explanation of big2's 32-node loss was for W 2,500, which the paper no longer uses, and C9 found no slow waves on this allocation's halves.
+
+### §264 · V8 results: with the batch host idle, VLSI's 8-node cell barely moves; Charades ÷ Devastator is 1.29 with the controller (VA 1.30) and 1.28 with the best fixed arm (VA 1.29); Devastator's best window runs at VA's rate, its narrower ones 1.04–1.10 faster (2026-11-08; skx-dev batch job 3696170, 9 nodes)
+
+> **Status: current for VLSI at 8 nodes.** Design and predictions in section 262 (phold.md). It replaces the 8-node cell of section 249 (VA) in the paper's VLSI row.
+> - **Job:** 3696170 on skx-dev; its skx copy 3696169 was cancelled by its guard. 9 nodes, node 0 idle, the stream on nodes 1–8; 12 min 36 s. The gate passed 27/27. The first copy, 3696078, stopped at its gate on a /work2 stall (section 263).
+> - **Data:** `~/charades-data/vlsi/v8_262/j3696170`; summary by `v8_264.py` in `v8_262/v8_264_summary.txt`.
+
+**Rates at 8 nodes** (M committed events/s, median of 5 reps; VA: median of 3; higher is better; "V8 ÷ VA" compares one arm across the two jobs; spread = fastest ÷ slowest rep):
+
+| arm | V8 | VA | V8 ÷ VA | spread |
+|---|---|---|---|---|
+| Charades, eager commits, W 5,000 | 193.3 | 195.7 | 0.988 | 1.040 |
+| Charades, eager commits, W 2,500 | 188.7 | 188.4 | 1.002 | 1.024 |
+| Charades, lazy commits, W 2,500 | 194.3 | 195.0 | 0.996 | 1.011 |
+| Charades, controller | 196.4 | 197.3 | 0.995 | 1.053 |
+| Devastator, W 2,500 | 151.5 | 137.9 | 1.099 | 1.017 |
+| Devastator, W 5,000 | 151.9 | 145.8 | 1.042 | 1.031 |
+| Devastator, W 10,000 | 152.1 | 151.7 | 1.002 | 1.026 |
+
+**Findings:**
+- **Counts:** one committed count, 1,078,843,202, in both engines and every arm, equal to VA's. Every Charades run has count waves (10,003–10,247), so none ran on the defaults (section 263).
+- **Charades ÷ Devastator at 8 nodes:** 1.29 with the controller (VA 1.30) and 1.28 with the best fixed arm (VA 1.29). Against Devastator's fastest rep (154.2): 1.27 and 1.26.
+- **Charades' fixed arms** lie within 3% of each other. The best is lazy commits at W 2,500 (194.3), 0.5% above eager commits at W 5,000 (193.3), which was VA's best.
+- **Devastator:** its best window, W 10,000, ran at VA's rate (1.002). W 2,500 and W 5,000 ran 1.10 and 1.04 faster than in VA, so with node 0 idle its three windows are level (151.5–152.1). The busy batch host cost Devastator's narrower windows, not its best one.
+- **The controller** runs at 0.964–1.026 of the best fixed arm of the same rep (median 1.002); its mean W is 2,763–3,588.
+- **No slow rep:** every arm's reps spread 1.053 or less.
+
+**Predictions (section 262):**
+- **V8-1 right:** one count, equal to VA's.
+- **V8-2 right:** Devastator's best 1.002 of VA (predicted 1.00–1.05), Charades 0.993–0.995 (0.98–1.02). The reason given there (copy 2's node, not node 0, sets VLSI's pace) is not tested by this job.
+- **V8-3 right:** 1.29 with the controller (1.24–1.31) and 1.28 with the best fixed arm (1.23–1.30).
+- **V8-4 right on the median** (1.002); 4 of 5 reps within 0.97–1.03 (one at 0.964).
+
+**What follows:**
+- **The paper's VLSI row** takes this job's 8-node cell: 1.45 / 1.36 / 1.27 / 1.29 / 1.26 / 1.26 with the controller and 1.51 / 1.44 / 1.27 / 1.28 / 1.24 / 1.26 with the best fixed arm at 1–32 nodes.
+- **No paper table value now comes from a run on a busy batch host.** The 1–4-node columns ran beside other streams but not on node 0, which job R8 showed does not slow a run (section 261).
 
 ## Earlier
 

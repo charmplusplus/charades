@@ -28,7 +28,7 @@ Gaussian and uniform PHOLD in Charades, Devastator and ROSS: σ sweeps, full nod
 | 255 | 2026-11-07 | current | How each engine slows as events go to other processes, and its GVT pace, from F1's data: Charades keeps 0.4… |
 | 260 | 2026-11-08 | design (results in 261) | The 8-node columns of F1 and F5 rerun with the batch host idle, GC's four 1-node cells off node 0, and whet… |
 | 261 | 2026-11-08 | current | R8 results: with the batch host idle, Devastator runs 3–10% faster at 8 nodes and Charades ÷ Devastator the… |
-| 262 | 2026-11-08 | design | VLSI's 8-node column rerun with the batch host idle (job V8), and the paper's tables at 64 nodes (jobs P64… |
+| 262 | 2026-11-08 | design (V8 results in 264) | VLSI's 8-node column rerun with the batch host idle (job V8), and the paper's tables at 64 nodes (jobs P64… |
 | 1 | 2026-10-19 | historical | First Stampede3 measurements |
 | 2 | 2026-10-19 | historical | Optimism window sweep |
 | 11 | 2026-10-21 | design | Gaussian PHOLD σ sweep |
@@ -1193,7 +1193,7 @@ The load ran 15 Devastator 4-node runs and 9 Charades 2-node runs across the thr
 
 ### §262 · VLSI's 8-node column rerun with the batch host idle (job V8), and the paper's tables at 64 nodes (jobs P64 and A64) (design, 2026-11-08; written before any runs)
 
-> **Status: design.**
+> **Status: design (V8 results in section 264; P64 and A64 pending).**
 > - **User decision 2026-11-08:** queue the VLSI job and the 64-node jobs.
 > - **Submitted 2026-11-08:** V8 3696077 (skx) and 3696078 (skx-dev; twin file written after both); P64 3696079 and A64 3696080 (skx, 64 nodes each). All pending at submission (skx: 1,152 of 1,160 nodes allocated).
 > - **V8's first copy (3696078) stopped at its gate** on a /work2 stall that left one test on the engine's defaults (section 263); no timing run ran. Resubmitted with a gate that reruns once on such failures: 3696169 (skx) and 3696170 (skx-dev). The analyses of P64 and A64 drop and report any Charades run without count waves (section 263).
