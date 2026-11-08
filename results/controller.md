@@ -25,8 +25,9 @@ Every controller design and test: the delay-quantile rule, the aggregation bound
 | 245 | 2026-11-06 | design | Where the controller's 3–7% goes |
 | 246 | 2026-11-06 | current | CC results: without its per-round log the controller runs at 0.970–0.985 of the best fixed W. The log itsel… |
 | 250 | 2026-11-07 | design (results in 251) | F4 rerun without diagnostics: the robustness comparison on the current tree, with F4's three flags only in… |
-| 251 | 2026-11-07 | current | F4b results: without diagnostics the frozen controller is 0.92–1.03 of the best fixed W per cell (median of… |
-| 258 | 2026-11-08 | design | Grid check: the fixed-window grids behind claims 2 and 3, refined where a window between grid points may be… |
+| 251 | 2026-11-07 | superseded in part by §259 (was: current) | F4b results: without diagnostics the frozen controller is 0.92–1.03 of the best fixed W per cell (median of… |
+| 258 | 2026-11-08 | design (results in 259) | Grid check: the fixed-window grids behind claims 2 and 3, refined where a window between grid points may be… |
+| 259 | 2026-11-08 | current | Grid check results: on a finer grid the controller is 0.96–0.99 of the best fixed W (it was above 1 only wh… |
 | 6 | 2026-10-20 | design | Window controller |
 | 7 | 2026-10-20 | superseded | Window controller, first Stampede3 results |
 | 8 | 2026-10-20 | superseded | Waste floor, controller cost, horizon margin |
@@ -1306,6 +1307,7 @@ The GVT progress print stays at its default, as in every paper run (its cost was
 ### §251 · F4b results: without diagnostics the frozen controller is 0.92–1.03 of the best fixed W per cell (median of 3 reps; 0.86–1.03 per rep), and 0.96–1.03 everywhere but phase-changing PHOLD at 4 nodes; its baselines fail as in F4: Devastator's rule in Charades falls to 0.15, Devastator's own window to 0.09 or does not finish (now also out of memory), one PHOLD window to 0.51; one count and one digest per cell (2026-11-07; skx-dev batch job 3691176, 16 nodes)
 
 > **Status: current.** Design and predictions in section 250. Replaces sections 230 and 232 (F4, F4R).
+> - **Superseded in part (2026-11-08, section 259):** the controller column. On a finer grid (job GC) the controller is 0.960–0.987 of the best fixed W in the 12 steady cells; its 1.00–1.03 on dragonfly and on lookahead 10 at 16 nodes came from gaps in the grid. Claim 2 becomes 0.92–0.99 per cell. The other columns stand, scaled by each cell's gain from the finer grid (at most 1.048).
 > - **Job:** 66 minutes (07:36:53–08:42:51).
 >   - The gate passed, and the skx copy (3691177) was cancelled by the guard.
 >   - Every Charades timing and check run finished.
@@ -1508,6 +1510,100 @@ Phase-changing PHOLD is left out: its grid already runs in steps of 25 around it
   - Devastator at 16 and 32 nodes, where its best W lies inside the grid and Charades leads by 1.25 or more;
   - F1's lookahead-10 controller column at 1–16 nodes (W 75 was never run at F1's htram settings there);
   - phase-changing PHOLD.
+
+### §259 · Grid check results: on a finer grid the controller is 0.96–0.99 of the best fixed W (it was above 1 only where the grid had a gap); Devastator's finer grid gains at most 1.4%, and Charades stays ahead in every cell; runs on the batch host are slowed when streams run side by side, which may overstate the 8-node ratios (2026-11-08; skx-dev batch job 3694715, 16 nodes)
+
+> **Status: current.** Design and predictions in section 258.
+> - **Job:** 49 minutes (12:01–12:51), gate 126/126; the skx copy (3694714) was cancelled by the guard. All 420 Charades and 305 Devastator timing runs and the 13 warm-ups finished `ok`.
+> - **Data:** `~/charades-data/gc/j3694715` (digests and per-round GVT files not copied). `~/charades-data/gc/gc_258.py` writes `gc_259_summary.txt` there.
+> - **Counts:** one committed count per cell over every arm and both engines, equal to F4b's (part C) and F1's (part D).
+> - **Correction to section 258's part D table:** σ 1,000 at 1 node is 1.20 in F1's table (Charades with PP 512), not 1.13 (PP 2,048 alone). It still qualified (1.198, under 1.20).
+
+**Part C: Charades on a finer grid** (M committed ev/s, medians of 5 reps; the controller ÷ the best fixed W of the same rep, median and range over reps, as in F4b; higher is better):
+
+| workload | nodes | best fixed W (M ev/s) | best ÷ best at F4b's grid points | controller ÷ best fixed W | F4b on its grid | controller's mean W |
+|---|---|---|---|---|---|---|
+| lookahead 10, σ 500 | 4 | 60 (163.6) | 1.003 (W 50) | 0.967 (0.965–0.980) | 0.97 | 58 |
+| | 16 | 60 (667.3) | 1.037 (W 50) | 0.964 (0.957–1.005) | 1.00 | 61 |
+| σ 100 | 4 | 300 (207.8) | 1.000 | 0.971 (0.949–0.978) | 0.97 | 315 |
+| | 16 | 350 (835.3) | 1.015 (W 300) | 0.960 (0.943–0.985) | 0.96 | 376 |
+| σ 2,000 | 4 | 300 (157.9) | 1.000 | 0.960 (0.954–0.968) | 0.97 | 322 |
+| | 16 | 350 (619.3) | 1.015 (W 300) | 0.987 (0.972–0.990) | 0.99 | 371 |
+| uniform | 4 | 300 (137.3) | 1.000 | 0.967 (0.962–0.972) | 0.96 | 311 |
+| | 16 | 350 (394.2) | 1.013 (W 300) | 0.975 (0.971–0.978) | 0.99 | 358 |
+| traffic | 4 | 500 (300.2) | 1.000 | 0.965 (0.958–0.970) | 0.96 | 534 |
+| | 16 | 675 (1,197.4) | 1.009 (W 750) | 0.968 (0.963–0.979) | 0.98 | 704 |
+| dragonfly | 4 | 15,000 ps (129.2) | 1.048 (W 20,000) | 0.983 (0.973–0.993) | 1.03 | 14,316 |
+| | 16 | 15,000 ps (435.4) | 1.045 (W 20,000) | 0.979 (0.977–0.981) | 1.01 | 14,892 |
+
+- **The cells where the controller beat F4b's best fixed W were grid gaps.**
+  - On dragonfly, W 15,000 ps is 4.5–4.8% faster than W 20,000, F4b's best. Against it the controller is 0.98, not 1.01–1.03.
+  - On lookahead 10 at 16 nodes, W 60 is 3.7% faster than W 50. Against it the controller is 0.96, not 1.00.
+- **Elsewhere the finer grid moves the best by at most 1.5%:** W 350 instead of 300 at 16 nodes on σ 100, σ 2,000 and uniform, and W 675 instead of 750 on traffic at 16 nodes.
+- **The controller is 0.960–0.987 of the best fixed W in all 12 cells** (per rep 0.943–1.005; the ratio of medians gives the same range). It is never above the best fixed W once the grid has no gap.
+- **It finds the window.** Its mean W is within 10% of the best fixed W in every cell, and the fixed-W rates near the best are flat to within about 2%. Most of its 1–4% loss is therefore not the window it settles on. This is consistent with the cost of its trials, which section 251 named for phase-changing PHOLD, but it is not tested here.
+- **Against F4b (another allocation):** this job's controller ran at 0.979–1.016× F4b's rate, and the fixed arms F4b also ran at 0.979–1.005×.
+
+**Part D: Devastator on a finer grid** (Devastator's best W on this job's grid, and that rate ÷ its best at F1's grid points, both in this job; Charades ÷ Devastator = Charades' controller at its better F1 setting ÷ Devastator's best, both in this job; medians of 5 reps; higher is better for Charades):
+
+| cell | Devastator's best W (÷ best at F1's points) | Charades ÷ Devastator, this job | F1 |
+|---|---|---|---|
+| σ 100, 1 node (node 0) | 2,000 (1.000) | 1.40 | 1.26 |
+| σ 500, 1 node (node 0) | 1,000 (1.000) | 1.40 | 1.19 |
+| σ 500, 2 nodes | 1,000 (1.000) | 1.19 | 1.19 |
+| σ 1,000, 1 node (node 0) | 1,000 (1.000) | 1.41 | 1.20 |
+| σ 2,000, 1 node (node 0) | 500 (1.000) | 1.47 | 1.44 |
+| σ 4,000, 1 node | 500 (1.000) | 1.46 | 1.46 |
+| σ 4,000, 2 nodes | 700, the grid's top (1.011) | 1.87 | 1.90 |
+| uniform, 1 node | 500 (1.000) | 1.56 | 1.57 |
+| uniform, 2 nodes | 700, the grid's top (1.011) | 2.04 | 2.03 |
+| uniform, 4 nodes | 700, the grid's top (1.014) | 2.23 | 2.25 |
+| uniform, 8 nodes | 700 (1.009 over W 1,000) | 1.99 | 2.14 |
+| lookahead 10, σ 500, 1 node | 100 (1.000) | 1.07 | 1.08 |
+| lookahead 10, σ 500, 2 nodes | 200 (1.000) | 1.09 | 1.09 |
+| lookahead 10, σ 2,000, 1 node | 100 (1.000) | 1.28 | 1.27 |
+
+- **Devastator's finer grid gains at most 1.4%.**
+  - Where F1's best was the bottom of its grid (W 500 or W 100), the best stays there or moves up to W 700. Smaller windows (W 175–350; lookahead 10: 35–70) are slower in every cell.
+  - Where W 700 is this grid's top (σ 4,000 at 2 nodes, uniform at 2 and 4 nodes), F1's W 1,000 ran at 0.90–0.94 of W 500. The best therefore lies between 700 and 1,000 and is unlikely to be much above W 700's rate (this is a comparison across two jobs).
+- **Charades stays ahead in all 14 cells.** The closest cell stays the closest: lookahead 10 σ 500 at 1 node, 1.07 (F1: 1.08). In the 10 cells off node 0, this job's ratio is within 0.03 of F1's, apart from uniform at 8 nodes (below).
+- **The four 1-node cells on node 0 are not usable for the ratio.**
+  - Node 0 (c454-001) was the batch host. It ran the job script and, during phase 2, the `srun` clients and polling loops of six streams.
+  - There Devastator ran at 0.81–0.92 of its F1 rate with reps spread 1.12–1.37, and Charades at 0.94–0.97.
+  - On node 1, beside it, both engines were within 1% of F1, with spreads of 1.05 or less.
+  - Node 0's fifth rep ran after four of the other five streams had ended, and was 11% faster for Devastator (2% for Charades) than the arm's median; node 1 was flat across reps.
+  - Within those cells no finer W beat F1's grid point either, but at that noise the check is weak. Their ratios (1.40–1.47) overstate Charades' lead.
+- **Uniform at 8 nodes ran alone** (phase 3, nodes 0–7). Here Devastator ran at 1.085× its F1 rate at W 1,000, and Charades at 1.011×, so the ratio is 1.99 against F1's 2.14.
+  - F1's 8-node stream ran on nodes 0–7 beside three other streams, with node 0 the batch host. This job cannot tell whether the batch host or the other streams' traffic cost Devastator those 8.5%.
+  - F1's σ 100 and σ 500 rows show a bump at 8 nodes (1.30 and 1.46, against 1.21 / 1.25 and 1.23 / 1.35 at 4 and 16 nodes).
+  - F5's and the VLSI job's 8-node columns used the same layout. So did F5-32b's dragonfly half and V32b's half A at 16 nodes, beside one other stream.
+  - So the 8-node ratios may overstate Charades' lead by up to about 7% (one cell measured). Every 8-node PHOLD ratio in F1 is at least 1.30, so the lead holds.
+
+**Predictions (section 258):**
+- **GC-1 right.**
+- **GC-2 mostly right.**
+  - The best fixed W is where predicted in all 12 cells: W 60 on lookahead 10, 15,000 ps on dragonfly, 500 and 675 on traffic, and 300 at 4 nodes and 350 at 16 on σ 100, σ 2,000 and uniform.
+  - The gain is in range in 9 of 12 cells: dragonfly is just above (1.045–1.048 against at most 1.04), and lookahead 10 at 4 nodes is below (1.003 against at least 1.02).
+- **GC-3 right:** 0.960–0.987, none above 1.01.
+- **GC-4 half right.** Devastator gains at most 1.4% (predicted at most 1.06), but no cell gains above 1.03, and its best never moved below W 500 (predicted 250–350).
+- **GC-5 right on the claim, wrong on the margin.**
+  - Charades is ahead in all 14 cells, and lookahead 10 σ 500 at 1 node is 1.07.
+  - The ratio is within 0.07 of F1's in 11 of 14 cells. The exceptions are three of the node-0 cells (+0.14 to +0.21) and uniform at 8 nodes (−0.15).
+- **GC-6 right in 11 of 14 cells.** The three outside (0.94–0.95) are node-0 cells.
+- **GC-7 right off node 0.** Every part C arm spread at most 1.07, apart from lookahead 10 at 16 nodes at W 60 (1.15, one slow rep; 1.02 without it). Part D off node 0 spread at most 1.09; on node 0, 1.12–1.37.
+
+**What follows:**
+- **Claim 2** (PAPER.md; the front page's robustness table):
+  - The frozen controller is 0.92–0.99 of the best fixed W per cell (median), 0.96–0.99 in 13 of 14 cells, and 0.86–1.01 per rep. Phase-changing PHOLD keeps F4b's 0.92 and 0.96.
+  - It never beats a best fixed W found on a grid without gaps. It finds that window to within 10% and pays 1–4% for doing so.
+  - The baselines' F4b ratios divided by each cell's gain from the finer grid: Devastator's rule in Charades 0.16–0.77; one fixed window 0.51 (W 300) and 0.54 (W 100); Devastator's own window is unchanged (its grid is Devastator's).
+- **Claim 3:**
+  - No cell off node 0 changes by more than 3%, so F1's table stands.
+  - The paper can say Devastator's window was searched over W 500 / 1,000 / 2,000 (lookahead 10: 100 / 200 / 400), and refined in steps of √2 around its best on the 14 cells where the grid's end or a lead under 1.20 called for it, which moved its best by at most 1.4%.
+- **Open (not run):**
+  - the four node-0 cells, rerun with the batch host idle;
+  - the 8-node columns of F1 and F5 (and VLSI), rerun alone or with node 0 idle.
+- **Layout rule from now on:** when streams run side by side, no stream runs on the batch host (node 0 of the allocation); it stays idle or takes the job's only stream.
 
 ## Earlier
 

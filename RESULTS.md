@@ -27,7 +27,7 @@ Split on 2026-11-07 from one file of 11,400 lines and 249 sections; the text mov
 | [results/phold.md](results/phold.md) | **PHOLD: performance and weak scaling.** Gaussian and uniform PHOLD in Charades, Devastator and ROSS: σ sweeps, full nodes, long runs, weak scaling from 1 to 32 nodes, and the paper runs F1. | 34 |
 | [results/applications.md](results/applications.md) | **Traffic and dragonfly.** The two applications ported from Charades to ROSS and Devastator (phase B), the traffic count fix, and the paper runs F5 at 1–32 nodes. | 16 |
 | [results/vlsi.md](results/vlsi.md) | **VLSI (b19 × N).** Gate-level simulation of copies of ITC'99's b19: the model and its layout, the gap to Devastator and how it closed, commits, and the paper's VLSI row. | 31 |
-| [results/controller.md](results/controller.md) | **The optimism-window controller.** Every controller design and test: the delay-quantile rule, the aggregation bound, the measured-cost rule and its freeze, where the best window lies at scale, robustness (F4), and the controller's own cost (CC). | 37 |
+| [results/controller.md](results/controller.md) | **The optimism-window controller.** Every controller design and test: the delay-quantile rule, the aggregation bound, the measured-cost rule and its freeze, where the best window lies at scale, robustness (F4), the grid check (GC), and the controller's own cost (CC). | 39 |
 | [results/aggregation.md](results/aggregation.md) | **Aggregation through htram.** Message cost, htram's modes and buffers, the deadline flush policy, choosing htram automatically, input buffers, PP's allocation and start-up, flush timing, and F2 (htram against direct sends), and bundling at 32 nodes (AG32). | 36 |
 | [results/hold.md](results/hold.md) | **The PADS'19 hold (F3).** Mikida and Kale's hold of events past a cutoff, run as a baseline beside the window. | 2 |
 | [results/engine.md](results/engine.md) | **The engine: GVT, rollback and per-event cost.** What paces the bucketed GVT at scale, rollback depth and unit, the same-process fast path, and the rounds that closed Charades' per-event gap to Devastator. | 53 |
@@ -35,20 +35,26 @@ Split on 2026-11-07 from one file of 11,400 lines and 249 sections; the text mov
 | [results/baselines.md](results/baselines.md) | **ROSS and Devastator as baselines.** First runs and feasibility, ROSS's optimism window on PHOLD, and the Mac checks that both engines commit Charades' counts. | 3 |
 | [results/methods.md](results/methods.md) | **Methods.** How runs are made and checked: run length and warm-up, and the flag check that keeps diagnostics out of timing runs. | 3 |
 | [results/history.md](results/history.md) | The re-read of 2026-10-28 and the plan history | — |
-| [results/INDEX.md](results/INDEX.md) | Every section by number, with its date, job, status and file | 258 |
+| [results/INDEX.md](results/INDEX.md) | Every section by number, with its date, job, status and file | 260 |
 
 ## Current numbers
 
-**Robustness of the window policies** (job F4b, section 251; F4's seven workloads at 4 and 16 nodes, current tree, no diagnostics; each policy ÷ the best fixed W of the same engine and rep, median of 3 reps; higher is better):
+**Robustness of the window policies** (job F4b, section 251, with Charades' grid refined by job GC, section 259; F4's seven workloads at 4 and 16 nodes, current tree, no diagnostics; each policy ÷ the best fixed W of the same engine and rep, median of 3 reps (GC: 5); higher is better):
 
 | policy | worst cell (median) | range over the 14 cells | where it fails |
 |---|---|---|---|
-| Charades' frozen controller | 0.92 | 0.92–1.03 (0.86–1.03 per rep); 0.96–1.03 in 13 of 14 | phase-changing PHOLD at 4 nodes (the cost of measuring) |
-| Devastator's rule in Charades | 0.16 | 0.16–0.81 | σ 2,000 at 16 nodes; at most 0.46 on any PHOLD workload |
+| Charades' frozen controller | 0.92 | 0.92–0.99 (0.86–1.01 per rep); 0.96–0.99 in 13 of 14 | phase-changing PHOLD at 4 nodes (the cost of measuring) |
+| Devastator's rule in Charades | 0.16 | 0.16–0.77 | σ 2,000 at 16 nodes; at most 0.46 on any PHOLD workload |
 | Devastator's own window | did not finish | 0.09–0.84 where it finished | 120 s cap on phase-changing PHOLD and σ 2,000 at 4 nodes; out of memory on lookahead 10 at 16 nodes (2 of 3 reps); 0.09 on uniform at 4 nodes |
-| one fixed window for the five PHOLD workloads | 0.51 (W 300), 0.55 (W 100) | | lookahead 10 (W 300), σ 100 (W 100) |
+| one fixed window for the five PHOLD workloads | 0.51 (W 300), 0.54 (W 100) | | lookahead 10 (W 300), σ 100 (W 100) |
 
 Every cell commits one count in both engines and one Charades digest, as F4. Charades ÷ Devastator, each at its best fixed W, is 1.16–2.00 on these short runs.
+
+- **Charades' grid** (job GC, section 259): steps of 15–25% around the best fixed W of each of the six steady workloads.
+  - On that grid the controller is 0.960–0.987 of the best in all 12 cells. Its 1.00–1.03 on F4b's coarser grid (dragonfly; lookahead 10 at 16 nodes) came from gaps: W 15,000 ps beats W 20,000 by 4.5–4.8%, and W 60 beats W 50 by 3.7%.
+  - Its mean W is within 10% of the best fixed W in every cell.
+  - Phase-changing PHOLD keeps F4b's grid (steps of 25 around its best).
+- **The baselines' F4b ratios** are divided by each cell's gain from the finer grid (at most 1.048). Devastator's own window is measured against Devastator's grid and is unchanged.
 
 **Applications, 1–32 nodes, three engines** (F5: sections 248 and 253, jobs 3690453 and 3690451; VLSI: sections 249 and 254, jobs 3691150 and 3690452; final defaults, no diagnostics; medians of 3 reps, 5 at 32 nodes. Charades: its controller (dragonfly WPs 512, traffic PP 2,048; VLSI one process per node, eager commits, buckets of 2,500 ps). Devastator: its best W. ROSS: its best setting, with its optimism window. One committed count per cell in every engine, and one Charades digest):
 
@@ -68,6 +74,7 @@ Every cell commits one count in both engines and one Charades digest, as F4. Cha
   - dragonfly reps spread 1.19 (Charades), 1.74 (Devastator, one slow rep) and 1.56 (ROSS);
   - VLSI had one slow Charades rep of five.
   - Against Devastator's fastest rep, Charades' controller is 2.16 on dragonfly, 1.35 on traffic and 1.25 on VLSI.
+- **The 8-node column** ran beside three other streams on nodes that included the batch host, as F1's did. In F1 that may overstate Charades ÷ Devastator by up to about 7% (job GC, section 259); it has not been checked on these applications.
 - **Aggregation at 32 nodes:** htram ÷ direct sends is 1.17 on dragonfly (W 20,000 against 10,000) and 1.24 on traffic at W 500.
 
 **PHOLD weak scaling, Charades against Devastator and ROSS, 1–32 nodes, all eight workloads** (F1: jobs 3689004, 3689513 and 3688916, sections 242, 243 and 252; final defaults, `numactl --localalloc` for Charades, no diagnostics; medians of 3 reps, 5 at 32 nodes. Charades: its controller at the better htram setting per node count. Devastator: its best W. ROSS: the best of optimistic, conservative and optimistic with its window. The same committed events in all three engines in every cell):
@@ -93,6 +100,9 @@ Every cell commits one count in both engines and one Charades digest, as F4. Cha
   - At 32 nodes it is 0.94–0.98 (median of 5 reps). On lookahead 10 that is against W 75 from job AG32 (section 257), which is 8–15% faster than F1's W 50 and W 100; against F1's own grid it was 1.05–1.07 there.
   - In AG32's own runs it is 0.95–1.00 of the best fixed W, and 0.87 on lookahead 10 σ 500, where two of its five reps ran at 0.6× the other three (section 257).
   - On σ 100 at 32 nodes it stayed at W ≈ 290 in 2 of 5 reps and ran at 0.79–0.80 there (section 252).
+- **Devastator's grid** (job GC, section 259): W 500 / 1,000 / 2,000 (lookahead 10: 100 / 200 / 400).
+  - Refined in steps of √2 on the 14 cells at 1–8 nodes where its best was the grid's end or Charades led by less than 1.20, it gained at most 1.4%. Charades stays ahead in every cell; the closest is lookahead 10 σ 500 at 1 node (1.07 in GC, 1.08 here).
+  - **The 8-node column may overstate Charades' lead by up to about 7%.** It ran beside three other streams, on nodes that included the batch host. Uniform at 8 nodes, rerun alone in GC, gave Devastator 1.085× its F1 rate and Charades 1.011× (2.14 → 1.99).
 - **Fixed windows at 32 nodes** (job AG32, section 257): W 400 stays the best at lookahead 100 (W 500 is 0.91–0.95 of it, W 600 0.81–0.84), and W 1,000 on traffic (W 1,500 0.85). On lookahead 10 the best is W 75.
 
 **Bundling: htram ÷ direct sends, 4–32 nodes** (each at its best fixed W; higher is better for htram. 4 and 16 nodes: job ABL, section 223, W 250/400, mean of 2 reps, diagnostics on both sides. 32 nodes: job AG32, section 257, W 300–600, median of 5 reps, no diagnostics. σ 100 with PP 2,048; σ 2,000 and σ 4,000 with PP 512; uniform with WPs 512):
