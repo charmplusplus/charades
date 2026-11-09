@@ -134,6 +134,7 @@ extern unsigned g_tw_map_rotate;      ///< diagnostic: rotate each process's LP 
 extern unsigned g_tw_agg_flush_order; ///< htram flush pass order: 0 by index, 1 rotating start, 2 earliest timestamp
 extern unsigned g_tw_agg_pp_alloc;     ///< htram PP shared buffers allocated at 0: htram's largest size, 1: their own limit (default)
 extern unsigned g_tw_agg_pp_local;     ///< htram PP: events a PE collects per destination process before copying them into the shared buffer (16 default; 1, 2, 4, 8)
+extern unsigned g_tw_agg_pp_pad;       ///< htram PP shared counters: 0 packed (default), 1 one destination per cache line per array, 2 one line per destination
 extern unsigned g_tw_agg_input_buffer_mode;  ///< htram input buffer: 0 mutex, 1 mutex on its own cache lines, 2 lock-free rings
 extern unsigned g_tw_agg_auto_wps;    ///< --agg-auto: may also choose WPs (makes a second htram instance)
 ///@}

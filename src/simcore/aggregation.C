@@ -10,6 +10,7 @@
 
 #ifndef CHARADES_HTRAM
 
+void agg_configure() {}
 void agg_create(CkCallback) {
   CkAbort("--aggregation=1 needs Charades built with HTRAM_DIR set in "
           "config.mk\n");
@@ -203,6 +204,10 @@ Aggregator::Aggregator(CkGroupID tram_gid, CkGroupID wps_gid) : advances(0) {
                g_tw_agg_pp_local);
   }
   htram_pp_local_size = (int)g_tw_agg_pp_local;
+  if (g_tw_agg_pp_pad && CkMyPe() == 0)
+    CkPrintf("Aggregation: PP shared counters %s (--agg-pp-pad=%u)\n",
+             g_tw_agg_pp_pad == 1 ? "one destination per cache line in each array"
+                                  : "one cache line per destination holding all four", g_tw_agg_pp_pad);
   if (g_tw_agg_flush_order && CkMyPe() == 0)
     CkPrintf("Aggregation: htram flush passes visit destinations %s\n",
              g_tw_agg_flush_order == 1 ? "by index, starting one later each pass" : "earliest timestamp first");
@@ -354,6 +359,13 @@ static void create_tram(void*, void* msg) {
         CkCallback(CkCallback::ignore));
   }
   CkStartQD(CkCallback(create_aggregators, NULL));
+}
+
+void agg_configure() {
+  if (g_tw_agg_pp_pad > 2) CkAbort("--agg-pp-pad must be 0, 1 or 2, not %u\n", g_tw_agg_pp_pad);
+  // Read by HTramNodeGrp's constructor; every process sets it from its own
+  // arguments before agg_create makes the node group
+  htram_pp_pad = (int)g_tw_agg_pp_pad;
 }
 
 void agg_create(CkCallback done) {

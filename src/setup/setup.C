@@ -33,6 +33,7 @@ void tw_init(int argc, char** argv) {
   // configuration files.
   char** ck_argv = CkGetArgv();
   parse_command_line(CmiGetArgc(ck_argv), ck_argv);
+  agg_configure();
   get_msg_id<void *>();
 
   // Derive the load balancing schedule here, once per process, rather than in
