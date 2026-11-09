@@ -16,6 +16,7 @@ The two applications ported from Charades to ROSS and Devastator (phase B), the 
 | 187 | 2026-11-02 | current / design | F5 calibration results: every engine commits the same events; aggregation gains 1.36–1.38× on traffic throu… |
 | 248 | 2026-11-06 | superseded in part by §261 (was: current) | F5a2 results: traffic and dragonfly at 1–16 nodes without diagnostics. Charades ÷ Devastator (controller) i… |
 | 253 | 2026-11-07 | current | F5-32b results, and F5 at 1–32 nodes: at 32 nodes Charades ÷ Devastator is 2.17 on dragonfly (old 2.03) and… |
+| 266 | 2026-11-08 | current | A64 results: traffic, dragonfly and VLSI at 64 nodes; Charades ÷ Devastator 2.82 (dragonfly), 1.27 (traffic… |
 | 188 | 2026-11-02 | superseded by §244, then §248 (was: current / design) | F5a results, 1–16 nodes: every cell commits one count in all three engines; on dragonfly Charades' lead ove… |
 | 189 | 2026-11-02 | superseded by §244 (was: current) | F5c results: ROSS's best on dragonfly is batch 2 / GVT interval 64; batch 1 and GVT interval 16 are slower;… |
 | 194 | 2026-11-02 | superseded by §253 (was: current) | F5b results, 32 nodes: one count per cell in all three engines; on dragonfly Charades ÷ Devastator reaches… |
@@ -667,6 +668,49 @@ The sequential scheduler commits 30,302,829 events. That is the count of every r
   - Charades ÷ Devastator: dragonfly rises from 1.08 at 1 node to 2.17 at 32; traffic stays at 1.24–1.38.
   - Charades ÷ ROSS: 2.93–3.13 on dragonfly and 1.85–2.27 on traffic, with ROSS's window.
 - **Traffic's best fixed W at 32 nodes is the grid's widest (1,000).** The controller sits just below it. A wider fixed W was not run.
+
+### §266 · A64 results: traffic, dragonfly and VLSI at 64 nodes; Charades ÷ Devastator 2.82 (dragonfly), 1.27 (traffic) and 1.26 (VLSI); ÷ ROSS 3.87 and 2.47; one count and one digest per application; the controller 0.965–0.979 of the best fixed W (2026-11-08; skx batch job 3696080, 64 nodes)
+
+> **Status: current for traffic, dragonfly and VLSI at 64 nodes.** Design and predictions in section 262 (phold.md).
+> - **Job:** 3696080 on skx, 64 nodes, 19:41–21:12 (1 h 31 min). The gates passed 60/60 (dragonfly, traffic) and 27/27 (VLSI). All three engines passed their warm-up.
+> - **Runs:** every run finished; every Charades run has count waves (section 263).
+> - **Data:** `~/charades-data/s64_262/a_j3696080`; summary by `a64_266.py` in `a64_266_summary.txt`.
+
+**64 nodes, each engine at its best** (M committed events/s, medians of 5 reps; ratios Charades ÷ the other, higher is better, 32 nodes in brackets (F5-32b, V32b); per-node rate 32 → 64, 1.0 is perfect; definitions as F5 and VA):
+
+| application | Charades, controller | Charades, best fixed | Devastator, best W | ROSS, best arm | Charades ÷ Devastator | Charades ÷ ROSS | per-node 32 → 64, Charades / Devastator / ROSS | controller ÷ best fixed |
+|---|---|---|---|---|---|---|---|---|
+| dragonfly (a = 46, h = 22) | 1,556.1 | 1,613.3 (WPs 512, W 15,000) | 551.1 (W 20,000) | 402.5 (window 5,000) | 2.82 (2.17) | 3.87 (3.05) | 1.05 / 0.80 / 0.83 | 0.965 |
+| traffic | 4,192.4 | 4,308.2 (PP 2,048, W 1,000) | 3,314.0 (W 2,000) | 1,695.6 (window 2,000) | 1.27 (1.38) | 2.47 (2.27) | 0.94 / 1.03 / 0.87 | 0.973 |
+| VLSI (b19 × 64) | 1,361.4 | 1,355.7 (eager, W 5,000) | 1,084.8 (W 10,000) | — | 1.26 (1.26) | — | 0.93 / 0.93 / — | 0.979 (median per rep) |
+
+**Findings:**
+- **Counts and digests:** one committed count per application in every engine and arm (dragonfly 26,643,052,208; traffic 36,193,451,263; VLSI 8,347,025,786), and one Charades digest per application from the check runs. Per PE, dragonfly's 64-node shape commits 0.9998 of the 32-node shape's events and traffic 1.0000, so the work per PE is the same.
+- **Dragonfly:** Charades ÷ Devastator rises from 2.17 to 2.82 (2.80 against Devastator's fastest rep; 32 nodes: 2.16).
+  - Devastator keeps 0.80 of its per-node rate (16 → 32: 0.81).
+  - Charades' 1.05 does not mean it scales past perfect: F5-32b's 32-node median was pulled down by noisy reps (673–803). Against that job's fastest rep it is 0.97.
+- **Traffic:** Charades ÷ Devastator falls from 1.38 to 1.27 (1.26 against Devastator's fastest rep). Devastator's best W moves from 1,000 to 2,000 and keeps its per-node rate (1.03; its 32-node reps spread 1.31, so part of that is noise at 32 nodes). Charades keeps 0.94.
+- **VLSI:** 1.26 with the controller (32 nodes: 1.26) and 1.25 with the best fixed arm (1.26); both engines keep 0.93 of their per-node rate. Charades' controller and its eager W 5,000 arm each had a slow rep (0.83–0.84 of their medians); per rep the controller is 0.921–1.181 of the best fixed arm.
+- **Windows:** dragonfly's best fixed W is 15,000 (W 20,000 0.98 of it, W 10,000 0.85), as job GC found at 4 and 16 nodes; traffic's is 1,000 (W 1,500 0.88, W 500 0.71). The controller's mean W is 14,983–16,949 ps on dragonfly and 982–1,034 on traffic.
+- **Aggregation:** on dragonfly htram ÷ direct sends, each at its best fixed W, is 1.12 (32 nodes: 1.17), with 1.6 events per htram message in the controller runs. On traffic, at W 500, the only W direct sends ran at, it is 1.09 (32 nodes: 1.24). htram's best (W 1,000) is 1.53 times direct sends at W 500, but direct sends were not run at W 1,000.
+- **Charades ÷ ROSS:** dragonfly 3.87 (32 nodes: 3.05; ROSS keeps 0.83 of its per-node rate), traffic 2.47 (2.27).
+- **Slow reps:** Devastator's dragonfly arms each had one or two slow reps (W 20,000: 337 against 541–555), as did its traffic W 1,000 and W 4,000 (spread 2.9 and 2.5). Charades' dragonfly W 10,000 and direct W 20,000 had one slow rep each (0.6 of the median). The medians of 5 absorb them.
+- **Check arms:** the digest runs ran at 1.018 (dragonfly), 0.996 (traffic) and 1.017 (VLSI) of their timing arms; the digest costs nothing measurable.
+
+**Predictions (section 262):**
+- **A64-1 right:** one count and one digest per application.
+- **A64-2 wrong:** dragonfly 2.82 against 1.9–2.6, and Charades' per-node 1.05 against 0.80–0.95 (the 32-node median); Devastator's 0.80 is inside 0.70–0.90.
+- **A64-3 right:** traffic 1.27.
+- **A64-4 right:** VLSI 1.26; both engines 0.93.
+- **A64-5 right:** 0.965, 0.973 and 0.979.
+- **A64-6 half:** traffic 2.47 right; dragonfly 3.87 above 2.7–3.5.
+- **A64-7 right:** traffic W 1,000 with W 1,500 below it; dragonfly W 15,000.
+- **A64-8 half:** dragonfly 1.12 right; traffic 1.09 at W 500 below 1.15–1.35.
+
+**What follows:**
+- **The applications table** gains a 64-node column: dragonfly 2.82, traffic 1.27, VLSI 1.26 (best fixed arm 1.25); Charades ÷ ROSS 3.87 and 2.47.
+- **Dragonfly's step from 32 to 64 nodes** should be read with both jobs' fastest-rep ratios (2.16 and 2.80): part of the rise is F5-32b's noisy 32-node median.
+- **Charades leads Devastator on every application at every node count from 1 to 64.**
 
 ## Earlier
 

@@ -28,7 +28,8 @@ Gaussian and uniform PHOLD in Charades, Devastator and ROSS: σ sweeps, full nod
 | 255 | 2026-11-07 | current | How each engine slows as events go to other processes, and its GVT pace, from F1's data: Charades keeps 0.4… |
 | 260 | 2026-11-08 | design (results in 261) | The 8-node columns of F1 and F5 rerun with the batch host idle, GC's four 1-node cells off node 0, and whet… |
 | 261 | 2026-11-08 | current | R8 results: with the batch host idle, Devastator runs 3–10% faster at 8 nodes and Charades ÷ Devastator the… |
-| 262 | 2026-11-08 | design (V8 results in 264) | VLSI's 8-node column rerun with the batch host idle (job V8), and the paper's tables at 64 nodes (jobs P64… |
+| 262 | 2026-11-08 | design (results in 264, 265, 266) | VLSI's 8-node column rerun with the batch host idle (job V8), and the paper's tables at 64 nodes (jobs P64… |
+| 265 | 2026-11-08 | current | P64 results: PHOLD at 64 nodes; Charades ÷ Devastator 1.21–2.00, ahead in all eight workloads and each with… |
 | 1 | 2026-10-19 | historical | First Stampede3 measurements |
 | 2 | 2026-10-19 | historical | Optimism window sweep |
 | 11 | 2026-10-21 | design | Gaussian PHOLD σ sweep |
@@ -1193,7 +1194,7 @@ The load ran 15 Devastator 4-node runs and 9 Charades 2-node runs across the thr
 
 ### §262 · VLSI's 8-node column rerun with the batch host idle (job V8), and the paper's tables at 64 nodes (jobs P64 and A64) (design, 2026-11-08; written before any runs)
 
-> **Status: design (V8 results in section 264; P64 and A64 pending).**
+> **Status: design (results in sections 264, 265 and 266).**
 > - **User decision 2026-11-08:** queue the VLSI job and the 64-node jobs.
 > - **Submitted 2026-11-08:** V8 3696077 (skx) and 3696078 (skx-dev; twin file written after both); P64 3696079 and A64 3696080 (skx, 64 nodes each). All pending at submission (skx: 1,152 of 1,160 nodes allocated).
 > - **V8's first copy (3696078) stopped at its gate** on a /work2 stall that left one test on the engine's defaults (section 263); no timing run ran. Resubmitted with a gate that reruns once on such failures: 3696169 (skx) and 3696170 (skx-dev). The analyses of P64 and A64 drop and report any Charades run without count waves (section 263).
@@ -1275,6 +1276,53 @@ The load ran 15 Devastator 4-node runs and 9 Charades 2-node runs across the thr
 - **P64 and A64:** the PHOLD, applications and bundling tables gain a 64-node column, and the per-node columns gain 32 → 64. Claim 3 is then stated at 1–64 nodes.
 - **If an engine fails at 64 nodes,** it is debugged in an interactive allocation before any resubmission, and the paper keeps 1–32 nodes for that engine.
 - **If Charades trails in a cell at 64 nodes,** the cell is reported as measured; a diagnosis waits until after the writing starts.
+
+### §265 · P64 results: PHOLD at 64 nodes; Charades ÷ Devastator 1.21–2.00, ahead in all eight workloads and each within 0.05 of its 32-node value; both engines keep 0.95–1.00 of their per-node rate on the Gaussian workloads and 0.78 on uniform; bundling on uniform 1.85 with 5.6 events per message, σ 4,000 3.32; the best fixed W is 500 at lookahead 100 and 75 at lookahead 10; the controller 0.93–0.98 of it (2026-11-08; skx batch job 3696079, 64 nodes)
+
+> **Status: current for PHOLD at 64 nodes.** Design and predictions in section 262.
+> - **Job:** 3696079 on skx, 64 nodes, 19:16–22:12 (2 h 56 min). The gate passed 36/36. All three engines passed their warm-up: Devastator's `p128w23` build and ROSS at 2,944 ranks ran for the first time.
+> - **Runs:** 480 (Charades 220, Devastator 145, ROSS 115). One stalled: Devastator on uniform at W 4,000 hit its 200 s cap in rep 1 and was skipped after. Every Charades run has count waves, so none ran on the engine defaults (section 263).
+> - **Data:** `~/charades-data/s64_262/p_j3696079`; summary by `p64_265.py` in `p64_265_summary.txt`; per-node rates from 1 node in `pernode_1_64.txt`.
+
+**64 nodes, each engine at its best** (M committed events/s, medians of 5 reps; ratios Charades ÷ the other, higher is better, F1-32 in brackets; per-node rate 32 → 64 is rate per node at 64 ÷ at 32, 1.0 is perfect; definitions as F1):
+
+| workload | Charades, controller | Devastator, best W | ROSS, best arm | Charades ÷ Devastator | Charades ÷ ROSS | per-node 32 → 64, Charades / Devastator / ROSS | controller ÷ best fixed W (that W) |
+|---|---|---|---|---|---|---|---|
+| σ 100 | 2,942.6 | 2,430.0 (W 1,000) | 640.6 (conservative) | 1.21 (1.26) | 4.59 (4.05) | 0.96 / 1.00 / 0.85 | 0.969 (W 500) |
+| σ 500 | 2,599.9 | 1,822.5 (W 1,000) | 468.9 (window 500) | 1.43 (1.46) | 5.54 (4.98) | 0.96 / 0.98 / 0.86 | 0.973 (W 500) |
+| σ 1,000 | 2,435.5 | 1,559.8 (W 1,000) | 410.0 (window 500) | 1.56 (1.58) | 5.94 (5.46) | 0.95 / 0.96 / 0.87 | 0.934 (W 500, PP 512) |
+| σ 2,000 | 2,307.4 | 1,354.2 (W 1,000) | 356.9 (window 500) | 1.70 (1.66) | 6.46 (5.94) | 0.99 / 0.97 / 0.91 | 0.968 (W 400) |
+| σ 4,000 | 2,056.1 | 1,058.8 (W 1,000) | 340.1 (window 1,000) | 1.94 (1.98) | 6.04 (6.08) | 0.96 / 0.98 / 0.97 | 0.948 (W 400) |
+| uniform | 980.0 | 489.3 (W 1,000) | 295.2 (optimistic) | 2.00 (2.01) | 3.32 (3.87) | 0.78 / 0.78 / 0.91 | 0.979 (W 500) |
+| lookahead 10, σ 500 | 2,412.0 | 1,792.8 (W 200) | 463.2 (window 100) | 1.35 (1.31) | 5.21 (4.54) | 0.99 / 0.96 / 0.86 | 0.973 (W 75) |
+| lookahead 10, σ 2,000 | 2,006.0 | 1,294.9 (W 200) | 354.5 (window 100) | 1.55 (1.51) | 5.66 (5.18) | 0.99 / 0.97 / 0.91 | 0.979 (W 75) |
+
+**Findings:**
+- **Counts:** one committed count per workload over all three engines and every arm.
+- **Charades leads Devastator in all eight workloads,** by 1.21–2.00 (1.20–1.97 against Devastator's fastest rep). Each ratio is within −0.05 to +0.04 of its 32-node value, so F1's lead holds at 2,944 cores. σ 100 is the closest (1.21).
+- **Per-node rate from 32 to 64 nodes:** on the five Gaussian workloads at lookahead 100 and both at lookahead 10, Charades keeps 0.95–0.99, Devastator 0.96–1.00 and ROSS 0.85–0.97. On uniform Charades and Devastator both keep 0.78, ROSS 0.91. Charades keeps more than Devastator in 3 of 8 workloads (σ 2,000 and both at lookahead 10); from 16 to 32 nodes it was 6 of 8. The two engines now scale alike, which is why the ratios barely move.
+- **Per-node rate from 1 to 64 nodes:** Charades 0.77–0.90 on the Gaussian workloads and 0.33 on uniform; Devastator 0.58–0.91 and 0.26; ROSS 0.52–0.68 and 0.49. Charades scales best of the three in 6 of 8 (Devastator on σ 100, 0.91 against 0.87; ROSS on uniform, 0.49 against 0.33).
+- **Bundling** (best htram fixed W ÷ best direct fixed W): uniform 1.85 (WPs 512 at W 500, 1,000.7, against direct sends at W 300, 540.6; 32 nodes: 2.29), with 5.6–5.7 events per htram message (32 nodes: 8). σ 4,000: 3.32 (32 nodes: 3.14), 50 events per message. The controller ÷ the best direct fixed W: 1.81 and 3.15.
+- **Charades' windows:** the best fixed W is 500 on σ 100, 500, 1,000 and uniform and 400 on σ 2,000 and 4,000 (32 nodes: 400 everywhere); on lookahead 10 it is 75, as at 32 nodes. W 500 is the grid's edge: on σ 100 it is 1.02× W 400, on σ 500 and uniform the two are level. The controller's mean W is 454–513 at lookahead 100 (400–455 on σ 4,000) and 75–86 at lookahead 10.
+- **The controller** is 0.934–0.979 of the best fixed W. σ 1,000's 0.934 is against PP 512 at W 500; against its own setting (PP 2,048) it is 0.978. If a W above 500 is faster on σ 100 or σ 1,000, these ratios are upper bounds there.
+- **Devastator:** its best W is 1,000 in all six lookahead-100 workloads and 200 at lookahead 10, as at 32 nodes. W 4,000 runs at 0.10–0.12 of W 1,000 on σ 2,000 and σ 4,000, and did not finish within 200 s on uniform.
+- **ROSS:** conservative is its best arm only on σ 100, as at 32 nodes; optimistic with its window elsewhere, plain optimistic on uniform.
+- **Slow reps:** four Devastator arms had one rep 2.9–7.4× slower than the others (uniform W 1,000, σ 500 W 500, lookahead 10 σ 500 W 100, lookahead 10 σ 2,000 W 200; the last is its best arm there). The medians of 5 absorb them. Charades' σ 100 controller had one rep at 0.79 of its median (2,320 against 2,930–3,008) with a mean W of 478–513 in every rep, so not the low window of 32 nodes' two slow reps (section 252).
+
+**Predictions (section 262):**
+- **P64-1 right:** one count per workload.
+- **P64-2 half:** all three engines passed their warm-up, but one arm hit its cap (Devastator, uniform, W 4,000).
+- **P64-3 mostly wrong:** the ranges hold except Charades on uniform (0.78 against at least 0.80), but Charades keeps more than Devastator in 3 of 8 workloads, not 6.
+- **P64-4 right:** 1.21–2.00, each within −0.05 to +0.04 of its 32-node value.
+- **P64-5 right:** 3.32–6.46.
+- **P64-6 right:** W 400 or 500 at lookahead 100 and 75 at lookahead 10; the controller 0.934–0.979 in all eight cells (0.922 on σ 1,000 with PP 512 alone).
+- **P64-7 right on uniform** (1.85, 5.6 events per message); σ 4,000's 3.32 is 0.02 above the predicted 2.6–3.3.
+- **P64-8 right:** Devastator's best W is 1,000 in all six lookahead-100 workloads; W 4,000 is never the best.
+
+**What follows:**
+- **The PHOLD table** gains a 64-node column: 1.21 / 1.43 / 1.56 / 1.70 / 1.94 / 2.00 / 1.35 / 1.55. Charades leads Devastator in all 56 cells at 1–64 nodes; Charades ÷ ROSS is 2.73–6.46.
+- **The bundling table** gains 64 nodes: uniform 1.85, σ 4,000 3.32.
+- **Claim 3** is stated at 1–64 nodes (2,944 cores).
 
 ## Earlier
 

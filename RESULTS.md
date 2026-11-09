@@ -24,8 +24,8 @@ Split on 2026-11-07 from one file of 11,400 lines and 249 sections; the text mov
 
 | file | what | sections |
 |---|---|---|
-| [results/phold.md](results/phold.md) | **PHOLD: performance and weak scaling.** Gaussian and uniform PHOLD in Charades, Devastator and ROSS: σ sweeps, full nodes, long runs, weak scaling from 1 to 32 nodes, and the paper runs F1. | 37 |
-| [results/applications.md](results/applications.md) | **Traffic and dragonfly.** The two applications ported from Charades to ROSS and Devastator (phase B), the traffic count fix, and the paper runs F5 at 1–32 nodes. | 16 |
+| [results/phold.md](results/phold.md) | **PHOLD: performance and weak scaling.** Gaussian and uniform PHOLD in Charades, Devastator and ROSS: σ sweeps, full nodes, long runs, weak scaling from 1 to 64 nodes, and the paper runs F1 and P64. | 38 |
+| [results/applications.md](results/applications.md) | **Traffic and dragonfly.** The two applications ported from Charades to ROSS and Devastator (phase B), the traffic count fix, and the paper runs F5 at 1–32 nodes and A64 at 64. | 17 |
 | [results/vlsi.md](results/vlsi.md) | **VLSI (b19 × N).** Gate-level simulation of copies of ITC'99's b19: the model and its layout, the gap to Devastator and how it closed, commits, and the paper's VLSI row. | 32 |
 | [results/controller.md](results/controller.md) | **The optimism-window controller.** Every controller design and test: the delay-quantile rule, the aggregation bound, the measured-cost rule and its freeze, where the best window lies at scale, robustness (F4), the grid check (GC), and the controller's own cost (CC). | 39 |
 | [results/aggregation.md](results/aggregation.md) | **Aggregation through htram.** Message cost, htram's modes and buffers, the deadline flush policy, choosing htram automatically, input buffers, PP's allocation and start-up, flush timing, and F2 (htram against direct sends), and bundling at 32 nodes (AG32). | 36 |
@@ -35,7 +35,7 @@ Split on 2026-11-07 from one file of 11,400 lines and 249 sections; the text mov
 | [results/baselines.md](results/baselines.md) | **ROSS and Devastator as baselines.** First runs and feasibility, ROSS's optimism window on PHOLD, and the Mac checks that both engines commit Charades' counts. | 3 |
 | [results/methods.md](results/methods.md) | **Methods.** How runs are made and checked: run length and warm-up, and the flag check that keeps diagnostics out of timing runs. | 4 |
 | [results/history.md](results/history.md) | The re-read of 2026-10-28 and the plan history | — |
-| [results/INDEX.md](results/INDEX.md) | Every section by number, with its date, job, status and file | 265 |
+| [results/INDEX.md](results/INDEX.md) | Every section by number, with its date, job, status and file | 267 |
 
 ## Current numbers
 
@@ -56,17 +56,21 @@ Every cell commits one count in both engines and one Charades digest, as F4. Cha
   - Phase-changing PHOLD keeps F4b's grid (steps of 25 around its best).
 - **The baselines' F4b ratios** are divided by each cell's gain from the finer grid (at most 1.048). Devastator's own window is measured against Devastator's grid and is unchanged.
 
-**Applications, 1–32 nodes, three engines** (F5: sections 248 and 253, jobs 3690453 and 3690451, with the 8-node column from job R8, section 261; VLSI: sections 249 and 254, jobs 3691150 and 3690452, with the 8-node cell from job V8, section 264; final defaults, no diagnostics; medians of 3 reps, 5 at 32 nodes. Charades: its controller (dragonfly WPs 512, traffic PP 2,048; VLSI one process per node, eager commits, buckets of 2,500 ps). Devastator: its best W. ROSS: its best setting, with its optimism window. One committed count per cell in every engine, and one Charades digest):
+**Applications, 1–64 nodes, three engines** (F5: sections 248 and 253, jobs 3690453 and 3690451, with the 8-node column from job R8, section 261; VLSI: sections 249 and 254, jobs 3691150 and 3690452, with the 8-node cell from job V8, section 264; 64 nodes: job A64, section 266, dragonfly shape a = 46, h = 22; final defaults, no diagnostics; medians of 3 reps, 5 at 32 and 64 nodes. Charades: its controller (dragonfly WPs 512, traffic PP 2,048; VLSI one process per node, eager commits, buckets of 2,500 ps). Devastator: its best W. ROSS: its best setting, with its optimism window. One committed count per cell in every engine, and one Charades digest):
 
-| application | Charades ÷ Devastator at 1 / 2 / 4 / 8 / 16 / 32 nodes (higher is better) | Charades ÷ ROSS at 1 / 2 / 4 / 8 / 16 / 32 | per-node rate 16→32, Charades / Devastator / ROSS (1.0 is perfect) | per-node rate 1→32, C / D / R | M ev/s at 32 nodes, Charades / Devastator / ROSS |
+| application | Charades ÷ Devastator at 1 / 2 / 4 / 8 / 16 / 32 / 64 nodes (higher is better) | Charades ÷ ROSS at 1 / 2 / 4 / 8 / 16 / 32 / 64 | per-node rate 16→32 and 32→64, Charades / Devastator / ROSS (1.0 is perfect) | per-node rate 1→64, C / D / R | M ev/s at 64 nodes, Charades / Devastator / ROSS |
 |---|---|---|---|---|---|
-| dragonfly | 1.08 / 1.18 / 1.46 / 1.69 / 2.04 / 2.17 | 3.11 / 2.93 / 3.04 / 3.14 / 3.03 / 3.05 | **0.86** / 0.81 / 0.85 | 0.52 / 0.26 / **0.53** | 743.5 / 343.2 / 243.8 |
-| traffic | 1.27 / 1.25 / 1.24 / 1.26 / 1.28 / 1.38 | 1.85 / 1.97 / 2.04 / 2.13 / 2.21 / 2.27 | **0.96** / 0.89 / 0.93 | **0.92** / 0.84 / 0.75 | 2,223.8 / 1,607.2 / 979.9 |
-| VLSI (b19 × N) | 1.45 / 1.36 / 1.27 / 1.29 / 1.26 / 1.26 | 18.1 at 32 nodes (ROSS from section 226) | 0.98 / **0.98** / — | — | 731.7 / 582.1 / 40.5 |
+| dragonfly | 1.08 / 1.18 / 1.46 / 1.69 / 2.04 / 2.17 / 2.82 | 3.11 / 2.93 / 3.04 / 3.14 / 3.03 / 3.05 / 3.87 | 0.86 / 0.81 / 0.85; 1.05\* / 0.80 / 0.83 | **0.55** / 0.21 / 0.44 | 1,556.1 / 551.1 / 402.5 |
+| traffic | 1.27 / 1.25 / 1.24 / 1.26 / 1.28 / 1.38 / 1.27 | 1.85 / 1.97 / 2.04 / 2.13 / 2.21 / 2.27 / 2.47 | 0.96 / 0.89 / 0.93; 0.94 / 1.03 / 0.87 | 0.86 / **0.87** / 0.65 | 4,192.4 / 3,314.0 / 1,695.6 |
+| VLSI (b19 × N) | 1.45 / 1.36 / 1.27 / 1.29 / 1.26 / 1.26 / 1.26 | 18.1 at 32 nodes (ROSS from section 226) | 0.98 / 0.98 / —; 0.93 / 0.93 / — | — | 1,361.4 / 1,084.8 / — |
 
-(Bold: best of the three in the per-node columns; on VLSI 16→32 Charades 0.976, Devastator 0.979.)
+(Bold: best of the three in the 1→64 column. \*Dragonfly's 1.05 reflects F5-32b's low 32-node median (reps 673–803); against that job's fastest rep it is 0.97.)
 
-- **VLSI with Charades' best fixed arm** (eager, W 5,000; at 8 nodes lazy commits at W 2,500, 0.5% faster): 1.51 / 1.44 / 1.27 / 1.28 / 1.24 / 1.26.
+- **64 nodes** (job A64, section 266): one count and one digest per application.
+  - Dragonfly rises from 2.17 to 2.82: Devastator keeps 0.80 of its per-node rate, and part of the rise is F5-32b's noisy 32-node median. Against Devastator's fastest rep: 2.16 at 32 nodes, 2.80 at 64.
+  - Traffic falls from 1.38 to 1.27: Devastator's best W moves from 1,000 to 2,000 and keeps its per-node rate.
+  - The controller is 0.965 (dragonfly), 0.973 (traffic) and 0.979 (VLSI, median per rep) of Charades' best fixed W; the best fixed W is 15,000 ps on dragonfly and 1,000 on traffic.
+- **VLSI with Charades' best fixed arm** (eager, W 5,000; at 8 nodes lazy commits at W 2,500, 0.5% faster): 1.51 / 1.44 / 1.27 / 1.28 / 1.24 / 1.26 / 1.25.
   - The controller runs at 0.94–0.97 of that arm at 1–2 nodes, 0.98–1.02 at 4–16 (section 249) and 1.00 at 32 (median; 0.96–1.09 per rep).
   - From 3 nodes up, one PE (copy 2's node, rank 13) sets the pace in every engine (section 234).
 - **The controller on traffic and dragonfly** is 0.98 of Charades' best fixed W at 32 nodes (medians; per rep 0.96–1.05, and one traffic rep at 1.21 in the noise below).
@@ -78,26 +82,27 @@ Every cell commits one count in both engines and one Charades digest, as F4. Cha
   - Dragonfly falls from 1.91 to 1.69, mostly because F5's median took two slow Devastator reps at W 20,000 (F5's ratio against Devastator's fastest rep was 1.70).
   - Traffic is unchanged.
   - VLSI's 8-node value comes from job V8 (section 264), also rerun with node 0 idle: 1.29 against VA's 1.30. Devastator's best window ran at VA's rate; its narrower windows ran 1.04–1.10 faster.
-- **Aggregation at 32 nodes:** htram ÷ direct sends is 1.17 on dragonfly (W 20,000 against 10,000) and 1.24 on traffic at W 500.
+- **Aggregation at 32 nodes:** htram ÷ direct sends is 1.17 on dragonfly (W 20,000 against 10,000) and 1.24 on traffic at W 500. At 64 nodes: 1.12 on dragonfly (W 15,000 against 20,000) and 1.09 on traffic at W 500.
 
-**PHOLD weak scaling, Charades against Devastator and ROSS, 1–32 nodes, all eight workloads** (F1: jobs 3689004, 3689513 and 3688916, sections 242, 243 and 252, with the 8-node column from job R8, section 261; final defaults, `numactl --localalloc` for Charades, no diagnostics; medians of 3 reps, 5 at 32 nodes. Charades: its controller at the better htram setting per node count. Devastator: its best W. ROSS: the best of optimistic, conservative and optimistic with its window. The same committed events in all three engines in every cell):
+**PHOLD weak scaling, Charades against Devastator and ROSS, 1–64 nodes, all eight workloads** (F1: jobs 3689004, 3689513 and 3688916, sections 242, 243 and 252, with the 8-node column from job R8, section 261; 64 nodes: job P64, section 265; final defaults, `numactl --localalloc` for Charades, no diagnostics; medians of 3 reps, 5 at 32 and 64 nodes. Charades: its controller at the better htram setting per node count. Devastator: its best W. ROSS: the best of optimistic, conservative and optimistic with its window. The same committed events in all three engines in every cell):
 
-| workload | Charades ÷ Devastator at 1 / 2 / 4 / 8 / 16 / 32 nodes (higher is better) | Charades ÷ ROSS | per-node rate 16→32, Charades / Devastator / ROSS (1.0 is perfect) | per-node rate 1→32, C / D / R | M ev/s at 32 nodes, Charades / Devastator / ROSS |
+| workload | Charades ÷ Devastator at 1 / 2 / 4 / 8 / 16 / 32 / 64 nodes (higher is better) | Charades ÷ ROSS, 1–64 nodes | per-node rate 16→32 and 32→64, Charades / Devastator / ROSS (1.0 is perfect) | per-node rate 1→64, C / D / R | M ev/s at 64 nodes, Charades / Devastator / ROSS |
 |---|---|---|---|---|---|
-| σ 100 | 1.26 / 1.23 / 1.21 / 1.22 / 1.25 / 1.26 | 2.73–4.05 | 0.95 / 0.94 / 0.88 | **0.91** / 0.91 / 0.61 | 1,532.3 / 1,216.0 / 378.3 |
-| σ 500 | 1.19 / 1.19 / 1.23 / 1.32 / 1.35 / 1.46 | 4.04–4.98 | 1.00 / 0.92 / 0.94 | **0.92** / 0.75 / 0.74 | 1,358.5 / 927.5 / 272.9 |
-| σ 1,000 | 1.20 / 1.30 / 1.40 / 1.48 / 1.60 / 1.58 | 4.62–5.46 | 0.96 / 0.97 / 0.96 | **0.90** / 0.69 / 0.77 | 1,279.7 / 810.2 / 234.6 |
-| σ 2,000 | 1.44 / 1.55 / 1.52 / 1.58 / 1.63 / 1.66 | 4.60–5.94 | 0.98 / 0.96 / 0.93 | **0.86** / 0.74 / 0.66 | 1,163.5 / 699.5 / 195.8 |
-| σ 4,000 | 1.46 / 1.90 / 1.86 / 1.82 / 1.93 / 1.98 | 4.51–6.08 | 0.97 / 0.95 / 0.89 | **0.80** / 0.59 / 0.59 | 1,067.6 / 540.2 / 175.6 |
-| uniform | 1.57 / 2.03 / 2.25 / 1.99 / 2.01 / 2.01 | 3.87–5.95 | 0.82 / 0.82 / 0.89 | 0.43 / 0.33 / **0.54** | 627.8 / 312.4 / 162.4 |
-| lookahead 10, σ 500 | 1.08 / 1.09 / 1.15 / 1.20 / 1.31 / 1.31 | 3.95–4.54 | 0.95 / 0.95 / 0.94 | **0.92** / 0.75 / 0.80 | 1,222.4 / 930.8 / 269.4 |
-| lookahead 10, σ 2,000 | 1.27 / 1.41 / 1.38 / 1.46 / 1.49 / 1.51 | 4.21–5.18 | 0.98 / 0.96 / 0.94 | **0.86** / 0.73 / 0.70 | 1,012.8 / 669.6 / 195.6 |
+| σ 100 | 1.26 / 1.23 / 1.21 / 1.22 / 1.25 / 1.26 / 1.21 | 2.73–4.59 | 0.95 / 0.94 / 0.88; 0.96 / 1.00 / 0.85 | 0.87 / **0.91** / 0.52 | 2,942.6 / 2,430.0 / 640.6 |
+| σ 500 | 1.19 / 1.19 / 1.23 / 1.32 / 1.35 / 1.46 / 1.43 | 4.04–5.54 | 1.00 / 0.92 / 0.94; 0.96 / 0.98 / 0.86 | **0.88** / 0.73 / 0.64 | 2,599.9 / 1,822.5 / 468.9 |
+| σ 1,000 | 1.20 / 1.30 / 1.40 / 1.48 / 1.60 / 1.58 / 1.56 | 4.62–5.94 | 0.96 / 0.97 / 0.96; 0.95 / 0.96 / 0.87 | **0.86** / 0.66 / 0.67 | 2,435.5 / 1,559.8 / 410.0 |
+| σ 2,000 | 1.44 / 1.55 / 1.52 / 1.58 / 1.63 / 1.66 / 1.70 | 4.60–6.46 | 0.98 / 0.96 / 0.93; 0.99 / 0.97 / 0.91 | **0.85** / 0.72 / 0.60 | 2,307.4 / 1,354.2 / 356.9 |
+| σ 4,000 | 1.46 / 1.90 / 1.86 / 1.82 / 1.93 / 1.98 / 1.94 | 4.51–6.08 | 0.97 / 0.95 / 0.89; 0.96 / 0.98 / 0.97 | **0.77** / 0.58 / 0.57 | 2,056.1 / 1,058.8 / 340.1 |
+| uniform | 1.57 / 2.03 / 2.25 / 1.99 / 2.01 / 2.01 / 2.00 | 3.32–5.95 | 0.82 / 0.82 / 0.89; 0.78 / 0.78 / 0.91 | 0.33 / 0.26 / **0.49** | 980.0 / 489.3 / 295.2 |
+| lookahead 10, σ 500 | 1.08 / 1.09 / 1.15 / 1.20 / 1.31 / 1.31 / 1.35 | 3.95–5.21 | 0.95 / 0.95 / 0.94; 0.99 / 0.96 / 0.86 | **0.90** / 0.72 / 0.68 | 2,412.0 / 1,792.8 / 463.2 |
+| lookahead 10, σ 2,000 | 1.27 / 1.41 / 1.38 / 1.46 / 1.49 / 1.51 / 1.55 | 4.21–5.66 | 0.98 / 0.96 / 0.94; 0.99 / 0.97 / 0.91 | **0.86** / 0.70 / 0.64 | 2,006.0 / 1,294.9 / 354.5 |
 
-(Bold: best of the three in the 1→32 column; on σ 100 Charades 0.908 against Devastator's 0.906.)
+(Bold: best of the three in the 1→64 column. From 1 to 32 nodes Charades was best in 7 of 8; its 1→32 values are in section 252.)
 
-- **Charades leads Devastator in all 48 cells** (the old table, sections 142–143 and 153: 44). At 32 nodes the lead is 1.26–2.01, and 1.19–2.00 against Devastator's fastest rep (it had two slow reps on σ 4,000).
-- **Charades ÷ ROSS** is 2.73–6.08.
-- **Per-node rate from 16 to 32 nodes:** Charades keeps 0.82–1.00, against 0.72–0.87 in the old table, and more than Devastator in 6 of 8 workloads (level on uniform, 0.96 against 0.97 on σ 1,000). From 1 to 32 nodes it scales best of the three in 7 of 8 workloads.
+- **Charades leads Devastator in all 56 cells** (1–32 nodes: 48; the old table, sections 142–143 and 153: 44 of 48). At 32 nodes the lead is 1.26–2.01, and 1.19–2.00 against Devastator's fastest rep (it had two slow reps on σ 4,000). At 64 nodes it is 1.21–2.00 (1.20–1.97 against Devastator's fastest rep), each within −0.05 to +0.04 of its 32-node value (section 265).
+- **Charades ÷ ROSS** is 2.73–6.46.
+- **Per-node rate from 16 to 32 nodes:** Charades keeps 0.82–1.00, against 0.72–0.87 in the old table, and more than Devastator in 6 of 8 workloads (level on uniform, 0.96 against 0.97 on σ 1,000).
+- **From 32 to 64 nodes** the two engines scale alike: Charades 0.95–0.99 and Devastator 0.96–1.00 on the Gaussian workloads, both 0.78 on uniform; Charades keeps more in 3 of 8. From 1 to 64 nodes Charades scales best of the three in 6 of 8 workloads (Devastator on σ 100, ROSS on uniform).
 - **The controller:**
   - At 1–16 nodes it is 0.930–1.032 of the better fixed W.
   - At 32 nodes it is 0.94–0.98 (median of 5 reps). On lookahead 10 that is against W 75 from job AG32 (section 257), which is 8–15% faster than F1's W 50 and W 100; against F1's own grid it was 1.05–1.07 there.
@@ -108,21 +113,23 @@ Every cell commits one count in both engines and one Charades digest, as F4. Cha
   - **The 8-node column comes from job R8** (section 261), rerun with the batch host idle. F1's had run beside three other streams on nodes that included it, which cost Devastator 3–10% and Charades at most 4%.
   - Beside load streams on other nodes, an 8-node run keeps its full rate, so the 1–4-node columns stand.
 - **Fixed windows at 32 nodes** (job AG32, section 257): W 400 stays the best at lookahead 100 (W 500 is 0.91–0.95 of it, W 600 0.81–0.84), and W 1,000 on traffic (W 1,500 0.85). On lookahead 10 the best is W 75.
+- **At 64 nodes** (section 265) the best fixed W is 500 on σ 100, 500, 1,000 and uniform (the grid's edge; 1.02× W 400 on σ 100, level elsewhere) and 400 on σ 2,000 and 4,000; 75 at lookahead 10. The controller is 0.934–0.979 of it (mean W 454–513). Devastator's best W stays 1,000 (lookahead 10: 200); its W 4,000 did not finish on uniform within 200 s.
 
-**Bundling: htram ÷ direct sends, 4–32 nodes** (each at its best fixed W; higher is better for htram. 4 and 16 nodes: job ABL, section 223, W 250/400, mean of 2 reps, diagnostics on both sides. 32 nodes: job AG32, section 257, W 300–600, median of 5 reps, no diagnostics. σ 100 with PP 2,048; σ 2,000 and σ 4,000 with PP 512; uniform with WPs 512):
+**Bundling: htram ÷ direct sends, 4–64 nodes** (each at its best fixed W; higher is better for htram. 4 and 16 nodes: job ABL, section 223, W 250/400, mean of 2 reps, diagnostics on both sides. 32 nodes: job AG32, section 257, W 300–600, median of 5 reps, no diagnostics. 64 nodes: job P64, section 265, htram W 300–500 and direct W 300/400, median of 5 reps, no diagnostics. σ 100 with PP 2,048; σ 2,000 and σ 4,000 with PP 512; uniform with WPs 512):
 
-| workload | 4 nodes | 16 nodes | 32 nodes |
-|---|---|---|---|
-| σ 100 | 2.11 | 2.20 | — |
-| σ 2,000 | 2.85 | 2.87 | — |
-| σ 4,000 | — | — | 3.14 |
-| uniform | 3.31 | 2.65 | 2.29 |
+| workload | 4 nodes | 16 nodes | 32 nodes | 64 nodes |
+|---|---|---|---|---|
+| σ 100 | 2.11 | 2.20 | — | — |
+| σ 2,000 | 2.85 | 2.87 | — | — |
+| σ 4,000 | — | — | 3.14 | 3.32 |
+| uniform | 3.31 | 2.65 | 2.29 | 1.85 |
 
-- **On uniform the gain shrinks as the messages do, but stays above 2.**
-  - htram's messages carry 102, 14.5 and 8 events at 4, 16 and 32 nodes (F1's controller runs, sections 255 and 257).
+- **On uniform the gain shrinks as the messages do:** above 2 up to 32 nodes, 1.85 at 64.
+  - htram's messages carry 102, 14.5, 8 and 5.6 events at 4, 16, 32 and 64 nodes (the controller runs, sections 255, 257 and 265).
+  - On σ 4,000 messages still carry 50 events at 64 nodes, and the gain grows (3.14 → 3.32).
   - At 32 nodes neither buffer 2,048 nor a wider W (up to 600) makes them bigger.
-- **Controller against controller** (the paper's configuration): uniform 3.30 / 2.68 / 2.32 at 4 / 16 / 32 nodes; σ 4,000 3.28 at 32 nodes.
-- **Applications at 32 nodes:** 1.17 on dragonfly and 1.24 on traffic (section 253; see the applications table above).
+- **Controller against controller** (the paper's configuration): uniform 3.30 / 2.68 / 2.32 at 4 / 16 / 32 nodes; σ 4,000 3.28 at 32 nodes. At 64 nodes direct sends ran at fixed W only: the controller ÷ the best direct fixed W is 1.81 (uniform) and 3.15 (σ 4,000).
+- **Applications:** 1.17 on dragonfly and 1.24 on traffic at 32 nodes (section 253), 1.12 and 1.09 at 64 (section 266; see the applications table above).
 
 > **Launch change, 2026-10-30:** every Stampede3 run now goes through `numactl --localalloc` (`ctl_sweep.sh`'s `NUMA_WRAP`), so the kernel's automatic NUMA balancing skips our processes (section 164). At 16 nodes it gains 1.024–1.049×, and at 32 nodes 1.060× (σ 100), 1.124× (σ 2,000) and 1.028× (uniform), removing a dip 1.5–2.0 s after the clock starts (sections 164 and 166). The tables from here down used the default (balancing on), and so did Devastator and ROSS; the robustness, applications and PHOLD tables above use `--localalloc` for Charades. Devastator does not gain from it (section 166), so each engine keeps its better launch.
 
