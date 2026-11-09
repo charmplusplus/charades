@@ -38,6 +38,7 @@ Message cost, htram's modes and buffers, the deadline flush policy, choosing htr
 | 256 | 2026-11-07 | design (results in 257) | Bundling at 32 nodes on the remote-heavy end, and fixed windows past F1's and F5's grids |
 | 257 | 2026-11-08 | current | AG32 results: at 32 nodes bundling is 2.29× direct sends on uniform and 3.14× on σ 4,000; W 400 and traffic… |
 | 267 | 2026-11-09 | design (results in 268) | Why uniform's messages shrink with node count, and per-process flushing in PP (`--agg-pp-local`): job PL16 |
+| 268 | 2026-11-09 | current | PL16 results: one shared buffer per process makes uniform's messages 9× larger (111 events) but runs at 0.8… |
 | 3 | 2026-10-20 | historical | Per-message cost and scaling |
 | 4 | 2026-10-20 | superseded | Aggregation through htram |
 | 5 | 2026-10-20 | historical | Deadline flush policy |
@@ -1323,6 +1324,70 @@ No log, stats, trace or digest flag appears in any command.
 - **If local 1 (or 4) ÷ WPs 512 is at least 1.05 on uniform:** run uniform at 64 nodes with WPs 512 and PP 512 at local 1 and 4, W 400 / 500 and the controller. The model predicts 1.50–1.67× there, at about 32 events per message.
 - **If it is below 1.05:** report it, and find where local 1's time goes before any 64-node run.
 - **If local 1 or 4 is at least 0.98 of PP 512 on σ 2,000 and σ 4,000 too,** it could become PP's setting everywhere. That would mean rerunning every PP cell of F1 and F5, which is a user decision. The default stays 16 until then.
+
+### §268 · PL16 results: one shared buffer per process makes uniform's messages 9× larger (111 events) but runs at 0.80 of WPs 512 and 0.90 of PP 512, and at 0.51–0.66 of PP 512 on σ 2,000 and σ 4,000; local 4 is worse, through a flush race; no 64-node run (2026-11-09; skx-dev batch job 3698962, 16 nodes)
+
+> **Status: current.** Design and predictions in section 267.
+> - **Job:** 16 nodes, 22.5 minutes (2026-11-09 11:38–12:01); the skx twin 3698961 was cancelled by the guard. Gate 42/42; the warm-up and all 100 timing runs finished `ok`, every one with count waves.
+> - **Data:** `~/charades-data/f1/pl267/j3698962` (digests and per-round GVT files not copied). `~/charades-data/f1/pl267/pl268.py` writes `pl268_summary.txt`.
+> - **Counts:** one per workload over all 100 runs, equal to F1-16's (uniform 2,895,361,579; σ 2,000 2,895,361,550; σ 4,000 2,895,358,752).
+
+**Rates** (M committed ev/s, median of 5 reps, higher is better; events per htram message, median):
+
+| workload | htram setting | W 400 | controller | events per message (W 400) | ÷ the workload's F1 setting at W 400 |
+|---|---|---|---|---|---|
+| uniform | WPs 512 (F1) | **381.5** | **380.6** | 12.5 | 1 |
+| uniform | PP 512 | 336.7 | 339.5 | 14.3 | 0.882 |
+| uniform | PP 512 local 4 | 266.6 | 257.8 | 9.5 | 0.699 |
+| uniform | PP 512 local 1 | 303.4 | 307.2 | 111.0 | 0.795 |
+| σ 2,000 | PP 512 (F1) | **598.2** | **596.1** | 60.2 | 1 |
+| σ 2,000 | PP 512 local 4 | 526.3 | 558.7 | 47.8 | 0.880 |
+| σ 2,000 | PP 512 local 1 | 395.2 | 390.5 | 231.3 | 0.661 |
+| σ 4,000 | PP 512 (F1) | **542.4** | **548.3** | 50.2 | 1 |
+| σ 4,000 | PP 512 local 4 | 451.8 | 476.4 | 30.9 | 0.833 |
+| σ 4,000 | PP 512 local 1 | 276.6 | 292.9 | 244.3 | 0.510 |
+
+- **The baselines repeat F1-16:** WPs 512 381.5 (F1-16: 383.3), PP 512 336.7 (337.3), σ 2,000 598.2 (605.0), σ 4,000 542.4 (553.5), with the same message sizes (12.5 and 14.3 on uniform).
+- **Local 1 does what it was built to do:** on uniform each process now sends one message per destination process per GVT update, carrying 111 events. That is 0.0090 messages per event, against 0.0798 for WPs, 8.9 times fewer. 95% of its messages are sent at a GVT update, 4.2% for an urgent event, and 1.9% are a PE's events sent alone.
+- **It is slower anyway.** In PE time per committed event (736 PEs ÷ rate), local 1 takes 2.43 µs on uniform against WPs' 1.93 and PP's 2.19.
+  - Section 267's cost model (9.8 µs per message) predicted 0.58 µs less than PP from the messages saved. Measured, it takes 0.24 µs more.
+  - So something else costs 0.82 µs per event on uniform: 0.85 µs per event sent to another process.
+  - The same calculation gives 0.69 µs per event on σ 2,000 (1.38 per event sent to another process) and 1.42 µs on σ 4,000 (1.97), where the message saving is small (0.06 and 0.11 µs).
+- **Where that time goes is not measured** (no diagnostic in timing runs). The candidate is the per-event write into the process's shared buffer.
+  - At local 1 every event sent to another process makes a compare-and-swap on the destination's reservation counter, an atomic add on its done counter, and a store into a buffer slot next to slots that other PEs of the process are writing.
+  - The counters are 4-byte atomics packed 16 to a cache line, so all of a process's destinations share two lines of each, and all 23 PEs of the process write them at every such event.
+  - Section 75's padding changed nothing, but at that time a copy happened once per 16 events and rarely at all.
+- **Local 4 loses more, for a different reason:** a flush race.
+  - 89% of its messages on uniform are a PE's local events sent alone (82% on σ 4,000, 76% on σ 2,000), and its messages shrink to 9.5 events.
+  - At each GVT update every PE of a process flushes the same due destinations at nearly the same moment. The first sends the shared buffer, and the others find it reserved and send their one to three local events on their own.
+  - Local 1 escapes this because its local buffers are almost always empty when a flush comes.
+- **Rollbacks are not the cause:** efficiency is 99.95–99.99% in every arm, and late stragglers per committed event at local 1 are below PP 512's on all three workloads.
+- **The controller ranks the settings as W 400 does** on all three workloads. Each setting's controller ÷ W 400 is 0.967–1.061.
+
+**Predictions (section 267):**
+- **PL-1 right:** one count per workload, equal to F1-16's.
+- **PL-2 mostly right:**
+  - WPs 512 and PP 512 carry 12.5 and 14.3 events per message, as in F1-16: right.
+  - Local 1 carries 111, at least 50 predicted: right.
+  - Local 4 carries 0.086 of local 1's, against 0.8–1.0 predicted: wrong (the flush race).
+- **PL-3 wrong:**
+  - Local 1 ÷ WPs 512 is 0.795 (1.05–1.30 predicted).
+  - Local 1 ÷ PP 512 is 0.901 (1.20–1.45 predicted).
+- **PL-4 wrong:** local 4 ÷ local 1 is 0.879 (0.95–1.05 predicted).
+- **PL-5 half right:**
+  - Local 1 ÷ PP 512 is 0.661 on σ 2,000 and 0.510 on σ 4,000 (0.90–1.05 predicted): wrong.
+  - Local 1's messages are 3.8 and 4.9 times PP 512's (at least 1.3 predicted): right.
+- **PL-6 right in 6 of 7:** the settings rank alike under both arms. The exception is σ 2,000 at local 4, where controller ÷ W 400 is 1.061 against PP 512's 0.996.
+- **PL-7 right:** 95.3% of local 1's messages on uniform are sent at a GVT update, and none from a full buffer.
+- **PL-8 right:** efficiency is at least 99.95% in every arm, and local 1's late stragglers are below PP 512's.
+
+**What follows:**
+- **Section 267's rule** (local 1 ÷ WPs 512 below 1.05) holds: no 64-node run. `--agg-pp-local` stays at 16, the `pp-local` branches stay unmerged, and F1's settings and every paper table stand.
+- **The cost model mispredicted by about 1 µs per event.** It was fitted on runs whose events each go through one PE's own buffers, and it does not hold for a design that changes the per-event path.
+  - Section 267's 2D estimate used the same model, and 2D also adds per-event work (a second hop), so this result gives no more reason to expect 2D to help.
+- **Open:** where local 1's 0.85–1.97 µs per event sent to another process goes. Settling it would take a simulation-only profile at 4 nodes of local 1 against PP 512 on uniform, and an arm with each destination's counters on their own cache line.
+- **For the paper:** the limit stands as written: aggregation's gain on all-remote traffic falls from 3.31× at 4 nodes to 1.85× at 64.
+  - This job shows why the obvious fix does not work. One buffer shared by a process's PEs makes messages 9× larger, but costs more per event than the messages it saves.
 
 ## Earlier
 
