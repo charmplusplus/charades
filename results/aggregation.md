@@ -1209,6 +1209,7 @@ No log, stats, trace or digest flag appears in any command. PHOLD runs carry no 
 > - **User question 2026-11-09:** how can aggregation be improved, and is 2D aggregation worth trying for uniform's shrinking gain at scale? **User decision:** try per-process flushing first (the analysis below; 2D not now).
 > - **Code:** htram branch `pp-local` (ca22b77, on `pdes` 42d347f); Charades branch `pp-local` (e12e40d, on main: 85a2aad's code plus the parser fix 0fc842d). The default (`--agg-pp-local=16`) runs the old code paths.
 > - **Script:** `~/charades-data/f1/pl267.slurm` (copy in `$WORK/charades-runs/pl267/`); tree `$WORK/charades-ppl`, htram `$WORK/htram-ppl`.
+> - **Submitted 2026-11-09:** 3698961 (skx) and 3698962 (skx-dev, `TWIN=3698961`; twin file `$WORK/charades-runs/pl267/pl267.twin`); the copy that starts first cancels the other. 16 nodes, limit 1:30, `-x c455-081`.
 
 **What sets uniform's message size** (offline, from P64's logs, section 265; uniform, rep 1, W 400):
 
