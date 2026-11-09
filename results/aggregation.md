@@ -37,6 +37,7 @@ Message cost, htram's modes and buffers, the deadline flush policy, choosing htr
 | 223 | 2026-11-04 | current (F2, ROSS) / superseded (F3) | ABL results: htram's deadline flush is 2.1–3.3× direct sends on PHOLD and 1.4× on traffic; eager flush lose… |
 | 256 | 2026-11-07 | design (results in 257) | Bundling at 32 nodes on the remote-heavy end, and fixed windows past F1's and F5's grids |
 | 257 | 2026-11-08 | current | AG32 results: at 32 nodes bundling is 2.29× direct sends on uniform and 3.14× on σ 4,000; W 400 and traffic… |
+| 267 | 2026-11-09 | design (results in 268) | Why uniform's messages shrink with node count, and per-process flushing in PP (`--agg-pp-local`): job PL16 |
 | 3 | 2026-10-20 | historical | Per-message cost and scaling |
 | 4 | 2026-10-20 | superseded | Aggregation through htram |
 | 5 | 2026-10-20 | historical | Deadline flush policy |
@@ -1200,7 +1201,127 @@ No log, stats, trace or digest flag appears in any command. PHOLD runs carry no 
 - **Claim 1 can quote 32 nodes:** bundling is 2.29× direct sends on uniform and 3.14× on σ 4,000, each at its best fixed W. On uniform it falls from 3.31 at 4 nodes but stays above 2. This job ran without diagnostics; F2's 4- and 16-node runs carried them on both sides.
 - **No setting raises uniform's message size or rate by more than 5%,** so F1's uniform cell keeps WPs 512, which is the best setting here.
 - **The lookahead 10 rows take W 75 as the best fixed W at 32 nodes.** The front page's 32-node controller range becomes 0.94–0.98 (F1-32's controller; lookahead 10 against this job's W 75). W 400 at lookahead 100 and W 1,000 on traffic stand.
-- **Not run:** W 75 on lookahead 10 at 1–16 nodes; what sets uniform's 8 events per message at 32 nodes; why the controller sometimes settles at a narrower W (lookahead 100) or a wider one (lookahead 10 σ 500) in a slow run.
+- **Not run:** W 75 on lookahead 10 at 1–16 nodes; what sets uniform's 8 events per message at 32 nodes; why the controller sometimes settles at a narrower W (lookahead 100) or a wider one (lookahead 10 σ 500) in a slow run. (Section 267 answers the second from P64's logs.)
+
+### §267 · Why uniform's messages shrink with node count, and per-process flushing in PP (`--agg-pp-local`): job PL16 (design, 2026-11-09; written before any runs)
+
+> **Status: design (results in section 268).**
+> - **User question 2026-11-09:** how can aggregation be improved, and is 2D aggregation worth trying for uniform's shrinking gain at scale? **User decision:** try per-process flushing first (the analysis below; 2D not now).
+> - **Code:** htram branch `pp-local` (ca22b77, on `pdes` 42d347f); Charades branch `pp-local` (e12e40d, on main: 85a2aad's code plus the parser fix 0fc842d). The default (`--agg-pp-local=16`) runs the old code paths.
+> - **Script:** `~/charades-data/f1/pl267.slurm` (copy in `$WORK/charades-runs/pl267/`); tree `$WORK/charades-ppl`, htram `$WORK/htram-ppl`.
+
+**What sets uniform's message size** (offline, from P64's logs, section 265; uniform, rep 1, W 400):
+
+| htram setting | messages (millions) | sent at a GVT update | urgent event | buffer full | idle flush | events per message |
+|---|---|---|---|---|---|---|
+| WPs 512 | 2,036.5 | 2,023.0 (99.3%) | 13.5 | 0 | 0 | 5.64 |
+| PP 512 | 2,028.8 | 2,013.9 (99.3%) | 14.9 | 45 messages | 1,222 messages | 5.67 |
+
+- **How a message is formed now (deadline policy):**
+  - Under WPs each PE keeps one buffer per destination process: 127 at 64 nodes (2 processes per node).
+  - At each GVT update the PE sends every buffer holding an event that is now due (timestamp below GVT + W + 8), with everything in it.
+  - A PE sends about 175 events per GVT update at 64 nodes, so each buffer gains about 1.4 per update and goes out after about four updates, with 5.6 events.
+- **PP does the same here:**
+  - Each PE first collects events in a 16-event local buffer per destination process, and copies it into the process's shared buffer only when it is full.
+  - The GVT-update flush sends the local buffer on its own once it holds a due event. On uniform at 64 nodes that is at about 6 events, so 45 of 2,029 million messages came from a full buffer and the shared buffer was almost never used.
+- **Messages shrink more slowly than destinations grow** (htram events per message, F1's controller runs and P64):
+
+| nodes | destination processes | events per message | ratio to the previous row |
+|---|---|---|---|
+| 4 | 7 | 102 | — |
+| 16 | 31 | 14.5 | 0.14 |
+| 32 | 63 | 8.2 | 0.57 |
+| 64 | 127 | 5.6 | 0.68 |
+
+  - From 32 to 64 nodes the arrivals per buffer halve and messages shrink by 0.68, close to 1/√2 (0.71). A buffer that gains events more slowly also waits longer before its earliest event becomes due.
+  - So multiplying a buffer's arrivals by m raises its message size by roughly √m in this range, not m.
+- **What a message costs** (least-squares fit, Charades' uniform controller runs at 16, 32 and 64 nodes: 384.5, 627.8 and 980.0 M ev/s at 14.5, 8.3 and 5.55 events per message):
+  - PE time per committed event = 1.24 µs + 9.8 µs × (share of events sent to another process ÷ events per message).
+  - It fits the three points within about 2%, and predicts σ 4,000 at 32 and 64 nodes (1,080.6 and 2,169.2 M ev/s; 57.6 and 50.2 events per message; 72% sent to another process) within 1.5%, though those runs were not in the fit.
+  - At 64 nodes, messages are 59% of uniform's PE time.
+- **2D aggregation (estimate; not run):**
+  - Assumptions: an 8 × 16 grid of the 128 processes, so 22 first-hop buffers instead of 127, with 105 of 127 destinations two hops away, and 0.35 µs per event for the second hop's receive and insert.
+  - First-hop messages would grow by about √5.8 = 2.4 (to about 13 events), not 5.8×.
+  - The middle process receives events that were sent because they were due, so it has to send them on at once, and bundles them little.
+  - Model: 1.05× uniform's rate at 64 nodes (1.24× if the second hop carried 50 events; 1.44× if messages grew in proportion to arrivals).
+  - Costs: htram has no multi-hop routing; the forwarding runs on PEs that execute events; a middle process holding a due event holds GVT back; and the extra hop delays events that are already due.
+- **Per-process flushing (estimate):**
+  - A process's 23 PEs send about 32 events per destination process per GVT update at 64 nodes. If they share one buffer per destination, a message carries that.
+  - Model: 1.9× at 30 events per message, 1.6× at 15, before the cost of the per-event atomics on the shared buffer.
+- **PP's gap to WPs at the same message size,** not explained:
+  - At 16 nodes (F1-16, W 400) PP 512 runs 337.3 M ev/s at 14.3 events per message, and WPs 512 runs 383.3 at 12.5.
+  - At 64 nodes the figures are 810.1 at 5.7 and 1,000.7 at 5.6.
+  - Both differences come to about 3.8 µs of PE time per PP message, at both node counts. The node-level receive is the same code for both modes.
+
+**The change** (htram ca22b77, Charades e12e40d):
+- **`--agg-pp-local=N`** (N = 1, 2, 4, 8 or 16; default 16) sets htram's `htram_pp_local_size`. A PE copies its local buffer into the shared buffer every N events instead of every 16.
+- **Due flushes and urgent sends** (GVT update, idle, `flushTo`) send the shared buffer with the flushing PE's own local events added, as one message (`shipSharedWithLocalPP`).
+  - It reserves the rest of the buffer, as a flush always did, so the slots after the copies already reserved are its own.
+  - A buffer has 16 spare slots past its limit.
+- **While the shared buffer is full or being sent, a PE keeps its events** (up to 16) and copies them with its next copy or due flush, rather than sending them alone.
+  - So copies vary in size, and the PE whose reservation reaches the buffer's limit sends it, after the copies reserved before it land.
+  - The first version sent them alone: in a 2-process × 4-PE Mac run, 135,233 one-event messages (8% of events), and smaller messages at local 1 than at 16. It was fixed before any Stampede3 run.
+- **At 16 every path is the old code.**
+  - Found on the way, left as is: at 16, an urgent event that completes a local buffer is copied into the shared buffer, while `flushTo` sends only the local buffer, so that event waits for the next due flush.
+  - That is about 1 in 16 urgent events; urgent events are 0.12% of events on uniform at 64 nodes.
+- **Mac checks:**
+  - Committed counts are identical at local 16, 4 and 1 in every comparison run.
+  - In a shape where the GVT-update flush sends the messages (4 processes × 2 PEs, lookahead 500, W 400, 4,096-event buffers), messages carry 15.1 / 16.5 / 21.9 events at local 16 / 4 / 1.
+  - Tests: change tier 66/66 on the two deadline configs. Engine tier with the five new configs named (`agg_deadline_bucket_pp_local1`, `agg_deadline_bucket_pp_local4`, `agg_ctl_measured_bucket_pp_local1`, `agg_bucket_pp_local1`, `agg_blocking_pp_local4`): 4,638 of 4,668 passed.
+    - The five new configs passed all 565 of their runs, including 20 repeats each at the multi-PE shapes.
+    - The 30 that did not pass are known and none runs the changed code:
+      - 27 VLSI conservative failures (the lookahead abort, every tree);
+      - VLSI `agg_ctl_park_bucket_pp` at 2 × 2 (the intermittent `--sched-park` hang; PP at the default local size, so the old code);
+      - dragonfly `gentime` with `bucket_hold_early` and `bucket_hold_pads19` at 2 × 2, the hold hang recorded in applications.md (no aggregation in either config).
+- **Stampede3 build:** tree `charades-ppl` (clone at e12e40d; `config.mk` differs from `charades-r5`'s only in the tree path and `HTRAM_DIR = $WORK/htram-ppl`, a worktree at ca22b77). It has the same 23 objects plus htram as `charades-r5`, and links `charm-pads-perf`. A first `make -j4` hit the fresh-tree `.decl.h` race; PHOLD's own `make` then built the library serially.
+
+**Runs** (job PL16, 16 nodes, 5 reps, Charades only; F1's PHOLD settings: end 2,048,000, bucket 8, 128 LPs per PE, 2 × 23 PEs per node; workloads and htram settings in reverse order in even reps):
+- **Uniform:** WPs 512 (F1's setting), PP 512, PP 512 local 4, PP 512 local 1.
+- **σ 2,000 and σ 4,000:** PP 512 (F1's setting), PP 512 local 4, PP 512 local 1.
+- **Arms:** fixed W 400 and the controller (`mb:0`) for each.
+- **Run count:** 20 runs per rep, 100 in all, plus one warm-up (uniform, local 1, W 400, end 256,000). If the warm-up fails, the job stops.
+- **Gate:** change tier on 2 nodes: F1's PHOLD set plus `agg_deadline_bucket_pp_local1`, `agg_deadline_bucket_pp_local4`, `agg_ctl_measured_bucket_pp_local1`, `agg_bucket_pp_local1`.
+
+**Flags per arm** (from a stub run with a fake `srun`: 101 commands, as planned; `~/charades-data/f1/pl267/stub_cmds.txt`, `flag_table.txt`). Every run carries the paper launch only:
+- `srun --mpi=pmi2 --kill-on-bad-exit=1 --wait=30 -N 16 -n 32 -c 24 … numactl --localalloc phold +pe 736`, with `+lci_ndevices 23 +pemap 2-46:2,3-47:2 +mempool_remote_free`;
+- config `bucket`, `--gvt-bucket-size=8`, the workload config F1 used (94,208 LPs, 16 per chare, 15 start events, lookahead 100, mean 1,000, end 2,048,000).
+
+| arm | Charades flags beyond the launch | runs |
+|---|---|---|
+| W 400, WPs 512 (uniform) | `--optimism-window=400 --aggregation=1 --agg-mode=0 --agg-buffer=512 --agg-policy=1 --agg-horizon-margin=8` | 5 |
+| W 400, PP 512 | the same with `--agg-mode=2` | 5 per workload |
+| W 400, PP 512 local 4 / local 1 | the same plus `--agg-pp-local=4` / `--agg-pp-local=1` | 5 each per workload |
+| controller | `--ctl=3 --ctl-bracket=1` in place of `--optimism-window=400`, with each htram setting above | 5 each |
+| warm-up | W 400, PP 512 local 1, uniform, end 256,000 | 1 |
+
+No log, stats, trace or digest flag appears in any command.
+
+**Predictions:**
+- **PL-1. Counts:** one committed count per workload over every arm and rep, equal to F1-16's: uniform 2,895,361,579; σ 2,000 2,895,361,550; σ 4,000 2,895,358,752.
+- **PL-2. Uniform's message size** (median events per message, W 400):
+  - WPs 512 and PP 512 within ±15% of F1-16's (12.5 and 14.3).
+  - Local 1 at least 50, about 3.5× PP 512. A process sends about 99 events per destination process per GVT update at 16 nodes.
+  - Local 4 at 0.8–1.0 of local 1's.
+- **PL-3. Uniform's rate at W 400:**
+  - Local 1 ÷ WPs 512: 1.05–1.30.
+  - Local 1 ÷ PP 512: 1.20–1.45.
+  - The model gives 1.13–1.28 against WPs at 80 events per message, for per-event atomics costing 0.1–0.3 µs.
+- **PL-4. Uniform:** local 4 ÷ local 1 is 0.95–1.05.
+- **PL-5. σ 2,000 and σ 4,000 at W 400:**
+  - Local 1 ÷ PP 512 is 0.90–1.05. Their messages already carry 50–60 events, so the saving is small and the atomics may cost more.
+  - Local 1's events per message are at least 1.3× PP 512's.
+- **PL-6. Controller arms:** within each workload the htram settings rank as at W 400, and each setting's controller ÷ W 400 is within ±0.05 of F1's setting's in this job.
+- **PL-7. Message triggers on uniform at local 1:**
+  - GVT-update messages are at least 90% of messages.
+  - Messages from a full buffer (fills, and full local buffers sent alone) are at most 5%.
+- **PL-8. Rollbacks:**
+  - Efficiency is at least 99.9% in every arm (F1-16: 99.95–99.99).
+  - Late stragglers per committed event at local 1 are within 2× of PP 512's.
+
+**What follows:**
+- **If local 1 (or 4) ÷ WPs 512 is at least 1.05 on uniform:** run uniform at 64 nodes with WPs 512 and PP 512 at local 1 and 4, W 400 / 500 and the controller. The model predicts 1.50–1.67× there, at about 32 events per message.
+- **If it is below 1.05:** report it, and find where local 1's time goes before any 64-node run.
+- **If local 1 or 4 is at least 0.98 of PP 512 on σ 2,000 and σ 4,000 too,** it could become PP's setting everywhere. That would mean rerunning every PP cell of F1 and F5, which is a user decision. The default stays 16 until then.
 
 ## Earlier
 
