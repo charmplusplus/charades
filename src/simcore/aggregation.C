@@ -188,6 +188,21 @@ Aggregator::Aggregator(CkGroupID tram_gid, CkGroupID wps_gid) : advances(0) {
   htram_pp_alloc_limit = (int)g_tw_agg_pp_alloc;
   if (!g_tw_agg_pp_alloc && g_tw_agg_mode == 2 && CkMyPe() == 0)
     CkPrintf("Aggregation: PP shared buffers are allocated at htram's largest size (--agg-pp-alloc=0)\n");
+  // --agg-pp-local: below 16, events reach the process's shared buffer
+  // sooner, and a due flush sends the shared buffer with the flushing PE's
+  // own events added, so the PEs of a process share one message toward each
+  // destination process (on uniform PHOLD at 64 nodes each PE's local buffer
+  // was sent at about 6 events, long before it filled; section 267)
+  if (g_tw_agg_pp_local != 16) {
+    if (g_tw_agg_pp_local == 0 || 16 % g_tw_agg_pp_local)
+      CkAbort("--agg-pp-local must be 1, 2, 4, 8 or 16, not %u\n", g_tw_agg_pp_local);
+    if (g_tw_agg_mode != PP) CkAbort("--agg-pp-local applies to PP (--agg-mode=2) only\n");
+    if (g_tw_agg_auto) CkAbort("--agg-pp-local below 16 does not support --agg-auto\n");
+    if (CkMyPe() == 0)
+      CkPrintf("Aggregation: PP local buffers hold %u events; due flushes send the shared buffer with the flushing PE's events added (--agg-pp-local)\n",
+               g_tw_agg_pp_local);
+  }
+  htram_pp_local_size = (int)g_tw_agg_pp_local;
   if (g_tw_agg_flush_order && CkMyPe() == 0)
     CkPrintf("Aggregation: htram flush passes visit destinations %s\n",
              g_tw_agg_flush_order == 1 ? "by index, starting one later each pass" : "earliest timestamp first");

@@ -1,0 +1,7 @@
+# agg_blocking_pp with four-event PP local buffers (--agg-pp-local=4)
+sync=3
+gvt=1
+aggregation=1
+agg-mode=2
+agg-buffer=16
+agg-pp-local=4
