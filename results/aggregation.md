@@ -39,6 +39,7 @@ Message cost, htram's modes and buffers, the deadline flush policy, choosing htr
 | 257 | 2026-11-08 | current | AG32 results: at 32 nodes bundling is 2.29× direct sends on uniform and 3.14× on σ 4,000; W 400 and traffic… |
 | 267 | 2026-11-09 | design (results in 268) | Why uniform's messages shrink with node count, and per-process flushing in PP (`--agg-pp-local`): job PL16 |
 | 268 | 2026-11-09 | current | PL16 results: one shared buffer per process makes uniform's messages 9× larger (111 events) but runs at 0.8… |
+| 269 | 2026-11-09 | design (results in 270) | Where local 1's extra time goes: a profile, and PP's shared counters one destination per cache line |
 | 3 | 2026-10-20 | historical | Per-message cost and scaling |
 | 4 | 2026-10-20 | superseded | Aggregation through htram |
 | 5 | 2026-10-20 | historical | Deadline flush policy |
@@ -1388,6 +1389,78 @@ No log, stats, trace or digest flag appears in any command.
 - **Open:** where local 1's 0.85–1.97 µs per event sent to another process goes. Settling it would take a simulation-only profile at 4 nodes of local 1 against PP 512 on uniform, and an arm with each destination's counters on their own cache line.
 - **For the paper:** the limit stands as written: aggregation's gain on all-remote traffic falls from 3.31× at 4 nodes to 1.85× at 64.
   - This job shows why the obvious fix does not work. One buffer shared by a process's PEs makes messages 9× larger, but costs more per event than the messages it saves.
+
+### §269 · Where local 1's extra time goes: a profile, and PP's shared counters one destination per cache line (job PD16 design, 2026-11-09; written before any runs)
+
+> **Status: design (results in section 270).**
+> - **User decision 2026-11-09:** one bounded diagnostic of section 268's local 1 (option 2 there). The stop rule is below.
+> - **Code:** htram branch `pp-pad` (978e065, on `pp-local`); Charades branch `pp-pad` (836f7fd, on `pp-local`). The default (`--agg-pp-pad=0`) keeps the packed layout.
+> - **Script:** `~/charades-data/f1/pd269.slurm`; tree `$WORK/charades-pplpad`, htram `$WORK/htram-pplpad`.
+- **Jobs:** 3699744 (skx) and 3699745 (skx-dev), twins: whichever starts first cancels the other.
+
+**Why.**
+- In section 268, local 1 took 0.85 µs more per event sent to another process on uniform, and 1.97 µs more on σ 4,000, than the messages it saved allow.
+- At local 1 every such event does three things in the process's shared buffer: a compare-and-swap on the destination's reservation counter (`get_idx`), an atomic add on its done counter (`done_count`), and a store into a buffer slot. It also reads the buffer's limit (`pp_limit`) and may lower its minimum key (`min_key`).
+- These four counters were packed arrays: 16 destinations' 4-byte counters to a cache line. So every event any of a process's 23 PEs sends to another process writes one of the same two or three lines.
+- Section 75 padded the same counters (with the input buffers) for PP at local 16 and found no effect (padded ÷ unpadded 0.98–1.02 at σ 100 and 2,000). At local 16 a PE touches them once per 16 events; at local 1 it touches them on every event, so that result does not settle this one.
+- The test has two parts:
+  - a perturbation: the same counters with no line shared between destinations;
+  - a closure check: a profile of where local 1's cycles go.
+
+**The change** (htram 978e065, Charades 836f7fd):
+- **`--agg-pp-pad=M`** sets htram's `htram_pp_pad` on every process in `tw_init`, before the node group exists:
+  - 0 = the four packed arrays, as before;
+  - 1 = each array with one destination per 64-byte line;
+  - 2 = one 64-byte line per destination holding all four counters (one line touched per event instead of up to four).
+- The counters are read through a byte stride (`PPCounters`), so every call site is unchanged.
+- **Mac:** committed counts identical at local 1 with pad 0 / 1 / 2 and at local 16 with pad 2 (2,049,257 events, 4 processes × 2 PEs). Change tier on the nine PP configs, 3 repeats, under pad 1 and under pad 2: 891/891 each.
+
+**Runs** (job PD16, 16 nodes, F1's PHOLD settings as in section 267, W 400 only):
+- **Part A, timing,** 5 reps, settings and workloads reversed in even reps:
+  - uniform: WPs 512; PP 512 at pad 0 / 1 / 2; PP 512 local 1 at pad 0 / 1 / 2;
+  - σ 4,000: PP 512 at pad 0 / 2; PP 512 local 1 at pad 0 / 1 / 2.
+  - That is 12 runs per rep and 60 in all, plus one warm-up (uniform, local 1, pad 2, end 256,000). If the warm-up fails, the job stops.
+- **Part B, profiles** (check runs after part A, not timing):
+  - uniform W 400, one run each of WPs 512, PP 512, and local 1 at pad 0 / 1 / 2;
+  - `perfwrap_d.sh`: user cycles at 1,999 Hz in task 0 (one process of 23 PEs on the first node), from 3 s after launch (setup takes about 1.5 s; the runs execute for 8–10 s);
+  - `perf report` by symbol and by library, and `perf annotate` of htram's send path, run in the job.
+- **Gate:** change tier on 2 nodes: PHOLD with the PP configs (`agg_deadline_bucket_pp`, `agg_ctl_measured_bucket_pp` and the three local-1 configs) and `agg_inputbuf_bucket_wps`, then the PP configs again under pad 1 and under pad 2.
+
+**Flags per arm** (stub run on the login node, 66 commands: 60 timing, 1 warm-up, 5 profiles; `~/charades-data/f1/pd269/flag_table.txt`):
+- Launch, every run: `srun --mpi=pmi2 --kill-on-bad-exit=1 --wait=30 -N 16 -n 32 -c 24 -w <16 nodes> numactl --localalloc phold`; the 5 profile runs alone put `perfwrap_d.sh` before `numactl`.
+- Every run: `+pe 736`, `test_configs/bucket`, `--optimism-window=400 --gvt-bucket-size=8 --aggregation=1 --agg-buffer=512 --agg-policy=1 --agg-horizon-margin=8 +lci_ndevices 23 +pemap 2-46:2,3-47:2 +mempool_remote_free`. These match section 268's fixed-W arms flag for flag.
+
+| arm | runs | flags beyond the common set |
+|---|---|---|
+| WPs 512 (uniform) | 5 timing + 1 profile | `--agg-mode=0` |
+| PP 512, pad 0 (uniform, σ 4,000) | 5 + 5 timing + 1 profile | `--agg-mode=2` |
+| PP 512, pad 1 (uniform) | 5 | `--agg-mode=2 --agg-pp-pad=1` |
+| PP 512, pad 2 (uniform, σ 4,000) | 5 + 5 | `--agg-mode=2 --agg-pp-pad=2` |
+| local 1, pad 0 (uniform, σ 4,000) | 5 + 5 timing + 1 profile | `--agg-mode=2 --agg-pp-local=1` |
+| local 1, pad 1 (uniform, σ 4,000) | 5 + 5 timing + 1 profile | `--agg-mode=2 --agg-pp-local=1 --agg-pp-pad=1` |
+| local 1, pad 2 (uniform, σ 4,000) | 5 + 5 timing + 1 profile | `--agg-mode=2 --agg-pp-local=1 --agg-pp-pad=2` |
+| warm-up (uniform, end 256,000) | 1 | `--agg-mode=2 --agg-pp-local=1 --agg-pp-pad=2` |
+
+**Predictions:**
+- **PD-1. Counts:** one per workload over every run, equal to F1-16's (uniform 2,895,361,579; σ 4,000 2,895,358,752).
+- **PD-2. The baselines repeat PL16:** WPs 512, PP 512 and local 1 at pad 0 within ±5% of section 268's medians (uniform 381.5 / 336.7 / 303.4; σ 4,000 542.4 / 276.6 M ev/s).
+- **PD-3. Padding leaves PP 512 alone** (as in section 75):
+  - pad 1 and pad 2 ÷ pad 0 within 0.97–1.03 on uniform, where its counters are touched about once per 16 events;
+  - pad 2 ÷ pad 0 within 0.97–1.05 on σ 4,000.
+- **PD-4. Padding helps local 1:**
+  - the better of pad 1 and pad 2 ÷ pad 0 is 1.10–1.30 on uniform and 1.10–1.50 on σ 4,000;
+  - pad 2 is at least pad 1's rate.
+- **PD-5. Against WPs 512 on uniform:** the best padded local 1 ÷ WPs 512 is 0.90–1.05, so below the stop rule's 1.05.
+  - Padding removes sharing between destinations, but 23 PEs still write each destination's counters and slots.
+- **PD-6. Profile:**
+  - In local 1 at pad 0, htram's send path (the functions holding the copy into the shared buffer and the flushes) takes at least 15% of the profiled process's user cycles, against at most 5% under PP 512.
+  - Most of the copy's samples fall on its atomic instructions and the instructions right after them.
+  - At pad 2 that share falls by at least a third.
+- **PD-7. Message sizes:** padding changes local 1's events per message by less than 10% (uniform about 111, σ 4,000 about 244).
+
+**Stop rule** (user decision 2026-11-09):
+- **If the best padded local 1 is at least 1.05 × WPs 512 on uniform:** propose uniform at 64 nodes (user decision).
+- **Otherwise the per-process line closes:** the paper keeps its limit with this evidence and names per-process aggregation as future work, and no more aggregation runs go in before writing.
 
 ## Earlier
 
