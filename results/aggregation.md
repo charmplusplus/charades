@@ -1642,7 +1642,7 @@ No log, stats, trace or digest flag appears in any command.
 - **The baseline did not repeat P64.** WPs 512 ran at 0.49–0.50 of P64's rate with the same message size (5.7 events against 5.6), so it did the same aggregation work at half the speed.
 - **The cause looks like the machine, not the code:**
   - Every rep was slow, from the first, and the rates fell through the job: local 1 at W 400 went from 764 to 521, WPs 512 from 534 to 456.
-  - Each GVT round took 2.2 count waves for WPs and 3.0 for local 1, against 1.0 in P64. A wave repeats when the sent and received counts disagree, that is, when messages are still in transit.
+  - Each GVT round took 1.9–2.2 count waves for WPs and 2.7–3.0 for local 1, against 1.0 in P64. A wave repeats when the sent and received counts disagree, that is, when messages are still in transit.
   - WPs' late stragglers rose 4.4× (2.89 million against 0.66 million at W 400).
   - `/work2` returned I/O errors at start-up.
 - **What was checked on the code:**
