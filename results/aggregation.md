@@ -1551,6 +1551,7 @@ No log, stats, trace or digest flag appears in any command.
 > - **User decision 2026-11-09:** run the 64-node proposal of section 270's stop rule.
 > - **Code:** the same binary as section 270 (Charades branch `pp-pad` 836f7fd, htram `pp-pad` 978e065, tree `$WORK/charades-pplpad`).
 > - **Script:** `~/charades-data/f1/l64/l64.slurm`. 64 nodes is above skx-dev's limit, so it goes to skx alone, with no twin.
+> - **Job:** 3700829 (skx), submitted 2026-11-09 evening.
 > - **Cost:** 20 timing runs of about 12–20 s, plus the gate and warm-up: about 15–20 minutes of 64 nodes, roughly 20 SUs (P64 took 188).
 
 **Why.**
