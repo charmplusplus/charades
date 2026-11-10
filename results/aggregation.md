@@ -42,6 +42,7 @@ Message cost, htram's modes and buffers, the deadline flush policy, choosing htr
 | 269 | 2026-11-09 | design (results in 270) | Where local 1's extra time goes: a profile, and PP's shared counters one destination per cache line |
 | 270 | 2026-11-09 | current | PD16 results: with each destination's counters on their own cache line, local 1 runs at 1.41× its packed ra… |
 | 271 | 2026-11-09 | design (results in 272) | Does padded local 1 keep its lead over WPs 512 on uniform at 64 nodes? |
+| 272 | 2026-11-10 | current (inconclusive) | L64 results: the machine ran at half speed, so the 64-node comparison is not usable; local 1 led WPs 512 in… |
 | 3 | 2026-10-20 | historical | Per-message cost and scaling |
 | 4 | 2026-10-20 | superseded | Aggregation through htram |
 | 5 | 2026-10-20 | historical | Deadline flush policy |
@@ -1613,6 +1614,56 @@ No log, stats, trace or digest flag appears in any command.
   - (b) uniform's setting in the tables, which needs the `pp-pad` branches merged (engine tier) and uniform rerun at 1–64 nodes.
 - **If 1.00–1.10:** the result goes in the limit's text, and there are no more runs.
 - **Below 1.00:** the 16-node gain does not hold at scale. The limit stays, with section 270's measured causes as future work.
+
+### §272 · L64 results: the machine ran at half speed, so the 64-node comparison is not usable; local 1 led WPs 512 in all 10 paired reps (1.05–1.43) (2026-11-10; skx batch job 3700829, 64 nodes)
+
+> **Status: current (inconclusive).** Design and predictions in section 271.
+> - **Job:** 64 nodes, 13.5 minutes (2026-11-10 11:14–11:27), about 14 SUs. Gate 36/36 and 30/30 (pad 1); the warm-up and all 20 timing runs finished `ok`, every one with count waves, and every local-1 run's log names pad 1.
+> - **Start-up:** Slurm could not enter the job's `/work2` directory at start (`Input/output error`, it ran from `/tmp`). The script uses absolute paths, and every run read its configuration (count waves present).
+> - **Data:** `~/charades-data/f1/l64/j3700829` (digests and per-round GVT files not copied). `~/charades-data/f1/l64/l64_272.py` writes `l64_272_summary.txt`.
+> - **Count:** one over all 20 runs, equal to P64's uniform count (11,581,457,663).
+
+**Rates** (uniform, 64 nodes, M committed ev/s, median of 5 reps, higher is better; spread = fastest ÷ slowest rep):
+
+| htram setting | arm | rate (M ev/s) | spread | events per message | efficiency (%) | late stragglers per run (median) | P64 rate (M ev/s) | ÷ P64 |
+|---|---|---|---|---|---|---|---|---|
+| WPs 512 | controller | 493.6 | 1.19 | 5.7 | 99.74 | 3,964,000 | 980.0 | 0.504 |
+| WPs 512 | W 400 | 493.4 | 1.17 | 5.7 | 99.75 | 2,888,000 | 998.9 | 0.494 |
+| local 1 pad 1 | controller | 566.9 | 1.36 | 35.7 | 99.90 | 2,784 | | |
+| local 1 pad 1 | W 400 | 583.6 | 1.47 | 36.5 | 99.92 | 1,323 | | |
+
+**Local 1 pad 1 ÷ WPs 512, by rep** (each pair ran minutes apart in the same rep; higher is better):
+
+| arm | rep 1 | rep 2 | rep 3 | rep 4 | rep 5 | median |
+|---|---|---|---|---|---|---|
+| controller | 1.320 | 1.382 | 1.106 | 1.149 | 1.051 | 1.149 |
+| W 400 | 1.430 | 1.252 | 1.183 | 1.061 | 1.253 | 1.252 |
+
+- **The baseline did not repeat P64.** WPs 512 ran at 0.49–0.50 of P64's rate with the same message size (5.7 events against 5.6), so it did the same aggregation work at half the speed.
+- **The cause looks like the machine, not the code:**
+  - Every rep was slow, from the first, and the rates fell through the job: local 1 at W 400 went from 764 to 521, WPs 512 from 534 to 456.
+  - Each GVT round took 2.2 count waves for WPs and 3.0 for local 1, against 1.0 in P64. A wave repeats when the sent and received counts disagree, that is, when messages are still in transit.
+  - WPs' late stragglers rose 4.4× (2.89 million against 0.66 million at W 400).
+  - `/work2` returned I/O errors at start-up.
+- **What was checked on the code:**
+  - The code since P64's build (Charades 85a2aad → 836f7fd, htram 42d347f → 978e065) changes only PP's paths and how the node group lays out PP's counters; WPs' insert and flush paths are unchanged.
+  - At 16 nodes the same binary's WPs ran at 1.017 of section 268's rate and as fast as F1-16 (section 270).
+  - Not checked: P64's own binary on the same nodes at the same time. That is the control a rerun needs.
+- **Local 1 still led in every pair** (10 of 10, 1.05–1.43). Its far fewer messages (0.027 per event against 0.175) and far fewer late stragglers may also have made it less sensitive to a slow network, so these ratios may overstate the lead on a quiet machine.
+- **Local 1's messages carry 36 events,** below the 40–70 predicted, and 13–15% of them go out for an urgent event (9% at 16 nodes).
+
+**Predictions (section 271):**
+- **L64-1 right:** one count, equal to P64's.
+- **L64-2 wrong:** WPs 512 ran at 0.494–0.504 of P64 (±5% predicted); message size 5.7: right.
+- **L64-3 mostly wrong:** 36–37 events per message (40–70 predicted). 87% of messages are sent at a GVT update at W 400 (right) but 84% under the controller (at least 85% predicted).
+- **L64-4 not tested:** the W 400 ratio is 1.183 (median of rates) or 1.252 (median of paired reps), inside 1.15–1.55. But the baseline failed L64-2, so the result does not count.
+- **L64-5 right:** the controller ratio (1.148) is within 0.05 of W 400's (1.183), and controller ÷ W 400 is 1.000 (WPs) and 0.971 (local 1).
+- **L64-6 wrong:** WPs' efficiency is 99.74–99.75% (at least 99.9% predicted), and local 1's spread is 1.36–1.47 (at most 1.10).
+- **L64-7 not tested:** it compares across jobs, against P64's direct sends, and this job ran at half speed.
+
+**What follows:**
+- **No 64-node number from this job goes in the paper.** The limit's text keeps section 270's 16-node result.
+- **A rerun would need a control** to separate the machine from the code: P64's own binary (`charades-r5`) running WPs 512 at W 400 in each rep, with a stop if its first run is far below P64's 998.9. That is a user decision.
 
 ## Earlier
 
