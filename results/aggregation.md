@@ -41,6 +41,7 @@ Message cost, htram's modes and buffers, the deadline flush policy, choosing htr
 | 268 | 2026-11-09 | current; superseded in part by 270 | PL16 results: one shared buffer per process makes uniform's messages 9× larger (111 events) but runs at 0.8… |
 | 269 | 2026-11-09 | design (results in 270) | Where local 1's extra time goes: a profile, and PP's shared counters one destination per cache line |
 | 270 | 2026-11-09 | current | PD16 results: with each destination's counters on their own cache line, local 1 runs at 1.41× its packed ra… |
+| 271 | 2026-11-09 | design (results in 272) | Does padded local 1 keep its lead over WPs 512 on uniform at 64 nodes? |
 | 3 | 2026-10-20 | historical | Per-message cost and scaling |
 | 4 | 2026-10-20 | superseded | Aggregation through htram |
 | 5 | 2026-10-20 | historical | Deadline flush policy |
@@ -1535,7 +1536,7 @@ No log, stats, trace or digest flag appears in any command.
 - **PD-7 half right:** on uniform, local 1's messages change by 5.4% (pad 1) and 1.8% (pad 2): right. On σ 4,000 they shrink by 20% and 13%: wrong.
 
 **What follows:**
-- **The stop rule's first branch holds:** the best padded local 1 ÷ WPs 512 is 1.102, at least 1.05. Uniform at 64 nodes goes to the user as a proposal; it is not run.
+- **The stop rule's first branch holds:** the best padded local 1 ÷ WPs 512 is 1.102, at least 1.05. Uniform at 64 nodes went to the user as a proposal; the user approved it (job L64, section 271).
 - **Per workload:** padded local 1 replaces WPs 512 as the fastest uniform setting at 16 nodes. PP 512 at local 16 stays the fastest on σ 4,000.
   - F1 already chooses htram's setting per workload (WPs 512 for uniform, PP 512 for σ 2,000 and σ 4,000), so a uniform-only change fits the tables as they are.
 - **Next costs, if the line continues:**
@@ -1543,6 +1544,74 @@ No log, stats, trace or digest flag appears in any command.
   - The remaining same-destination atomics take 12%.
 - **The paper tables are unchanged:** the branches `pp-pad` stay unmerged and F1's settings stand until a 64-node result.
 - **Section 268's lesson stands:** the per-message cost model did not predict a per-event cost. Here padding fixed most of that cost, but the model would not have found it.
+
+### §271 · Does padded local 1 keep its lead over WPs 512 on uniform at 64 nodes? (job L64 design, 2026-11-09; written before any runs)
+
+> **Status: design (results in section 272).**
+> - **User decision 2026-11-09:** run the 64-node proposal of section 270's stop rule.
+> - **Code:** the same binary as section 270 (Charades branch `pp-pad` 836f7fd, htram `pp-pad` 978e065, tree `$WORK/charades-pplpad`).
+> - **Script:** `~/charades-data/f1/l64/l64.slurm`. 64 nodes is above skx-dev's limit, so it goes to skx alone, with no twin.
+> - **Cost:** 20 timing runs of about 12–20 s, plus the gate and warm-up: about 15–20 minutes of 64 nodes, roughly 20 SUs (P64 took 188).
+
+**Why.**
+- The paper states a limit: aggregation's gain on uniform falls from 3.31× at 4 nodes to 1.85× at 64 (P64, section 265), because WPs' messages shrink to 5.6 events.
+- At 16 nodes, local 1 with padded counters ran at 1.102 × WPs 512 (section 270). It makes one message per process pair per GVT update instead of one per PE and process.
+- The open question is whether that lead holds or grows at 64 nodes, where messages cost WPs more, or whether local 1's own per-event costs grow with the number of destinations.
+
+**Runs** (64 nodes, one stream, F1's PHOLD settings as P64: end 2,048,000, bucket 8, 128 LPs per PE, 2 × 23 PEs, uniform):
+- WPs 512 (F1's uniform setting) and PP 512 local 1 pad 1 (`--agg-mode=2 --agg-pp-local=1 --agg-pp-pad=1`), each under the controller and at W 400.
+- 5 reps, settings and arms reversed in even reps: 20 runs.
+- One warm-up first (local 1 pad 1, W 400, end 256,000). If it fails, the job stops.
+- **Gate:** change tier on 2 nodes, PHOLD with the PP configs (including the three local-1 configs) and `agg_inputbuf_bucket_wps`, then the PP configs again under `--agg-pp-pad=1`.
+- No diagnostics and no profiles: P64 already gives the 64-node baselines (WPs 512 controller 980.0, W 400 998.9, best fixed W 1,000.7 at W 500; PP 512 W 400 810.1; direct sends best 540.6 at W 300; 5.6 events per WPs message).
+
+**Flags per arm** (stub run on the login node, 21 commands; `~/charades-data/f1/l64/flag_table.txt`):
+- Launch, every run: `srun --mpi=pmi2 --kill-on-bad-exit=1 --wait=30 -N 64 -n 128 -c 24 -w <64 nodes> numactl --localalloc phold`.
+- Every run: `+pe 2944`, `test_configs/bucket`, `--gvt-bucket-size=8 --aggregation=1 --agg-buffer=512 --agg-policy=1 --agg-horizon-margin=8 +lci_ndevices 23 +pemap 2-46:2,3-47:2 +mempool_remote_free`, workload `steady_100_1000_1.0_376832_15_2048000`.
+- Compared command by command with P64's stub log: the WPs 512 arms are identical apart from the tree's path.
+
+| arm | runs | flags beyond the common set |
+|---|---|---|
+| WPs 512, controller | 5 | `--ctl=3 --ctl-bracket=1 --agg-mode=0` |
+| WPs 512, W 400 | 5 | `--optimism-window=400 --agg-mode=0` |
+| local 1 pad 1, controller | 5 | `--ctl=3 --ctl-bracket=1 --agg-mode=2 --agg-pp-local=1 --agg-pp-pad=1` |
+| local 1 pad 1, W 400 | 5 | `--optimism-window=400 --agg-mode=2 --agg-pp-local=1 --agg-pp-pad=1` |
+| warm-up (end 256,000) | 1 | `--optimism-window=400 --agg-mode=2 --agg-pp-local=1 --agg-pp-pad=1` |
+
+**The estimate behind the predictions** (PE time per committed event, µs; lower is better):
+- **WPs 512 at 64 nodes:** 2,944 PEs ÷ 998.9 M ev/s = 2.95 µs.
+  - At section 267's 9.8 µs per message, its messages cost 1.74 µs of that: 0.992 of events go through htram, 5.6 to a message.
+  - That leaves 1.21 µs for everything else (1.15 at 16 nodes).
+- **Local 1's messages:** section 267's square-root rule (message size grows as the square root of a buffer's arrivals) and 4.1 times as many destinations take its 105.5 events per message at 16 nodes to about 52. That is 0.19 µs per committed event.
+- **Local 1's own per-event cost:** 0.49 µs per committed event at 16 nodes. That is its measured time less its messages, less WPs' time less its messages.
+  - If it stays at 0.49 µs: 1.21 + 0.49 + 0.19 = 1.89 µs, which is 1.56 × WPs 512.
+  - If it doubles: 1.24 ×. If it triples: 1.03 ×.
+- **Why it might grow:**
+  - `flushDue` reads every destination's shared `min_key` on every idle pass (13.6% of cycles at 16 nodes, section 270).
+  - At 64 nodes there are 127 destinations instead of 31, each on its own line at pad 1.
+- **Why it might shrink:** a process's 23 PEs spread their sends over 4 times as many destinations, so fewer of them write any one destination's counters at once.
+
+**Predictions:**
+- **L64-1. Counts:** one over all 20 runs, equal to P64's uniform count (11,581,457,663).
+- **L64-2. WPs 512 repeats P64:**
+  - controller and W 400 within ±5% of 980.0 and 998.9;
+  - 5.2–6.0 events per message.
+- **L64-3. Local 1's messages:**
+  - 40–70 events per message;
+  - at least 85% of them sent at a GVT update (90.7% at 16 nodes).
+- **L64-4. The lead holds:** local 1 pad 1 ÷ WPs 512 at W 400 is 1.15–1.55. Below 1.15 would mean local 1's own per-event cost more than doubled with four times the destinations.
+- **L64-5. The controller agrees:**
+  - local 1 ÷ WPs 512 under the controller is within 0.05 of the W 400 ratio;
+  - each setting's controller ÷ W 400 is 0.95–1.06.
+- **L64-6. Quality:** efficiency at least 99.9% in every run; local 1's rep spread (fastest ÷ slowest) at most 1.10.
+- **L64-7. Bundling** (across jobs: local 1's better arm ÷ P64's best direct sends, 540.6) is 2.1–2.9, against P64's 1.85 and AG32's 2.29 at 32 nodes.
+
+**After the result** (user decisions):
+- **If local 1 ÷ WPs 512 is at least 1.10 under both arms,** the user decides how it enters the paper:
+  - (a) a paragraph or figure on uniform at scale, with the tables kept on F1's settings;
+  - (b) uniform's setting in the tables, which needs the `pp-pad` branches merged (engine tier) and uniform rerun at 1–64 nodes.
+- **If 1.00–1.10:** the result goes in the limit's text, and there are no more runs.
+- **Below 1.00:** the 16-node gain does not hold at scale. The limit stays, with section 270's measured causes as future work.
 
 ## Earlier
 
