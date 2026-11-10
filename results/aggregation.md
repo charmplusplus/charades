@@ -43,6 +43,7 @@ Message cost, htram's modes and buffers, the deadline flush policy, choosing htr
 | 270 | 2026-11-09 | current | PD16 results: with each destination's counters on their own cache line, local 1 runs at 1.41× its packed ra… |
 | 271 | 2026-11-09 | design (results in 272) | Does padded local 1 keep its lead over WPs 512 on uniform at 64 nodes? |
 | 272 | 2026-11-10 | current (inconclusive) | L64 results: the machine ran at half speed, so the 64-node comparison is not usable; local 1 led WPs 512 in… |
+| 273 | 2026-11-10 | design (results in 274) | L64 again, with P64's own binary as a control in every rep and a probe that stops the job on a slow machine |
 | 3 | 2026-10-20 | historical | Per-message cost and scaling |
 | 4 | 2026-10-20 | superseded | Aggregation through htram |
 | 5 | 2026-10-20 | historical | Deadline flush policy |
@@ -1663,7 +1664,32 @@ No log, stats, trace or digest flag appears in any command.
 
 **What follows:**
 - **No 64-node number from this job goes in the paper.** The limit's text keeps section 270's 16-node result.
-- **A rerun would need a control** to separate the machine from the code: P64's own binary (`charades-r5`) running WPs 512 at W 400 in each rep, with a stop if its first run is far below P64's 998.9. That is a user decision.
+- **A rerun would need a control** to separate the machine from the code: P64's own binary (`charades-r5`) running WPs 512 at W 400 in each rep, with a stop if its first run is far below P64's 998.9. The user approved it (job L64b, section 273).
+
+### §273 · L64 again, with P64's own binary as a control in every rep and a probe that stops the job on a slow machine (job L64b design, 2026-11-10; written before any runs)
+
+> **Status: design (results in section 274).**
+> - **User decision 2026-11-10:** rerun L64 (section 272: the machine ran at half speed) with a control.
+> - **Script:** `~/charades-data/f1/l64/l64b.slurm` (L64's script with the probe and the control added); skx only, no twin.
+> - **Cost:** about 10–15 minutes of 64 nodes at P64's speed (about 11–16 SUs). A slow machine stops the job after the probe, about 1–2 SUs.
+
+**What changes from L64** (section 271 otherwise):
+- **Probe first.** Before the gate, one run of P64's own tree and binary (`charades-r5`, 85a2aad, its own `ctl_sweep.sh`) with WPs 512 at W 400. If its rate is below 900 M committed ev/s (0.90 of P64's 998.9), the job stops. I then report to the user and do not resubmit without a decision.
+- **A control in every rep.** The same `charades-r5` run, next to L64's four runs (WPs 512 and local 1 pad 1, each under the controller and at W 400). Settings and arms are reversed in even reps, as before: 25 timing runs.
+- **What the control separates:**
+  - If the control runs at P64's rate, the machine is as P64 saw it.
+  - The same-rep ratio of `charades-pplpad`'s WPs 512 to the control then tests the code since P64. That code should not touch WPs' paths (section 272).
+
+**Flags per arm** (stub run, 27 commands: probe, warm-up, 25 timing runs; `~/charades-data/f1/l64/flag_table_b.txt`):
+- The probe's and the control's commands are identical to P64's uniform WPs 512 W 400 commands, apart from the node list, the job name and the run directory.
+- The other arms' commands are identical to L64's (section 271's table).
+
+**Predictions:**
+- **L64-1 to L64-7 of section 271 stand unchanged.** Section 272's half-speed run does not revise them.
+- **L64b-1. Control:** the probe and the control's median are within ±5% of P64's 998.9 M ev/s.
+- **L64b-2. No code effect on WPs:** `charades-pplpad`'s WPs 512 at W 400 ÷ the control, paired by rep, has a median of 0.97–1.03.
+
+**After the result:** as in section 271. A control below 0.95 of P64 marks the run as on a slow machine, as L64's was. Then no ratio from it counts, and the next step goes to the user.
 
 ## Earlier
 
