@@ -1671,6 +1671,7 @@ No log, stats, trace or digest flag appears in any command.
 > **Status: design (results in section 274).**
 > - **User decision 2026-11-10:** rerun L64 (section 272: the machine ran at half speed) with a control.
 > - **Script:** `~/charades-data/f1/l64/l64b.slurm` (L64's script with the probe and the control added); skx only, no twin.
+> - **Job:** 3704609 (skx).
 > - **Cost:** about 10–15 minutes of 64 nodes at P64's speed (about 11–16 SUs). A slow machine stops the job after the probe, about 1–2 SUs.
 
 **What changes from L64** (section 271 otherwise):
