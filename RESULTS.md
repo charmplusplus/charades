@@ -28,14 +28,14 @@ Split on 2026-11-07 from one file of 11,400 lines and 249 sections; the text mov
 | [results/applications.md](results/applications.md) | **Traffic and dragonfly.** The two applications ported from Charades to ROSS and Devastator (phase B), the traffic count fix, and the paper runs F5 at 1–32 nodes and A64 at 64. | 17 |
 | [results/vlsi.md](results/vlsi.md) | **VLSI (b19 × N).** Gate-level simulation of copies of ITC'99's b19: the model and its layout, the gap to Devastator and how it closed, commits, and the paper's VLSI row. | 32 |
 | [results/controller.md](results/controller.md) | **The optimism-window controller.** Every controller design and test: the delay-quantile rule, the aggregation bound, the measured-cost rule and its freeze, where the best window lies at scale, robustness (F4), the grid check (GC), and the controller's own cost (CC). | 39 |
-| [results/aggregation.md](results/aggregation.md) | **Aggregation through htram.** Message cost, htram's modes and buffers, the deadline flush policy, choosing htram automatically, input buffers, PP's allocation and start-up, flush timing, and F2 (htram against direct sends), and bundling at 32 nodes (AG32). | 39 |
+| [results/aggregation.md](results/aggregation.md) | **Aggregation through htram.** Message cost, htram's modes and buffers, the deadline flush policy, choosing htram automatically, input buffers, PP's allocation and start-up, flush timing, and F2 (htram against direct sends), and bundling at 32 nodes (AG32). | 40 |
 | [results/hold.md](results/hold.md) | **The PADS'19 hold (F3).** Mikida and Kale's hold of events past a cutoff, run as a baseline beside the window. | 2 |
 | [results/engine.md](results/engine.md) | **The engine: GVT, rollback and per-event cost.** What paces the bucketed GVT at scale, rollback depth and unit, the same-process fast path, and the rounds that closed Charades' per-event gap to Devastator. | 53 |
 | [results/runtime.md](results/runtime.md) | **Runtime, transport and the machine.** Reconverse builds and settings, native psm2 through LCI, LCI devices, the late-rank investigation, the message pool, NUMA balancing, shared memory between processes, and the slow node. | 43 |
 | [results/baselines.md](results/baselines.md) | **ROSS and Devastator as baselines.** First runs and feasibility, ROSS's optimism window on PHOLD, and the Mac checks that both engines commit Charades' counts. | 3 |
 | [results/methods.md](results/methods.md) | **Methods.** How runs are made and checked: run length and warm-up, and the flag check that keeps diagnostics out of timing runs. | 4 |
 | [results/history.md](results/history.md) | The re-read of 2026-10-28 and the plan history | — |
-| [results/INDEX.md](results/INDEX.md) | Every section by number, with its date, job, status and file | 270 |
+| [results/INDEX.md](results/INDEX.md) | Every section by number, with its date, job, status and file | 271 |
 
 ## Current numbers
 
@@ -124,7 +124,7 @@ Every cell commits one count in both engines and one Charades digest, as F4. Cha
 | σ 4,000 | — | — | 3.14 | 3.32 |
 | uniform | 3.31 | 2.65 | 2.29 | 1.85 |
 
-- **On uniform the gain shrinks as the messages do:** above 2 up to 32 nodes, 1.85 at 64. Almost every message there is sent at a GVT update, once a buffer's earliest event is due, so message size grows only about as the square root of a buffer's arrivals (section 267). One buffer shared by a process's 23 PEs (`--agg-pp-local=1`, job PL16, section 268) made uniform's messages 9× larger at 16 nodes but ran at 0.80 of WPs 512, so F1's settings stand.
+- **On uniform the gain shrinks as the messages do:** above 2 up to 32 nodes, 1.85 at 64. Almost every message there is sent at a GVT update, once a buffer's earliest event is due, so message size grows only about as the square root of a buffer's arrivals (section 267). One buffer shared by a process's 23 PEs (`--agg-pp-local=1`, job PL16, section 268) made uniform's messages 9× larger at 16 nodes but ran at 0.80 of WPs 512 while the buffer's counters were packed 16 to a cache line. With each destination's counters on their own line (job PD16, section 270) it runs at 1.10× WPs 512 on uniform at 16 nodes, though still at 0.84 of PP 512 on σ 4,000. It has not been run at 64 nodes, so F1's settings stand.
   - htram's messages carry 102, 14.5, 8 and 5.6 events at 4, 16, 32 and 64 nodes (the controller runs, sections 255, 257 and 265).
   - On σ 4,000 messages still carry 50 events at 64 nodes, and the gain grows (3.14 → 3.32).
   - At 32 nodes neither buffer 2,048 nor a wider W (up to 600) makes them bigger.

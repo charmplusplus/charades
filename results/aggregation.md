@@ -38,8 +38,9 @@ Message cost, htram's modes and buffers, the deadline flush policy, choosing htr
 | 256 | 2026-11-07 | design (results in 257) | Bundling at 32 nodes on the remote-heavy end, and fixed windows past F1's and F5's grids |
 | 257 | 2026-11-08 | current | AG32 results: at 32 nodes bundling is 2.29× direct sends on uniform and 3.14× on σ 4,000; W 400 and traffic… |
 | 267 | 2026-11-09 | design (results in 268) | Why uniform's messages shrink with node count, and per-process flushing in PP (`--agg-pp-local`): job PL16 |
-| 268 | 2026-11-09 | current | PL16 results: one shared buffer per process makes uniform's messages 9× larger (111 events) but runs at 0.8… |
+| 268 | 2026-11-09 | current; superseded in part by 270 | PL16 results: one shared buffer per process makes uniform's messages 9× larger (111 events) but runs at 0.8… |
 | 269 | 2026-11-09 | design (results in 270) | Where local 1's extra time goes: a profile, and PP's shared counters one destination per cache line |
+| 270 | 2026-11-09 | current | PD16 results: with each destination's counters on their own cache line, local 1 runs at 1.41× its packed ra… |
 | 3 | 2026-10-20 | historical | Per-message cost and scaling |
 | 4 | 2026-10-20 | superseded | Aggregation through htram |
 | 5 | 2026-10-20 | historical | Deadline flush policy |
@@ -1328,7 +1329,7 @@ No log, stats, trace or digest flag appears in any command.
 
 ### §268 · PL16 results: one shared buffer per process makes uniform's messages 9× larger (111 events) but runs at 0.80 of WPs 512 and 0.90 of PP 512, and at 0.51–0.66 of PP 512 on σ 2,000 and σ 4,000; local 4 is worse, through a flush race; no 64-node run (2026-11-09; skx-dev batch job 3698962, 16 nodes)
 
-> **Status: current.** Design and predictions in section 267.
+> **Status: current; superseded in part by section 270** (padded counters: the excess below was mostly false sharing, and local 1 then beats WPs 512 on uniform). Design and predictions in section 267.
 > - **Job:** 16 nodes, 22.5 minutes (2026-11-09 11:38–12:01); the skx twin 3698961 was cancelled by the guard. Gate 42/42; the warm-up and all 100 timing runs finished `ok`, every one with count waves.
 > - **Data:** `~/charades-data/f1/pl267/j3698962` (digests and per-round GVT files not copied). `~/charades-data/f1/pl267/pl268.py` writes `pl268_summary.txt`.
 > - **Counts:** one per workload over all 100 runs, equal to F1-16's (uniform 2,895,361,579; σ 2,000 2,895,361,550; σ 4,000 2,895,358,752).
@@ -1396,7 +1397,7 @@ No log, stats, trace or digest flag appears in any command.
 > - **User decision 2026-11-09:** one bounded diagnostic of section 268's local 1 (option 2 there). The stop rule is below.
 > - **Code:** htram branch `pp-pad` (978e065, on `pp-local`); Charades branch `pp-pad` (836f7fd, on `pp-local`). The default (`--agg-pp-pad=0`) keeps the packed layout.
 > - **Script:** `~/charades-data/f1/pd269.slurm`; tree `$WORK/charades-pplpad`, htram `$WORK/htram-pplpad`.
-- **Jobs:** 3699744 (skx) and 3699745 (skx-dev), twins: whichever starts first cancels the other.
+> - **Jobs:** 3699744 (skx) and 3699745 (skx-dev), twins: whichever starts first cancels the other.
 
 **Why.**
 - In section 268, local 1 took 0.85 µs more per event sent to another process on uniform, and 1.97 µs more on σ 4,000, than the messages it saved allow.
@@ -1461,6 +1462,87 @@ No log, stats, trace or digest flag appears in any command.
 **Stop rule** (user decision 2026-11-09):
 - **If the best padded local 1 is at least 1.05 × WPs 512 on uniform:** propose uniform at 64 nodes (user decision).
 - **Otherwise the per-process line closes:** the paper keeps its limit with this evidence and names per-process aggregation as future work, and no more aggregation runs go in before writing.
+
+### §270 · PD16 results: with each destination's counters on their own cache line, local 1 runs at 1.41× its packed rate and 1.10× WPs 512 on uniform at 16 nodes, but at 0.84 of PP 512 on σ 4,000; false sharing on the packed counters was most of section 268's excess; the stop rule calls for a 64-node proposal (2026-11-09; skx-dev batch job 3699745, 16 nodes)
+
+> **Status: current.** Design and predictions in section 269. Supersedes in part section 268 (its cause "not measured" and its "no 64-node run").
+> - **Job:** 16 nodes, 17 minutes (2026-11-09 17:37–17:54); the skx twin 3699744 was cancelled by the guard. Gate 36/36, 30/30 (pad 1) and 30/30 (pad 2); the warm-up and all 60 timing runs finished `ok`, every one with count waves, and every padded run's log names its layout.
+> - **Data:** `~/charades-data/f1/pd269/j3699745` (digests and per-round GVT files not copied). `~/charades-data/f1/pd269/pd270.py` writes `pd270_summary.txt`. Perf data and reports in `j3699745/perf/`.
+> - **Counts:** one per workload over all 60 runs, equal to F1-16's (uniform 2,895,361,579; σ 4,000 2,895,358,752).
+
+**Rates** (W 400, M committed ev/s, median of 5 reps, higher is better; spread = fastest ÷ slowest rep; PE time = 736 PEs ÷ rate, lower is better):
+
+| workload | htram setting | rate (M ev/s) | spread | events per message | PE time per committed event (µs) | ÷ PP 512 pad 0 | ÷ WPs 512 |
+|---|---|---|---|---|---|---|---|
+| uniform | WPs 512 (F1) | **387.9** | 1.03 | 12.6 | 1.90 | 1.160 | 1 |
+| uniform | PP 512, pad 0 | 334.5 | 1.04 | 14.4 | 2.20 | 1 | 0.862 |
+| uniform | PP 512, pad 1 | 334.9 | 1.04 | 14.3 | 2.20 | 1.001 | 0.863 |
+| uniform | PP 512, pad 2 | 337.5 | 1.03 | 14.3 | 2.18 | 1.009 | 0.870 |
+| uniform | local 1, pad 0 | 302.6 | 1.13 | 111.5 | 2.43 | 0.905 | 0.780 |
+| uniform | local 1, pad 1 | **427.6** | 1.05 | 105.5 | 1.72 | 1.278 | **1.102** |
+| uniform | local 1, pad 2 | 381.6 | 1.10 | 109.5 | 1.93 | 1.141 | 0.984 |
+| σ 4,000 | PP 512, pad 0 (F1) | **553.9** | 1.05 | 50.0 | 1.33 | 1 | |
+| σ 4,000 | PP 512, pad 2 | 555.7 | 1.01 | 49.8 | 1.32 | 1.003 | |
+| σ 4,000 | local 1, pad 0 | 283.4 | 1.13 | 247.7 | 2.60 | 0.512 | |
+| σ 4,000 | local 1, pad 1 | 467.6 | 1.03 | 198.9 | 1.57 | 0.844 | |
+| σ 4,000 | local 1, pad 2 | 416.6 | 1.06 | 216.4 | 1.77 | 0.752 | |
+
+- **The baselines repeat section 268:** this job ÷ PL16 is 1.017 (WPs 512), 0.994 (PP 512) and 0.997 (local 1) on uniform, and 1.021 and 1.025 on σ 4,000.
+- **Padding leaves PP 512 alone,** as in section 75: 1.001 and 1.009 on uniform, 1.003 on σ 4,000.
+- **Padding speeds local 1 up a great deal:** pad 1 ÷ pad 0 is 1.413 on uniform and 1.650 on σ 4,000. Pad 2 helps less (1.261 and 1.470; pad 2 ÷ pad 1 0.89 on both).
+- **On uniform, local 1 at pad 1 is now the fastest setting:** 1.102 × WPs 512 and 1.278 × PP 512, with 8.3 times fewer messages than WPs (0.0095 against 0.0792 per event through htram).
+- **On σ 4,000 it still loses:** 0.844 of PP 512.
+- **Closure against section 268:**
+  - Pad 1 saves 0.71 µs per committed event on uniform and 1.02 µs on σ 4,000. Section 268's unexplained excess was 0.82 and 1.42 µs, so the packed layout accounts for about 87% of it on uniform and 72% on σ 4,000.
+  - Padded, local 1 takes 0.48 µs less per committed event than PP 512 on uniform. Section 267's model predicted 0.58 µs less from the messages saved.
+- **The packed layout also made local 1 noisy:** a rep spread of 1.13 on both workloads, against 1.03–1.05 at pad 1.
+- **Messages on σ 4,000 shrink when padded** (248 → 199 events at pad 1), and the share sent for an urgent event rises from 6.8% to 24.5%. Why is not measured.
+- **Rollbacks are not involved:** efficiency is 99.95–99.99% in every arm.
+
+**Profiles** (part B: one check run per setting, uniform W 400; user cycles in one process of 23 PEs on the first node, from 3 s after launch to the end; the sample count follows the run's length; send path = htram's `copyLocalToNodeBuf`, `flushDue`, `flushOrder`, `shipSharedPP`, `insertValue`, `insert` and Charades' `agg_send`):
+
+| setting | samples (thousands) | send path (% of samples) | send path (thousands of samples) | `copyLocalToNodeBuf` (%) | `flushDue` (%) | `flushOrder` (%) |
+|---|---|---|---|---|---|---|
+| WPs 512 | 256 | 4.6 | 11.8 | | below 0.3 | 1.4 |
+| PP 512, pad 0 | 325 | 7.9 | 25.8 | | 2.8 | 2.6 |
+| local 1, pad 0 | 438 | 30.9 | 135.3 | 15.7 | 4.9 | 7.7 |
+| local 1, pad 1 | 236 | 31.5 | 74.2 | 12.0 | 13.6 | 1.5 |
+| local 1, pad 2 | 246 | 34.2 | 84.1 | 12.6 | 17.8 | 1.3 |
+
+- **Where the copy's time goes:** at every pad, 63–75% of `copyLocalToNodeBuf`'s samples fall on the instructions right after its two atomic instructions (the `lock cmpxchg` reserving a slot through `get_idx`, and the `lock add` on `done_count`), and another 18–20% on the load of `pp_limit` just before the compare-and-swap. A sample lands on the instruction after the one that waited, so this is the pattern of the atomics and the load waiting for lines other PEs write (no cache-miss counter was recorded).
+- **What padding removes:** at pad 0, all 31 destinations' counters of each kind sit on two lines, so every event any of the process's 23 PEs sends to another process takes one of those lines away from the others. Padded, PEs sending to different destinations no longer interfere. The copy's samples fall from 68.8 to 28.3 thousand, the largest single drop.
+- **What padding cannot remove:** the copy still takes 12% of cycles at pad 1, because PEs sending to the *same* destination still write the same `get_idx` and `done_count`.
+- **A new cost appears in `flushDue`:**
+  - Under the deadline policy, a scheduler pass that runs less than a full batch calls `agg_flush_idle`, which calls `flushDue`.
+  - At local 1, a PE's local buffers are nearly always empty, so for each destination `flushDue` reads the process's shared `min_key`.
+  - Packed, those 31 values sit on 4 lines. Padded, each is on a line of its own, recently written by an inserting PE, so each read is a miss. 95–96% of `flushDue`'s samples at pad 1 and pad 2 fall on that one load.
+- **Why pad 2 loses to pad 1** (the reading the profile supports): pad 2 puts `min_key` on the same line as `get_idx` and `done_count`, which every insert writes. So every idle-pass read misses, and the next insert's atomic must take the line back. `flushDue` takes 17.8% of cycles at pad 2 against 13.6% at pad 1.
+- **`flushOrder` is not a layout effect:** its samples at pad 0 and pad 1 fall on the same instructions (an integer division per destination, building the visiting order). It is called from the same idle passes, and it shrinks because local 1 waits less once padded.
+- **The rest of the sample drop** (pad 0 → pad 1: 202 thousand, 61 of them in the send path) is spread over the scheduler, polling and lock functions that run while a PE waits. They shrink as the run gets shorter.
+
+**Predictions (section 269):**
+- **PD-1 right:** one count per workload, equal to F1-16's.
+- **PD-2 right:** the baselines are within 0.994–1.025 of section 268's medians.
+- **PD-3 right:** PP 512 padded ÷ packed is 1.001 and 1.009 on uniform and 1.003 on σ 4,000.
+- **PD-4 wrong in size and in order:**
+  - Padding helped local 1 more than predicted: 1.413 on uniform (1.10–1.30 predicted) and 1.650 on σ 4,000 (1.10–1.50).
+  - Pad 2 is 0.89 of pad 1, not at least equal: `flushDue`'s reads of `min_key` were not in the reasoning.
+- **PD-5 wrong:** the best padded local 1 ÷ WPs 512 is 1.102 (0.90–1.05 predicted).
+- **PD-6 half right:**
+  - The send path takes 30.9% of local 1's cycles at pad 0: right (at least 15%). PP 512's takes 7.9%: wrong (at most 5%).
+  - Most of the copy's samples fall right after its atomic instructions: right.
+  - The send path's share does not fall at pad 2 (34.2%) because `flushDue` grew: wrong. Its sample count falls 38% at pad 2 and 45% at pad 1.
+- **PD-7 half right:** on uniform, local 1's messages change by 5.4% (pad 1) and 1.8% (pad 2): right. On σ 4,000 they shrink by 20% and 13%: wrong.
+
+**What follows:**
+- **The stop rule's first branch holds:** the best padded local 1 ÷ WPs 512 is 1.102, at least 1.05. Uniform at 64 nodes goes to the user as a proposal; it is not run.
+- **Per workload:** padded local 1 replaces WPs 512 as the fastest uniform setting at 16 nodes. PP 512 at local 16 stays the fastest on σ 4,000.
+  - F1 already chooses htram's setting per workload (WPs 512 for uniform, PP 512 for σ 2,000 and σ 4,000), so a uniform-only change fits the tables as they are.
+- **Next costs, if the line continues:**
+  - `flushDue`'s reads of every destination's shared `min_key` on every idle pass take 13.6% of cycles at pad 1. Cutting them touches the flush rules that keep GVT moving, so it needs its own design.
+  - The remaining same-destination atomics take 12%.
+- **The paper tables are unchanged:** the branches `pp-pad` stay unmerged and F1's settings stand until a 64-node result.
+- **Section 268's lesson stands:** the per-message cost model did not predict a per-event cost. Here padding fixed most of that cost, but the model would not have found it.
 
 ## Earlier
 
