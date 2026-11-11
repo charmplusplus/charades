@@ -44,7 +44,8 @@ Message cost, htram's modes and buffers, the deadline flush policy, choosing htr
 | 271 | 2026-11-09 | design (results in 272) | Does padded local 1 keep its lead over WPs 512 on uniform at 64 nodes? |
 | 272 | 2026-11-10 | current (inconclusive) | L64 results: the machine ran at half speed, so the 64-node comparison is not usable; local 1 led WPs 512 in… |
 | 273 | 2026-11-10 | design (results in 274) | L64 again, with P64's own binary as a control in every rep and a probe that stops the job on a slow machine |
-| 274 | 2026-11-11 | current (stopped by its probe) | L64b results: the probe stopped the job (P64's own binary at 0.52 of its P64 rate); both slow 64-node jobs… |
+| 274 | 2026-11-11 | current (stopped by its probe); superseded in part by 275 | L64b results: the probe stopped the job (P64's own binary at 0.52 of its P64 rate); both slow 64-node jobs… |
+| 275 | 2026-11-11 | design (results in 276) | Can the job name a bad node? L64b again with a network record between runs |
 | 3 | 2026-10-20 | historical | Per-message cost and scaling |
 | 4 | 2026-10-20 | superseded | Aggregation through htram |
 | 5 | 2026-10-20 | historical | Deadline flush policy |
@@ -1695,7 +1696,7 @@ No log, stats, trace or digest flag appears in any command.
 
 ### §274 · L64b results: the probe stopped the job (P64's own binary at 0.52 of its P64 rate); both slow 64-node jobs show 0.2 s stalls consistent with PSM2 retransmitting lost packets (2026-11-11; skx batch job 3704609, 64 nodes)
 
-> **Status: current (stopped by its probe; no comparison).** Design in section 273.
+> **Status: current (stopped by its probe; no comparison); superseded in part by section 275** (the 7 nodes are weak suspects; job 3708456 cancelled before it ran). Design in section 273.
 > - **Job:** 64 nodes, 4.2 minutes (2026-11-11 06:28–06:32), about 4.5 SUs; balance 1,825 SUs. The probe ran, and the job stopped before the gate, as designed.
 > - **Data:** `~/charades-data/f1/l64/b_j3704609` (the probe's CSV and log); node lists of the five recent jobs in `~/charades-data/f1/l64/nodes.txt`.
 
@@ -1723,7 +1724,61 @@ No log, stats, trace or digest flag appears in any command.
   - Not shown: whether one of these 7 is at fault (as c455-081 was, and is excluded from every job), or the fabric at large changed after 2026-11-09. PD16 at 16 nodes on 2026-11-09 ran at its usual rate, and nothing has run at 16 nodes since.
 - **Predictions (section 273):** L64b-1 wrong (the probe at 0.52 of P64, ±5% predicted). L64b-2 and L64-1 to L64-7 not tested.
 - **Next** (user decision): exclude the 7 nodes and run L64b again with its probe; report the stalls to TACC; wait; or stop.
-- **User decision 2026-11-11:** run L64b again, unchanged (same script, checked by checksum), with the 7 nodes excluded as well as c455-081: job 3708456 (skx, `-x c455-081,c483-111,c494-023,c501-071,c503-[084,094,102],c504-104`). Results in section 275.
+- **User decision 2026-11-11:** run L64b again, unchanged (same script, checked by checksum), with the 7 nodes excluded as well as c455-081: job 3708456 (skx, `-x c455-081,c483-111,c494-023,c501-071,c503-[084,094,102],c504-104`). Cancelled before it ran: section 275 adds a network record to the same job.
+
+### §275 · Can the job name a bad node? L64b again with a network record between runs (job L64b design addendum, 2026-11-11; written before any runs)
+
+> **Status: design (results in 276).** Corrects section 274's node list in part.
+> - **Job:** section 273's L64b script plus a network record between runs; the runs, their order and their flags unchanged; the 7 nodes of section 274 and c455-081 still excluded (user decision in section 274).
+> - **Files:** `~/charades-data/f1/l64/l64b.slurm` (the version before this change is `l64b_pre275.slurm`); analysis `net_276.py`, written before the run; stub run in `stub_c/`; the fabric manager's ports at 11:03 in `pa_focus_*.txt`.
+
+**Why the 7 nodes are weak suspects.**
+- About 1,060 skx nodes were in service on 2026-11-11 (`sinfo`: 1,050 allocated, 6 idle, the rest drained or down).
+- Two 64-node jobs placed at random share 64 × 64 / 1,060 ≈ 3.9 nodes on average, and 7 or more about 1 time in 10.
+- The slow jobs also shared nodes with normal ones: L64b had 5 of P64's nodes, and L64 had 2 of A64's.
+- So a full-speed rerun without the 7 would not show they were at fault, and a slow one would not say which node was. The job has to record where packets were lost.
+
+**What loses a packet on Stampede3's Omni-Path network, and which counter shows it.** A pause of about 0.2 s fits PSM2's 160 ms resend timer (section 274), which runs only when a packet vanishes entirely.
+
+| where the packet is lost | counter | who can read it |
+|---|---|---|
+| The receiving card finds the input queue of the destination process's receive context full (the process did not poll in time) and drops the whole packet | `RcvHdrOvr<N>` (N = receive context), per node | any user, in sysfs |
+| Dropped on the way out of the sending card | `PktDrop`, `XmitDscd`, `TxDropped`, `port_xmit_discards`, per node | any user, in sysfs |
+| Dropped by a switch after waiting too long at the head of a queue (congestion) | the switch port's discard counters | the fabric manager only |
+| Corrupted on a cable: the link resends most such packets itself; the rest are dropped | resends `DcRxReplay`, `DcTxReplay`; dropped or failed `port_rcv_errors`, `link_error_recovery`, `local_link_integrity_errors`; the fabric manager's integrity ranking | any user (node side), the fabric manager (both sides) |
+
+A packet whose payload finds the eager buffer full still delivers its header, so PSM2 can ask for it again at once. That should not cause a 160 ms wait. `DRIVER_EgrBufFull` is recorded anyway.
+
+**The fabric manager answers users** (read-only queries with `opapaquery` from the login node, 2026-11-11 about 11:00; the same tool can also clear counters, which we never do).
+- It reads every port every 120 s: 11,819 ports (10,271 on 341 switches, 1,548 on nodes).
+- It keeps the last 10 readings (20 minutes), so it cannot show the slow jobs of 2026-11-10 and 2026-11-11.
+- After each reading it clears the 32- and 8-bit error counters (`Clr32bitErrCntrs`, `Clr8bitErrCntrs` on). A node's own reading of those counters can therefore fall between two records; `net_276.py` reports that as "cleared".
+- The fabric at 10:59 and 11:03:
+  - No congestion: the worst port scored 89,619 against a threshold of 500,000,000, and discards were 0.0%.
+  - 3 links were over the integrity threshold of 100. At 10:59: s454-U to core3 (600), s460-L to core2 (120), and s506-L to core2 (120). At 11:03: c486-001's own cable (1,265), s454-U to core3 (600), and s460-L to core2 (120).
+  - c486-001 was drained for a reboot and was in none of our jobs.
+
+**The record** (between runs only, never alongside one):
+- **When:** at the start, after the probe, after the gate, after the warm-up, and after each rep. The record after the probe comes before the stop test, so a stopped job still records its probe.
+- **Every node** (one task per node): link state from `opainfo` (width, speed, downgrade, quality) and every nonzero counter in sysfs (`ports/1/counters`, `hw_counters`, `ports/1/hw_counters`).
+- **The fabric manager** (from the first node): for each 2-minute reading since the last record, up to its 10, the summary of all ports and the 40 ports with the most link errors and the most congestion.
+- **Cost:** 0.02 s per node to read the counters, 0.02 s per query, plus srun's start-up for 9 record steps. Under a minute in all, under 1 SU.
+- **Stub run** (login node, fake srun):
+  - The srun commands are L64b's, line for line, plus the 9 record steps.
+  - The job's output is identical apart from the stub directory's size.
+  - The login node stood in for the nodes: 133 nonzero values per record, and `net_276.py` parsed all 40 ports of each ranking.
+
+**Predictions** (written before the run; L64-1 to L64-7 and L64b-1, L64b-2 carry over):
+- **NC-1:** if the probe runs below 900 M ev/s, the record after it shows lost packets, at least as many as the probe's 0.2 s stalls. The lost packets show as per-node drop counters or as switch discards in the fabric manager's readings.
+- **NC-2:** those losses are receive-queue overflows (`RcvHdrOvr`) on 3 nodes or fewer, not switch discards or link errors (none of those near our racks at 11:00).
+- **NC-3:** in a probe or rep at normal speed (control at 0.90 of 998.9 or above), every node's lost-packet counters stay at 0.
+
+**What each outcome means:**
+- **Slow, losses on a few nodes:** exclude those nodes and report them to TACC; the spare-node job (ask for 66 nodes, swap out a node that loses packets) becomes worth building.
+- **Slow, losses spread over many nodes or in switches:** a fabric-wide problem; report it to TACC; no choice of nodes helps.
+- **Slow, no losses anywhere:** the stalls have another cause, and section 274's reading is wrong.
+- **Normal speed:** section 271's decision rule applies to the comparison.
+- **User decision 2026-11-11:** make the read-only query and add the record.
 
 ## Earlier
 
