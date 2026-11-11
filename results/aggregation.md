@@ -1778,7 +1778,7 @@ A packet whose payload finds the eager buffer full still delivers its header, so
 - **Slow, losses spread over many nodes or in switches:** a fabric-wide problem; report it to TACC; no choice of nodes helps.
 - **Slow, no losses anywhere:** the stalls have another cause, and section 274's reading is wrong.
 - **Normal speed:** section 271's decision rule applies to the comparison.
-- **User decision 2026-11-11:** make the read-only query and add the record.
+- **User decision 2026-11-11:** make the read-only query and add the record. Job 3708456 was cancelled before it ran, and the new script was submitted as job 3708796 (skx, 64 nodes, the same exclusions). Results in section 276.
 
 ## Earlier
 
