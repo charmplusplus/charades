@@ -44,6 +44,7 @@ Message cost, htram's modes and buffers, the deadline flush policy, choosing htr
 | 271 | 2026-11-09 | design (results in 272) | Does padded local 1 keep its lead over WPs 512 on uniform at 64 nodes? |
 | 272 | 2026-11-10 | current (inconclusive) | L64 results: the machine ran at half speed, so the 64-node comparison is not usable; local 1 led WPs 512 in… |
 | 273 | 2026-11-10 | design (results in 274) | L64 again, with P64's own binary as a control in every rep and a probe that stops the job on a slow machine |
+| 274 | 2026-11-11 | current (stopped by its probe) | L64b results: the probe stopped the job (P64's own binary at 0.52 of its P64 rate); both slow 64-node jobs… |
 | 3 | 2026-10-20 | historical | Per-message cost and scaling |
 | 4 | 2026-10-20 | superseded | Aggregation through htram |
 | 5 | 2026-10-20 | historical | Deadline flush policy |
@@ -1691,6 +1692,37 @@ No log, stats, trace or digest flag appears in any command.
 - **L64b-2. No code effect on WPs:** `charades-pplpad`'s WPs 512 at W 400 ÷ the control, paired by rep, has a median of 0.97–1.03.
 
 **After the result:** as in section 271. A control below 0.95 of P64 marks the run as on a slow machine, as L64's was. Then no ratio from it counts, and the next step goes to the user.
+
+### §274 · L64b results: the probe stopped the job (P64's own binary at 0.52 of its P64 rate); both slow 64-node jobs show 0.2 s stalls consistent with PSM2 retransmitting lost packets (2026-11-11; skx batch job 3704609, 64 nodes)
+
+> **Status: current (stopped by its probe; no comparison).** Design in section 273.
+> - **Job:** 64 nodes, 4.2 minutes (2026-11-11 06:28–06:32), about 4.5 SUs; balance 1,825 SUs. The probe ran, and the job stopped before the gate, as designed.
+> - **Data:** `~/charades-data/f1/l64/b_j3704609` (the probe's CSV and log); node lists of the five recent jobs in `~/charades-data/f1/l64/nodes.txt`.
+
+**The probe** (P64's tree and binary, `charades-r5`; WPs 512 at W 400, uniform, 64 nodes; its command identical to P64's apart from the nodes):
+
+| run | execution time (s) | rate (M committed ev/s) | count waves per GVT round | late stragglers | events rolled back | efficiency (%) |
+|---|---|---|---|---|---|---|
+| P64, rep 1 (2026-11-08) | 11.51 | 1,006.0 | 1.00 | 661,831 | 5,206,605 | 99.96 |
+| L64b probe (2026-11-11) | 22.27 | 520.1 | 3.13 | 3,017,574 | 31,046,181 | 99.73 |
+
+- **The same binary, half as fast.**
+  - It loads the same libraries: Charades' runtime libraries date from 2026-11-03, and PSM2, libfabric and the C library from September or earlier.
+  - L64's WPs 512 (section 272) ran at the same 0.49–0.50.
+- **Where the time goes:** the run prints a line every 64 GVT rounds with the elapsed time.
+  - In P64's run no gap between lines exceeds 0.12 s.
+  - In the probe, 45 gaps take about 0.2 s each (median 0.198 s), 8.98 of its 22.27 s. Without them it takes 13.29 s, 1.15 × P64's 11.51 s.
+  - L64's first WPs run has 18 such gaps (3.70 s).
+- **A reading consistent with these numbers** (not tested):
+  - PSM2 resends a packet it gets no acknowledgement for after its error-check timeout. That timeout is 160 ms at least, doubling up to 640 ms (`PSM2_ERRCHK_TIMEOUT` default `160:640:2`, from the library).
+  - A stall of about 0.2 s every so often, more count waves per GVT round, and more late stragglers are what lost packets would do here.
+  - A packet can be lost on a faulty link, or at a receiving node that falls behind and overflows its receive queues. The data do not separate the two.
+- **Nodes:**
+  - 7 nodes were in both slow jobs and in none of the three normal ones (P64, A64, PD16): c483-111, c494-023, c501-071, c503-084, c503-094, c503-102, c504-104.
+  - Racks are not the pattern: P64 and A64 also used 4–5 nodes in c503.
+  - Not shown: whether one of these 7 is at fault (c455-081 was such a node, section 75 era), or the fabric at large changed after 2026-11-09. PD16 at 16 nodes on 2026-11-09 ran at its usual rate, and nothing has run at 16 nodes since.
+- **Predictions (section 273):** L64b-1 wrong (the probe at 0.52 of P64, ±5% predicted). L64b-2 and L64-1 to L64-7 not tested.
+- **Next** (user decision): exclude the 7 nodes and run L64b again with its probe; report the stalls to TACC; wait; or stop.
 
 ## Earlier
 
