@@ -1723,6 +1723,7 @@ No log, stats, trace or digest flag appears in any command.
   - Not shown: whether one of these 7 is at fault (as c455-081 was, and is excluded from every job), or the fabric at large changed after 2026-11-09. PD16 at 16 nodes on 2026-11-09 ran at its usual rate, and nothing has run at 16 nodes since.
 - **Predictions (section 273):** L64b-1 wrong (the probe at 0.52 of P64, ±5% predicted). L64b-2 and L64-1 to L64-7 not tested.
 - **Next** (user decision): exclude the 7 nodes and run L64b again with its probe; report the stalls to TACC; wait; or stop.
+- **User decision 2026-11-11:** run L64b again, unchanged (same script, checked by checksum), with the 7 nodes excluded as well as c455-081: job 3708456 (skx, `-x c455-081,c483-111,c494-023,c501-071,c503-[084,094,102],c504-104`). Results in section 275.
 
 ## Earlier
 
