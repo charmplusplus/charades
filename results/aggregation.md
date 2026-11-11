@@ -1720,7 +1720,7 @@ No log, stats, trace or digest flag appears in any command.
 - **Nodes:**
   - 7 nodes were in both slow jobs and in none of the three normal ones (P64, A64, PD16): c483-111, c494-023, c501-071, c503-084, c503-094, c503-102, c504-104.
   - Racks are not the pattern: P64 and A64 also used 4–5 nodes in c503.
-  - Not shown: whether one of these 7 is at fault (c455-081 was such a node, section 75 era), or the fabric at large changed after 2026-11-09. PD16 at 16 nodes on 2026-11-09 ran at its usual rate, and nothing has run at 16 nodes since.
+  - Not shown: whether one of these 7 is at fault (as c455-081 was, and is excluded from every job), or the fabric at large changed after 2026-11-09. PD16 at 16 nodes on 2026-11-09 ran at its usual rate, and nothing has run at 16 nodes since.
 - **Predictions (section 273):** L64b-1 wrong (the probe at 0.52 of P64, ±5% predicted). L64b-2 and L64-1 to L64-7 not tested.
 - **Next** (user decision): exclude the 7 nodes and run L64b again with its probe; report the stalls to TACC; wait; or stop.
 
