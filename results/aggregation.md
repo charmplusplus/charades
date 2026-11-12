@@ -48,8 +48,9 @@ Message cost, htram's modes and buffers, the deadline flush policy, choosing htr
 | 275 | 2026-11-11 | design (results in 276) | Can the job name a bad node? L64b again with a network record between runs |
 | 276 | 2026-11-11 | current | L64b results: at normal speed, padded local 1 runs at 1.52× WPs 512 on uniform at 64 nodes (1.49× under the… |
 | 277 | 2026-11-12 | design (results in 278 and later) | Padded local 1 as a candidate setting for uniform in the tables, 1–64 nodes |
-| 278 | 2026-11-12 | current (1–16 nodes) | UL results, 1–16 nodes: padded local 1 is 1.17× the table's setting on uniform at 16 nodes, but 0.61–0.80 o… |
-| 279 | 2026-11-12 | design (results later) | Why local 1 loses at 1 node: a profile, and fewer copies into the shared buffer |
+| 278 | 2026-11-12 | current (1–16 nodes); superseded in part by 280 | UL results, 1–16 nodes: padded local 1 is 1.17× the table's setting on uniform at 16 nodes, but 0.61–0.80 o… |
+| 279 | 2026-11-12 | design (results in 280) | Why local 1 loses at 1 node: a profile, and fewer copies into the shared buffer |
+| 280 | 2026-11-12 | current | PF1 results: at 1 node, local 1 loses its time in the copy into the shared buffer, almost all of it on two… |
 | 3 | 2026-10-20 | historical | Per-message cost and scaling |
 | 4 | 2026-10-20 | superseded | Aggregation through htram |
 | 5 | 2026-10-20 | historical | Deadline flush policy |
@@ -1911,7 +1912,7 @@ PE time per event through htram = PEs × execution time ÷ events sent through h
 
 ### §278 · UL results, 1–16 nodes: padded local 1 is 1.17× the table's setting on uniform at 16 nodes, but 0.61–0.80 of it at 1–8 (2026-11-12; skx-dev batch job 3711818, 16 nodes)
 
-> **Status: current (1–16 nodes; 32 and 64 nodes pending, in a later section).** Design in section 277. The 1-node profile asked for after this section: section 279.
+> **Status: current (1–16 nodes; 32 and 64 nodes pending, in a later section); superseded in part by section 280** (the 1-node loss: contention on the shared buffer's counters). Design in section 277. The 1-node profile asked for after this section: sections 279 and 280.
 > - **Job:** the skx-dev copy, 3711818, started first and cancelled its skx twin, 3711817. It ran 16 nodes for 7.5 minutes (2026-11-12 05:52–06:00), about 2 SUs. Probe: the reference binary's WPs 512 at W 400 on 16 nodes ran at 395.3 M ev/s, against F1's 383.3. Gate 66 of 66. All 60 timing runs `ok`; none dropped.
 > - **Data:** `~/charades-data/f1/ul277/small_j3711818`; analysis `ul_278.py` (written before the runs; output `ul_278_small_summary.txt`).
 
@@ -1963,7 +1964,7 @@ PE time per event through htram = PEs × execution time ÷ events sent through h
 
 ### §279 · Why local 1 loses at 1 node: a profile, and fewer copies into the shared buffer (job PF1 design, 2026-11-12; written before any runs)
 
-> **Status: design (results in a later section).** User decision 2026-11-12, after section 278: profile local 1 at 1 node.
+> **Status: design (results in section 280).** User decision 2026-11-12, after section 278: profile local 1 at 1 node.
 > - **Job:** 1 node, skx-dev with a twin on skx; tree `charades-r6` (main 9f7480a, htram `pdes` 978e065), gated in job 3711818; no network, so no probe. About 10 minutes, under 0.2 SU.
 > - **Files:** `~/charades-data/f1/pf279/pf279.slurm`; stub run `stub_cmds.txt`; per-arm flags `flag_table.txt`.
 
@@ -2001,6 +2002,98 @@ PE time per event through htram = PEs × execution time ÷ events sent through h
 - **If H holds:** the paper says local 1 pays per-event atomics on a shared buffer, a cost spread out only when there are many destination processes, and uniform uses local 1 from 16 nodes. Batching (local 4) may serve every scale; that would be a separate decision.
 - **If H fails:** the reason is still open, and the profile says where to look next.
 - **Submitted 2026-11-12:** 3712467 (skx) and its twin 3712468 (skx-dev); the copy that starts first cancels the other. Output `$WORK/charades-runs/pf279/j<id>`, log `pf279_<id>.out`.
+
+### §280 · PF1 results: at 1 node, local 1 loses its time in the copy into the shared buffer, almost all of it on two atomic instructions; local 4 recovers most of it but sends as many messages as local 16 (2026-11-12; skx-dev job 3712468, 1 node)
+
+> **Status: current.** Design and predictions in section 279.
+> - **Job:** the skx-dev copy, 3712468, started first and cancelled its skx twin, 3712467. It ran 1 node (c454-083) for 6.8 minutes (2026-11-12 12:46–12:53). The warm-up, all 25 timing runs and all 4 profile runs finished `ok`, every one with count waves.
+> - **Data:** `~/charades-data/f1/pf279/j3712468`; the `perf.data` files stay on Stampede3 in `$WORK/charades-runs/pf279/j3712468/perf`. Analysis `pf_prof.py`, written before the runs, with one fix after them (below); output `pf_279_summary.txt`.
+
+**Rates** (uniform, fixed W 300, 1 node, 2 × 23 PEs; medians of 5 reps):
+
+| setting | rate (M committed ev/s) | ÷ PP 512, paired median (higher is better for the setting) | per-rep ratios | rep spread (fastest ÷ slowest) | events per htram message | GVT rounds per second |
+|---|---|---|---|---|---|---|
+| WPs 512 | 45.5 | 0.989 | 0.983 / 0.989 / 1.006 / 1.002 / 0.962 | 1.06 | 82.5 | 7,751 |
+| PP 512 (local 16, packed counters) | 46.1 | 1 | – | 1.06 | 131.2 | 7,812 |
+| PP 512 pad 1 | 46.2 | 1.003 | 1.003 / 1.011 / 1.012 / 1.002 / 1.000 | 1.06 | 131.2 | 7,824 |
+| local 4 pad 1 | 42.0 | 0.921 | 0.921 / 0.903 / 0.921 / 0.921 / 0.901 | 1.07 | 130.1 | 7,095 |
+| local 1 pad 1 | 34.0 | 0.742 | 0.740 / 0.745 / 0.735 / 0.742 / 0.754 | 1.04 | 276.5 | 5,781 |
+
+- **Counts:** one, 180,941,384 committed events in every run, equal to F1's. Efficiency is at least 99.98% in every run, so no setting loses time to rollback.
+- **Local 1 repeats section 278's loss:** 0.742 of PP 512 here, against 0.759 of WPs 512 there.
+- Every setting does the same work in about the same number of GVT rounds (30,574–30,813 per run); the slower settings complete fewer rounds per second.
+
+**Where the time goes.** One profile run per setting: `perf` cycles:u in task 0 (one process, 23 PEs). Each group's share of the samples times the setting's PE time per committed event (46 PEs ÷ the rate above) gives µs of PE time per committed event (lower is better):
+
+| group | WPs 512 | PP 512 | local 4 pad 1 | local 1 pad 1 | local 1 − PP 512 |
+|---|---|---|---|---|---|
+| htram send path | 0.023 | 0.044 | 0.088 | 0.390 | +0.346 |
+| … of which the copy into the shared buffer | – | 0.014 | 0.052 | 0.359 | +0.345 |
+| htram receive | 0.050 | 0.044 | 0.040 | 0.037 | −0.007 |
+| scheduler and polling | 0.032 | 0.033 | 0.042 | 0.033 | 0.000 |
+| LCI / PSM2 progress | 0.012 | 0.010 | 0.020 | 0.014 | +0.004 |
+| engine and model | 0.600 | 0.619 | 0.627 | 0.611 | −0.008 |
+| locks | 0.019 | 0.016 | 0.022 | 0.021 | +0.004 |
+| memory | 0.041 | 0.015 | 0.013 | 0.010 | −0.005 |
+| other | 0.117 | 0.108 | 0.120 | 0.100 | −0.008 |
+| symbols below 0.2% each | 0.117 | 0.107 | 0.124 | 0.135 | +0.028 |
+| **total** | 1.010 | 0.997 | 1.095 | 1.351 | **+0.354** |
+
+- The copy is `copyToNodeBuf` at local 16 (16 events at a time) and `copyLocalToNodeBuf` below 16. WPs has no shared buffer.
+- **Checks on the profiles:** the profile runs (end 8,192,000) ran at 0.97–0.99 of the rates above, with one count, 723,844,217. Their sample counts (674,000–923,000) are 6–8% more than 23 PEs × 1,999 Hz give over each run's measured time after the 2.5 s delay (a process also runs before and after the measured part). So the PEs are in user code almost all the time, spinning included, and cycles:u sees nearly all of it.
+- **Closure:** 0.346 µs of local 1's extra 0.354 µs per committed event (97.6%) is in htram's send path, and 0.345 µs of that is the copy itself. No other group moves by more than 0.03 µs.
+
+**On which instructions** (`perf annotate` of `copyLocalToNodeBuf`; share of that function's samples; a sample usually lands on the instruction after the one that stalled):
+
+| the samples follow | what it does | local 1 pad 1 | local 4 pad 1 |
+|---|---|---|---|
+| `lock add` on `done_count[d]` | marks this PE's copied events as written | 40.2% | 40.5% |
+| `lock cmpxchg` on `get_idx[d]` | reserves the slots | 38.6% | 25.2% |
+| the plain load of `get_idx[d]` before it | reads the next free slot; misses, because another PE wrote the line last | 17.2% | 18.8% |
+| `lock cmpxchg` on `min_key[d]` | lowers the buffer's earliest timestamp, when needed | 0.7% | 2.7% |
+| everything else, including writing the event into its slot | | 3.3% | 12.8% |
+
+- At local 1, 96.0% of the copy's samples are on the two shared counters, `get_idx` and `done_count`. Pad 1 puts each on a line of its own, so every copy takes two contended lines from whichever PEs wrote them last.
+- **The cost per copy rises with the copy rate.** Local 1 copies once per event: 0.36 µs per copy. Local 4 copies about once per 4 events: 0.052 × 4 ≈ 0.21 µs per copy. A fixed cost per atomic would make those equal. With contention, each atomic waits for the line to pass through the PEs ahead of it, so the cost grows with the rate, as measured.
+- **The rate.** Charades sends through htram with scope all, so a process's own process is also a destination: at 1 node each process has 2 destination processes, the other one and its own. At local 1 each process copies about 17 M events per second, so each destination's counters take about 8.5 M copies per second from 23 PEs, one every 120 ns.
+
+**Predictions (section 279):**
+- **Right:**
+  - PF-1: one count, equal to F1's; WPs 512 at 45.5 M ev/s, 0.971 of F1's 46.9 (within ±5%).
+  - PF-2: local 1 pad 1 ÷ PP 512 is 0.742, in 0.68–0.80.
+  - PF-3: PP 512 pad 1 ÷ PP 512 is 1.003, in 0.97–1.03.
+  - PF-4: local 4 pad 1 ÷ PP 512 is 0.921, at least 0.90. From the medians it is 0.911; the lowest rep is 0.901.
+  - PF-5: 97.6% of the extra time is in htram's send path, against at least 70%, and the annotation puts it on the atomics on the shared counters.
+- **Fixed in the analysis after the run:** `pf_prof.py` filed local 16's copy function, `copyToNodeBuf`, under "other", and first gave the closure as 101.6%. It now counts that function in the send path; nothing else changed.
+
+**Hypothesis H holds at 1 node.** Local 1's loss there is contention on the shared buffer's two counters:
+- each event makes one reservation and one add;
+- every PE of the process makes them on the same two lines;
+- those two counters take 96% of the copy's 0.36 µs.
+
+The perturbation agrees: local 4 makes a quarter of the copies and cuts the copy's cost 6.9× (0.359 → 0.052 µs per committed event).
+
+**Not explained by this job:**
+- **Local 4's own loss** (0.098 µs per committed event against PP 512): 0.044 µs is the send path. The other 0.054 µs is spread over every group, none above 0.017 µs.
+- **2 nodes, the worst point in section 278** (0.61; +0.94 µs per event sent to another process) is not profiled. Contention alone would predict a smaller loss there than at 1 node: each destination's counters take about 3.1 M copies per second (4 destination processes), against 8.6 M at 1 node. So something else adds to it.
+
+**Local 4 does not keep local 1's message savings.** Section 279 said local 4 might serve every scale. As built, it does not: its messages carry 130.1 events, the same as local 16's 131.2, against local 1's 276.5. The code (`flushDue` and `shipSharedWithLocalPP` in htram) says why:
+- At a GVT update with local below 16, each PE checks each destination. If its own leftover events or the shared buffer hold a due event, it reserves the rest of the shared buffer, adds its own leftovers, and sends that as a message.
+- At local 4, most PEs hold 1–3 leftovers toward each destination, so most PEs send a message of their own at each update. Local 16 does the same: each PE sends its partly filled local buffer.
+- At local 1 no PE holds leftovers. A PE sends only if due events reached the shared buffer since the last send, and the first PE to flush usually takes them all.
+- Section 267's Mac measurement showed the same: 16.5 events per message at local 4, against 15.1 at local 16 and 21.9 at local 1.
+
+**Corrections to sections 278 and 279:**
+- Both say a process has one destination process at 1 node (and 31 at 16 nodes, 127 at 64). Under scope all it has 2, 32 and 128.
+- Section 278's insertion rates per destination (8.6 M events/s at 1 node, 0.4 M at 16) already used 2 and 32. No conclusion changes.
+
+**What it decides:**
+- **For the paper, the reason uniform's setting depends on scale:**
+  - Local 1 makes one reservation and one add per event, on counters shared by a process's 23 PEs.
+  - At 1 node (2 destination processes) those counters take about 8.5 M copies per second each. The copies cost 0.36 µs of PE time per event, and local 1 runs at 0.74 of PP 512.
+  - At 16 nodes (32 destinations) the same copies spread over 16× as many counters. Local 1 then wins on message count: 1.17× the table's setting at 16 nodes (section 278) and 1.52× WPs 512 at 64 (section 276).
+  - Section 277's rule already gives this: 1–8 nodes keep F1's settings. No table changes here.
+- **One setting for every scale would need a design change in htram.** For example, at a GVT update each PE copies its leftovers into the shared buffer, and the last of the process's PEs to flush sends it. That would keep local 16's few copies and send one message per destination per update. It is not written or measured, and it needs a GVT-liveness argument (the update reaches a process's PEs at different times).
 
 ## Earlier
 
