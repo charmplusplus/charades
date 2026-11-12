@@ -47,6 +47,7 @@ Message cost, htram's modes and buffers, the deadline flush policy, choosing htr
 | 274 | 2026-11-11 | current (stopped by its probe); superseded in part by 275 | L64b results: the probe stopped the job (P64's own binary at 0.52 of its P64 rate); both slow 64-node jobs… |
 | 275 | 2026-11-11 | design (results in 276) | Can the job name a bad node? L64b again with a network record between runs |
 | 276 | 2026-11-11 | current | L64b results: at normal speed, padded local 1 runs at 1.52× WPs 512 on uniform at 64 nodes (1.49× under the… |
+| 277 | 2026-11-12 | design (results in 278) | Padded local 1 as a candidate setting for uniform in the tables, 1–64 nodes |
 | 3 | 2026-10-20 | historical | Per-message cost and scaling |
 | 4 | 2026-10-20 | superseded | Aggregation through htram |
 | 5 | 2026-10-20 | historical | Deadline flush policy |
@@ -1844,6 +1845,60 @@ PE time per event through htram = PEs × execution time ÷ events sent through h
 **Section 271's decision rule:** local 1 ÷ WPs 512 is at least 1.10 under both arms (1.49 and 1.52), so the user decides how it enters the paper:
 - (a) a paragraph or figure on uniform at scale, with the tables kept on F1's settings;
 - (b) uniform's setting in the tables, which needs the `pp-pad` branches merged (engine tier) and uniform rerun at 1–64 nodes.
+
+### §277 · Padded local 1 as a candidate setting for uniform in the tables, 1–64 nodes (job UL design, 2026-11-12; written before any runs)
+
+> **Status: design (results in 278).** User decision 2026-11-12, after section 276: padded local 1 becomes one of uniform's htram settings in the tables, which take Charades' controller at the better setting per node count.
+> - **Code:** Charades `main` 9f7480a merges `pp-pad` (`--agg-pp-local`, `--agg-pp-pad`); htram `pdes` fast-forwarded to 978e065. Both settings default to the old behaviour, so existing configurations run unchanged. The Mac tests are in section 278.
+> - **Trees on Stampede3:** `charades-r6` (main 9f7480a) with `htram-r6` (978e065), built serially; its option strings match `charades-pplpad`'s binary. Reference: `charades-r5` (85a2aad), F1's and P64's binary.
+> - **Files:** `~/charades-data/f1/ul277/ul277.slurm`; stub runs `stub_cmds_{small,n32,n64}.txt`; per-arm flags `flag_table.txt`.
+
+**Jobs** (Charades only; Devastator and ROSS keep F1's, R8's and P64's numbers):
+
+| job | nodes | partition | node counts | reps |
+|---|---|---|---|---|
+| UL small | 16 | skx-dev, with a twin on skx | 8, 4, 2 and 1 side by side on nodes 1–15 (the batch host idle, section 261), then 16 | 3 |
+| UL 32 | 32 | skx | 32 | 5 |
+| UL 64 | 64 | skx | 64 | 5 |
+
+- **Workload and launch:** uniform PHOLD on F1's settings (end time 2,048,000, bucket 8, margin 8, 128 LPs per PE, 2 × 23 PEs per node, `+lci_ndevices 23`, `numactl --localalloc`, `+mempool_remote_free`). Same exclusions as section 275 (c455-081 and the 7 nodes).
+- **New setting** (`charades-r6`): PP 512 with `--agg-pp-local=1 --agg-pp-pad=1`, under the controller and at F1's fixed W (300 and 400; at 64 nodes P64's 400 and 500).
+- **Reference** (`charades-r5`): the table's setting at that node count, under the controller only: WPs 512 at 1 node, PP 512 at 2, 4 and 8, WPs 512 at 16, 32 and 64. Its commands are F1's, R8's and P64's apart from the nodes and the output paths (checked against R8's and P64's stub commands).
+- **Order:** in even reps the two settings, and the new setting's arms, run in reverse order.
+- **Probe** (as L64b): before the gate, the reference binary runs WPs 512 at W 400 at the job's largest node count. The job stops below 0.90 of F1's median there (16 nodes 383.3, 32 nodes 639.5 M ev/s; 64 nodes P64's 998.9).
+- **Gate** (as L64b): the PP and local 1 test configurations on 2 nodes, with packed and padded counters.
+- **Network record** (section 275): sysfs counters on every node, between runs only; no fabric-manager queries, which fail on compute nodes (section 276).
+- **Cost:** about 23 SUs (UL small 4, UL 32 6, UL 64 13).
+
+**The table's values that would change**, from F1 (jobs 3689513 and 3688916), R8 (3695259) and P64 (3696079); M committed ev/s, controller medians:
+
+| nodes | 1 | 2 | 4 | 8 | 16 | 32 | 64 |
+|---|---|---|---|---|---|---|---|
+| table's setting | WPs 512 | PP 512 | PP 512 | PP 512 | WPs 512 | WPs 512 | WPs 512 |
+| rate (M ev/s) | 45.9 | 79.3 | 151.9 | 229.0 | 384.5 | 627.8 | 980.0 |
+| events per htram message | 74.8 | 104.6 | 101.9 | 36.7 | 12.6 | 8.3 | 5.6 |
+| committed events | 180,941,384 | 361,891,305 | 723,815,947 | 1,447,683,514 | 2,895,361,579 | 5,790,767,104 | 11,581,457,663 |
+
+**Estimate** (section 267's 9.8 µs per message; local 1's own extra per event sent to another process: 0.48 µs over WPs, at both 16 and 64 nodes, and 0.09 µs over PP, at 16 nodes; local 1's events per message fitted to 105.5 at 16 nodes and 37.0 at 64, about 512 at 1–4 nodes). Local 1 ÷ the table's setting comes out at 0.97, 0.99, 0.98, 1.08, 1.11, 1.29 and 1.51 at 1, 2, 4, 8, 16, 32 and 64 nodes. At 1–4 nodes the table's settings already send 75–105 events per message, so there is little left to save.
+
+**Predictions** (written before any runs):
+- **UL-1. Counts:** one count per node count over every run, equal to F1's (table above).
+- **UL-2. The reference repeats F1:** within ±5% of the table's rate at every node count.
+- **UL-3. Local 1 ÷ the reference** (controller, median of the per-rep ratios):
+
+| nodes | 1 | 2 | 4 | 8 | 16 | 32 | 64 |
+|---|---|---|---|---|---|---|---|
+| predicted range | 0.90–1.02 | 0.93–1.05 | 0.93–1.05 | 0.98–1.15 | 1.03–1.20 | 1.20–1.40 | 1.40–1.60 |
+
+- **UL-4. Local 1's messages:** 80–130 events per message at 16 nodes, 45–80 at 32 and 33–42 at 64.
+- **UL-5. The controller:** 0.93–1.03 of local 1's better fixed W at every node count.
+- **UL-6. Quality:** efficiency at least 99.8% in every run; local 1's rep spread (fastest ÷ slowest) at most 1.10 under the controller.
+
+**How results enter the tables** (decided before the runs):
+- **Uniform's cell** at each node count is Charades' controller at the better setting, as now. Local 1's controller median replaces F1's value where it is higher, and the old value stays where it is not. Devastator and ROSS keep F1's, R8's and P64's numbers, so the ratios become cross-job; the table's caption says so.
+- **Where the reference misses UL-2** (more than ±5% from F1), that node count's local 1 number is not used: that node count is rerun, not scaled.
+- **The uniform row of the bundling table** (htram ÷ direct sends) takes local 1 where it wins, as a cross-job ratio, marked as such.
+- **Not changed:** σ 4,000 and every Gaussian workload keep their settings (local 1 ran at 0.84 of PP 512 on σ 4,000 at 16 nodes, section 270).
 
 ## Earlier
 
