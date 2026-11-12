@@ -96,6 +96,8 @@ unsigned g_tw_agg_pp_limit;
 unsigned g_tw_map_rotate;
 unsigned g_tw_agg_flush_order;
 unsigned g_tw_agg_pp_alloc;
+unsigned g_tw_agg_pp_local;
+unsigned g_tw_agg_pp_pad;
 unsigned g_tw_agg_input_buffer_mode;
 unsigned g_tw_agg_auto_wps;
 unsigned g_tw_ctl;
@@ -223,6 +225,8 @@ void clear_globals() {
   g_tw_map_rotate         = 0;
   g_tw_agg_flush_order    = 0;
   g_tw_agg_pp_alloc       = 1;
+  g_tw_agg_pp_local       = 16;
+  g_tw_agg_pp_pad         = 0;
   g_tw_agg_input_buffer_mode     = 2;
   g_tw_ctl                = 0;
   g_tw_ctl_period         = 8;

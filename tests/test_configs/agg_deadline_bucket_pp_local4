@@ -1,0 +1,12 @@
+# agg_deadline_bucket_pp with four-event PP local buffers (--agg-pp-local=4)
+# and 64-event shared buffers, so due flushes add a PE's partial local
+# buffer to a partly filled shared buffer
+sync=3
+gvt=4
+buffer-size=655360
+optimism-window=2000
+aggregation=1
+agg-mode=2
+agg-buffer=64
+agg-policy=1
+agg-pp-local=4

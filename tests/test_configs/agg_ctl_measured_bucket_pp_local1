@@ -1,0 +1,11 @@
+# agg_ctl_measured_bucket_pp with one-event PP local buffers (--agg-pp-local=1)
+sync=3
+gvt=4
+buffer-size=655360
+optimism-window=2000
+aggregation=1
+agg-mode=2
+agg-buffer=16
+agg-policy=1
+ctl=3
+agg-pp-local=1

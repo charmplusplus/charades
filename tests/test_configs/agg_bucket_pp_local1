@@ -1,0 +1,8 @@
+# agg_bucket_pp (eager policy) with one-event PP local buffers (--agg-pp-local=1)
+sync=3
+gvt=4
+buffer-size=655360
+aggregation=1
+agg-mode=2
+agg-buffer=16
+agg-pp-local=1

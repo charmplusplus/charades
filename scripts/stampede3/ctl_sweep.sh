@@ -64,7 +64,9 @@
 #   BUCKETS="8" (bucketed GVT bucket sizes), MARGINS="8" (deadline policy:
 #     --agg-horizon-margin values, the horizon being W + margin),
 #   AGG="pp:512" (htram mode:buffer with the deadline policy, so the horizon
-#     follows the window; "off" sends directly), AGG_POLICY=1 (--agg-policy:
+#     follows the window; "off" sends directly; a third field l<N> adds
+#     --agg-pp-local=N, e.g. "pp:512:l1", and a fourth p<N> --agg-pp-pad=N,
+#     e.g. "pp:512:l1:p2" or "pp:512::p2"), AGG_POLICY=1 (--agg-policy:
 #     1 deadline, 0 eager), TREE=charades-exp (production
 #     runtime with the psm2 LCI patch),
 #   XPORT=psm2 with LCI_ATTR_PACKET_SIZE=65536 (env.sh; XPORT=verbs for the old
@@ -137,8 +139,12 @@ run_one() {  # nodes procs pes cfg arm label
   fi
   extra+=(--gvt-bucket-size=$bucket)
   if [ "$AGG" != off ]; then
-    extra+=(--aggregation=1 --agg-mode=$(mode_num ${AGG%%:*}) --agg-buffer=${AGG##*:}
+    local amode abuf alocal apad
+    IFS=: read -r amode abuf alocal apad <<< "$AGG"
+    extra+=(--aggregation=1 --agg-mode=$(mode_num $amode) --agg-buffer=$abuf
             --agg-policy=$AGG_POLICY --agg-horizon-margin=$margin)
+    [ -n "$alocal" ] && extra+=(--agg-pp-local=${alocal#l})
+    [ -n "$apad" ] && extra+=(--agg-pp-pad=${apad#p})
   fi
   extra+=(${EXTRA_ARGS:-})
   srun --mpi=pmi2 --kill-on-bad-exit=1 --wait=30 -N $N -n $n -c ${CPT:-$((pe / n))} ${SRUN_ARGS:-} -J cs_$label \

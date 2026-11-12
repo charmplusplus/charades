@@ -27,6 +27,12 @@
 class RemoteEvent;
 class Statistics;
 
+/**
+ * Every process, after the arguments are parsed and before any group exists:
+ * htram settings read when its node groups are constructed (--agg-pp-pad)
+ */
+void agg_configure();
+
 /** PE 0: create htram and the per-PE aggregators, then invoke done */
 void agg_create(CkCallback done);
 
