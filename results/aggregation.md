@@ -47,7 +47,8 @@ Message cost, htram's modes and buffers, the deadline flush policy, choosing htr
 | 274 | 2026-11-11 | current (stopped by its probe); superseded in part by 275 | L64b results: the probe stopped the job (P64's own binary at 0.52 of its P64 rate); both slow 64-node jobs… |
 | 275 | 2026-11-11 | design (results in 276) | Can the job name a bad node? L64b again with a network record between runs |
 | 276 | 2026-11-11 | current | L64b results: at normal speed, padded local 1 runs at 1.52× WPs 512 on uniform at 64 nodes (1.49× under the… |
-| 277 | 2026-11-12 | design (results in 278) | Padded local 1 as a candidate setting for uniform in the tables, 1–64 nodes |
+| 277 | 2026-11-12 | design (results in 278 and 279) | Padded local 1 as a candidate setting for uniform in the tables, 1–64 nodes |
+| 278 | 2026-11-12 | current (1–16 nodes) | UL results, 1–16 nodes: padded local 1 is 1.17× the table's setting on uniform at 16 nodes, but 0.61–0.80 o… |
 | 3 | 2026-10-20 | historical | Per-message cost and scaling |
 | 4 | 2026-10-20 | superseded | Aggregation through htram |
 | 5 | 2026-10-20 | historical | Deadline flush policy |
@@ -1848,7 +1849,7 @@ PE time per event through htram = PEs × execution time ÷ events sent through h
 
 ### §277 · Padded local 1 as a candidate setting for uniform in the tables, 1–64 nodes (job UL design, 2026-11-12; written before any runs)
 
-> **Status: design (results in 278).** User decision 2026-11-12, after section 276: padded local 1 becomes one of uniform's htram settings in the tables, which take Charades' controller at the better setting per node count.
+> **Status: design (results in 278 and 279).** User decision 2026-11-12, after section 276: padded local 1 becomes one of uniform's htram settings in the tables, which take Charades' controller at the better setting per node count.
 > - **Code:** Charades `main` 9f7480a merges `pp-pad` (`--agg-pp-local`, `--agg-pp-pad`); htram `pdes` fast-forwarded to 978e065. Both settings default to the old behaviour, so existing configurations run unchanged.
 > - **Mac tests on the merge** (2026-11-12):
 >   - **Engine tier** with the five local-buffer configs named: 4,637 of 4,668 passed, and the five named configs passed every run, including their 20 repeats at the multi-PE shapes. The 31 that did not pass are the known ones from section 267, and none runs the merged code:
@@ -1905,7 +1906,59 @@ PE time per event through htram = PEs × execution time ÷ events sent through h
 - **Where the reference misses UL-2** (more than ±5% from F1), that node count's local 1 number is not used: that node count is rerun, not scaled.
 - **The uniform row of the bundling table** (htram ÷ direct sends) takes local 1 where it wins, as a cross-job ratio, marked as such.
 - **Not changed:** σ 4,000 and every Gaussian workload keep their settings (local 1 ran at 0.84 of PP 512 on σ 4,000 at 16 nodes, section 270).
-- **Submitted 2026-11-12** (after the Mac tests passed and both branches were pushed): UL small 3711817 (skx) with its twin 3711818 (skx-dev; the copy that starts first cancels the other), UL 32 3711819 (skx), UL 64 3711820 (skx). Output `$WORK/charades-runs/ul277/<group>_j<id>`, logs `ul277_<id>.out`. Results in section 278.
+- **Submitted 2026-11-12** (after the Mac tests passed and both branches were pushed): UL small 3711817 (skx) with its twin 3711818 (skx-dev; the copy that starts first cancels the other), UL 32 3711819 (skx), UL 64 3711820 (skx). Output `$WORK/charades-runs/ul277/<group>_j<id>`, logs `ul277_<id>.out`. Results: 1–16 nodes in section 278, 32 and 64 nodes in 279.
+
+### §278 · UL results, 1–16 nodes: padded local 1 is 1.17× the table's setting on uniform at 16 nodes, but 0.61–0.80 of it at 1–8 (2026-11-12; skx-dev batch job 3711818, 16 nodes)
+
+> **Status: current (1–16 nodes; 32 and 64 nodes pending, results in 279).** Design in section 277.
+> - **Job:** the skx-dev copy, 3711818, started first and cancelled its skx twin, 3711817. It ran 16 nodes for 7.5 minutes (2026-11-12 05:52–06:00), about 2 SUs. Probe: the reference binary's WPs 512 at W 400 on 16 nodes ran at 395.3 M ev/s, against F1's 383.3. Gate 66 of 66. All 60 timing runs `ok`; none dropped.
+> - **Data:** `~/charades-data/f1/ul277/small_j3711818`; analysis `ul_278.py` (written before the runs; output `ul_278_small_summary.txt`).
+
+**Rates** (uniform, controller arms, medians of 3 reps; reference = the table's setting on F1's binary, `charades-r5`):
+
+| nodes | reference setting | reference (M ev/s) | reference ÷ F1's table value | local 1 pad 1 (M ev/s) | local 1 ÷ reference, paired median (higher is better for local 1) | per-rep ratios | local 1 rep spread (fastest ÷ slowest) | events per htram message, reference / local 1 |
+|---|---|---|---|---|---|---|---|---|
+| 1 | WPs 512 | 45.5 | 0.992 | 34.5 | 0.759 | 0.751 / 0.759 / 0.760 | 1.01 | 74.5 / 227.8 |
+| 2 | PP 512 | 81.8 | 1.032 | 50.2 | 0.610 | 0.610 / 0.626 / 0.520 | 1.18 | 104.5 / 327.0 |
+| 4 | PP 512 | 153.2 | 1.009 | 117.5 | 0.774 | 0.718 / 0.820 / 0.774 | 1.16 | 99.5 / 300.7 |
+| 8 | PP 512 | 232.1 | 1.014 | 185.8 | 0.800 | 0.685 / 0.800 / 0.896 | 1.29 | 36.6 / 188.4 |
+| 16 | WPs 512 | 386.1 | 1.004 | 450.5 | 1.172 | 1.172 / 1.177 / 1.167 | 1.02 | 12.6 / 104.7 |
+
+- **Counts:** one per node count, equal to F1's.
+- **Machine speed:** the reference is 0.992–1.032 of F1's table values, so the cross-job comparison holds.
+- **Local 1's fixed W** (M ev/s, W 300 / W 400): 34.4 / 27.2 at 1 node, 41.3 / 43.5 at 2, 109.7 / 92.7 at 4, 199.9 / 173.8 at 8, 463.5 / 415.0 at 16. The fixed-W arms at 2 nodes vary a lot between reps (spread 1.18 and 1.47).
+
+**Where local 1 loses at 1–8 nodes** (controller arms, medians):
+
+| nodes | GVT rounds per second, reference / local 1 | messages sent urgent, reference / local 1 (share) | messages sent at a GVT update, reference / local 1 (share) | extra PE time per event sent to another process, local 1 − reference (µs) |
+|---|---|---|---|---|
+| 1 | 8,079 / 6,181 | 0.16 / 0.36 | 0.84 / 0.11 | +0.64 |
+| 2 | 7,158 / 4,471 | 0.12 / 0.25 | 0.16 / 0.20 | +0.94 |
+| 4 | 6,479 / 5,228 | 0.08 / 0.16 | 0.71 / 0.78 | +0.42 |
+| 8 | 4,974 / 4,100 | 0.01 / 0.06 | 0.96 / 0.93 | +0.42 |
+| 16 | 3,752 / 4,669 | 0.01 / 0.07 | 0.99 / 0.93 | −0.28 |
+
+- Both settings complete the same number of GVT rounds (28,000–32,300); local 1 takes longer for each. Efficiency is 99.85–99.95% in both, so the time is not spent rolling back. Where it goes is not measured: the blocked-time fields need a diagnostic these timing runs do not carry.
+- Local 1's messages are 2–5× larger than the reference's at 1–8 nodes, so message count is not the cost.
+- **Not explained.** One reading fits the trend, untested: at 1–8 nodes a process has only 1–15 destination processes, so its 23 PEs insert into the same few shared buffers and contend for the same counters (section 270 found same-destination atomics at about 12% of cycles at 16 nodes, with 31 destinations). The insertion rate into one destination's buffer falls from about 8.6 M events/s at 1 node to 0.4 M at 16. The extra time does not fall evenly with that rate (2 nodes is the worst), so this reading is incomplete at best.
+
+**Predictions (section 277):**
+- **Right:**
+  - UL-1: the counts.
+  - UL-2: reference within ±5% of F1 at every node count.
+  - UL-3 at 16 nodes: 1.17, in 1.03–1.20.
+  - UL-4 at 16 nodes: 104.7 events per message, in 80–130.
+  - UL-5 at 1 and 16 nodes: 1.00 and 0.97 of local 1's better fixed W.
+- **Wrong:**
+  - **UL-3 at 1–8 nodes:** 0.61–0.80, against 0.90–1.15. The estimate applied local 1's extra cost over PP measured at 16 nodes (0.09 µs per event) to 1–8 nodes; the measured extra over the reference there is 0.42–0.94 µs.
+  - **UL-5 at 2, 4 and 8 nodes:** 1.155, 1.071 and 0.929, against 0.93–1.03. The fixed-W arms vary a lot between reps there.
+  - **UL-6 in part:** one arm's lowest efficiency is 99.76% (1 node, W 400), against at least 99.8%; local 1's controller spread is 1.16–1.29 at 2–8 nodes, against at most 1.10. At 1 and 16 nodes it is 1.01–1.02.
+
+**Section 277's rule applied:**
+- **Uniform's 16-node cell becomes local 1's 450.5 M ev/s.** Charades ÷ Devastator rises from 2.01 to 2.36 and Charades ÷ ROSS from 4.23 to 4.96, both cross-job (Devastator and ROSS from F1).
+- **The 1–8-node cells keep F1's values** (WPs 512 at 1 node, PP 512 at 2–8).
+- **The front page's tables change once the 32- and 64-node jobs report** (section 279). Changing the 16-node cell alone would move the 16→32 per-node column.
+- **For the paper:** uniform's htram setting then depends on scale: local 1 from 16 nodes, the old settings below. The paper needs the rule and its reason; the reason is open (above).
 
 ## Earlier
 
