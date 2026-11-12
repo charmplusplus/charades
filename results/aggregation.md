@@ -47,8 +47,9 @@ Message cost, htram's modes and buffers, the deadline flush policy, choosing htr
 | 274 | 2026-11-11 | current (stopped by its probe); superseded in part by 275 | L64b results: the probe stopped the job (P64's own binary at 0.52 of its P64 rate); both slow 64-node jobs… |
 | 275 | 2026-11-11 | design (results in 276) | Can the job name a bad node? L64b again with a network record between runs |
 | 276 | 2026-11-11 | current | L64b results: at normal speed, padded local 1 runs at 1.52× WPs 512 on uniform at 64 nodes (1.49× under the… |
-| 277 | 2026-11-12 | design (results in 278 and 279) | Padded local 1 as a candidate setting for uniform in the tables, 1–64 nodes |
+| 277 | 2026-11-12 | design (results in 278 and later) | Padded local 1 as a candidate setting for uniform in the tables, 1–64 nodes |
 | 278 | 2026-11-12 | current (1–16 nodes) | UL results, 1–16 nodes: padded local 1 is 1.17× the table's setting on uniform at 16 nodes, but 0.61–0.80 o… |
+| 279 | 2026-11-12 | design (results later) | Why local 1 loses at 1 node: a profile, and fewer copies into the shared buffer |
 | 3 | 2026-10-20 | historical | Per-message cost and scaling |
 | 4 | 2026-10-20 | superseded | Aggregation through htram |
 | 5 | 2026-10-20 | historical | Deadline flush policy |
@@ -1849,7 +1850,7 @@ PE time per event through htram = PEs × execution time ÷ events sent through h
 
 ### §277 · Padded local 1 as a candidate setting for uniform in the tables, 1–64 nodes (job UL design, 2026-11-12; written before any runs)
 
-> **Status: design (results in 278 and 279).** User decision 2026-11-12, after section 276: padded local 1 becomes one of uniform's htram settings in the tables, which take Charades' controller at the better setting per node count.
+> **Status: design (results: 1–16 nodes in 278; 32 and 64 nodes in a later section, listed in INDEX).** User decision 2026-11-12, after section 276: padded local 1 becomes one of uniform's htram settings in the tables, which take Charades' controller at the better setting per node count.
 > - **Code:** Charades `main` 9f7480a merges `pp-pad` (`--agg-pp-local`, `--agg-pp-pad`); htram `pdes` fast-forwarded to 978e065. Both settings default to the old behaviour, so existing configurations run unchanged.
 > - **Mac tests on the merge** (2026-11-12):
 >   - **Engine tier** with the five local-buffer configs named: 4,637 of 4,668 passed, and the five named configs passed every run, including their 20 repeats at the multi-PE shapes. The 31 that did not pass are the known ones from section 267, and none runs the merged code:
@@ -1906,11 +1907,11 @@ PE time per event through htram = PEs × execution time ÷ events sent through h
 - **Where the reference misses UL-2** (more than ±5% from F1), that node count's local 1 number is not used: that node count is rerun, not scaled.
 - **The uniform row of the bundling table** (htram ÷ direct sends) takes local 1 where it wins, as a cross-job ratio, marked as such.
 - **Not changed:** σ 4,000 and every Gaussian workload keep their settings (local 1 ran at 0.84 of PP 512 on σ 4,000 at 16 nodes, section 270).
-- **Submitted 2026-11-12** (after the Mac tests passed and both branches were pushed): UL small 3711817 (skx) with its twin 3711818 (skx-dev; the copy that starts first cancels the other), UL 32 3711819 (skx), UL 64 3711820 (skx). Output `$WORK/charades-runs/ul277/<group>_j<id>`, logs `ul277_<id>.out`. Results: 1–16 nodes in section 278, 32 and 64 nodes in 279.
+- **Submitted 2026-11-12** (after the Mac tests passed and both branches were pushed): UL small 3711817 (skx) with its twin 3711818 (skx-dev; the copy that starts first cancels the other), UL 32 3711819 (skx), UL 64 3711820 (skx). Output `$WORK/charades-runs/ul277/<group>_j<id>`, logs `ul277_<id>.out`. Results: 1–16 nodes in section 278; 32 and 64 nodes in a later section (section 279 went to the 1-node profile).
 
 ### §278 · UL results, 1–16 nodes: padded local 1 is 1.17× the table's setting on uniform at 16 nodes, but 0.61–0.80 of it at 1–8 (2026-11-12; skx-dev batch job 3711818, 16 nodes)
 
-> **Status: current (1–16 nodes; 32 and 64 nodes pending, results in 279).** Design in section 277.
+> **Status: current (1–16 nodes; 32 and 64 nodes pending, in a later section).** Design in section 277. The 1-node profile asked for after this section: section 279.
 > - **Job:** the skx-dev copy, 3711818, started first and cancelled its skx twin, 3711817. It ran 16 nodes for 7.5 minutes (2026-11-12 05:52–06:00), about 2 SUs. Probe: the reference binary's WPs 512 at W 400 on 16 nodes ran at 395.3 M ev/s, against F1's 383.3. Gate 66 of 66. All 60 timing runs `ok`; none dropped.
 > - **Data:** `~/charades-data/f1/ul277/small_j3711818`; analysis `ul_278.py` (written before the runs; output `ul_278_small_summary.txt`).
 
@@ -1957,8 +1958,48 @@ PE time per event through htram = PEs × execution time ÷ events sent through h
 **Section 277's rule applied:**
 - **Uniform's 16-node cell becomes local 1's 450.5 M ev/s.** Charades ÷ Devastator rises from 2.01 to 2.36 and Charades ÷ ROSS from 4.23 to 4.96, both cross-job (Devastator and ROSS from F1).
 - **The 1–8-node cells keep F1's values** (WPs 512 at 1 node, PP 512 at 2–8).
-- **The front page's tables change once the 32- and 64-node jobs report** (section 279). Changing the 16-node cell alone would move the 16→32 per-node column.
+- **The front page's tables change once the 32- and 64-node jobs report** (a later section). Changing the 16-node cell alone would move the 16→32 per-node column.
 - **For the paper:** uniform's htram setting then depends on scale: local 1 from 16 nodes, the old settings below. The paper needs the rule and its reason; the reason is open (above).
+
+### §279 · Why local 1 loses at 1 node: a profile, and fewer copies into the shared buffer (job PF1 design, 2026-11-12; written before any runs)
+
+> **Status: design (results in a later section).** User decision 2026-11-12, after section 278: profile local 1 at 1 node.
+> - **Job:** 1 node, skx-dev with a twin on skx; tree `charades-r6` (main 9f7480a, htram `pdes` 978e065), gated in job 3711818; no network, so no probe. About 10 minutes, under 0.2 SU.
+> - **Files:** `~/charades-data/f1/pf279/pf279.slurm`; stub run `stub_cmds.txt`; per-arm flags `flag_table.txt`.
+
+**The question.** At 1 node local 1 runs at 0.76 of WPs 512 and about 0.73 of PP 512 (section 278). Both settings complete the same GVT rounds, but local 1 takes about 0.32 µs more per committed event. Is that time spent working (in htram's send path) or waiting?
+
+**How local 1 sends now** (PP, `--agg-pp-local=1`):
+- **Where:** each process holds one shared buffer per destination process, plus that buffer's counters (reservation index, done count, limit, minimum key).
+- **Insert:** a PE sending an event to another process copies it straight into that destination's shared buffer. It reserves a slot with a compare-and-swap on the reservation index, copies the event, then adds 1 to the done count. At the default local size of 16, a PE gathers 16 events in its own buffer first and copies them with one reservation.
+- **At 1 node:** each process has one destination, so all 23 of its PEs make these atomic updates on the same few counters, for every event. At 16 nodes they spread over 31 destinations; at 64 over 127.
+
+**Hypothesis (H):** the extra time is contention on those counters. Every event's reservation and done-count update moves the counters' cache line between cores, and with one destination all 23 PEs share that line.
+
+**Runs** (1 node, uniform, F1's PHOLD settings, 2 × 23 PEs, fixed W 300, the better fixed W at 1 node for local 1 and WPs in section 278):
+- **Part A, timing** (end 2,048,000, 5 reps, settings reversed in even reps, no diagnostics):
+
+| setting | flags | why |
+|---|---|---|
+| WPs 512 | `--agg-mode=0` | F1's 1-node setting |
+| PP 512 | `--agg-mode=2` (local 16, packed counters) | F1's 2–8-node setting |
+| PP 512 pad 1 | `--agg-pp-pad=1` | padding alone |
+| local 4 pad 1 | `--agg-pp-local=4 --agg-pp-pad=1` | a quarter of local 1's reservations per event |
+| local 1 pad 1 | `--agg-pp-local=1 --agg-pp-pad=1` | the new setting |
+
+- **Part B, profiles** (check runs after part A, end 8,192,000): one run each of WPs 512, PP 512, local 4 pad 1 and local 1 pad 1, under `perf record -e cycles:u -F 1999` in task 0 (one process, 23 PEs) from 2.5 s after launch. Reports by symbol and by library, and annotations of htram's send path (`copyLocalToNodeBuf`, `insert`, `insertValue`, `shipSharedWithLocalPP`, `shipSharedPP`, `flushDue`, `flushOrder`).
+- **Stub run:** 30 srun commands (1 warm-up, 25 timing, 4 profiles); each setting adds only its own flags, and only the profile runs go through the perf wrapper.
+
+**Predictions** (written before any runs):
+- **PF-1. Checks:** one count, 180,941,384, in every timing run; WPs 512 at W 300 within ±5% of F1's 46.9 M ev/s.
+- **PF-2. The loss repeats:** local 1 pad 1 ÷ PP 512 is 0.68–0.80.
+- **PF-3. Padding alone does nothing here:** PP 512 pad 1 ÷ PP 512 is 0.97–1.03 (one destination, so the counters cannot share a line with another destination's).
+- **PF-4. The perturbation (H):** local 4 pad 1 ÷ PP 512 is at least 0.90, because it makes a quarter of local 1's reservations per event. At 0.80 or below, the cost does not follow the number of reservations, and H is wrong.
+- **PF-5. Closure (H):** at least 70% of local 1's extra time per committed event over PP 512 is in htram's send path (the functions above). The annotation puts those cycles on the atomic instructions on the shared counters. If the extra time is instead in the scheduler loop, LCI progress or the receive path, H is wrong: the PEs are waiting, not working.
+
+**What it decides:**
+- **If H holds:** the paper says local 1 pays per-event atomics on a shared buffer, a cost spread out only when there are many destination processes, and uniform uses local 1 from 16 nodes. Batching (local 4) may serve every scale; that would be a separate decision.
+- **If H fails:** the reason is still open, and the profile says where to look next.
 
 ## Earlier
 
