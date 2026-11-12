@@ -2000,6 +2000,7 @@ PE time per event through htram = PEs × execution time ÷ events sent through h
 **What it decides:**
 - **If H holds:** the paper says local 1 pays per-event atomics on a shared buffer, a cost spread out only when there are many destination processes, and uniform uses local 1 from 16 nodes. Batching (local 4) may serve every scale; that would be a separate decision.
 - **If H fails:** the reason is still open, and the profile says where to look next.
+- **Submitted 2026-11-12:** 3712467 (skx) and its twin 3712468 (skx-dev); the copy that starts first cancels the other. Output `$WORK/charades-runs/pf279/j<id>`, log `pf279_<id>.out`.
 
 ## Earlier
 
