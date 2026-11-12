@@ -42,10 +42,11 @@ Message cost, htram's modes and buffers, the deadline flush policy, choosing htr
 | 269 | 2026-11-09 | design (results in 270) | Where local 1's extra time goes: a profile, and PP's shared counters one destination per cache line |
 | 270 | 2026-11-09 | current | PD16 results: with each destination's counters on their own cache line, local 1 runs at 1.41× its packed ra… |
 | 271 | 2026-11-09 | design (results in 272) | Does padded local 1 keep its lead over WPs 512 on uniform at 64 nodes? |
-| 272 | 2026-11-10 | current (inconclusive) | L64 results: the machine ran at half speed, so the 64-node comparison is not usable; local 1 led WPs 512 in… |
+| 272 | 2026-11-10 | current (inconclusive); superseded in part by 276 | L64 results: the machine ran at half speed, so the 64-node comparison is not usable; local 1 led WPs 512 in… |
 | 273 | 2026-11-10 | design (results in 274) | L64 again, with P64's own binary as a control in every rep and a probe that stops the job on a slow machine |
 | 274 | 2026-11-11 | current (stopped by its probe); superseded in part by 275 | L64b results: the probe stopped the job (P64's own binary at 0.52 of its P64 rate); both slow 64-node jobs… |
 | 275 | 2026-11-11 | design (results in 276) | Can the job name a bad node? L64b again with a network record between runs |
+| 276 | 2026-11-11 | current | L64b results: at normal speed, padded local 1 runs at 1.52× WPs 512 on uniform at 64 nodes (1.49× under the… |
 | 3 | 2026-10-20 | historical | Per-message cost and scaling |
 | 4 | 2026-10-20 | superseded | Aggregation through htram |
 | 5 | 2026-10-20 | historical | Deadline flush policy |
@@ -1620,7 +1621,7 @@ No log, stats, trace or digest flag appears in any command.
 
 ### §272 · L64 results: the machine ran at half speed, so the 64-node comparison is not usable; local 1 led WPs 512 in all 10 paired reps (1.05–1.43) (2026-11-10; skx batch job 3700829, 64 nodes)
 
-> **Status: current (inconclusive).** Design and predictions in section 271.
+> **Status: current (inconclusive); superseded in part by section 276** (the comparison at normal speed). Design and predictions in section 271.
 > - **Job:** 64 nodes, 13.5 minutes (2026-11-10 11:14–11:27), about 14 SUs. Gate 36/36 and 30/30 (pad 1); the warm-up and all 20 timing runs finished `ok`, every one with count waves, and every local-1 run's log names pad 1.
 > - **Start-up:** Slurm could not enter the job's `/work2` directory at start (`Input/output error`, it ran from `/tmp`). The script uses absolute paths, and every run read its configuration (count waves present).
 > - **Data:** `~/charades-data/f1/l64/j3700829` (digests and per-round GVT files not copied). `~/charades-data/f1/l64/l64_272.py` writes `l64_272_summary.txt`.
@@ -1779,6 +1780,70 @@ A packet whose payload finds the eager buffer full still delivers its header, so
 - **Slow, no losses anywhere:** the stalls have another cause, and section 274's reading is wrong.
 - **Normal speed:** section 271's decision rule applies to the comparison.
 - **User decision 2026-11-11:** make the read-only query and add the record. Job 3708456 was cancelled before it ran, and the new script was submitted as job 3708796 (skx, 64 nodes, the same exclusions). Results in section 276.
+
+### §276 · L64b results: at normal speed, padded local 1 runs at 1.52× WPs 512 on uniform at 64 nodes (1.49× under the controller), and no node lost a packet (2026-11-11; skx batch job 3708796, 64 nodes)
+
+> **Status: current.** Designs in sections 271, 273 and 275.
+> - **Job:** 64 nodes, 11.9 minutes (2026-11-11 22:44–22:56), about 12.6 SUs; balance 1,809 SUs. The probe passed; the gate passed 66 of 66 (36 PHOLD, 30 with pad 1); the warm-up ran; all 25 timing runs were `ok`, and none was dropped for missing count waves. Nodes excluded as in section 275.
+> - **Data:** `~/charades-data/f1/l64/b_j3708796`; analysis `l64_276.py` (output `l64_276_summary.txt`) and `net_276.py` (output `net_276_summary.txt`).
+
+**Rates** (uniform, 64 nodes, 2,944 PEs; medians of 5 reps; P64 = job 3696079, 2026-11-08):
+
+| setting | arm | rate (M committed ev/s) | rep spread (fastest ÷ slowest) | events per htram message | PE time per committed event (µs) | efficiency (%) | P64 rate (M ev/s) | this ÷ P64 |
+|---|---|---|---|---|---|---|---|---|
+| probe (P64's binary, WPs 512) | W 400 | 990.2 | one run | 5.6 | 2.973 | 99.95 | 998.9 | 0.991 |
+| control (P64's binary, WPs 512) | W 400 | 1,006.6 | 1.06 | 5.6 | 2.925 | 99.95 | 998.9 | 1.008 |
+| WPs 512 | controller | 982.4 | 1.05 | 5.5 | 2.997 | 99.93 | 980.0 | 1.002 |
+| WPs 512 | W 400 | 1,001.3 | 1.03 | 5.6 | 2.940 | 99.95 | 998.9 | 1.002 |
+| local 1 pad 1 | controller | 1,467.8 | 1.04 | 35.6 | 2.006 | 99.97 | – | – |
+| local 1 pad 1 | W 400 | 1,522.3 | 1.03 | 37.0 | 1.934 | 99.99 | – | – |
+
+PE time per committed event is 2,944 PEs ÷ the rate. Efficiency is committed ÷ executed events. All 26 runs committed the same count as P64 (11,581,457,663).
+
+**Ratios** (higher is better for the first named):
+- **local 1 pad 1 ÷ WPs 512:** 1.520 at W 400 and 1.494 under the controller. Paired by rep (runs minutes apart), every one of the 10 pairs is 1.457–1.540; medians 1.525 (W 400) and 1.496 (controller).
+- **controller ÷ W 400:** 0.981 for WPs 512, 0.964 for local 1 pad 1.
+- **The machine ran at P64's speed:** the control is 1.008 of P64's median and the probe 0.991. `charades-pplpad`'s WPs 512 ÷ the control, paired by rep, is 0.973–1.048 (median 1.004), so the `pp-pad` code does not change WPs.
+- **Bundling** (across jobs, ÷ P64's best direct sends, 540.6 M ev/s): local 1's better arm is 2.82×, against WPs' 1.85× (P64's 1.85).
+- **Across engines** (across jobs, three days apart, against P64's other engines on the same workload: Devastator at its best W 489.3 M ev/s, ROSS 295.2):
+  - Charades ÷ Devastator is 3.00 under the controller and 3.11 at W 400, against P64's 2.00 (controller) and 2.01 (best fixed W).
+  - Charades ÷ ROSS is 4.97 and 5.16, against 3.32 and 3.87.
+
+**Why the lead grew from 1.10 at 16 nodes to 1.52 at 64.** Section 267's cost of 9.8 µs per message accounts for both settings' change from PD16 (section 270) to this job:
+
+| setting | events per htram message, 16 → 64 nodes | messages per event through htram, 16 → 64 nodes | PE time per event through htram (µs), 16 → 64 nodes | change (µs) | 9.8 µs × change in messages per event (µs) |
+|---|---|---|---|---|---|
+| WPs 512 | 12.6 → 5.6 | 0.0792 → 0.1775 | 1.958 → 2.964 | +1.006 | +0.96 |
+| local 1 pad 1 | 105.5 → 37.0 | 0.0095 → 0.0271 | 1.776 → 1.950 | +0.174 | +0.17 |
+
+PE time per event through htram = PEs × execution time ÷ events sent through htram (W 400 at 64 nodes, W 400 at 16 nodes).
+- With 4× the destination processes, each of WPs' per-PE buffers gets 4× fewer events per GVT update, so its messages shrink. Local 1 shares one buffer per destination process among a process's 23 PEs, so its messages start 8× larger and stay 6.6× larger.
+- Local 1's own cost per event (the copy into the shared buffer and the shared counters) did not grow with the 4× destinations. Its per-event time rose by just what its extra messages cost.
+
+**Network record** (section 275):
+- **No packet was lost in any segment.** In every segment the change in each node's drop counters (receive-queue overflows `RcvHdrOvr`, `PktDrop`, `XmitDscd`, `TxDropped`, port discards and receive errors) is 0. So are the link counters (`DcRxReplay`, `DcTxReplay`, `link_error_recovery`, `local_link_integrity_errors`). The probe covers 48 nodes; the gate, warm-up and every rep cover all 64.
+- **The first record missed 16 nodes.** The job's first srun step did not start on them within its 120 s limit; 48 nodes reported within 8 s. The probe's step launched normally 2.5 minutes later, and every later record reached all 64. The first version of `net_276.py` counted a missing earlier record as zero, so it showed those 16 nodes' totals since reset as losses during the probe. Fixed: a node needs both records.
+- **Users can't reach the fabric manager from compute nodes.** Every `opapaquery` there failed ("No hfi names found"), and `opainfo` printed nothing; the sysfs counters read on all 64 nodes. To query it for a future slow job, query from a login node within 20 minutes of the slow segment.
+- **Earlier totals:** at their first record, 44 of the 64 nodes carried nonzero receive-queue overflow totals from before this job (median about 50,000; the largest, c489-072, 1.57 billion). These cannot be tied to any job.
+- **Cost:** the first record's 2.5 minutes (about 2.7 SUs); every later record took a few seconds.
+
+**Predictions:**
+- **Right:**
+  - L64-1: one count, P64's.
+  - L64-2: WPs within ±5% of P64; 5.5–5.6 events per message.
+  - L64-4: 1.52, in 1.15–1.55.
+  - L64-5: the controller's ratio 1.494, within 0.05 of 1.520; controller ÷ W 400 0.96–0.98.
+  - L64-6: lowest efficiency 99.93%; local 1's spread 1.03–1.04.
+  - L64-7: bundling 2.82, in 2.1–2.9.
+  - L64b-1: control 1.008, probe 0.991.
+  - L64b-2: median 1.004.
+  - NC-3: no lost packets at normal speed.
+- **Wrong in part:** L64-3. 35.6–37.0 events per message, against 40–70 predicted; the 92–97% of messages sent at a GVT update was right (85% or more predicted).
+- **Not tested:** NC-1 and NC-2, since the probe ran at normal speed. Section 274's slow jobs remain unexplained, and this job cannot say whether the 7 excluded nodes were at fault.
+
+**Section 271's decision rule:** local 1 ÷ WPs 512 is at least 1.10 under both arms (1.49 and 1.52), so the user decides how it enters the paper:
+- (a) a paragraph or figure on uniform at scale, with the tables kept on F1's settings;
+- (b) uniform's setting in the tables, which needs the `pp-pad` branches merged (engine tier) and uniform rerun at 1–64 nodes.
 
 ## Earlier
 
