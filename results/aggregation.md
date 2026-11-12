@@ -1849,7 +1849,13 @@ PE time per event through htram = PEs × execution time ÷ events sent through h
 ### §277 · Padded local 1 as a candidate setting for uniform in the tables, 1–64 nodes (job UL design, 2026-11-12; written before any runs)
 
 > **Status: design (results in 278).** User decision 2026-11-12, after section 276: padded local 1 becomes one of uniform's htram settings in the tables, which take Charades' controller at the better setting per node count.
-> - **Code:** Charades `main` 9f7480a merges `pp-pad` (`--agg-pp-local`, `--agg-pp-pad`); htram `pdes` fast-forwarded to 978e065. Both settings default to the old behaviour, so existing configurations run unchanged. The Mac tests are in section 278.
+> - **Code:** Charades `main` 9f7480a merges `pp-pad` (`--agg-pp-local`, `--agg-pp-pad`); htram `pdes` fast-forwarded to 978e065. Both settings default to the old behaviour, so existing configurations run unchanged.
+> - **Mac tests on the merge** (2026-11-12):
+>   - **Engine tier** with the five local-buffer configs named: 4,637 of 4,668 passed, and the five named configs passed every run, including their 20 repeats at the multi-PE shapes. The 31 that did not pass are the known ones from section 267, and none runs the merged code:
+>     - 27 VLSI conservative lookahead aborts;
+>     - the intermittent `--sched-park` hang in VLSI `agg_ctl_park_bucket_pp`, twice this time (2 × 2 on `file`, and 1 × 4 on `base`, a shape where it had not been seen). PP there runs at the default local size and packed counters, so on the old code; the paper's runs do not use `--sched-park`;
+>     - dragonfly `gentime` with `bucket_hold_early` and `bucket_hold_pads19` at 2 × 2, the hold hang recorded in applications.md, which has no aggregation.
+>   - **Change tier with `--agg-pp-pad=1`, then with `--agg-pp-pad=2`,** on the nine PP configs (deadline, controller, eager and blocking, and the five local-buffer configs): 297 of 297 each.
 > - **Trees on Stampede3:** `charades-r6` (main 9f7480a) with `htram-r6` (978e065), built serially; its option strings match `charades-pplpad`'s binary. Reference: `charades-r5` (85a2aad), F1's and P64's binary.
 > - **Files:** `~/charades-data/f1/ul277/ul277.slurm`; stub runs `stub_cmds_{small,n32,n64}.txt`; per-arm flags `flag_table.txt`.
 
