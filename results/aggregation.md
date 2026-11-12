@@ -1905,6 +1905,7 @@ PE time per event through htram = PEs × execution time ÷ events sent through h
 - **Where the reference misses UL-2** (more than ±5% from F1), that node count's local 1 number is not used: that node count is rerun, not scaled.
 - **The uniform row of the bundling table** (htram ÷ direct sends) takes local 1 where it wins, as a cross-job ratio, marked as such.
 - **Not changed:** σ 4,000 and every Gaussian workload keep their settings (local 1 ran at 0.84 of PP 512 on σ 4,000 at 16 nodes, section 270).
+- **Submitted 2026-11-12** (after the Mac tests passed and both branches were pushed): UL small 3711817 (skx) with its twin 3711818 (skx-dev; the copy that starts first cancels the other), UL 32 3711819 (skx), UL 64 3711820 (skx). Output `$WORK/charades-runs/ul277/<group>_j<id>`, logs `ul277_<id>.out`. Results in section 278.
 
 ## Earlier
 
