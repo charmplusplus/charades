@@ -51,6 +51,7 @@ Message cost, htram's modes and buffers, the deadline flush policy, choosing htr
 | 278 | 2026-11-12 | current (1–16 nodes); superseded in part by 280 | UL results, 1–16 nodes: padded local 1 is 1.17× the table's setting on uniform at 16 nodes, but 0.61–0.80 o… |
 | 279 | 2026-11-12 | design (results in 280) | Why local 1 loses at 1 node: a profile, and fewer copies into the shared buffer |
 | 280 | 2026-11-12 | current | PF1 results: at 1 node, local 1 loses its time in the copy into the shared buffer, almost all of it on two… |
+| 281 | 2026-11-12 | current | Charades' htram setting in each paper cell, 1–64 nodes |
 | 3 | 2026-10-20 | historical | Per-message cost and scaling |
 | 4 | 2026-10-20 | superseded | Aggregation through htram |
 | 5 | 2026-10-20 | historical | Deadline flush policy |
@@ -2094,6 +2095,54 @@ The perturbation agrees: local 4 makes a quarter of the copies and cuts the copy
   - At 16 nodes (32 destinations) the same copies spread over 16× as many counters. Local 1 then wins on message count: 1.17× the table's setting at 16 nodes (section 278) and 1.52× WPs 512 at 64 (section 276).
   - Section 277's rule already gives this: 1–8 nodes keep F1's settings. No table changes here.
 - **One setting for every scale would need a design change in htram.** For example, at a GVT update each PE copies its leftovers into the shared buffer, and the last of the process's PEs to flush sends it. That would keep local 16's few copies and send one message per destination per update. It is not written or measured, and it needs a GVT-liveness argument (the update reaches a process's PEs at different times).
+
+### §281 · Charades' htram setting in each paper cell, 1–64 nodes (2026-11-12; no new job: from F1, R8, F1-32, P64, UL, F5a2, F5-32b and A64)
+
+> **Status: current.** User request 2026-11-12, after section 280: document the best htram setting for each case. The front page's settings table comes from here.
+> - **Scripts and outputs:** `~/charades-data/f1/settings_281_phold.py` → `settings_281_phold.txt`; `settings_281_apps.py` → `settings_281_apps.txt`.
+
+**Rule.** Each cell takes the setting whose controller median is highest among the settings that cell's job ran, as F1's tables already did (section 243).
+- The 8-node column comes from job R8 alone (section 261).
+- Uniform's 16-node cell is local 1, from job UL (section 278), under section 277's rule.
+- These choices reproduce every Charades rate in the front page's PHOLD table.
+
+**Settings:**
+- **PP 512 / PP 2,048:** `--agg-mode=2 --agg-buffer=512` or `2048`. Each process has one shared buffer per destination process, and each PE copies into it 16 events at a time.
+- **WPs 512:** `--agg-mode=0 --agg-buffer=512`. Each PE has its own buffer per destination process.
+- **local 1:** PP 512 with `--agg-pp-local=1 --agg-pp-pad=1`. Each event is copied into the shared buffer as it is sent, and each destination's counters sit on their own cache lines.
+- **direct sends:** no htram.
+
+**PHOLD** (the setting at each node count; runner-up ÷ best is the other setting's controller median ÷ the chosen one's, so lower means a clearer choice):
+
+| workload | setting at 1 / 2 / 4 / 8 / 16 / 32 / 64 nodes | settings the paper jobs ran | runner-up ÷ best at 1 / 2 / 4 / 8 / 16 / 32 / 64 |
+|---|---|---|---|
+| σ 100 | PP 2,048 at every node count | PP 2,048 | – |
+| σ 500 | PP 2,048 at every node count | PP 2,048 | – |
+| σ 1,000 | PP 512 / PP 2,048 / PP 2,048 / PP 2,048 / PP 2,048 / PP 2,048 / PP 2,048 | PP 2,048 and PP 512 (PP 2,048 alone at 32) | 0.944 / 0.956 / 0.977 / 0.985 / 0.971 / – / 0.987 |
+| σ 2,000 | PP 512 at every node count | PP 512 | – |
+| σ 4,000 | PP 512 at every node count | PP 512 | – |
+| uniform | WPs 512 / PP 512 / PP 512 / PP 512 / local 1 / WPs 512 / WPs 512 | PP 512 and WPs 512; local 1 at 1–16 (32 and 64 pending) | 0.974 / 0.951 / 0.867 / 0.983 / 0.857 / 0.834 / 0.847 |
+| lookahead 10, σ 500 | PP 2,048 at every node count | PP 2,048 | – |
+| lookahead 10, σ 2,000 | WPs 512 / WPs 512 / WPs 512 / PP 512 / PP 512 / WPs 512 / WPs 512 | PP 512 and WPs 512 | 0.986 / 0.996 / 0.995 / 0.999 / 0.996 / 0.943 / 0.971 |
+
+- **Uniform's runner-up:** at 1–8 nodes it is the other of PP 512 and WPs 512. Local 1 ran there too, at 0.61–0.80 of the chosen setting (section 278). At 16 nodes the runner-up is WPs 512, the same job's reference (386.1 against local 1's 450.5 M ev/s).
+- **The single-setting workloads** (σ 100, σ 500, σ 2,000, σ 4,000, lookahead 10 σ 500) took their setting from the 1/4/16-node long runs that compared PP 512 and PP 2,048 (sections 124 and 130, fixed in section 140). The other setting was not rerun at 2, 8, 32 or 64 nodes.
+
+**Applications:**
+
+| application | setting at every node count | what it was chosen against | runner-up ÷ best |
+|---|---|---|---|
+| dragonfly | WPs 512 | PP 512 at 1 and 4 nodes (section 179); direct sends in every paper job | PP 512 0.89–0.92 (section 179); direct sends: htram ÷ direct 1.12–1.17 at 32–64 nodes (front page) |
+| traffic | PP 2,048 (the only setting the controller ran) | WPs 512 at W 500 only | WPs 512 ÷ PP 2,048, both at W 500: 0.99 / 1.00 / 0.98 / 0.97 / 0.99 / 0.99 / **1.05** at 1 / 2 / 4 / 8 / 16 / 32 / 64 nodes |
+| VLSI | direct sends | PP 2,048 and WPs 512 at 1 and 4 nodes (section 195) | PP 2,048 0.65–0.83 of direct, WPs 512 0.96–0.99 |
+
+**Close calls and gaps:**
+- **Lookahead 10, σ 2,000 at 1–16 nodes:** PP 512 and WPs 512 are within 1.4% of each other, inside the reps' spread. The table takes the higher median.
+- **Uniform at 32 and 64 nodes:** local 1 is pending (jobs 3711819 and 3711820, section 277). At 64 nodes it ran at 1.49× WPs 512 under the controller in job L64b (section 276), so it will probably take both cells. This table changes when UL reports.
+- **Traffic at 64 nodes is not settled.** WPs 512 is 1.05× PP 2,048 at W 500, but it never ran at W 1,000 (PP 2,048's best fixed W there, 4,308.2 M ev/s) or with the controller. The table keeps PP 2,048.
+- **Local 1 is a candidate on uniform only:**
+  - σ 4,000: 0.84 of PP 512 at 16 nodes (section 270).
+  - Uniform at 1–8 nodes: it loses to contention on the shared buffer's counters (section 280).
 
 ## Earlier
 

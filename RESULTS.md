@@ -28,14 +28,14 @@ Split on 2026-11-07 from one file of 11,400 lines and 249 sections; the text mov
 | [results/applications.md](results/applications.md) | **Traffic and dragonfly.** The two applications ported from Charades to ROSS and Devastator (phase B), the traffic count fix, and the paper runs F5 at 1–32 nodes and A64 at 64. | 17 |
 | [results/vlsi.md](results/vlsi.md) | **VLSI (b19 × N).** Gate-level simulation of copies of ITC'99's b19: the model and its layout, the gap to Devastator and how it closed, commits, and the paper's VLSI row. | 32 |
 | [results/controller.md](results/controller.md) | **The optimism-window controller.** Every controller design and test: the delay-quantile rule, the aggregation bound, the measured-cost rule and its freeze, where the best window lies at scale, robustness (F4), the grid check (GC), and the controller's own cost (CC). | 39 |
-| [results/aggregation.md](results/aggregation.md) | **Aggregation through htram.** Message cost, htram's modes and buffers, the deadline flush policy, choosing htram automatically, input buffers, PP's allocation and start-up, flush timing, and F2 (htram against direct sends), and bundling at 32 nodes (AG32). | 50 |
+| [results/aggregation.md](results/aggregation.md) | **Aggregation through htram.** Message cost, htram's modes and buffers, the deadline flush policy, choosing htram automatically, input buffers, PP's allocation and start-up, flush timing, and F2 (htram against direct sends), and bundling at 32 nodes (AG32). | 51 |
 | [results/hold.md](results/hold.md) | **The PADS'19 hold (F3).** Mikida and Kale's hold of events past a cutoff, run as a baseline beside the window. | 2 |
 | [results/engine.md](results/engine.md) | **The engine: GVT, rollback and per-event cost.** What paces the bucketed GVT at scale, rollback depth and unit, the same-process fast path, and the rounds that closed Charades' per-event gap to Devastator. | 53 |
 | [results/runtime.md](results/runtime.md) | **Runtime, transport and the machine.** Reconverse builds and settings, native psm2 through LCI, LCI devices, the late-rank investigation, the message pool, NUMA balancing, shared memory between processes, and the slow node. | 43 |
 | [results/baselines.md](results/baselines.md) | **ROSS and Devastator as baselines.** First runs and feasibility, ROSS's optimism window on PHOLD, and the Mac checks that both engines commit Charades' counts. | 3 |
 | [results/methods.md](results/methods.md) | **Methods.** How runs are made and checked: run length and warm-up, and the flag check that keeps diagnostics out of timing runs. | 4 |
 | [results/history.md](results/history.md) | The re-read of 2026-10-28 and the plan history | — |
-| [results/INDEX.md](results/INDEX.md) | Every section by number, with its date, job, status and file | 281 |
+| [results/INDEX.md](results/INDEX.md) | Every section by number, with its date, job, status and file | 282 |
 
 ## Current numbers
 
@@ -84,7 +84,7 @@ Every cell commits one count in both engines and one Charades digest, as F4. Cha
   - VLSI's 8-node value comes from job V8 (section 264), also rerun with node 0 idle: 1.29 against VA's 1.30. Devastator's best window ran at VA's rate; its narrower windows ran 1.04–1.10 faster.
 - **Aggregation at 32 nodes:** htram ÷ direct sends is 1.17 on dragonfly (W 20,000 against 10,000) and 1.24 on traffic at W 500. At 64 nodes: 1.12 on dragonfly (W 15,000 against 20,000) and 1.09 on traffic at W 500.
 
-**PHOLD weak scaling, Charades against Devastator and ROSS, 1–64 nodes, all eight workloads** (F1: jobs 3689004, 3689513 and 3688916, sections 242, 243 and 252, with the 8-node column from job R8, section 261; 64 nodes: job P64, section 265; final defaults, `numactl --localalloc` for Charades, no diagnostics; medians of 3 reps, 5 at 32 and 64 nodes. Charades: its controller at the better htram setting per node count. Devastator: its best W. ROSS: the best of optimistic, conservative and optimistic with its window. The same committed events in all three engines in every cell):
+**PHOLD weak scaling, Charades against Devastator and ROSS, 1–64 nodes, all eight workloads** (F1: jobs 3689004, 3689513 and 3688916, sections 242, 243 and 252, with the 8-node column from job R8, section 261; 64 nodes: job P64, section 265; final defaults, `numactl --localalloc` for Charades, no diagnostics; medians of 3 reps, 5 at 32 and 64 nodes. Charades: its controller at the better htram setting per node count, listed in the settings table below. Devastator: its best W. ROSS: the best of optimistic, conservative and optimistic with its window. The same committed events in all three engines in every cell):
 
 | workload | Charades ÷ Devastator at 1 / 2 / 4 / 8 / 16 / 32 / 64 nodes (higher is better) | Charades ÷ ROSS, 1–64 nodes | per-node rate 16→32 and 32→64, Charades / Devastator / ROSS (1.0 is perfect) | per-node rate 1→64, C / D / R | M ev/s at 64 nodes, Charades / Devastator / ROSS |
 |---|---|---|---|---|---|
@@ -115,6 +115,26 @@ Every cell commits one count in both engines and one Charades digest, as F4. Cha
 - **Fixed windows at 32 nodes** (job AG32, section 257): W 400 stays the best at lookahead 100 (W 500 is 0.91–0.95 of it, W 600 0.81–0.84), and W 1,000 on traffic (W 1,500 0.85). On lookahead 10 the best is W 75.
 - **At 64 nodes** (section 265) the best fixed W is 500 on σ 100, 500, 1,000 and uniform (the grid's edge; 1.02× W 400 on σ 100, level elsewhere) and 400 on σ 2,000 and 4,000; 75 at lookahead 10. The controller is 0.934–0.979 of it (mean W 454–513). Devastator's best W stays 1,000 (lookahead 10: 200); its W 4,000 did not finish on uniform within 200 s.
 
+**Charades' htram setting in each cell** (section 281, which lists each runner-up and its ratio). Each cell takes the setting with the highest controller median among those its job ran. PP N: one shared buffer per destination process, N events. WPs 512: one buffer per PE and destination process. local 1: PP 512 with `--agg-pp-local=1 --agg-pp-pad=1`.
+
+| workload | 1 node | 2 | 4 | 8 | 16 | 32 | 64 |
+|---|---|---|---|---|---|---|---|
+| σ 100, σ 500, lookahead 10 σ 500 | PP 2,048 | PP 2,048 | PP 2,048 | PP 2,048 | PP 2,048 | PP 2,048 | PP 2,048 |
+| σ 1,000 | PP 512 | PP 2,048 | PP 2,048 | PP 2,048 | PP 2,048 | PP 2,048 | PP 2,048 |
+| σ 2,000, σ 4,000 | PP 512 | PP 512 | PP 512 | PP 512 | PP 512 | PP 512 | PP 512 |
+| uniform | WPs 512 | PP 512 | PP 512 | PP 512 | local 1 | WPs 512 (local 1 pending) | WPs 512 (local 1 pending) |
+| lookahead 10, σ 2,000 | WPs 512 | WPs 512 | WPs 512 | PP 512 | PP 512 | WPs 512 | WPs 512 |
+| dragonfly | WPs 512 | WPs 512 | WPs 512 | WPs 512 | WPs 512 | WPs 512 | WPs 512 |
+| traffic | PP 2,048 | PP 2,048 | PP 2,048 | PP 2,048 | PP 2,048 | PP 2,048 | PP 2,048 |
+| VLSI | direct sends | direct sends | direct sends | direct sends | direct sends | direct sends | direct sends |
+
+- **Uniform at 16 nodes is local 1** (450.5 M ev/s, 1.17× WPs 512; section 278). The PHOLD table above still shows F1's WPs 512 value there; it changes with the 32 and 64 nodes, when job UL reports.
+- **Margins:** on uniform and σ 1,000 the runner-up is 0.83–0.99 of the chosen setting. The clear choices are uniform at 4, 16, 32 and 64 nodes (0.83–0.87); elsewhere it is 0.94–0.99.
+- **Near-ties:** on lookahead 10 σ 2,000 at 1–16 nodes PP 512 and WPs 512 are within 1.4%.
+- **Not settled:** traffic at 64 nodes, where WPs 512 is 1.05× PP 2,048 at W 500 but was not run at W 1,000 or with the controller.
+- **One setting only:** five PHOLD workloads ran one setting at every node count, fixed from the 1/4/16-node long runs (sections 124, 130 and 140).
+- **Local 1 elsewhere:** it loses on uniform at 1–8 nodes, to contention on the shared buffer's counters (0.61–0.80; sections 278 and 280), and on σ 4,000 (0.84 of PP 512 at 16 nodes; section 270).
+
 **Bundling: htram ÷ direct sends, 4–64 nodes** (each at its best fixed W; higher is better for htram. 4 and 16 nodes: job ABL, section 223, W 250/400, mean of 2 reps, diagnostics on both sides. 32 nodes: job AG32, section 257, W 300–600, median of 5 reps, no diagnostics. 64 nodes: job P64, section 265, htram W 300–500 and direct W 300/400, median of 5 reps, no diagnostics. σ 100 with PP 2,048; σ 2,000 and σ 4,000 with PP 512; uniform with WPs 512):
 
 | workload | 4 nodes | 16 nodes | 32 nodes | 64 nodes |
@@ -124,7 +144,7 @@ Every cell commits one count in both engines and one Charades digest, as F4. Cha
 | σ 4,000 | — | — | 3.14 | 3.32 |
 | uniform | 3.31 | 2.65 | 2.29 | 1.85 |
 
-- **On uniform the gain shrinks as the messages do:** above 2 up to 32 nodes, 1.85 at 64. Almost every message there is sent at a GVT update, once a buffer's earliest event is due, so message size grows only about as the square root of a buffer's arrivals (section 267). One buffer shared by a process's 23 PEs (`--agg-pp-local=1`, job PL16, section 268) made uniform's messages 9× larger at 16 nodes but ran at 0.80 of WPs 512 while the buffer's counters were packed 16 to a cache line. With each destination's counters on their own line (job PD16, section 270) it runs at 1.10× WPs 512 on uniform at 16 nodes, though still at 0.84 of PP 512 on σ 4,000. At 64 nodes (job L64b, section 276) it runs at 1.52× WPs 512 at W 400 and 1.49× under the controller, which makes bundling on uniform 2.82× direct sends instead of 1.85×: WPs' messages shrink to 5.6 events while local 1's hold at 37. F1's settings stand until the user decides between a paragraph and uniform's table setting (section 276).
+- **On uniform the gain shrinks as the messages do:** above 2 up to 32 nodes, 1.85 at 64. Almost every message there is sent at a GVT update, once a buffer's earliest event is due, so message size grows only about as the square root of a buffer's arrivals (section 267). One buffer shared by a process's 23 PEs (`--agg-pp-local=1`, job PL16, section 268) made uniform's messages 9× larger at 16 nodes but ran at 0.80 of WPs 512 while the buffer's counters were packed 16 to a cache line. With each destination's counters on their own line (job PD16, section 270) it runs at 1.10× WPs 512 on uniform at 16 nodes, though still at 0.84 of PP 512 on σ 4,000. At 64 nodes (job L64b, section 276) it runs at 1.52× WPs 512 at W 400 and 1.49× under the controller, which makes bundling on uniform 2.82× direct sends instead of 1.85×: WPs' messages shrink to 5.6 events while local 1's hold at 37. The user made local 1 uniform's table setting wherever it is faster (section 277): it is at 16 nodes (1.17×; section 278) and not at 1–8 (sections 278 and 280); 32 and 64 nodes are pending.
   - htram's messages carry 102, 14.5, 8 and 5.6 events at 4, 16, 32 and 64 nodes (the controller runs, sections 255, 257 and 265).
   - On σ 4,000 messages still carry 50 events at 64 nodes, and the gain grows (3.14 → 3.32).
   - At 32 nodes neither buffer 2,048 nor a wider W (up to 600) makes them bigger.
