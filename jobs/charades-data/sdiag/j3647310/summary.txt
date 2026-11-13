@@ -1,0 +1,26 @@
+A. Throughput with +mempool_remote_free, rings on (M committed ev/s without it, mean of 3 reps; ratio = with / without, higher is better)
+
+  W 400
+  σ 100, PP      |  1n   44.1 remote free 0.994 (44/44/44 vs 44/44/44) |  4n  166.3 remote free 1.008 (168/167/169 vs 167/164/167) | 16n  624.9 remote free 1.011 (632/629/634 vs 623/631/621)
+  σ 2,000, PP    |  1n   34.0 remote free 0.995 (34/33/34 vs 34/34/34) |  4n  125.2 remote free 1.010 (126/127/126 vs 125/126/125) | 16n  443.6 remote free 1.000 (439/445/447 vs 443/444/443)
+  uniform, PP    |  1n   35.7 remote free 1.001 (36/36/36 vs 36/36/36) |  4n  118.9 remote free 1.034 (123/123/123 vs 121/119/117) | 16n  251.6 remote free 1.025 (259/254/260 vs 252/252/251)
+  uniform, WPs   |  1n   36.0 remote free 1.007 (36/36/36 vs 36/36/36) |  4n  111.5 remote free 1.006 (115/115/107 vs 107/113/114) | 16n  339.6 remote free 1.046 (360/350/355 vs 338/342/339)
+
+  controller
+  σ 100, PP      |  1n   46.6 remote free 0.999 (47/46/46 vs 46/47/47) |  4n  170.7 remote free 0.999 (172/170/170 vs 171/171/170) | 16n  611.5 remote free 1.003 (612/611/617 vs 618/605/612)
+  σ 2,000, PP    |  1n   38.7 remote free 0.995 (38/39/39 vs 39/38/39) |  4n  128.2 remote free 1.032 (133/132/132 vs 132/122/131) | 16n  408.7 remote free 0.983 (395/401/410 vs 410/407/409)
+  uniform, PP    |  1n   41.3 remote free 1.005 (41/41/42 vs 41/41/41) |  4n  129.6 remote free 1.014 (132/131/131 vs 130/130/129) | 16n  221.2 remote free 1.018 (224/226/225 vs 222/221/220)
+  uniform, WPs   |  1n   41.3 remote free 1.004 (42/41/41 vs 41/42/41) |  4n  120.7 remote free 1.030 (124/125/124 vs 121/121/120) | 16n  323.4 remote free 1.063 (345/344/342 vs 325/321/324)
+   1 nodes remote free: geomean 1.000, min 0.994, max 1.007
+   4 nodes remote free: geomean 1.017, min 0.999, max 1.034
+  16 nodes remote free: geomean 1.018, min 0.983, max 1.063
+
+B. htram node-level receives at 16 nodes, uniform, W 400, rings, all PEs, whole run (µs; lower is better)
+  uni_wps512 remote free 0 r1: 4.20 µs/receive (hand-off 1.56, free_in 1.44) | pushes/receive 8.9, µs/push 0.176, overflows 0.000% | drain µs/item 0.348 | rate 329.4
+  uni_wps512 remote free 0 r2: 4.10 µs/receive (hand-off 1.44, free_in 1.47) | pushes/receive 8.8, µs/push 0.163, overflows 0.000% | drain µs/item 0.352 | rate 323.4
+  uni_wps512 remote free 1 r1: 3.02 µs/receive (hand-off 1.54, free_in 0.30) | pushes/receive 8.9, µs/push 0.172, overflows 0.000% | drain µs/item 0.327 | rate 350.0
+  uni_wps512 remote free 1 r2: 3.08 µs/receive (hand-off 1.59, free_in 0.30) | pushes/receive 8.9, µs/push 0.178, overflows 0.000% | drain µs/item 0.327 | rate 351.3
+  uni_pp512  remote free 0 r1: 3.39 µs/receive (hand-off 1.38, free_in 0.85) | pushes/receive 8.5, µs/push 0.162, overflows 0.000% | drain µs/item 0.365 | rate 252.6
+  uni_pp512  remote free 0 r2: 3.47 µs/receive (hand-off 1.44, free_in 0.85) | pushes/receive 8.5, µs/push 0.170, overflows 0.000% | drain µs/item 0.371 | rate 246.1
+  uni_pp512  remote free 1 r1: 2.69 µs/receive (hand-off 1.25, free_in 0.29) | pushes/receive 8.5, µs/push 0.147, overflows 0.000% | drain µs/item 0.355 | rate 249.8
+  uni_pp512  remote free 1 r2: 2.72 µs/receive (hand-off 1.27, free_in 0.29) | pushes/receive 8.5, µs/push 0.149, overflows 0.000% | drain µs/item 0.348 | rate 260.4

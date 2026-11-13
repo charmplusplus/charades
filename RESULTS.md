@@ -36,6 +36,7 @@ Split on 2026-11-07 from one file of 11,400 lines and 249 sections; the text mov
 | [results/methods.md](results/methods.md) | **Methods.** How runs are made and checked: run length and warm-up, and the flag check that keeps diagnostics out of timing runs. | 4 |
 | [results/history.md](results/history.md) | The re-read of 2026-10-28 and the plan history | — |
 | [results/INDEX.md](results/INDEX.md) | Every section by number, with its date, job, status and file | 283 |
+| [jobs/](jobs/README.md) | The job, build and analysis scripts the sections cite (`~/charades-data/…` and Stampede3's `$WORK/charades-runs/…`, same relative paths), and where each engine's and the runtime's code for the paper runs is on GitHub | — |
 
 ## Current numbers
 

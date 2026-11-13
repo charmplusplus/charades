@@ -1,0 +1,10 @@
+Uniform, W 400, short runs (mean of 2 reps). rate M committed ev/s (higher is better); PE time per committed event µs (lower is better)
+  A_b512_n4 : rate  115.1 (114.9, 115.4) ÷ WPs 512 1.000 | events/msg  30.9, messages per event 0.0325 | PE time per event 1.598 µs | efficiency 99.155
+  A_b64_n4  : rate  115.6 (116.0, 115.1) ÷ WPs 512 1.004 | events/msg  30.8, messages per event 0.0327 | PE time per event 1.592 µs | efficiency 99.190
+  A_b32_n4  : rate  121.5 (121.6, 121.4) ÷ WPs 512 1.056 | events/msg  26.3, messages per event 0.0382 | PE time per event 1.514 µs | efficiency 99.265
+  A_b16_n4  : rate  111.3 (112.1, 110.5) ÷ WPs 512 0.967 | events/msg  15.4, messages per event 0.0650 | PE time per event 1.653 µs | efficiency 99.360
+  B_b512_n16: rate  350.5 (352.5, 348.6) ÷ WPs 512 1.000 | events/msg  12.4, messages per event 0.0811 | PE time per event 2.100 µs | efficiency 99.615
+  B_b16_n16 : rate  365.5 (367.4, 363.5) ÷ WPs 512 1.043 | events/msg  11.4, messages per event 0.0878 | PE time per event 2.014 µs | efficiency 99.690
+
+Slope, extra PE time per extra message (µs): 4-node buffer perturbation 1.7; 4 -> 16 nodes 10.3 (ratio 0.16)
+Share of the 4->16 PE-time-per-event rise that thinning accounts for at the perturbation's slope: 16%

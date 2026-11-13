@@ -1,0 +1,202 @@
+From 75010bf9e7301f313723454ce53aaeb3433961ea Mon Sep 17 00:00:00 2001
+From: Ritvik Rao <rsrao2@illinois.edu>
+Date: Sat, 24 Oct 2026 14:21:33 -0500
+Subject: [PATCH] Bucketed GVT: --gvt-ask-ahead makes each count wave report
+ counts up to the window, so a bucket completes one wave after every PE passed
+ it instead of about three
+
+Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>
+---
+ src/globals.C                                 |  2 ++
+ src/globals.h                                 |  1 +
+ src/gvt/bucketed.C                            | 21 +++++++++++++++++--
+ src/util/command_line.C                       |  1 +
+ tests/test_configs/agg_bucket_pp_askahead     |  8 +++++++
+ .../agg_ctl_sparse_bucket_pp_askahead         | 14 +++++++++++++
+ tests/test_configs/bucket_ask40               |  5 +++++
+ tests/test_configs/bucket_askahead            |  5 +++++
+ tests/test_configs/bucket_hold_askahead       |  7 +++++++
+ tests/test_configs/bucket_msgwaves_askahead   |  6 ++++++
+ tests/test_configs/bucket_window_askahead     |  6 ++++++
+ 11 files changed, 74 insertions(+), 2 deletions(-)
+ create mode 100644 tests/test_configs/agg_bucket_pp_askahead
+ create mode 100644 tests/test_configs/agg_ctl_sparse_bucket_pp_askahead
+ create mode 100644 tests/test_configs/bucket_ask40
+ create mode 100644 tests/test_configs/bucket_askahead
+ create mode 100644 tests/test_configs/bucket_hold_askahead
+ create mode 100644 tests/test_configs/bucket_msgwaves_askahead
+ create mode 100644 tests/test_configs/bucket_window_askahead
+
+diff --git a/src/globals.C b/src/globals.C
+index 4a86d35..1d9a144 100644
+--- a/src/globals.C
++++ b/src/globals.C
+@@ -41,6 +41,7 @@ unsigned g_tw_gvt_trigger;
+ unsigned g_tw_gvt_phases;
+ unsigned g_tw_gvt_bucket_size;
+ unsigned g_tw_gvt_min_buckets;
++int g_tw_gvt_ask_ahead;
+ unsigned g_tw_gvt_trace;
+ unsigned g_tw_pe_stats;
+ unsigned g_tw_gvt_wave_events;
+@@ -122,6 +123,7 @@ void clear_globals() {
+   g_tw_gvt_phases    = 2;
+   g_tw_gvt_bucket_size    = 8;
+   g_tw_gvt_min_buckets    = 1;
++  g_tw_gvt_ask_ahead      = 0;
+   g_tw_gvt_trace          = 0;
+   g_tw_pe_stats           = 0;
+   // Paced count waves are 1.0-1.38x faster on 4 nodes and remove the
+diff --git a/src/globals.h b/src/globals.h
+index 1b742a0..7fa6da2 100644
+--- a/src/globals.h
++++ b/src/globals.h
+@@ -45,6 +45,7 @@ extern unsigned g_tw_gvt_trigger;     ///< unit of the GVT interval (time or eve
+ extern unsigned g_tw_gvt_phases;      ///< number of phases in a phased gvt
+ extern unsigned g_tw_gvt_bucket_size; ///< size of each bucket in a bucketed gvt
+ extern unsigned g_tw_gvt_min_buckets; ///< bucketed gvt: buckets a PE passes before a round
++extern int g_tw_gvt_ask_ahead;        ///< bucketed gvt: buckets a count wave asks about at least (-1: window + 2)
+ extern unsigned g_tw_pe_stats;        ///< PE 0 writes one line per PE to pe_stats.csv at the end
+ extern unsigned g_tw_gvt_trace;       ///< bucketed gvt: PE 0 logs every count wave; time execute()
+ extern unsigned g_tw_gvt_wave_events; ///< bucketed gvt: events a PE runs between count waves (0: none)
+diff --git a/src/gvt/bucketed.C b/src/gvt/bucketed.C
+index ae08941..97e22b1 100644
+--- a/src/gvt/bucketed.C
++++ b/src/gvt/bucketed.C
+@@ -361,9 +361,26 @@ void BucketGVT::wave_done(const int* counts, int num_buckets,
+   /** Advance the GVT past the completed buckets */
+   if (completed_buckets) advance_gvt(completed_buckets);
+ 
+-  /** If there are still valid buckets then continue to send counts */
++  /**
++   * If there are still valid buckets then continue to send counts. The next
++   * wave asks about the buckets this one left open; with --gvt-ask-ahead, at
++   * least that many past GVT. A bucket can complete only if the wave before
++   * reported its counts, so asking only about those left open lets a bucket
++   * complete about three waves after every PE passed it (in steady state a
++   * wave completes a third of the buckets every PE has passed); asking about
++   * every bucket up to the window lets it complete one wave after. Every PE
++   * computes the same number from the same result and the same window.
++   */
+   if (valid_buckets - completed_buckets) {
+-    send_counts(valid_buckets - completed_buckets);
++    int next = valid_buckets - completed_buckets;
++    int ahead = g_tw_gvt_ask_ahead;
++    if (ahead < 0) {
++      Time window = PE_VALUE(window);
++      ahead = window ? (int)((window + bucket_size - 1) / bucket_size) + 2 : 0;
++    }
++    next = std::max(next, ahead);
++    next = std::min(next, total_buckets - curr_bucket);
++    send_counts(next);
+   } else {
+     active = false;
+     attempt_gvt();
+diff --git a/src/util/command_line.C b/src/util/command_line.C
+index b6c7400..169e3fe 100644
+--- a/src/util/command_line.C
++++ b/src/util/command_line.C
+@@ -23,6 +23,7 @@ void parse_command_line(int argc, char** argv) {
+   kernel.register_argument("gvt-trigger",          "Type of GVT interval - SCHEDULER INTERVAL=1, VIRTUAL TIME LEASH=2", g_tw_gvt_trigger);
+   kernel.register_argument("gvt-phases",           "Number of phases for the phased GVT algorithm", g_tw_gvt_phases);
+   kernel.register_argument("gvt-bucket-size",      "Bucket size for bucketed GVT algorithm", g_tw_gvt_bucket_size);
++  kernel.register_argument("gvt-ask-ahead",        "Bucketed GVT: each count wave reports counts for at least this many buckets past GVT, so a bucket can complete one wave after every PE passed it (0: only those the last wave left open; -1: the optimism window in buckets, plus 2)", g_tw_gvt_ask_ahead);
+   kernel.register_argument("gvt-min-buckets",      "Bucketed GVT: buckets a PE must pass before it starts a GVT round", g_tw_gvt_min_buckets);
+   kernel.register_argument("gvt-wave-events",      "Bucketed GVT: a PE contributes to the next count wave after executing this many events, or when it cannot execute (0 = at once; default 128)", g_tw_gvt_wave_events);
+   kernel.register_argument("gvt-node-waves",       "Optimistic, bucketed GVT, not --sched-park: each process combines its PEs' count-wave contributions in shared memory and contributes once; the result comes back once per process - NO=0, YES=1 (default)", g_tw_gvt_node_waves);
+diff --git a/tests/test_configs/agg_bucket_pp_askahead b/tests/test_configs/agg_bucket_pp_askahead
+new file mode 100644
+index 0000000..08cd382
+--- /dev/null
++++ b/tests/test_configs/agg_bucket_pp_askahead
+@@ -0,0 +1,8 @@
++# agg_bucket_pp with --gvt-ask-ahead=-1: every count wave reports counts up to the window
++sync=3
++gvt=4
++buffer-size=655360
++aggregation=1
++agg-mode=2
++agg-buffer=16
++gvt-ask-ahead=-1
+diff --git a/tests/test_configs/agg_ctl_sparse_bucket_pp_askahead b/tests/test_configs/agg_ctl_sparse_bucket_pp_askahead
+new file mode 100644
+index 0000000..41104dc
+--- /dev/null
++++ b/tests/test_configs/agg_ctl_sparse_bucket_pp_askahead
+@@ -0,0 +1,14 @@
++# agg_ctl_sparse_bucket_pp with --gvt-ask-ahead=-1: every count wave reports counts up to the window
++sync=3
++gvt=4
++buffer-size=655360
++optimism-window=2000
++aggregation=1
++agg-mode=2
++agg-buffer=16
++agg-policy=1
++ctl=1
++ctl-agg-kappa=0.2
++ctl-sparse-waves=1
++ctl-hist-waves=32
++gvt-ask-ahead=-1
+diff --git a/tests/test_configs/bucket_ask40 b/tests/test_configs/bucket_ask40
+new file mode 100644
+index 0000000..6855ff8
+--- /dev/null
++++ b/tests/test_configs/bucket_ask40
+@@ -0,0 +1,5 @@
++# bucket with --gvt-ask-ahead=40 (no window: a fixed number of buckets per wave)
++sync=3
++gvt=4
++buffer-size=655360
++gvt-ask-ahead=40
+diff --git a/tests/test_configs/bucket_askahead b/tests/test_configs/bucket_askahead
+new file mode 100644
+index 0000000..708c187
+--- /dev/null
++++ b/tests/test_configs/bucket_askahead
+@@ -0,0 +1,5 @@
++# bucket with --gvt-ask-ahead=-1: every count wave reports counts up to the window
++sync=3
++gvt=4
++buffer-size=655360
++gvt-ask-ahead=-1
+diff --git a/tests/test_configs/bucket_hold_askahead b/tests/test_configs/bucket_hold_askahead
+new file mode 100644
+index 0000000..049ff4f
+--- /dev/null
++++ b/tests/test_configs/bucket_hold_askahead
+@@ -0,0 +1,7 @@
++# bucket_hold with --gvt-ask-ahead=-1: every count wave reports counts up to the window
++sync=3
++gvt=4
++buffer-size=655360
++gvt-adaptive-buckets=1
++gvt-reserve-buckets=1
++gvt-ask-ahead=-1
+diff --git a/tests/test_configs/bucket_msgwaves_askahead b/tests/test_configs/bucket_msgwaves_askahead
+new file mode 100644
+index 0000000..4240468
+--- /dev/null
++++ b/tests/test_configs/bucket_msgwaves_askahead
+@@ -0,0 +1,6 @@
++# bucket_msgwaves with --gvt-ask-ahead=-1: every count wave reports counts up to the window
++sync=3
++gvt=4
++buffer-size=655360
++gvt-node-waves=0
++gvt-ask-ahead=-1
+diff --git a/tests/test_configs/bucket_window_askahead b/tests/test_configs/bucket_window_askahead
+new file mode 100644
+index 0000000..ec6d68f
+--- /dev/null
++++ b/tests/test_configs/bucket_window_askahead
+@@ -0,0 +1,6 @@
++# bucket_window with --gvt-ask-ahead=-1: every count wave reports counts up to the window
++sync=3
++gvt=4
++buffer-size=655360
++optimism-window=2000
++gvt-ask-ahead=-1
+-- 
+2.54.0 (Apple Git-157)
+

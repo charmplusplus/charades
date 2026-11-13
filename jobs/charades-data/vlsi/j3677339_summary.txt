@@ -1,0 +1,70 @@
+FAILED devastator 1 d1 2500 rep 1 stall
+FAILED devastator 4 d1 2500 rep 1 stall
+FAILED devastator 1 d1 5000 rep 1 stall
+FAILED devastator 4 d1 5000 rep 1 stall
+FAILED devastator 1 d1 10000 rep 1 stall
+FAILED devastator 4 d1 10000 rep 1 stall
+FAILED devastator 1 d1 10000 rep 2 stall
+FAILED devastator 4 d1 10000 rep 2 stall
+FAILED devastator 1 d1 5000 rep 2 stall
+FAILED devastator 4 d1 5000 rep 2 stall
+FAILED devastator 1 d1 2500 rep 2 stall
+FAILED devastator 4 d1 2500 rep 2 stall
+
+===== 1 node(s): counts [125998590]; Charades digests ['87c11aec982ad656']; Devastator deterministic ['1']
+   engine arm          M ev/s    ÷A ms/cycle   eff%  blk%   min   max     shm msgs  reps
+   Charades B W5000     34.19  1.47    0.737  96.35  61.7  35.9  76.5          0.0  34.24/34.15
+   Charades B W2500     30.84  1.33    0.817  97.09  69.1  49.0  80.0          0.0  30.96/30.73
+   Charades B W10000    30.58  1.32    0.824  91.98  59.1  32.8  76.6          0.0  30.36/30.81
+   Charades A W2500     23.23  1.00    1.085  98.52  62.6  22.1  84.9          0.0  23.08/23.38
+   Charades D W2500      4.83  0.21    5.219  96.78  77.8  25.9  96.4   12909404.0  4.82/4.84
+   Charades C W5000      4.52  0.19    5.579  95.16  75.2  18.0  96.2   14765376.5  4.40/4.64
+   Charades C W10000     4.20  0.18    6.008  79.62  69.8  10.4  96.0   19583502.5  4.35/4.05
+   Charades Ccs W2500    4.16  0.18    6.052  96.86  78.6  24.8  97.0   14577101.5  4.19/4.13
+   Charades C W2500      4.06  0.17    6.203  96.84  78.6  24.5  96.9   14668769.0  4.03/4.09
+   Devastator d2 W5000   44.64  1.92    0.565  94.44                                 44.47/44.81
+   Devastator d2 W10000   44.33  1.91    0.569  88.22                                 45.19/43.47
+   Devastator d2 W2500   41.53  1.79    0.607  98.05                                 41.33/41.73
+-- Z2: C ÷ A at W 2,500: 0.175; C ÷ B: 0.132; B ÷ A: 1.328
+-- Z3: D ÷ C at W 2,500: 1.188; D ÷ A: 0.208
+-- Z6: B: W 5,000 ÷ W 2,500 1.109, W 10,000 ÷ W 2,500 0.992
+-- Z6: C: W 5,000 ÷ W 2,500 1.113, W 10,000 ÷ W 2,500 1.034
+-- Z5: Charades' best (B W5000, 34.19) ÷ Devastator's best (d2 W5000, 44.64): 0.766; at W 2,500: B ÷ d2 0.743, C ÷ d2 0.098
+-- Z4: Ccs rep 1 (÷ C at W 2,500 1.032): send call 15.77 µs, 18.15% of PE time; shared-memory messages 14,551,424
+       Same Node    count   15,910,744  mean  275.26 µs  p50 ≤ 262.14 p90 ≤ 1048.58 p99 ≤ 2097.15 µs
+-- Z4: Ccs rep 2 (÷ C at W 2,500 1.017): send call 15.77 µs, 17.94% of PE time; shared-memory messages 14,602,779
+       Same Node    count   15,949,262  mean  333.08 µs  p50 ≤ 262.14 p90 ≤ 1048.58 p99 ≤ 2097.15 µs
+-- Z8: per-copy activity: 1 distinct set(s) over 18 runs
+       1.000 of the mean (18 runs)
+
+===== 4 node(s): counts [574541914]; Charades digests ['0c800d36f9c2f85c']; Devastator deterministic ['1']
+   engine arm          M ev/s    ÷A ms/cycle   eff%  blk%   min   max     shm msgs  reps
+   Charades B W2500     80.02  1.27    1.436  98.46  79.8  30.0  88.1          0.0  80.02
+   Charades B W5000     75.35  1.19    1.525  97.27  78.5   2.6  88.1          0.0  75.10/75.60
+   Charades B W10000    69.14  1.10    1.662  96.38  79.0   1.3  87.3          0.0  68.56/69.73
+   Charades A W2500     63.14  1.00    1.820  98.21  74.0  21.2  91.0          0.0  63.14
+   Charades D W2500     13.34  0.21    8.613  96.28  84.0  14.8  97.7   59150405.5  13.54/13.15
+   Charades C W5000     12.91  0.20    8.907  95.73  82.2   2.3  97.6   68514447.5  13.21/12.61
+   Charades C W2500     11.61  0.18    9.898  96.28  84.5  15.0  98.1   66985183.0  11.68/11.53
+   Charades Ccs W2500   11.43  0.18   10.052  96.34  84.7  14.6  98.1   66690355.0  11.45/11.42
+   Charades C W10000    10.03  0.16   11.493  87.65  83.3   5.9  98.0   80080007.0  10.55/9.50
+   Devastator d2 W10000   83.84  1.33    1.371  97.97                                 84.15/83.53
+   Devastator d2 W2500   83.57  1.32    1.375  99.24                                 84.77/82.37
+   Devastator d2 W5000   83.20  1.32    1.381  98.38                                 84.66/81.75
+-- Z2: C ÷ A at W 2,500: 0.184; C ÷ B: 0.145; B ÷ A: 1.267
+-- Z3: D ÷ C at W 2,500: 1.149; D ÷ A: 0.211
+-- Z6: B: W 5,000 ÷ W 2,500 0.942, W 10,000 ÷ W 2,500 0.864
+-- Z6: C: W 5,000 ÷ W 2,500 1.112, W 10,000 ÷ W 2,500 0.864
+-- Z5: Charades' best (B W2500, 80.02) ÷ Devastator's best (d2 W10000, 83.84): 0.954; at W 2,500: B ÷ d2 0.958, C ÷ d2 0.139
+-- Z4: Ccs rep 1 (÷ C at W 2,500 0.986): send call 16.22 µs, 12.8% of PE time; shared-memory messages 66,380,473
+       Same Node    count   72,873,383  mean  351.40 µs  p50 ≤ 262.14 p90 ≤ 1048.58 p99 ≤ 2097.15 µs
+       Other Node   count        9,902  mean  496.12 µs  p50 ≤ 262.14 p90 ≤ 524.29 p99 ≤ 16777.22 µs
+-- Z4: Ccs rep 2 (÷ C at W 2,500 0.983): send call 15.86 µs, 12.58% of PE time; shared-memory messages 67,000,237
+       Same Node    count   73,393,577  mean  436.94 µs  p50 ≤ 262.14 p90 ≤ 2097.15 p99 ≤ 4194.3 µs
+       Other Node   count        9,960  mean  385.17 µs  p50 ≤ 32.77 p90 ≤ 131.07 p99 ≤ 16777.22 µs
+-- Z8: per-copy activity: 1 distinct set(s) over 16 runs
+       0.840, 0.840, 1.478, 0.841 of the mean (16 runs)
+       Mac 4 copies, 5,000 cycles: SAME ((92601127, 92651900, 162965707, 92729904))
+
+-- Z7: n1/peB: blocked % min 49.5 (PE 36, remote sends 2,590,814), median 71.5, max 79.6; corr(blocked %, remote sends) -0.85
+-- Z7: n1/peC: blocked % min 26.8 (PE 18, remote sends 2,080,721), median 84.6, max 96.8; corr(blocked %, remote sends) -0.76

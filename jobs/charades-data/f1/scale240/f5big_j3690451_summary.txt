@@ -1,0 +1,29 @@
+Rates M committed ev/s, median of reps; ratios Charades ÷ other, higher is better. (old) = the old job.
+
+## dragonfly
+  N |     ctl             best fixed ctl/fx |           Deva             ROSS |        C/D ctl      C/D fixed      C/R ctl | C ctl n/o C fx n/o  D n/o  R n/o
+ 16 |   428.0  wps512 w:20000  408.2  1.048 |  20000   208.6 df_w5000   139.3 |  2.05 (1.82)  1.96 (1.76) 3.07 (4.03) |     1.112    1.098  0.987  1.460
+ 32 |   743.5  wps512 w:20000  756.6  0.983 |  20000   343.2 df_w5000   243.8 |  2.17 (2.03)  2.20 (1.96) 3.05 (4.26) |     1.078    1.140  1.012  1.506
+   controller ÷ best fixed W in its htram setting, per rep: 16: 1.034/1.034/1.048  32: 0.960/1.039/0.959/0.956/1.047
+   od ÷ wps512 w:10000 (per rep; median (range)): 16: 1.007 (0.996-1.022)  32: 0.980 (0.954-1.048)
+   dg ÷ wps512 w:10000 (per rep; median (range)): 
+   ri ÷ wps512 w:10000 (per rep; median (range)): 
+   16 nodes: counts ['6252883131']; digests ['c439ad414c55e3d3'] (empty: 0)
+   32 nodes: counts ['13323722220']; digests ['c5c00ee4ff1a86c3'] (empty: 0)
+   32 ÷ 16 rate per node (16 on one half): Charades ctl 0.869, best fixed 0.927, Devastator 0.823, ROSS 0.875
+   16 nodes reps: charades-ctl 409 429 428 (max/min 1.047) | devastator 206 210 209 (max/min 1.016) | ross 136 139 139 (max/min 1.027)
+   32 nodes reps: charades-ctl 673 803 743 786 718 (max/min 1.193) | devastator 343 198 345 319 343 (max/min 1.742) | ross 242 248 164 256 244 (max/min 1.561)
+
+## traffic
+  N |     ctl             best fixed ctl/fx |           Deva             ROSS |        C/D ctl      C/D fixed      C/R ctl | C ctl n/o C fx n/o  D n/o  R n/o
+ 16 |  1142.9   pp2048 w:1000 1108.9  1.031 |   2000   903.7 tr_w2000   511.3 |  1.26 (1.04)  1.23 (1.04) 2.24 (2.13) |     1.229    1.185  1.009  1.173
+ 32 |  2223.8   pp2048 w:1000 2280.7  0.975 |   1000  1607.2 tr_w2000   979.9 |  1.38 (1.08)  1.42 (1.05) 2.27 (2.19) |     1.204    1.271  0.942  1.162
+   controller ÷ best fixed W in its htram setting, per rep: 16: 1.063/1.028/0.973  32: 0.975/1.212/1.018/0.969/0.995
+   od ÷ pp2048 w:500 (per rep; median (range)): 16: 0.992 (0.963-1.000)  32: 0.996 (0.658-1.640)
+   dg ÷ pp2048 w:500 (per rep; median (range)): 
+   ri ÷ pp2048 w:500 (per rep; median (range)): 
+   16 nodes: counts ['9048375910']; digests ['58f089905cadc8ce'] (empty: 0)
+   32 nodes: counts ['18096870611']; digests ['e26bb10224735037'] (empty: 0)
+   32 ÷ 16 rate per node (16 on one half): Charades ctl 0.973, best fixed 1.028, Devastator 0.889, ROSS 0.958
+   16 nodes reps: charades-ctl 1179 1077 1143 (max/min 1.095) | devastator 912 874 904 (max/min 1.043) | ross 511 508 519 (max/min 1.022)
+   32 nodes reps: charades-ctl 2224 2242 1810 2274 2216 (max/min 1.257) | devastator 1257 1642 1362 1645 1607 (max/min 1.308) | ross 860 809 1004 1003 980 (max/min 1.240)

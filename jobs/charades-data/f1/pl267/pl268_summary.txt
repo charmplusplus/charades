@@ -1,0 +1,73 @@
+runs kept: 100; dropped without count waves: 0; failed/stalled/missing log: 0
+
+# Counts (one per workload; F1-16 in brackets)
+  uniform   ['2895361579'] [2895361579] SAME
+  σ 2,000   ['2895361550'] [2895361550] SAME
+  σ 4,000   ['2895358752'] [2895358752] SAME
+
+# Rates (M committed ev/s, median of 5; spread = fastest / slowest rep) and events per htram message
+workload  htram           | W 400: rate spread ev/msg  | controller: rate spread ev/msg | ctl / W400, ctl mean W
+uniform   WPs 512         |   381.5  1.06    12.5      |   380.6  1.06    12.6          | 0.998, W 352
+uniform   PP 512          |   336.7  1.03    14.3      |   339.5  1.37    14.6          | 1.008, W 324
+uniform   PP 512 local 4  |   266.6  1.10     9.5      |   257.8  1.05     9.6          | 0.967, W 322
+uniform   PP 512 local 1  |   303.4  1.04   111.0      |   307.2  1.10   114.8          | 1.013, W 287
+σ 2,000   PP 512          |   598.2  1.07    60.2      |   596.1  1.05    62.5          | 0.996, W 374
+σ 2,000   PP 512 local 4  |   526.3  1.02    47.8      |   558.7  1.03    49.4          | 1.061, W 343
+σ 2,000   PP 512 local 1  |   395.2  1.10   231.3      |   390.5  1.33   256.8          | 0.988, W 294
+σ 4,000   PP 512          |   542.4  1.02    50.2      |   548.3  1.01    53.0          | 1.011, W 365
+σ 4,000   PP 512 local 4  |   451.8  1.05    30.9      |   476.4  1.01    31.5          | 1.055, W 340
+σ 4,000   PP 512 local 1  |   276.6  1.20   244.3      |   292.9  1.12   236.1          | 1.059, W 289
+
+# Ratios (medians; higher is better for the first named)
+  uniform   W 400      local 1 / PP 512 0.901; local 1 / WPs 512 0.795; local 4 / PP 512 0.792; local 4 / WPs 512 0.699; local 4 / local 1 0.879; PP 512 / WPs 512 0.882
+  uniform   controller local 1 / PP 512 0.905; local 1 / WPs 512 0.807; local 4 / PP 512 0.759; local 4 / WPs 512 0.677; local 4 / local 1 0.839; PP 512 / WPs 512 0.892
+  σ 2,000   W 400      local 1 / PP 512 0.661; local 4 / PP 512 0.880; local 4 / local 1 1.332
+  σ 2,000   controller local 1 / PP 512 0.655; local 4 / PP 512 0.937; local 4 / local 1 1.431
+  σ 4,000   W 400      local 1 / PP 512 0.510; local 4 / PP 512 0.833; local 4 / local 1 1.633
+  σ 4,000   controller local 1 / PP 512 0.534; local 4 / PP 512 0.869; local 4 / local 1 1.627
+
+# Message triggers, W 400 (share of htram messages, medians; bypass = events a PE sent alone because the shared buffer was busy or its local buffer full)
+  uniform   WPs 512         msgs/event 0.0798  GVT 0.986  urgent 0.0138  full 0.0000  idle 0.0000  bypass/msgs 0.0000
+  uniform   PP 512          msgs/event 0.0701  GVT 0.980  urgent 0.0193  full 0.0009  idle 0.0001  bypass/msgs 0.0009
+  uniform   PP 512 local 4  msgs/event 0.1050  GVT 0.987  urgent 0.0116  full 0.0000  idle 0.0009  bypass/msgs 0.8910
+  uniform   PP 512 local 1  msgs/event 0.0090  GVT 0.953  urgent 0.0419  full 0.0000  idle 0.0050  bypass/msgs 0.0187
+  σ 2,000   PP 512          msgs/event 0.0166  GVT 0.618  urgent 0.0873  full 0.2946  idle 0.0001  bypass/msgs 0.2210
+  σ 2,000   PP 512 local 4  msgs/event 0.0209  GVT 0.861  urgent 0.0710  full 0.0625  idle 0.0051  bypass/msgs 0.7648
+  σ 2,000   PP 512 local 1  msgs/event 0.0043  GVT 0.435  urgent 0.2269  full 0.3232  idle 0.0216  bypass/msgs 0.1373
+  σ 4,000   PP 512          msgs/event 0.0199  GVT 0.737  urgent 0.0807  full 0.1792  idle 0.0002  bypass/msgs 0.1367
+  σ 4,000   PP 512 local 4  msgs/event 0.0323  GVT 0.928  urgent 0.0409  full 0.0278  idle 0.0035  bypass/msgs 0.8191
+  σ 4,000   PP 512 local 1  msgs/event 0.0041  GVT 0.661  urgent 0.0816  full 0.2380  idle 0.0189  bypass/msgs 0.0427
+
+# Rollbacks, W 400 and controller (medians): efficiency %, rolled back per committed, late stragglers per committed, held stragglers per committed
+  uniform   WPs 512         w:400 eff 99.970  rb 0.00031  late 2.14e-06  held 2.44e-04
+  uniform   WPs 512         mb:0  eff 99.950  rb 0.00050  late 1.11e-05  held 2.62e-04
+  uniform   PP 512          w:400 eff 99.970  rb 0.00028  late 6.60e-07  held 2.18e-04
+  uniform   PP 512          mb:0  eff 99.950  rb 0.00052  late 1.28e-05  held 2.42e-04
+  uniform   PP 512 local 4  w:400 eff 99.980  rb 0.00016  late 0.00e+00  held 4.72e-05
+  uniform   PP 512 local 4  mb:0  eff 99.970  rb 0.00029  late 3.00e-08  held 4.42e-05
+  uniform   PP 512 local 1  w:400 eff 99.960  rb 0.00036  late 0.00e+00  held 2.37e-04
+  uniform   PP 512 local 1  mb:0  eff 99.960  rb 0.00041  late 9.33e-08  held 2.69e-04
+  σ 2,000   PP 512          w:400 eff 99.990  rb 0.00010  late 4.75e-06  held 5.96e-05
+  σ 2,000   PP 512          mb:0  eff 99.980  rb 0.00022  late 6.57e-06  held 6.08e-05
+  σ 2,000   PP 512 local 4  w:400 eff 99.990  rb 0.00008  late 1.57e-06  held 1.43e-05
+  σ 2,000   PP 512 local 4  mb:0  eff 99.990  rb 0.00014  late 2.08e-06  held 1.39e-05
+  σ 2,000   PP 512 local 1  w:400 eff 99.990  rb 0.00012  late 2.51e-07  held 1.59e-05
+  σ 2,000   PP 512 local 1  mb:0  eff 99.980  rb 0.00019  late 6.00e-07  held 1.56e-05
+  σ 4,000   PP 512          w:400 eff 99.970  rb 0.00029  late 7.69e-06  held 2.21e-04
+  σ 4,000   PP 512          mb:0  eff 99.950  rb 0.00051  late 1.10e-05  held 2.27e-04
+  σ 4,000   PP 512 local 4  w:400 eff 99.990  rb 0.00012  late 2.30e-06  held 2.87e-05
+  σ 4,000   PP 512 local 4  mb:0  eff 99.980  rb 0.00020  late 3.33e-06  held 3.08e-05
+  σ 4,000   PP 512 local 1  w:400 eff 99.990  rb 0.00014  late 3.64e-07  held 2.72e-05
+  σ 4,000   PP 512 local 1  mb:0  eff 99.980  rb 0.00018  late 7.82e-07  held 3.42e-05
+
+# Per rep, W 400 (M ev/s, by rep 1-5)
+  uniform   WPs 512           393.6   372.6   381.6   381.5   376.0
+  uniform   PP 512            331.1   330.5   340.2   336.7   338.6
+  uniform   PP 512 local 4    272.5   247.7   266.6   254.0   269.6
+  uniform   PP 512 local 1    299.1   304.9   303.4   302.1   310.6
+  σ 2,000   PP 512            609.3   593.4   571.8   598.2   603.0
+  σ 2,000   PP 512 local 4    531.0   520.7   522.1   528.9   526.3
+  σ 2,000   PP 512 local 1    395.2   408.1   372.6   403.0   381.0
+  σ 4,000   PP 512            545.8   535.0   545.3   534.1   542.4
+  σ 4,000   PP 512 local 4    452.0   452.8   450.1   431.8   451.8
+  σ 4,000   PP 512 local 1    282.5   310.9   276.6   274.7   260.1

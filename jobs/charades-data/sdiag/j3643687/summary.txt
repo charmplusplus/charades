@@ -1,0 +1,39 @@
+Throughput (M committed ev/s, W 400, mean of 2 reps; higher is better)
+  config       4 nodes  16 nodes 4->16 eff  traced/untraced 4     16
+  uni_wps512     101.7     280.2      0.69              0.984  0.985
+  uni_pp512      122.1     224.5      0.46              0.987  1.018
+  s2k_pp512      125.8     431.8      0.86              0.990  1.013
+
+--gvt-wave-events K / default 128, 16 nodes, untraced (higher is better)
+  uni_wps512  K  0:  296.2 (296.7, 295.8) vs 280.2 (279.4, 281.0) ratio 1.057
+  uni_wps512  K 32:  296.0 (298.0, 294.0) vs 280.2 (279.4, 281.0) ratio 1.056
+  uni_pp512   K  0:  232.9 (233.5, 232.3) vs 224.5 (224.8, 224.1) ratio 1.037
+  uni_pp512   K 32:  233.8 (232.0, 235.6) vs 224.5 (224.8, 224.1) ratio 1.042
+  s2k_pp512   K 32:  447.0 (444.4, 449.6) vs 431.8 (429.3, 434.4) ratio 1.035
+
+The late PE (the slowest process's last PE) against the median PE of the same process, per recorded wave, waves 10-95%, both reps
+(µs after the previous result in that process; lower is better; 'count' = share of waves it contributed because it reached --gvt-wave-events)
+  uni_wps512 4 nodes (3136 waves):
+    late  : delay 209 pick_in_pass 8 pick_outside 9 after_pick 192 exec 133 drain 35 recv 47 rollback 0 events 79 count 1.00 | µs/event after pickup 2.44 | buckets passed (median) 28
+    median: delay 49 pick_in_pass 2 pick_outside 1 after_pick 46 exec 5 drain 1 recv 1 rollback 0 events 2 count 0.29 | µs/event after pickup 21.86 | buckets passed (median) 41
+    late PE's rank (share): r18 0.08, r0 0.07, r6 0.06, r7 0.06 | slowest process: p2 0.35, p3 0.32, p4 0.14 | late PE ran >= 128 events in 0.00 of waves
+  uni_wps512 16 nodes (2780 waves):
+    late  : delay 339 pick_in_pass 22 pick_outside 28 after_pick 288 exec 159 drain 53 recv 102 rollback 0 events 61 count 0.97 | µs/event after pickup 4.74 | buckets passed (median) 37
+    median: delay 78 pick_in_pass 2 pick_outside 2 after_pick 75 exec 7 drain 1 recv 2 rollback 0 events 2 count 0.31 | µs/event after pickup 38.75 | buckets passed (median) 40
+    late PE's rank (share): r0 0.10, r18 0.06, r5 0.05, r11 0.05 | slowest process: p2 0.26, p12 0.11, p27 0.09 | late PE ran >= 128 events in 0.00 of waves
+  uni_pp512 4 nodes (3126 waves):
+    late  : delay 165 pick_in_pass 8 pick_outside 7 after_pick 150 exec 125 drain 28 recv 6 rollback 0 events 87 count 0.98 | µs/event after pickup 1.72 | buckets passed (median) 26
+    median: delay 25 pick_in_pass 2 pick_outside 1 after_pick 23 exec 3 drain 0 recv 0 rollback 0 events 2 count 0.30 | µs/event after pickup 14.18 | buckets passed (median) 41
+    late PE's rank (share): r8 0.08, r17 0.07, r7 0.07, r12 0.06 | slowest process: p4 0.28, p0 0.25, p2 0.15 | late PE ran >= 128 events in 0.01 of waves
+  uni_pp512 16 nodes (2798 waves):
+    late  : delay 387 pick_in_pass 13 pick_outside 32 after_pick 343 exec 154 drain 46 recv 79 rollback 0 events 59 count 0.94 | µs/event after pickup 5.78 | buckets passed (median) 37
+    median: delay 81 pick_in_pass 2 pick_outside 6 after_pick 73 exec 7 drain 1 recv 2 rollback 0 events 2 count 0.33 | µs/event after pickup 31.40 | buckets passed (median) 40
+    late PE's rank (share): r5 0.06, r0 0.06, r18 0.06, r6 0.06 | slowest process: p0 0.14, p16 0.13, p4 0.11 | late PE ran >= 128 events in 0.01 of waves
+  s2k_pp512 4 nodes (3106 waves):
+    late  : delay 156 pick_in_pass 12 pick_outside 8 after_pick 136 exec 117 drain 22 recv 2 rollback 0 events 90 count 0.99 | µs/event after pickup 1.51 | buckets passed (median) 27
+    median: delay 22 pick_in_pass 3 pick_outside 1 after_pick 18 exec 2 drain 0 recv 0 rollback 0 events 1 count 0.34 | µs/event after pickup 18.77 | buckets passed (median) 41
+    late PE's rank (share): r0 0.20, r6 0.10, r2 0.07, r21 0.06 | slowest process: p4 0.21, p0 0.18, p2 0.14 | late PE ran >= 128 events in 0.03 of waves
+  s2k_pp512 16 nodes (2831 waves):
+    late  : delay 143 pick_in_pass 20 pick_outside 15 after_pick 107 exec 78 drain 16 recv 2 rollback 0 events 55 count 0.94 | µs/event after pickup 1.94 | buckets passed (median) 36
+    median: delay 21 pick_in_pass 3 pick_outside 1 after_pick 17 exec 1 drain 0 recv 0 rollback 0 events 1 count 0.32 | µs/event after pickup 26.43 | buckets passed (median) 41
+    late PE's rank (share): r0 0.21, r2 0.05, r4 0.05, r3 0.05 | slowest process: p16 0.06, p2 0.05, p20 0.05 | late PE ran >= 128 events in 0.00 of waves

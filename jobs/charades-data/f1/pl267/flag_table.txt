@@ -1,0 +1,27 @@
+workload configs:
+  1 x steady_100_1000_1.0_94208_15_256000
+  40 x steady_100_1000_1.0_94208_15_2048000
+  30 x gauss_100_1000_2000_94208_15_2048000
+  30 x gauss_100_1000_4000_94208_15_2048000
+flags between "+pe 736" and the launch, by workload:
+   5 x sigma2000  bucket --ctl=3 --ctl-bracket=1 --gvt-bucket-size=8 --aggregation=1 --agg-mode=2 --agg-buffer=512 --agg-policy=1 --agg-horizon-margin=8
+   5 x sigma2000  bucket --ctl=3 --ctl-bracket=1 --gvt-bucket-size=8 --aggregation=1 --agg-mode=2 --agg-buffer=512 --agg-policy=1 --agg-horizon-margin=8 --agg-pp-local=1
+   5 x sigma2000  bucket --ctl=3 --ctl-bracket=1 --gvt-bucket-size=8 --aggregation=1 --agg-mode=2 --agg-buffer=512 --agg-policy=1 --agg-horizon-margin=8 --agg-pp-local=4
+   5 x sigma2000  bucket --optimism-window=400 --gvt-bucket-size=8 --aggregation=1 --agg-mode=2 --agg-buffer=512 --agg-policy=1 --agg-horizon-margin=8
+   5 x sigma2000  bucket --optimism-window=400 --gvt-bucket-size=8 --aggregation=1 --agg-mode=2 --agg-buffer=512 --agg-policy=1 --agg-horizon-margin=8 --agg-pp-local=1
+   5 x sigma2000  bucket --optimism-window=400 --gvt-bucket-size=8 --aggregation=1 --agg-mode=2 --agg-buffer=512 --agg-policy=1 --agg-horizon-margin=8 --agg-pp-local=4
+   5 x sigma4000  bucket --ctl=3 --ctl-bracket=1 --gvt-bucket-size=8 --aggregation=1 --agg-mode=2 --agg-buffer=512 --agg-policy=1 --agg-horizon-margin=8
+   5 x sigma4000  bucket --ctl=3 --ctl-bracket=1 --gvt-bucket-size=8 --aggregation=1 --agg-mode=2 --agg-buffer=512 --agg-policy=1 --agg-horizon-margin=8 --agg-pp-local=1
+   5 x sigma4000  bucket --ctl=3 --ctl-bracket=1 --gvt-bucket-size=8 --aggregation=1 --agg-mode=2 --agg-buffer=512 --agg-policy=1 --agg-horizon-margin=8 --agg-pp-local=4
+   5 x sigma4000  bucket --optimism-window=400 --gvt-bucket-size=8 --aggregation=1 --agg-mode=2 --agg-buffer=512 --agg-policy=1 --agg-horizon-margin=8
+   5 x sigma4000  bucket --optimism-window=400 --gvt-bucket-size=8 --aggregation=1 --agg-mode=2 --agg-buffer=512 --agg-policy=1 --agg-horizon-margin=8 --agg-pp-local=1
+   5 x sigma4000  bucket --optimism-window=400 --gvt-bucket-size=8 --aggregation=1 --agg-mode=2 --agg-buffer=512 --agg-policy=1 --agg-horizon-margin=8 --agg-pp-local=4
+   5 x uniform    bucket --ctl=3 --ctl-bracket=1 --gvt-bucket-size=8 --aggregation=1 --agg-mode=0 --agg-buffer=512 --agg-policy=1 --agg-horizon-margin=8
+   5 x uniform    bucket --ctl=3 --ctl-bracket=1 --gvt-bucket-size=8 --aggregation=1 --agg-mode=2 --agg-buffer=512 --agg-policy=1 --agg-horizon-margin=8
+   5 x uniform    bucket --ctl=3 --ctl-bracket=1 --gvt-bucket-size=8 --aggregation=1 --agg-mode=2 --agg-buffer=512 --agg-policy=1 --agg-horizon-margin=8 --agg-pp-local=1
+   5 x uniform    bucket --ctl=3 --ctl-bracket=1 --gvt-bucket-size=8 --aggregation=1 --agg-mode=2 --agg-buffer=512 --agg-policy=1 --agg-horizon-margin=8 --agg-pp-local=4
+   5 x uniform    bucket --optimism-window=400 --gvt-bucket-size=8 --aggregation=1 --agg-mode=0 --agg-buffer=512 --agg-policy=1 --agg-horizon-margin=8
+   5 x uniform    bucket --optimism-window=400 --gvt-bucket-size=8 --aggregation=1 --agg-mode=2 --agg-buffer=512 --agg-policy=1 --agg-horizon-margin=8
+   6 x uniform    bucket --optimism-window=400 --gvt-bucket-size=8 --aggregation=1 --agg-mode=2 --agg-buffer=512 --agg-policy=1 --agg-horizon-margin=8 --agg-pp-local=1
+   5 x uniform    bucket --optimism-window=400 --gvt-bucket-size=8 --aggregation=1 --agg-mode=2 --agg-buffer=512 --agg-policy=1 --agg-horizon-margin=8 --agg-pp-local=4
+diagnostic flags anywhere: 0

@@ -1,0 +1,52 @@
+records: start probe gate warm rep1 rep2 rep3 rep4 rep5
+
+# probe (start -> probe, 253 s, 48 nodes in both records; no earlier record for 16: c478-093 c482-014 c484-004 c484-041 c485-024 c489-081 c489-084 c489-101 c490-001 c490-034 c491-024 c497-101 c498-073 c500-043 c501-011 c504-092)
+  lost packets, all nodes: none
+
+# gate (probe -> gate, 51 s, 64 nodes in both records)
+  lost packets, all nodes: none
+
+# warm (gate -> warm, 8 s, 64 nodes in both records)
+  lost packets, all nodes: none
+
+# rep1 (warm -> rep1, 82 s, 64 nodes in both records)
+  lost packets, all nodes: none
+
+# rep2 (rep1 -> rep2, 77 s, 64 nodes in both records)
+  lost packets, all nodes: none
+
+# rep3 (rep2 -> rep3, 76 s, 64 nodes in both records)
+  lost packets, all nodes: none
+
+# rep4 (rep3 -> rep4, 77 s, 64 nodes in both records)
+  lost packets, all nodes: none
+
+# rep5 (rep4 -> rep5, 82 s, 64 nodes in both records)
+  lost packets, all nodes: none
+
+# fabric manager, start
+  every query failed: failed to open hfi 0, port 0: 16 (6 times)
+
+# fabric manager, probe
+  every query failed: failed to open hfi 0, port 0: 16 (4 times)
+
+# fabric manager, gate
+  every query failed: failed to open hfi 0, port 0: 16 (4 times)
+
+# fabric manager, warm
+  every query failed: failed to open hfi 0, port 0: 16 (4 times)
+
+# fabric manager, rep1
+  every query failed: failed to open hfi 0, port 0: 16 (4 times)
+
+# fabric manager, rep2
+  every query failed: failed to open hfi 0, port 0: 16 (4 times)
+
+# fabric manager, rep3
+  every query failed: failed to open hfi 0, port 0: 16 (4 times)
+
+# fabric manager, rep4
+  every query failed: failed to open hfi 0, port 0: 16 (4 times)
+
+# fabric manager, rep5
+  every query failed: failed to open hfi 0, port 0: 16 (4 times)

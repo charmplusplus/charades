@@ -1,0 +1,7 @@
+uniform, WPs 512, W 400, long runs (µs per send, mean over PEs and 2 reps; lower is better)
+   4 nodes: a send 6.642 = trim 0.041 + Charm++ send 6.367 + renew 0.235 | inside the Charm++ send: Reconverse node send 6.146 per call (1.02 calls per htram send; shared-memory attempt 0.045, sent by shared memory 0.00; LCI issueAm 6.102 per call), Charm++'s own 0.091
+           GVT-time flush: 24.4 µs per update, 3.48 messages, 7.03 µs per message | traced ÷ untraced 0.816 (untraced 115.2 M ev/s)
+  16 nodes: a send 4.224 = trim 0.040 + Charm++ send 4.005 + renew 0.180 | inside the Charm++ send: Reconverse node send 3.864 per call (1.01 calls per htram send; shared-memory attempt 0.042, sent by shared memory 0.00; LCI issueAm 3.822 per call), Charm++'s own 0.109
+           GVT-time flush: 43.8 µs per update, 9.87 messages, 4.44 µs per message | traced ÷ untraced 0.857 (untraced 356.0 M ev/s)
+
+GVT-time flush slope between 4 and 16 nodes: 3.03 µs per message; a send costs 6.64 (4 nodes) and 4.22 (16 nodes) -> sends explain 139% of the slope; fixed part per update 13.9 µs

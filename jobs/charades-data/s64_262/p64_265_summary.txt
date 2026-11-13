@@ -1,0 +1,145 @@
+P64 runs: Charades 220, Devastator 145, ROSS 115; failed or stalled: 1; Charades runs without count waves: 0
+  bad ('p_j3696079/n64/deva/results.txt', 'uni_w4000_r1', 'stall')
+
+# 64 nodes (F1-32 in brackets): M committed ev/s, medians of 5; ratios Charades / other
+workload               | Charades ctl (htram)     | best fixed (htram, W)      | ctl/fx  | Devastator best (W)    | ROSS best          | C/D         | C/R         | per-node 32->64 C / D / R
+σ 100                  |  2942.6 pp2048   [ 1532.3] |  3035.6 pp2048 W500  [W400 ] | 0.969 |  2430.0 W1000  [ 1216.0] |  640.6 cons    | 1.21 [1.26] | 4.59 [4.05] | 0.96 / 1.00 / 0.85
+σ 500                  |  2599.9 pp2048   [ 1358.5] |  2671.7 pp2048 W500  [W400 ] | 0.973 |  1822.5 W1000  [  927.5] |  468.9 optw500 | 1.43 [1.46] | 5.54 [4.98] | 0.96 / 0.98 / 0.86
+σ 1,000                |  2435.5 pp2048   [ 1279.7] |  2608.1 pp512  W500  [W400 ] | 0.934 |  1559.8 W1000  [  810.2] |  410.0 optw500 | 1.56 [1.58] | 5.94 [5.46] | 0.95 / 0.96 / 0.87
+σ 2,000                |  2307.4 pp512    [ 1163.5] |  2383.7 pp512  W400  [W400 ] | 0.968 |  1354.2 W1000  [  699.5] |  356.9 optw500 | 1.70 [1.66] | 6.46 [5.94] | 0.99 / 0.97 / 0.91
+σ 4,000                |  2056.1 pp512    [ 1067.6] |  2169.2 pp512  W400  [W400 ] | 0.948 |  1058.8 W1000  [  540.2] |  340.1 optw1000 | 1.94 [1.98] | 6.04 [6.08] | 0.96 / 0.98 / 0.97
+uniform                |   980.0 wps512   [  627.8] |  1000.7 wps512 W500  [W400 ] | 0.979 |   489.3 W1000  [  312.4] |  295.2 opt     | 2.00 [2.01] | 3.32 [3.87] | 0.78 / 0.78 / 0.91
+lookahead 10, σ 500    |  2412.0 pp2048   [ 1222.4] |  2479.6 pp2048 W75   [W100 ] | 0.973 |  1792.8 W200   [  930.8] |  463.2 optw100 | 1.35 [1.31] | 5.21 [4.54] | 0.99 / 0.96 / 0.86
+lookahead 10, σ 2,000  |  2006.0 wps512   [ 1012.8] |  2049.1 wps512 W75   [W50  ] | 0.979 |  1294.9 W200   [  669.6] |  354.5 optw100 | 1.55 [1.51] | 5.66 [5.18] | 0.99 / 0.97 / 0.91
+C/D range 1.21-2.00 (32: 1.26-2.01); ahead in 8 of 8; C/R range 3.32-6.46
+per-node 32->64: Charades 0.78-0.99, Devastator 0.78-1.00, ROSS 0.85-0.97; Charades >= Devastator in 3 of 8
+controller / best fixed W: 0.934-0.979
+
+# Counts (one per workload over every engine and arm)
+  g100      [11581458749]
+  g500      [11581452723]
+  g1000     [11581454362]
+  g2000     [11581451841]
+  g4000     [11581445389]
+  uni       [11581457663]
+  l10g500   [14506146004]
+  l10g2000  [14506156424]
+  g1000x    [11581454362]
+
+# Charades per arm (median; spread = max/min over reps; controller mean W)
+  g100      pp2048  mb:0    2942.6  spread 1.30  reps 2320 2930 2943 2972 3008
+  g100      pp2048  w:300   2642.0  spread 1.17  reps 2295 2638 2642 2687 2688
+  g100      pp2048  w:400   2979.2  spread 1.06  reps 2870 2958 2979 3013 3027
+  g100      pp2048  w:500   3035.6  spread 1.02  reps 2988 3034 3036 3052 3057
+  g100      controller mean W 478-513
+  g500      pp2048  mb:0    2599.9  spread 1.02  reps 2579 2583 2600 2626 2639
+  g500      pp2048  w:300   2392.3  spread 1.05  reps 2335 2387 2392 2437 2456
+  g500      pp2048  w:400   2668.8  spread 1.09  reps 2474 2649 2669 2681 2700
+  g500      pp2048  w:500   2671.7  spread 1.07  reps 2509 2623 2672 2680 2686
+  g500      controller mean W 471-492
+  g1000     pp2048  mb:0    2435.5  spread 1.03  reps 2420 2429 2435 2485 2495
+  g1000     pp2048  w:300   2278.3  spread 1.03  reps 2213 2253 2278 2283 2288
+  g1000     pp2048  w:400   2489.0  spread 1.02  reps 2450 2460 2489 2497 2503
+  g1000     pp2048  w:500   2489.8  spread 1.12  reps 2272 2445 2490 2530 2535
+  g1000     controller mean W 481-493
+  g2000     pp512   mb:0    2307.4  spread 1.03  reps 2279 2306 2307 2343 2344
+  g2000     pp512   w:300   2233.5  spread 1.05  reps 2152 2213 2234 2239 2252
+  g2000     pp512   w:400   2383.7  spread 1.02  reps 2351 2360 2384 2396 2396
+  g2000     pp512   w:500   2312.1  spread 1.14  reps 2048 2167 2312 2336 2340
+  g2000     controller mean W 454-470
+  g4000     pp512   mb:0    2056.1  spread 1.04  reps 2014 2035 2056 2074 2086
+  g4000     pp512   w:300   2037.2  spread 1.00  reps 2029 2034 2037 2038 2038
+  g4000     pp512   w:400   2169.2  spread 1.04  reps 2116 2166 2169 2170 2191
+  g4000     pp512   w:500   2069.2  spread 1.05  reps 2016 2063 2069 2104 2116
+  g4000     controller mean W 400-455
+  uni       pp512   mb:0     829.8  spread 1.05  reps 801 812 830 839 840
+  uni       pp512   w:300    786.7  spread 1.01  reps 779 779 787 787 790
+  uni       pp512   w:400    810.1  spread 1.02  reps 800 809 810 811 814
+  uni       pp512   w:500    787.5  spread 1.05  reps 753 784 788 788 792
+  uni       wps512  mb:0     980.0  spread 1.09  reps 920 927 980 1000 1003
+  uni       wps512  w:300    940.2  spread 1.08  reps 902 908 940 973 977
+  uni       wps512  w:400    998.9  spread 1.04  reps 974 986 999 1006 1010
+  uni       wps512  w:500   1000.7  spread 1.03  reps 976 981 1001 1007 1009
+  uni       controller mean W 408-470
+  l10g500   pp2048  mb:0    2412.0  spread 1.03  reps 2364 2366 2412 2412 2426
+  l10g500   pp2048  w:100   2207.5  spread 1.15  reps 1945 2184 2208 2219 2238
+  l10g500   pp2048  w:50    2115.0  spread 1.01  reps 2105 2113 2115 2120 2134
+  l10g500   pp2048  w:75    2479.6  spread 1.19  reps 2102 2142 2480 2493 2499
+  l10g500   controller mean W 75-78
+  l10g2000  pp512   mb:0    1947.7  spread 1.07  reps 1854 1929 1948 1949 1976
+  l10g2000  pp512   w:100   1936.2  spread 1.03  reps 1879 1934 1936 1938 1939
+  l10g2000  pp512   w:50    1803.4  spread 1.02  reps 1794 1803 1803 1809 1822
+  l10g2000  pp512   w:75    2037.3  spread 1.01  reps 2015 2033 2037 2038 2039
+  l10g2000  wps512  mb:0    2006.0  spread 1.04  reps 1951 2003 2006 2024 2026
+  l10g2000  wps512  w:100   1867.4  spread 1.07  reps 1791 1865 1867 1882 1908
+  l10g2000  wps512  w:50    1814.3  spread 1.01  reps 1800 1814 1814 1820 1821
+  l10g2000  wps512  w:75    2049.1  spread 1.10  reps 1876 2041 2049 2052 2061
+  l10g2000  controller mean W 77-86
+  g1000x    pp512   mb:0    2404.9  spread 1.10  reps 2290 2346 2405 2474 2511
+  g1000x    pp512   w:300   2354.7  spread 1.02  reps 2320 2332 2355 2358 2362
+  g1000x    pp512   w:400   2515.2  spread 1.06  reps 2441 2514 2515 2575 2576
+  g1000x    pp512   w:500   2608.1  spread 1.01  reps 2594 2605 2608 2610 2618
+  g1000x    controller mean W 356-479
+
+# Devastator per W (median; spread) and ROSS per arm
+  g100      D: W500 2241.8 s1.12  W1000 2430.0 s1.79  W2000 2237.8 s1.27  W4000 1723.4 s1.04
+            R: cons 640.6  opt 528.6  optw250 630.0
+            C/D against Devastator's fastest rep (2459.2): 1.20
+  g500      D: W500 1660.4 s2.85  W1000 1822.5 s1.01  W2000 1569.7 s1.03  W4000 1147.2 s1.04
+            R: cons 447.9  opt 454.5  optw500 468.9
+            C/D against Devastator's fastest rep (1831.6): 1.42
+  g1000     D: W500 1344.2 s1.14  W1000 1559.8 s1.01  W2000 1455.3 s1.08  W4000 1085.9 s1.26
+            R: cons 388.0  opt 398.6  optw500 410.0
+            C/D against Devastator's fastest rep (1563.4): 1.56
+  g2000     D: W500 1169.1 s1.01  W1000 1354.2 s1.01  W2000 1259.0 s1.16  W4000 159.2 s1.22
+            R: cons 332.9  opt 348.8  optw500 356.9
+            C/D against Devastator's fastest rep (1357.2): 1.70
+  g4000     D: W500 982.3 s1.02  W1000 1058.8 s1.44  W2000 830.5 s1.07  W4000 101.1 s1.55
+            R: cons 313.4  opt 326.5  optw1000 340.1
+            C/D against Devastator's fastest rep (1093.0): 1.88
+  uni       D: W500 454.7 s1.01  W1000 489.3 s7.38  W2000 389.2 s1.16
+            R: cons 269.0  opt 295.2
+            C/D against Devastator's fastest rep (497.1): 1.97
+  l10g500   D: W100 1589.4 s4.28  W200 1792.8 s1.50  W400 1523.2 s1.17
+            R: cons 374.1  opt 441.7  optw100 463.2
+            C/D against Devastator's fastest rep (1801.6): 1.34
+  l10g2000  D: W100 1121.7 s1.27  W200 1294.9 s3.68  W400 1178.9 s1.11
+            R: cons 282.7  opt 350.9  optw100 354.5
+            C/D against Devastator's fastest rep (1298.6): 1.54
+
+# Bundling: best htram fixed W / best direct fixed W (64 nodes; AG32 at 32)
+  uni    direct w:300 540.6 w:400 504.6; best htram wps512 w:500 1000.7; bundling 1.85 (AG32 32 nodes: 2.29); controller / best direct 1.81; events per htram message pp512 5.7 wps512 5.6
+  g4000  direct w:300 603.9 w:400 652.7; best htram pp512 w:400 2169.2; bundling 3.32 (AG32 32 nodes: 3.14); controller / best direct 3.15; events per htram message pp512 50.2
+
+# Spread between reps above 1.10 (64 nodes)
+  ('uni', 64, 1000)                        7.38 (without the slowest 1.02)
+  ('l10g500', 64, 100)                     4.28 (without the slowest 1.04)
+  ('l10g2000', 64, 200)                    3.68 (without the slowest 1.03)
+  ('g500', 64, 500)                        2.85 (without the slowest 1.01)
+  ('g100', 64, 1000)                       1.79 (without the slowest 1.10)
+  ('g4000', 64, 4000)                      1.55 (without the slowest 1.21)
+  ('l10g500', 64, 200)                     1.50 (without the slowest 1.02)
+  ('g4000', 64, 1000)                      1.44 (without the slowest 1.13)
+  ('g4000', 64, 'optw1000')                1.36 (without the slowest 1.03)
+  ('g100', 64, 'pp2048', 'mb:0')           1.30 (without the slowest 1.03)
+  ('g100', 64, 2000)                       1.27 (without the slowest 1.06)
+  ('l10g2000', 64, 100)                    1.27 (without the slowest 1.00)
+  ('g1000', 64, 4000)                      1.26 (without the slowest 1.03)
+  ('g2000', 64, 4000)                      1.22 (without the slowest 1.16)
+  ('l10g500', 64, 'pp2048', 'w:75')        1.19 (without the slowest 1.17)
+  ('g4000', 64, 'cons')                    1.19 (without the slowest 1.01)
+  ('uni', 64, 'opt')                       1.18 (without the slowest 1.12)
+  ('g1000', 64, 'opt')                     1.18 (without the slowest 1.02)
+  ('g100', 64, 'pp2048', 'w:300')          1.17 (without the slowest 1.02)
+  ('l10g500', 64, 400)                     1.17 (without the slowest 1.05)
+  ('uni', 64, 2000)                        1.16 (without the slowest 1.03)
+  ('g2000', 64, 2000)                      1.16 (without the slowest 1.03)
+  ('l10g500', 64, 'pp2048', 'w:100')       1.15 (without the slowest 1.03)
+  ('uni', 64, 'cons')                      1.15 (without the slowest 1.08)
+  ('g2000', 64, 'pp512', 'w:500')          1.14 (without the slowest 1.08)
+  ('g1000', 64, 500)                       1.14 (without the slowest 1.04)
+  ('g4000', 64, 'opt')                     1.13 (without the slowest 1.06)
+  ('g100', 64, 500)                        1.12 (without the slowest 1.06)
+  ('g1000', 64, 'pp2048', 'w:500')         1.12 (without the slowest 1.04)
+  ('l10g2000', 64, 400)                    1.11 (without the slowest 1.03)
+arms above 1.10: 30

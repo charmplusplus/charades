@@ -1,0 +1,106 @@
+ross 1 1 vlsi_s1_b8g64 rep 1 stall
+ross 4 1 vlsi_s1_b8g64 rep 1 fail
+
+===== 1 node(s), span 1: counts ['125998590']; Charades digests {'balanced': ['87c11aec982ad656'], 'file': ['be287b9c982a21c5']}; Devastator deterministic ['1']
+-- charades: best fixed direct w:2500 (22.9 M ev/s)
+   arm                        M ev/s    eff%  blk%   min   max   meanW  ÷best of rep (r1/r2)
+   direct w:2500                22.9   98.52  62.7  20.3  85.2    2500  1.00/1.00
+   wps512 w:2500                22.7   98.06  62.0  21.7  81.8    2500  1.00/0.99
+   direct w:10000               22.6   84.14  49.5   1.3  78.2   10000  1.00/0.97
+   pp2048 w:5000                19.3   93.02  51.2   8.5  78.7    5000  0.84/0.85
+   pp2048 w:2500                19.1   97.19  60.5  29.4  79.3    2500  0.84/0.83
+   pp2048 w:1250                15.8   97.03  64.2  29.2  89.0    1250  0.69/0.69
+   pp2048 mb:0                  15.4   97.28  65.5  35.3  89.5     500  0.68/0.66
+   pp2048 w:10000               15.1   80.11  47.8   1.0  82.3   10000  0.66/0.66
+   pp2048 w:20000               12.8   69.13  43.9   0.5  84.9   20000  0.56/0.56
+   file w:2500                   8.2   98.05  67.3   0.0  99.8    2500  0.36/0.36
+-- devastator: best fixed 10000 (45.0 M ev/s)
+   arm                        M ev/s    eff%  blk%   min   max   meanW  ÷best of rep (r1/r2)
+   10000                        45.0   88.09                            1.00/1.00
+   5000                         44.3   94.37                            0.98/0.99
+   20000                        43.4   83.62                            0.96/0.97
+   2500                         41.2   98.10                            0.91/0.92
+   1250                         33.8   98.08                            0.75/0.75
+   adaptive                     27.0   72.71                            0.59/0.61
+   file 10000                    6.7   95.17                            0.15/0.15
+-- ross: best fixed vlsi_s1_b2g64m5000 (3.3 M ev/s)
+   arm                        M ev/s    eff%  blk%   min   max   meanW  ÷best of rep (r1/r2)
+   vlsi_s1_b2g64m5000            3.3   27.41                            1.00/1.00
+   vlsi_s1_b8g64m2500            1.8  -40.45                            0.55/0.54
+   vlsi_s1_b8g64m5000            1.4 -132.97                            0.41/0.40
+   vlsi_s1_b32g64m5000           1.3 -147.07                            0.39/0.38
+   vlsi_s1_b8g64m10000           0.8 -279.12                            0.25/0.25
+-- aggregation at W 2500, pp2048 ÷ direct: 0.83
+-- aggregation at W 2500, wps512 ÷ direct: 0.99
+-- aggregation at W 10000, pp2048 ÷ direct: 0.67
+-- Charades' controller ÷ its best fixed W: 0.67
+-- Charades ÷ devastator, each at its best fixed: 0.51; Charades' controller ÷ devastator: 0.34
+-- Charades ÷ ross, each at its best fixed: 6.86; Charades' controller ÷ ross: 4.62
+-- Charades at W 2,500, balanced ÷ file order: 2.32 (file order 8.2 M ev/s)
+-- Devastator at W 10,000, balanced ÷ file order: 6.73 (file order 6.7 M ev/s)
+
+===== 4 node(s), span 1: counts ['574541914']; Charades digests {'balanced': ['0c800d36f9c2f85c'], 'file': ['d936d32a519d4f62']}; Devastator deterministic ['1']
+-- charades: best fixed direct w:2500 (61.9 M ev/s)
+   arm                        M ev/s    eff%  blk%   min   max   meanW  ÷best of rep (r1/r2)
+   direct w:2500                61.9   98.19  73.9  19.5  91.0    2500  1.00/1.00
+   wps512 w:2500                59.3   97.75  74.1  20.4  89.8    2500  0.96/0.96
+   direct w:10000               56.0   92.43  71.9   1.0  90.6   10000  0.91/0.90
+   pp2048 w:2500                48.0   97.09  73.3  19.1  88.6    2500  0.76/0.79
+   pp2048 w:5000                45.4   95.78  73.0   1.4  88.9    5000  0.74/0.73
+   pp2048 w:1250                42.5   97.09  75.3  18.4  93.6    1250  0.69/0.69
+   pp2048 mb:0                  42.1   97.04  74.8  20.3  93.6     500  0.70/0.66
+   pp2048 w:10000               41.4   94.19  74.0   1.1  89.4   10000  0.68/0.66
+   pp2048 w:20000               39.3   91.38  74.3   0.6  89.4   20000  0.62/0.65
+   file w:2500                  35.9   98.97  69.1   0.0  99.9    2500  0.58/0.58
+-- devastator: best fixed 2500 (82.6 M ev/s)
+   arm                        M ev/s    eff%  blk%   min   max   meanW  ÷best of rep (r1/r2)
+   2500                         82.6   99.26                            0.99/1.00
+   10000                        82.5   98.28                            1.00/0.99
+   20000                        79.4   94.31                            0.96/0.96
+   5000                         78.8   98.56                            0.98/0.92
+   1250                         77.6   98.05                            0.93/0.93
+   adaptive                     44.3   73.10                            0.58/0.48
+   file 10000                   32.0   93.50                            0.38/0.39
+-- ross: best fixed vlsi_s1_b8g64m2500 (7.8 M ev/s)
+   arm                        M ev/s    eff%  blk%   min   max   meanW  ÷best of rep (r1/r2)
+   vlsi_s1_b8g64m2500            7.8   53.51                            1.00/1.00
+   vlsi_s1_b2g64m5000            7.3   42.97                            0.93/0.94
+   vlsi_s1_b8g64m5000            6.0   34.62                            0.76/0.76
+   vlsi_s1_b32g64m5000           5.2  -17.77                            0.66/0.67
+   vlsi_s1_b8g64m10000           3.1 -143.84                            0.39/0.40
+-- aggregation at W 2500, pp2048 ÷ direct: 0.78
+-- aggregation at W 2500, wps512 ÷ direct: 0.96
+-- aggregation at W 10000, pp2048 ÷ direct: 0.74
+-- Charades' controller ÷ its best fixed W: 0.68
+-- Charades ÷ devastator, each at its best fixed: 0.75; Charades' controller ÷ devastator: 0.51
+-- Charades ÷ ross, each at its best fixed: 7.89; Charades' controller ÷ ross: 5.37
+-- Charades at W 2,500, balanced ÷ file order: 1.34 (file order 35.9 M ev/s)
+-- Devastator at W 10,000, balanced ÷ file order: 2.58 (file order 32.0 M ev/s)
+
+===== 4 node(s), span 4: counts ['574541914']; Charades digests {'balanced': ['58c390632cd5d07d']}; Devastator deterministic ['1']
+-- charades: best fixed direct w:2500 (48.9 M ev/s)
+   arm                        M ev/s    eff%  blk%   min   max   meanW  ÷best of rep (r1/r2)
+   direct w:2500                48.9   97.93  72.1  18.5  91.5    2500  1.00/1.00
+   direct w:10000               46.9   93.28  69.9   0.9  90.8   10000  0.95/0.96
+   pp2048 w:10000               33.9   92.28  59.6   2.7  93.2   10000  0.69/0.70
+   pp2048 w:5000                33.4   96.88  63.8   9.2  93.5    5000  0.68/0.68
+   pp2048 w:2500                31.9   97.34  67.9  21.9  94.3    2500  0.65/0.65
+   pp2048 mb:0                  30.3   97.24  68.2  30.5  95.7     500  0.61/0.63
+-- devastator: best fixed 10000 (88.2 M ev/s)
+   arm                        M ev/s    eff%  blk%   min   max   meanW  ÷best of rep (r1/r2)
+   10000                        88.2   87.39                            1.00/1.00
+   5000                         87.4   94.67                            1.00/0.98
+   2500                         78.7   97.87                            0.89/0.89
+-- ross: best fixed vlsi_s4_b8g64m5000 (6.2 M ev/s)
+   arm                        M ev/s    eff%  blk%   min   max   meanW  ÷best of rep (r1/r2)
+   vlsi_s4_b8g64m5000            6.2   39.35                            1.00/1.00
+-- aggregation at W 2500, pp2048 ÷ direct: 0.65
+-- aggregation at W 10000, pp2048 ÷ direct: 0.72
+-- Charades' controller ÷ its best fixed W: 0.62
+-- Charades ÷ devastator, each at its best fixed: 0.55; Charades' controller ÷ devastator: 0.34
+-- Charades ÷ ross, each at its best fixed: 7.88; Charades' controller ÷ ross: 4.88
+
+-- 4 nodes, charades's best at span 4 ÷ at span 1: 0.79
+
+-- 4 nodes, devastator's best at span 4 ÷ at span 1: 1.07
+-- span 1, Charades per-node rate at 4 nodes ÷ at 1: 0.68

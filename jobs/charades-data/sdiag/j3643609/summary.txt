@@ -1,0 +1,21 @@
+37
+warm r1_n4_gauss_100_1000_100_pp512_b8_m8_w400                    stall   69.77s
+[13:57:23] REP 1 DONE
+[13:58:00] REP 2 DONE
+[13:58:36] REP 3 DONE
+[13:58:36] SDIAG12 DONE
+Throughput, untraced (M committed ev/s, mean of 3 reps; ratio = arm / base, higher is better)
+  sigma  100 fo0   :  167.5 (167.6, 168.3, 166.5) ratio 1.000
+  sigma  100 fo1   :  162.7 (167.8, 152.7, 167.8) ratio 0.972
+  sigma  100 fo2   :  165.4 (166.4, 165.2, 164.5) ratio 0.987
+  sigma 2000 fo0   :  125.1 (124.9, 125.0, 125.5) ratio 1.000
+  sigma 2000 fo1   :  125.2 (124.6, 125.9, 125.1) ratio 1.001
+  sigma 2000 fo2   :  124.8 (125.2, 125.3, 123.9) ratio 0.997
+
+Lateness (traced, waves 10-95%, both reps): mean contribution delay (us) by rank; last-PE share of the slowest process
+  sigma  100 fo0   : r0=25 r1=13 r2=12 r9=12 r10=12 r11=12 r12=12 r21=13 r22=15 | middle ranks 12 | last PE: r0 0.70, r22 0.10, r6 0.06, r3 0.05 | slowest-PE delay 109
+  sigma  100 fo1   : r0=24 r1=13 r2=12 r9=12 r10=12 r11=12 r12=12 r21=13 r22=15 | middle ranks 12 | last PE: r0 0.64, r22 0.14, r3 0.04, r11 0.04 | slowest-PE delay 111
+  sigma  100 fo2   : r0=25 r1=14 r2=13 r9=12 r10=12 r11=12 r12=12 r21=13 r22=15 | middle ranks 12 | last PE: r0 0.71, r22 0.08, r2 0.06, r1 0.04 | slowest-PE delay 111
+  sigma 2000 fo0   : r0=32 r1=24 r2=25 r9=23 r10=23 r11=23 r12=23 r21=23 r22=23 | middle ranks 23 | last PE: r0 0.28, r2 0.09, r8 0.06, r4 0.05 | slowest-PE delay 164
+  sigma 2000 fo1   : r0=31 r1=25 r2=24 r9=22 r10=22 r11=23 r12=23 r21=23 r22=24 | middle ranks 23 | last PE: r0 0.28, r1 0.10, r18 0.06, r2 0.05 | slowest-PE delay 161
+  sigma 2000 fo2   : r0=32 r1=25 r2=25 r9=23 r10=23 r11=24 r12=24 r21=23 r22=24 | middle ranks 23 | last PE: r0 0.28, r1 0.09, r2 0.08, r6 0.05 | slowest-PE delay 163

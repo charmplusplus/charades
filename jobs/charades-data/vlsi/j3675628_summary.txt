@@ -1,0 +1,44 @@
+
+===== 1 node(s): counts ['125998590']; digests ['87c11aec982ad656']
+   arm                               M ev/s  ÷ref   eff%  blk%   min   max  meanW   GVTs waves/GVT  lag ps ms/cycle
+   direct_b2500 w:5000                 24.5  1.07  93.94  54.4   3.7  79.4   5000   4999      2.57    2102    1.027
+   direct_batch64 w:2500               23.4  1.02  97.68  65.2  23.0  86.6   2500   5003      2.84    1826    1.075
+   direct_b2500 w:2500                 23.0  1.00  98.50  62.4  21.1  84.7   2500   5000      2.41    2111    1.098
+   direct_batch16 w:2500               23.0  1.00  98.53  62.3  20.7  85.0   2500   5003      2.44    2089    1.098
+   wps512_b2500 w:2500                 22.9  1.00  98.13  61.9  23.3  81.0   2500   5000      2.86    1831    1.100
+   direct_wavev16 w:2500               22.8  0.99  98.50  62.6  20.6  84.9   2500   5003      2.40    2117    1.104
+   direct_waveb4 w:2500                22.7  0.99  98.51  62.7  20.6  84.8   2500   5003      2.41    2108    1.108
+   direct_ctl_b2500 mb:0               22.7  0.99  98.50  62.7  21.5  84.5   2500   5000      2.38    2137    1.111
+   direct_batch4 w:2500                20.7  0.90  98.69  58.5  21.9  79.2   2500   5003      2.67    1876    1.215
+   direct_ctl mb:0                     20.5  0.89  94.77  67.9  22.0  85.1    500   5003      3.35    1506    1.228
+   pp2048_ctl_b2500 mb:0               19.3  0.84  97.27  60.4  29.7  79.2   2500   5000      3.51    1481    1.303
+-- direct_ctl mb:0 ÷ direct_batch16 w:2500: 0.89
+-- direct_ctl_b2500 mb:0 ÷ direct_b2500 w:2500: 0.99
+-- direct_ctl_b2500 mb:0 ÷ direct_batch16 w:2500: 0.99
+-- wps512_b2500 w:2500 ÷ direct_b2500 w:2500: 1.00
+-- pp2048_ctl_b2500 mb:0 ÷ V1's best PP 2,048 (19.3): 1.00
+
+===== 4 node(s): counts ['574541914']; digests ['0c800d36f9c2f85c']
+   arm                               M ev/s  ÷ref   eff%  blk%   min   max  meanW   GVTs waves/GVT  lag ps ms/cycle
+   direct_batch64 w:2500               64.5  1.03  97.43  75.5  18.7  92.0   2500   5008      2.13    2370    1.783
+   direct_batch16 w:2500               62.3  1.00  98.18  74.0  19.5  91.1   2500   5006      2.14    2351    1.844
+   direct_waveb4 w:2500                62.3  1.00  98.19  73.9  18.7  90.9   2500   5006      2.15    2338    1.845
+   direct_b2500 w:2500                 62.2  1.00  98.19  74.0  19.6  91.1   2500   5000      2.13    2363    1.848
+   direct_b2500 w:5000                 62.1  1.00  96.29  72.0   2.1  90.5   5000   5000      2.01    2497    1.852
+   direct_wavev16 w:2500               62.0  0.99  98.17  74.0  20.2  90.8   2500   5006      2.15    2338    1.854
+   direct_ctl_b2500 mb:0               61.6  0.99  98.17  74.1  20.0  91.0   2500   5000      2.14    2344    1.865
+   direct_ctl mb:0                     59.8  0.96  95.16  76.1  20.4  90.7    500   5006      3.09    1620    1.921
+   wps512_b2500 w:2500                 58.5  0.94  97.69  74.4  20.8  89.8   2500   5000      2.59    1937    1.963
+   direct_batch4 w:2500                54.5  0.87  98.44  72.1  21.2  88.2   2500   5006      2.10    2387    2.109
+   pp2048_ctl_b2500 mb:0               47.4  0.76  96.93  73.7  19.2  89.5   2500   5000      2.96    1697    2.424
+-- direct_ctl mb:0 ÷ direct_batch16 w:2500: 0.96
+-- direct_ctl_b2500 mb:0 ÷ direct_b2500 w:2500: 0.99
+-- direct_ctl_b2500 mb:0 ÷ direct_batch16 w:2500: 0.99
+-- wps512_b2500 w:2500 ÷ direct_b2500 w:2500: 0.94
+-- pp2048_ctl_b2500 mb:0 ÷ V1's best PP 2,048 (48.0): 0.99
+
+===== traces (rep 1, direct W 2,500)
+  1 node(s), buckets 2500: 9702 waves (middle 80%) over 4.41 s; waves per GVT update 2.42; wave duration median 0.026 ms (p90 0.036); gap median 0.035 ms; PE 0 lead over GVT median 5000.0 ps, share ≥ 1,500 ps 1.00; valid buckets median 1.0
+  1 node(s), buckets 500: 9672 waves (middle 80%) over 4.44 s; waves per GVT update 2.41; wave duration median 0.027 ms (p90 0.034); gap median 0.036 ms; PE 0 lead over GVT median 5000.0 ps, share ≥ 1,500 ps 1.00; valid buckets median 5.0
+  4 node(s), buckets 2500: 8510 waves (middle 80%) over 7.48 s; waves per GVT update 2.11; wave duration median 0.043 ms (p90 0.051); gap median 0.054 ms; PE 0 lead over GVT median 5000.0 ps, share ≥ 1,500 ps 1.00; valid buckets median 1.0
+  4 node(s), buckets 500: 8502 waves (middle 80%) over 7.48 s; waves per GVT update 2.11; wave duration median 0.044 ms (p90 0.051); gap median 0.053 ms; PE 0 lead over GVT median 5000.0 ps, share ≥ 1,500 ps 1.00; valid buckets median 5.0

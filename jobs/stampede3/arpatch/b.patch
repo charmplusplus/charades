@@ -1,0 +1,353 @@
+From 18d699119b78e487aa6f9a967c474f8ddbdeaebb Mon Sep 17 00:00:00 2001
+From: Ritvik Rao <rsrao2@illinois.edu>
+Date: Sat, 24 Oct 2026 11:46:12 -0500
+Subject: [PATCH] Bucketed GVT: --gvt-wave-allreduce combines count waves
+ across processes by recursive doubling; --gvt-trace records when PE 0's
+ process combined and got each result
+
+Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>
+---
+ src/globals.C                                 |  2 +
+ src/globals.h                                 |  1 +
+ src/gvt/bucketed.C                            | 79 +++++++++++++++++--
+ src/gvt/bucketed.h                            | 25 ++++++
+ src/gvt/gvtmanager.ci                         |  5 +-
+ src/util/command_line.C                       |  1 +
+ tests/test_configs/agg_bucket_pp_allreduce    |  8 ++
+ .../agg_ctl_sparse_bucket_pp_allreduce        | 14 ++++
+ tests/test_configs/bucket_allreduce           |  5 ++
+ tests/test_configs/bucket_window_allreduce    |  6 ++
+ 10 files changed, 136 insertions(+), 10 deletions(-)
+ create mode 100644 tests/test_configs/agg_bucket_pp_allreduce
+ create mode 100644 tests/test_configs/agg_ctl_sparse_bucket_pp_allreduce
+ create mode 100644 tests/test_configs/bucket_allreduce
+ create mode 100644 tests/test_configs/bucket_window_allreduce
+
+diff --git a/src/globals.C b/src/globals.C
+index 601b601..720433f 100644
+--- a/src/globals.C
++++ b/src/globals.C
+@@ -44,6 +44,7 @@ unsigned g_tw_gvt_min_buckets;
+ unsigned g_tw_gvt_trace;
+ unsigned g_tw_gvt_wave_events;
+ unsigned g_tw_gvt_node_waves;
++unsigned g_tw_gvt_wave_allreduce;
+ unsigned g_tw_sched_park;
+ Time     g_tw_optimism_window;
+ unsigned g_tw_comm_stats;
+@@ -125,6 +126,7 @@ void clear_globals() {
+   // run-to-run flip between two GVT paces (RESULTS.md, "Two speeds")
+   g_tw_gvt_wave_events    = 128;
+   g_tw_gvt_node_waves     = 1;
++  g_tw_gvt_wave_allreduce = 0;
+   g_tw_sched_park         = 0;
+   g_tw_optimism_window    = 0;
+   g_tw_comm_stats         = 0;
+diff --git a/src/globals.h b/src/globals.h
+index 071439a..4d14047 100644
+--- a/src/globals.h
++++ b/src/globals.h
+@@ -48,6 +48,7 @@ extern unsigned g_tw_gvt_min_buckets; ///< bucketed gvt: buckets a PE passes bef
+ extern unsigned g_tw_gvt_trace;       ///< bucketed gvt: PE 0 logs every count wave; time execute()
+ extern unsigned g_tw_gvt_wave_events; ///< bucketed gvt: events a PE runs between count waves (0: none)
+ extern unsigned g_tw_gvt_node_waves;  ///< bucketed gvt: combine each process's count-wave contributions in shared memory
++extern unsigned g_tw_gvt_wave_allreduce; ///< bucketed gvt, node waves: processes allreduce by recursive doubling
+ extern Time     g_tw_optimism_window; ///< execute no event past GVT + this (0: off)
+ extern unsigned g_tw_comm_stats;      ///< time remote sends and send->receive latency
+ extern unsigned g_tw_async_reduction; ///< use asynchronous reductions in GVTs
+diff --git a/src/gvt/bucketed.C b/src/gvt/bucketed.C
+index c1fa3f3..ae08941 100644
+--- a/src/gvt/bucketed.C
++++ b/src/gvt/bucketed.C
+@@ -30,6 +30,7 @@ void BucketGVT::init() {
+   node_waves = nullptr;
+   node_wave_seen = 0;
+   node_wave_pending = false;
++  wave_combined_t = wave_result_t = 0;
+   active = false;
+   continuous = true;
+ 
+@@ -68,12 +69,12 @@ void BucketGVT::init() {
+ void BucketGVT::finalize() {
+   if (g_tw_gvt_trace && CkMyPe() == 0) {
+     std::ofstream t(std::string(g_output_dir) + "gvt_trace.csv");
+-    t << "start_s,end_s,asked,passed0,valid,completed,bucket,lead0\n";
++    t << "start_s,end_s,asked,passed0,valid,completed,bucket,lead0,combined_s,result_s\n";
+     t << std::fixed << std::setprecision(7);
+     for (const WaveRecord& w : trace) {
+       t << w.start << "," << w.end << "," << w.asked << "," << w.passed0
+         << "," << w.valid << "," << w.completed << "," << w.bucket << ","
+-        << w.lead0 << "\n";
++        << w.lead0 << "," << w.combined << "," << w.result << "\n";
+     }
+   }
+   if (CkMyPe() == 0) {
+@@ -339,6 +340,8 @@ void BucketGVT::wave_done(const int* counts, int num_buckets,
+     WaveRecord w;
+     w.start = wave_start;
+     w.end = CmiWallTimer();
++    w.combined = wave_combined_t;
++    w.result = wave_result_t;
+     w.asked = wave_asked;
+     w.passed0 = wave_passed;
+     w.valid = valid_buckets;
+@@ -478,6 +481,8 @@ void BucketGVT::poll() {
+   node_wave_seen++;
+   node_wave_pending = false;
+   const std::vector<CmiInt8>& r = node_waves->result();
++  wave_combined_t = node_waves->t_combined;
++  wave_result_t = node_waves->t_result;
+   int n = r[0], nctl = r[2], nhist = r[3];
+   std::vector<int> sums(r.begin() + 4, r.begin() + 4 + 2 * n);
+   std::vector<uint64_t> ctl(r.begin() + 4 + 2 * n, r.begin() + 4 + 2 * n + nctl);
+@@ -486,7 +491,16 @@ void BucketGVT::poll() {
+       nhist ? hist.data() : nullptr, nhist);
+ }
+ 
+-NodeWaves::NodeWaves() : slots(CkMyNodeSize()), arrived(0), gen(0) {}
++NodeWaves::NodeWaves()
++    : t_combined(0), t_result(0), slots(CkMyNodeSize()), arrived(0), gen(0),
++      rounds(0), ar_wave(0), ar_round(0), ar_active(false) {
++  while ((1 << rounds) < CkNumNodes()) rounds++;
++  allreduce = g_tw_gvt_wave_allreduce && (1 << rounds) == CkNumNodes();
++  if (g_tw_gvt_wave_allreduce && !allreduce && CkMyNode() == 0) {
++    CkPrintf("Bucketed GVT: %d processes is not a power of two; count waves "
++             "use the nodegroup reduction\n", CkNumNodes());
++  }
++}
+ 
+ void NodeWaves::contribute_from(int rank, const std::vector<CmiInt8>& v) {
+   slots[rank].assign(v.begin(), v.end());
+@@ -496,6 +510,7 @@ void NodeWaves::contribute_from(int rank, const std::vector<CmiInt8>& v) {
+   // The last PE in: every slot is written, and none is written again before
+   // this wave's result is out
+   arrived.store(0, std::memory_order_relaxed);
++  if (g_tw_gvt_trace) t_combined = CmiWallTimer();
+   combined.assign(slots[0].begin(), slots[0].end());
+   for (int r = 1; r < CkMyNodeSize(); r++) {
+     combine_wave(combined, slots[r].data(), slots[r].size());
+@@ -504,15 +519,63 @@ void NodeWaves::contribute_from(int rank, const std::vector<CmiInt8>& v) {
+ }
+ 
+ void NodeWaves::contribute_combined(int n, CmiInt8* v) {
+-  contribute(n * sizeof(CmiInt8), v, gvtWaveReductionType,
+-      CkCallback(CkIndex_NodeWaves::wave_result(NULL), thisProxy));
++  if (!allreduce) {
++    contribute(n * sizeof(CmiInt8), v, gvtWaveReductionType,
++        CkCallback(CkIndex_NodeWaves::wave_result(NULL), thisProxy));
++    return;
++  }
++  ar_buf.assign(v, v + n);
++  ar_round = 0;
++  ar_active = true;
++  if (rounds == 0) {
++    publish(ar_buf.data(), n);
++    return;
++  }
++  send_round();
++}
++
++/** Sends this round's partial sums, then takes the partner's if it is here */
++void NodeWaves::send_round() {
++  thisProxy[CkMyNode() ^ (1 << ar_round)].exchange(ar_wave, ar_round,
++      ar_buf.size(), ar_buf.data());
++  auto it = early.find({ar_wave, ar_round});
++  if (it != early.end()) {
++    std::vector<CmiInt8> v = std::move(it->second);
++    early.erase(it);
++    add_partner(v.data(), v.size());
++  }
++}
++
++void NodeWaves::exchange(int wave, int round, int n, CmiInt8* v) {
++  if (ar_active && wave == ar_wave && round == ar_round) {
++    add_partner(v, n);
++  } else {
++    early[{wave, round}] = std::vector<CmiInt8>(v, v + n);
++  }
++}
++
++void NodeWaves::add_partner(const CmiInt8* v, int n) {
++  combine_wave(ar_buf, v, n);
++  if (++ar_round < rounds) {
++    send_round();
++  } else {
++    publish(ar_buf.data(), ar_buf.size());
++  }
++}
++
++void NodeWaves::publish(const CmiInt8* v, int n) {
++  res.assign(v, v + n);
++  if (g_tw_gvt_trace) t_result = CmiWallTimer();
++  if (allreduce) {
++    ar_active = false;
++    ar_wave++;
++  }
++  gen.fetch_add(1, std::memory_order_release);
+ }
+ 
+ void NodeWaves::wave_result(CkReductionMsg* msg) {
+-  const CmiInt8* d = (const CmiInt8*)msg->getData();
+-  res.assign(d, d + msg->getSize() / sizeof(CmiInt8));
++  publish((const CmiInt8*)msg->getData(), msg->getSize() / sizeof(CmiInt8));
+   delete msg;
+-  gen.fetch_add(1, std::memory_order_release);
+ }
+ 
+ void combine_wave(std::vector<CmiInt8>& into, const CmiInt8* from, int n) {
+diff --git a/src/gvt/bucketed.h b/src/gvt/bucketed.h
+index 1fae187..504d784 100644
+--- a/src/gvt/bucketed.h
++++ b/src/gvt/bucketed.h
+@@ -7,6 +7,8 @@
+ 
+ #include <atomic>
+ #include <list>
++#include <map>
++#include <utility>
+ #include <vector>
+ 
+ struct OffsetStats {
+@@ -56,6 +58,15 @@ struct OffsetStats {
+  * then contributes to the next wave -- so, as with messages, no PE
+  * contributes to wave k+1 before it has read wave k's result, which also
+  * keeps the slots and the result buffer from being overwritten early.
++ *
++ * --gvt-wave-allreduce: across processes, an allreduce by recursive doubling
++ * replaces the nodegroup reduction and broadcast: in round r a process sends
++ * its partial sums to process (me XOR 2^r) and adds in what that process
++ * sent; after log2 P rounds every process has the total. Integer sums and
++ * one minimum are exact, so every process gets the same result. A partner's
++ * message that arrives before this process reached that wave and round is
++ * kept until it does. The entry methods are [exclusive], so one PE at a time
++ * runs this state machine.
+  */
+ class NodeWaves : public CBase_NodeWaves {
+   public:
+@@ -64,11 +75,23 @@ class NodeWaves : public CBase_NodeWaves {
+     void contribute_from(int rank, const std::vector<CmiInt8>& v);
+     void contribute_combined(int n, CmiInt8* v);
+     void wave_result(CkReductionMsg* msg);
++    void exchange(int wave, int round, int n, CmiInt8* v);
+     /** Results published so far; read result() only after this moved */
+     uint64_t generation() const { return gen.load(std::memory_order_acquire); }
+     const std::vector<CmiInt8>& result() const { return res; }
++    /** --gvt-trace: when the last PE in arrived, and when the result came */
++    double t_combined, t_result;
+ 
+   private:
++    void publish(const CmiInt8* v, int n);
++    void send_round();
++    void add_partner(const CmiInt8* v, int n);
++    bool allreduce;     ///< --gvt-wave-allreduce, and a power-of-two process count
++    int rounds;         ///< log2 of the process count
++    int ar_wave, ar_round;
++    bool ar_active;     ///< this process is in wave ar_wave
++    std::vector<CmiInt8> ar_buf;
++    std::map<std::pair<int, int>, std::vector<CmiInt8>> early;
+     std::vector<std::vector<CmiInt8>> slots;
+     std::atomic<int> arrived;
+     std::vector<CmiInt8> combined;
+@@ -178,6 +201,7 @@ class BucketGVT : public CBase_BucketGVT {
+     uint64_t node_wave_seen;    ///< results of NodeWaves this PE has run
+     bool node_wave_pending;     ///< contributed, result not yet run
+     std::vector<CmiInt8> node_wave_buf;
++    double wave_combined_t, wave_result_t;  ///< --gvt-trace, PE 0
+     void init();
+ 
+     /**
+@@ -188,6 +212,7 @@ class BucketGVT : public CBase_BucketGVT {
+      */
+     struct WaveRecord {
+       double start, end;
++      double combined, result;  ///< --gvt-node-waves: PE 0's process (0 otherwise)
+       int asked, passed0, valid, completed, bucket;
+       long long lead0;
+     };
+diff --git a/src/gvt/gvtmanager.ci b/src/gvt/gvtmanager.ci
+index 21f4668..b4bb34e 100644
+--- a/src/gvt/gvtmanager.ci
++++ b/src/gvt/gvtmanager.ci
+@@ -44,7 +44,8 @@ module gvtmanager {
+    */
+   nodegroup NodeWaves {
+     entry [notrace] NodeWaves();
+-    entry [notrace] void contribute_combined(int n, CmiInt8 v[n]);
+-    entry [notrace] void wave_result(CkReductionMsg* msg);
++    entry [notrace, exclusive] void contribute_combined(int n, CmiInt8 v[n]);
++    entry [notrace, exclusive] void wave_result(CkReductionMsg* msg);
++    entry [notrace, exclusive] void exchange(int wave, int round, int n, CmiInt8 v[n]);
+   };
+ }
+diff --git a/src/util/command_line.C b/src/util/command_line.C
+index 4cf7595..2f184ca 100644
+--- a/src/util/command_line.C
++++ b/src/util/command_line.C
+@@ -26,6 +26,7 @@ void parse_command_line(int argc, char** argv) {
+   kernel.register_argument("gvt-min-buckets",      "Bucketed GVT: buckets a PE must pass before it starts a GVT round", g_tw_gvt_min_buckets);
+   kernel.register_argument("gvt-wave-events",      "Bucketed GVT: a PE contributes to the next count wave after executing this many events, or when it cannot execute (0 = at once; default 128)", g_tw_gvt_wave_events);
+   kernel.register_argument("gvt-node-waves",       "Optimistic, bucketed GVT, not --sched-park: each process combines its PEs' count-wave contributions in shared memory and contributes once; the result comes back once per process - NO=0, YES=1 (default)", g_tw_gvt_node_waves);
++  kernel.register_argument("gvt-wave-allreduce",   "With --gvt-node-waves: processes combine each count wave by recursive doubling (log2 P rounds of pairwise exchange) instead of a reduction and broadcast; needs a power-of-two process count - NO=0, YES=1", g_tw_gvt_wave_allreduce);
+   kernel.register_argument("gvt-trace",            "Bucketed GVT: PE 0 writes every count wave to gvt_trace.csv, and execute() is timed - NO=0, YES=1", g_tw_gvt_trace);
+   kernel.register_argument("gvt-adaptive-buckets", "Bucketed GVT: hold remote events far ahead of GVT in the sender - NO=0, YES=1", g_tw_adaptive_buckets);
+   kernel.register_argument("gvt-reserve-buckets",  "Bucketed GVT: hold events more than this many buckets ahead of GVT (0 = no offset cutoff)", g_tw_reserve_buckets);
+diff --git a/tests/test_configs/agg_bucket_pp_allreduce b/tests/test_configs/agg_bucket_pp_allreduce
+new file mode 100644
+index 0000000..a53c3d7
+--- /dev/null
++++ b/tests/test_configs/agg_bucket_pp_allreduce
+@@ -0,0 +1,8 @@
++# agg_bucket_pp with --gvt-wave-allreduce=1: processes combine count waves by recursive doubling
++sync=3
++gvt=4
++buffer-size=655360
++aggregation=1
++agg-mode=2
++agg-buffer=16
++gvt-wave-allreduce=1
+diff --git a/tests/test_configs/agg_ctl_sparse_bucket_pp_allreduce b/tests/test_configs/agg_ctl_sparse_bucket_pp_allreduce
+new file mode 100644
+index 0000000..6e3016f
+--- /dev/null
++++ b/tests/test_configs/agg_ctl_sparse_bucket_pp_allreduce
+@@ -0,0 +1,14 @@
++# agg_ctl_sparse_bucket_pp with --gvt-wave-allreduce=1: processes combine count waves by recursive doubling
++sync=3
++gvt=4
++buffer-size=655360
++optimism-window=2000
++aggregation=1
++agg-mode=2
++agg-buffer=16
++agg-policy=1
++ctl=1
++ctl-agg-kappa=0.2
++ctl-sparse-waves=1
++ctl-hist-waves=32
++gvt-wave-allreduce=1
+diff --git a/tests/test_configs/bucket_allreduce b/tests/test_configs/bucket_allreduce
+new file mode 100644
+index 0000000..a4620db
+--- /dev/null
++++ b/tests/test_configs/bucket_allreduce
+@@ -0,0 +1,5 @@
++# bucket with --gvt-wave-allreduce=1: processes combine count waves by recursive doubling
++sync=3
++gvt=4
++buffer-size=655360
++gvt-wave-allreduce=1
+diff --git a/tests/test_configs/bucket_window_allreduce b/tests/test_configs/bucket_window_allreduce
+new file mode 100644
+index 0000000..13acd8b
+--- /dev/null
++++ b/tests/test_configs/bucket_window_allreduce
+@@ -0,0 +1,6 @@
++# bucket_window with --gvt-wave-allreduce=1: processes combine count waves by recursive doubling
++sync=3
++gvt=4
++buffer-size=655360
++optimism-window=2000
++gvt-wave-allreduce=1
+-- 
+2.54.0 (Apple Git-157)
+

@@ -1,0 +1,53 @@
+A. --gvt-wave-events K / 128 (M committed ev/s, mean of 2 reps; ratio higher is better)
+
+  arm: fixed W (400; lookahead 10: 50)
+  cell             |  1 nodes: K128   32/128  64/128 |  4 nodes: K128   32/128  64/128 | 16 nodes: K128   32/128  64/128
+  σ 100            |        44.4   0.889   0.899 |       167.3   0.976   0.959 |       633.1   0.925   1.011
+  σ 500            |        38.4   0.846   0.858 |       146.8   0.924   0.912 |       552.3   1.014   1.026
+  σ 1,000          |        35.4   0.880   0.903 |       142.9   0.912   0.919 |       512.7   1.017   0.959
+  σ 2,000          |        33.8   0.858   0.887 |       125.1   0.944   0.959 |       442.6   1.007   1.014
+  σ 4,000          |        33.8   0.845   0.872 |       115.4   0.953   0.947 |       424.8   1.016   1.004
+  uniform          |        35.7   0.845   0.879 |       119.9   0.957   0.971 |       211.4   1.132   1.111
+  uniform WPs      |        36.1   0.858   0.899 |       101.8   1.009   1.031 |       288.1   1.007   1.020
+  LA10 σ 500       |        38.0   0.891   0.940 |       144.3   1.027   1.014 |       482.7   1.033   1.040
+  LA10 σ 2,000     |        33.4   0.948   0.986 |       108.5   1.077   1.076 |       369.0   1.024   1.014
+   1 nodes K 32: geomean 0.873, min 0.845, cells >= 1.02: 0/9
+   1 nodes K 64: geomean 0.902, min 0.858, cells >= 1.02: 0/9
+   4 nodes K 32: geomean 0.974, min 0.912, cells >= 1.02: 2/9
+   4 nodes K 64: geomean 0.975, min 0.912, cells >= 1.02: 2/9
+  16 nodes K 32: geomean 1.018, min 0.925, cells >= 1.02: 3/9
+  16 nodes K 64: geomean 1.021, min 0.959, cells >= 1.02: 3/9
+
+  arm: controller (eps 0.001)
+  cell             |  1 nodes: K128   32/128  64/128 |  4 nodes: K128   32/128  64/128 | 16 nodes: K128   32/128  64/128
+  σ 100            |        46.9   1.012   0.981 |       171.8   1.015   1.009 |       614.8   0.993   0.993
+  σ 500            |        41.6   1.002   1.001 |       154.5   1.019   1.007 |       564.1   0.982   0.989
+  σ 1,000          |        40.3   1.017   1.009 |       145.8   1.021   1.018 |       512.5   0.991   0.974
+  σ 2,000          |        39.1   1.012   0.999 |       132.9   1.005   1.009 |       406.9   0.983   1.005
+  σ 4,000          |        38.5   1.018   1.010 |       119.6   1.014   1.011 |       382.6   0.990   1.008
+  uniform          |        41.7   1.017   1.009 |       130.2   0.968   0.978 |       208.1   1.004   1.007
+  uniform WPs      |        41.0   1.023   1.005 |       104.3   1.081   1.068 |       275.1   1.042   1.053
+  LA10 σ 500       |        37.8   0.997   1.002 |       141.5   1.020   1.010 |       460.9   1.034   1.043
+  LA10 σ 2,000     |        33.5   1.026   1.031 |       109.8   1.021   1.028 |       356.9   1.011   1.016
+   1 nodes K 32: geomean 1.014, min 0.997, cells >= 1.02: 2/9
+   1 nodes K 64: geomean 1.005, min 0.981, cells >= 1.02: 1/9
+   4 nodes K 32: geomean 1.018, min 0.968, cells >= 1.02: 3/9
+   4 nodes K 64: geomean 1.015, min 0.978, cells >= 1.02: 2/9
+  16 nodes K 32: geomean 1.003, min 0.982, cells >= 1.02: 2/9
+  16 nodes K 64: geomean 1.009, min 0.974, cells >= 1.02: 2/9
+
+  both arms together: 1 nodes K 32: geomean 0.941 min 0.845; 1 nodes K 64: geomean 0.952 min 0.858; 4 nodes K 32: geomean 0.996 min 0.912; 4 nodes K 64: geomean 0.995 min 0.912; 16 nodes K 32: geomean 1.011 min 0.925; 16 nodes K 64: geomean 1.015 min 0.959
+
+B. htram node-level receives, all PEs, whole run (µs per receive; lower is better)
+  uni_wps512  4 nodes r1: 10.63 µs/receive (alloc 0.41 sort 0.88 free_in 0.70 handoff 8.21 unref 0.05 own 0.33; parts sum 10.58) | items/receive 29.5, pushes/receive 15.0, µs/push 0.55 | receives per PE 29325 | drain µs/item 0.32 | rate 101.8
+  uni_wps512  4 nodes r2: 10.04 µs/receive (alloc 0.42 sort 0.90 free_in 0.70 handoff 7.59 unref 0.05 own 0.34; parts sum 9.99) | items/receive 30.2, pushes/receive 15.2, µs/push 0.50 | receives per PE 28657 | drain µs/item 0.33 | rate 103.1
+  uni_wps512 16 nodes r1: 8.47 µs/receive (alloc 0.44 sort 0.46 free_in 1.12 handoff 6.18 unref 0.05 own 0.18; parts sum 8.42) | items/receive 12.4, pushes/receive 8.9, µs/push 0.70 | receives per PE 77206 | drain µs/item 0.35 | rate 281.2
+  uni_wps512 16 nodes r2: 8.44 µs/receive (alloc 0.45 sort 0.46 free_in 1.13 handoff 6.13 unref 0.05 own 0.18; parts sum 8.39) | items/receive 12.3, pushes/receive 8.8, µs/push 0.69 | receives per PE 77794 | drain µs/item 0.34 | rate 285.7
+  uni_pp512   4 nodes r1: 5.84 µs/receive (alloc 0.36 sort 1.82 free_in 0.60 handoff 2.15 unref 0.05 own 0.79; parts sum 5.78) | items/receive 79.0, pushes/receive 10.7, µs/push 0.20 | receives per PE 11058 | drain µs/item 0.31 | rate 120.5
+  uni_pp512   4 nodes r2: 5.77 µs/receive (alloc 0.37 sort 1.71 free_in 0.60 handoff 2.24 unref 0.05 own 0.74; parts sum 5.71) | items/receive 73.4, pushes/receive 10.3, µs/push 0.22 | receives per PE 11897 | drain µs/item 0.31 | rate 119.3
+  uni_pp512  16 nodes r1: 7.37 µs/receive (alloc 0.44 sort 0.47 free_in 0.84 handoff 5.34 unref 0.05 own 0.19; parts sum 7.32) | items/receive 13.8, pushes/receive 8.5, µs/push 0.63 | receives per PE 69363 | drain µs/item 0.37 | rate 228.7
+  uni_pp512  16 nodes r2: 7.22 µs/receive (alloc 0.42 sort 0.47 free_in 0.83 handoff 5.21 unref 0.05 own 0.19; parts sum 7.17) | items/receive 13.8, pushes/receive 8.5, µs/push 0.61 | receives per PE 69258 | drain µs/item 0.36 | rate 231.6
+  s2k_pp512   4 nodes r1: 3.99 µs/receive (alloc 0.33 sort 1.22 free_in 0.51 handoff 1.38 unref 0.05 own 0.45; parts sum 3.93) | items/receive 50.7, pushes/receive 8.4, µs/push 0.16 | receives per PE 9716 | drain µs/item 0.49 | rate 124.1
+  s2k_pp512   4 nodes r2: 3.95 µs/receive (alloc 0.32 sort 1.20 free_in 0.51 handoff 1.38 unref 0.05 own 0.44; parts sum 3.90) | items/receive 49.1, pushes/receive 8.3, µs/push 0.17 | receives per PE 10036 | drain µs/item 0.49 | rate 123.5
+  s2k_pp512  16 nodes r1: 3.89 µs/receive (alloc 0.31 sort 1.15 free_in 0.47 handoff 1.42 unref 0.05 own 0.42; parts sum 3.83) | items/receive 49.8, pushes/receive 8.4, µs/push 0.17 | receives per PE 9868 | drain µs/item 0.49 | rate 441.6
+  s2k_pp512  16 nodes r2: 3.93 µs/receive (alloc 0.32 sort 1.16 free_in 0.48 handoff 1.45 unref 0.05 own 0.43; parts sum 3.88) | items/receive 50.1, pushes/receive 8.4, µs/push 0.17 | receives per PE 9791 | drain µs/item 0.49 | rate 438.4

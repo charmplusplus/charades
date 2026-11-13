@@ -1,0 +1,76 @@
+# Counts and digests (ok runs; one value per workload and node count is right)
+n4 g100  ok  18 not ok  6  counts ['723814576']  digests ['60ae9641a33971e2']
+n4 g2000 ok  18 not ok  6  counts ['723816353']  digests ['acbaf97337f45bc0']
+n4 uni   ok  18 not ok  6  counts ['723815947']  digests ['e4ad729389332e94']
+n4 tr    ok  18 not ok  6  counts ['2262103209']  digests ['f4babdcd41892605']
+n4 df    ok   2 not ok  0  counts ['1445988962']  digests ['bdaedbeb3f00545f']
+n16 g100  ok  18 not ok  6  counts ['2895362159']  digests ['e1f0e10bdbd289e6']
+n16 g2000 ok  18 not ok  6  counts ['2895361550']  digests ['6f651f43e1858b3e']
+n16 uni   ok  18 not ok  6  counts ['2895361579']  digests ['da0417dfc6ae6116']
+n16 tr    ok  18 not ok  6  counts ['9048375910']  digests ['58f089905cadc8ce']
+n1 tr    ok   2 not ok  0  counts ['565555392']  digests ['13c2ce246f87fe69']
+n1 df    ok   2 not ok  0  counts ['382524695']  digests ['08f17bb7d4f828d1']
+
+# F2: M committed ev/s, mean of 2 reps (higher is better)
+
+## 4 nodes
+| workload | transport | W A | W B | controller (mean W) | controller ÷ better fixed | events per message | rolled back (M), better W |
+|---|---|---|---|---|---|---|---|
+| σ 100 | direct | 94.28 | 95.36 | 93.47 (368) | 0.98 | — | 0.186 |
+| σ 100 | eager | 197.27 | 195.68 | 191.16 (393) | 0.97 | 10.7 | 0.000 |
+| σ 100 | deadline | 201.18 | 196.46 | 192.96 (307) | 0.96 | 39.3 | 0.015 |
+| σ 2,000 | direct | 53.59 | 53.86 | 53.42 (313) | 0.99 | — | 0.320 |
+| σ 2,000 | eager | 132.97 | 138.75 | 133.83 (583) | 0.96 | 16.2 | 0.271 |
+| σ 2,000 | deadline | 153.27 | 148.12 | 150.93 (323) | 0.98 | 73.1 | 0.063 |
+| uniform | direct | 39.98 | 39.92 | 39.33 (399) | 0.98 | — | 0.000 |
+| uniform | eager | 120.16 | 116.38 | 124.17 (417) | 1.03 | 14.5 | 0.005 |
+| uniform | deadline | 132.18 | 121.66 | 129.60 (308) | 0.98 | 33.2 | 0.181 |
+| traffic | direct | 194.88 | 196.94 | 191.36 (1042) | 0.97 | — | 4.370 |
+| traffic | eager | 279.36 | 282.91 | 279.18 (2684) | 0.99 | 10.3 | 4.019 |
+| traffic | deadline | 284.05 | 259.48 | 266.31 (584) | 0.94 | 11.8 | 0.090 |
+
+| workload | deadline ÷ direct, better fixed W each | deadline ÷ direct, controllers | eager ÷ deadline, W A | eager ÷ deadline, W B |
+|---|---|---|---|---|
+| σ 100 | 2.11 | 2.06 | 0.98 | 1.00 |
+| σ 2,000 | 2.85 | 2.83 | 0.87 | 0.94 |
+| uniform | 3.31 | 3.30 | 0.91 | 0.96 |
+| traffic | 1.44 | 1.39 | 0.98 | 1.09 |
+
+## 16 nodes
+| workload | transport | W A | W B | controller (mean W) | controller ÷ better fixed | events per message | rolled back (M), better W |
+|---|---|---|---|---|---|---|---|
+| σ 100 | direct | 365.51 | 368.48 | 363.42 (408) | 0.99 | — | 0.177 |
+| σ 100 | eager | 749.98 | 779.88 | 752.96 (543) | 0.97 | 11.9 | 0.087 |
+| σ 100 | deadline | 776.36 | 810.71 | 783.93 (366) | 0.97 | 35.6 | 0.100 |
+| σ 2,000 | direct | 210.65 | 209.49 | 208.49 (346) | 0.99 | — | 0.000 |
+| σ 2,000 | eager | 512.96 | 552.46 | 540.19 (493) | 0.98 | 17.0 | 0.228 |
+| σ 2,000 | deadline | 575.44 | 603.62 | 594.18 (383) | 0.98 | 59.4 | 0.271 |
+| uniform | direct | 139.52 | 144.96 | 141.96 (346) | 0.98 | — | 0.379 |
+| uniform | eager | 227.04 | 242.31 | 262.56 (854) | 1.08 | 4.2 | 1.331 |
+| uniform | deadline | 373.32 | 384.24 | 380.75 (348) | 0.99 | 12.6 | 0.881 |
+| traffic | direct | 765.46 | 777.71 | 745.78 (1135) | 0.96 | — | 5.580 |
+| traffic | eager | 1060.41 | 1172.67 | 1148.26 (1355) | 0.98 | 10.9 | 3.179 |
+| traffic | deadline | 1063.61 | 1049.64 | 1111.00 (718) | 1.04 | 12.3 | 0.308 |
+
+| workload | deadline ÷ direct, better fixed W each | deadline ÷ direct, controllers | eager ÷ deadline, W A | eager ÷ deadline, W B |
+|---|---|---|---|---|
+| σ 100 | 2.20 | 2.16 | 0.97 | 0.96 |
+| σ 2,000 | 2.87 | 2.85 | 0.89 | 0.92 |
+| uniform | 2.65 | 2.68 | 0.61 | 0.63 |
+| traffic | 1.37 | 1.49 | 1.00 | 1.12 |
+
+# F3 hold arms (status of each run)
+n4 g100: hold128: stall,stall; hold32: stall,stall; hold8: stall,stall
+n4 g2000: hold128: stall,stall; hold32: stall,stall; hold8: stall,stall
+n4 uni: hold128: stall,stall; hold32: stall,stall; hold8: stall,stall
+n4 tr: hold16: stall,stall; hold256: stall,stall; hold64: stall,stall
+n16 g100: hold128: stall,stall; hold32: stall,stall; hold8: stall,stall
+n16 g2000: hold128: stall,stall; hold32: stall,stall; hold8: stall,stall
+n16 uni: hold128: stall,stall; hold32: stall,stall; hold8: stall,stall
+n16 tr: hold16: stall,stall; hold256: stall,stall; hold64: stall,stall
+
+# ROSS window (M committed ev/s, mean of 2 reps) and Charades controller
+n1 traffic: W 0: 35.82, W 250: 35.84, W 500: 39.44, W 1000: 40.45, W 2000: 39.90 | best window ÷ none 1.13 (W 1000) | Charades controller 70.87 ÷ ROSS best 1.75 | ROSS counts ['565555392'] Charades ['565555392']
+n1 dragonfly: W 0: 10.01, W 5000: 13.48, W 10000: 10.04, W 20000: 9.98, W 40000: 10.00 | best window ÷ none 1.35 (W 5000) | Charades controller 43.17 ÷ ROSS best 3.20 | ROSS counts ['382524695'] Charades ['382524695']
+n4 traffic: W 0: 117.75, W 250: 121.80, W 500: 135.37, W 1000: 140.09, W 2000: 140.10 | best window ÷ none 1.19 (W 2000) | Charades controller 266.31 ÷ ROSS best 1.90 | ROSS counts ['2262103209'] Charades ['2262103209']
+n4 dragonfly: W 0: 27.94, W 5000: 41.28, W 10000: 27.91, W 20000: 27.82, W 40000: 27.91 | best window ÷ none 1.48 (W 5000) | Charades controller 123.67 ÷ ROSS best 3.00 | ROSS counts ['1445988962'] Charades ['1445988962']

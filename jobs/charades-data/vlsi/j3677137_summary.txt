@@ -1,0 +1,72 @@
+
+===== 1 node(s): counts [125998590]; single worker [12309428]; Charades digests ['87c11aec982ad656']; Devastator deterministic ['1']
+   engine arm        M ev/s  ÷ref ms/cycle   eff%  blk%   min   max  reps
+   Charades 1p        30.47  1.32    0.827  97.07  69.3  49.3  79.5  30.66/30.29
+   Charades 1pcs      30.14  1.31    0.836  97.15  69.1  49.7  80.3  30.22/30.07
+   Charades ref       23.06  1.00    1.093  98.53  62.8  19.4  85.2  23.12/22.99
+   Charades w10k      22.64  0.98    1.113  83.91  49.3   1.4  77.9  22.42/22.87
+   Charades cs        22.44  0.97    1.123  98.55  63.0  19.3  85.5  22.42/22.46
+   Charades 1w         0.64   nan   38.540 100.00   0.0   0.0   0.0  0.65/0.63
+   Devastator w10k    45.09  1.08    0.559  88.16                    44.79/45.38
+   Devastator ref     41.56  1.00    0.606  98.09                    41.56/41.57
+   Devastator 1w       1.60   nan   15.387 100.00                    1.61/1.59
+-- Y2: Charades ÷ Devastator at W 2,500: 0.555; at W 10,000: 0.502; each at its better W: 0.511
+-- Y4: Charades 1 x 46 ÷ 2 x 23: 1.322; share of the gap (ln g / -ln Y2): 0.47
+-- Y3: single worker, Charades ÷ Devastator: 0.399 (0.64 / 1.60 M ev/s; µs per committed event 1.565 / 0.625); share of the gap (ln Y3 / ln Y2): 1.56
+-- Y5: cs (÷ 2 x 23 without --comm-stats: 0.973)
+     rep 1: send call 1.97 µs, 11.81% of PE time
+       Same Node    count   15,468,148  mean   14.47 µs  p50 ≤ 16.38 p90 ≤ 32.77 p99 ≤ 65.54 µs
+     rep 2: send call 1.97 µs, 11.82% of PE time
+       Same Node    count   15,501,670  mean   14.51 µs  p50 ≤ 16.38 p90 ≤ 32.77 p99 ≤ 65.54 µs
+-- Y5: 1pcs (÷ 1 x 46 without --comm-stats: 0.989)
+     rep 1: send call None µs, None% of PE time
+     rep 2: send call None µs, None% of PE time
+
+===== 4 node(s): counts [574541914]; single worker []; Charades digests ['0c800d36f9c2f85c']; Devastator deterministic ['1']
+   engine arm        M ev/s  ÷ref ms/cycle   eff%  blk%   min   max  reps
+   Charades 1p        76.97  1.28    1.493  98.44  80.3  30.1  88.1  77.64/76.30
+   Charades 1pcs      76.20  1.27    1.508  98.44  80.1  29.7  88.3  76.30/76.10
+   Charades ref       60.16  1.00    1.910  98.19  74.6  19.1  91.2  60.54/59.79
+   Charades cs        58.72  0.98    1.957  98.18  74.6  19.1  91.2  58.51/58.93
+   Devastator ref     80.50  1.00    1.427  99.23                    80.24/80.76
+-- Y2: Charades ÷ Devastator at W 2,500: 0.747
+-- Y4: Charades 1 x 46 ÷ 2 x 23: 1.279; share of the gap (ln g / -ln Y2): 0.85
+-- Y5: cs (÷ 2 x 23 without --comm-stats: 0.976)
+     rep 1: send call 2.0 µs, 7.97% of PE time
+       Same Node    count   71,863,899  mean   16.24 µs  p50 ≤ 16.38 p90 ≤ 32.77 p99 ≤ 131.07 µs
+       Other Node   count        8,568  mean   41.00 µs  p50 ≤ 32.77 p90 ≤ 131.07 p99 ≤ 2097.15 µs
+     rep 2: send call 2.02 µs, 8.1% of PE time
+       Same Node    count   71,809,561  mean   16.31 µs  p50 ≤ 16.38 p90 ≤ 32.77 p99 ≤ 131.07 µs
+       Other Node   count        8,604  mean   40.78 µs  p50 ≤ 65.54 p90 ≤ 131.07 p99 ≤ 2097.15 µs
+-- Y5: 1pcs (÷ 1 x 46 without --comm-stats: 0.990)
+     rep 1: send call 2.69 µs, 0.0% of PE time
+       Other Node   count        7,974  mean   18.63 µs  p50 ≤ 32.77 p90 ≤ 131.07 p99 ≤ 131.07 µs
+     rep 2: send call 2.71 µs, 0.0% of PE time
+       Other Node   count        7,968  mean   19.98 µs  p50 ≤ 65.54 p90 ≤ 131.07 p99 ≤ 131.07 µs
+
+-- Y6: Charades ref: ms per cycle 1 node 1.093, 4 nodes 1.910, difference 0.817 ms (4 nodes ÷ 1 node 1.75)
+-- Y6: Charades 1p: ms per cycle 1 node 0.827, 4 nodes 1.493, difference 0.666 ms (4 nodes ÷ 1 node 1.81)
+-- Y6: Devastator ref: ms per cycle 1 node 0.606, 4 nodes 1.427, difference 0.821 ms (4 nodes ÷ 1 node 2.35)
+
+-- Y7: n1/pe10k: 46 PEs; blocked % min 1.3, median 57.2, max 78.2; median PE executed ÷ committed 1.159; corr(blocked %, executed) 0.10, (blocked %, committed) -0.17
+     least blocked: PE 18 (process 0, rank 18) blocked 1.3%, executed ÷ mean 0.87, committed ÷ mean 1.04, executed ÷ committed 1.003, remote sends 2,044,512
+     least blocked: PE 26 (process 1, rank 3) blocked 1.6%, executed ÷ mean 0.98, committed ÷ mean 1.02, executed ÷ committed 1.140, remote sends 1,491,876
+     least blocked: PE 19 (process 0, rank 19) blocked 1.6%, executed ÷ mean 0.98, committed ÷ mean 1.03, executed ÷ committed 1.127, remote sends 1,649,393
+     least blocked: PE 22 (process 0, rank 22) blocked 1.8%, executed ÷ mean 0.93, committed ÷ mean 1.01, executed ÷ committed 1.093, remote sends 1,969,280
+     least blocked: PE 27 (process 1, rank 4) blocked 9.5%, executed ÷ mean 0.87, committed ÷ mean 1.02, executed ÷ committed 1.017, remote sends 1,364,212
+
+-- Y7: n1/pe2500: 46 PEs; blocked % min 20.2, median 71.0, max 85.2; median PE executed ÷ committed 1.008; corr(blocked %, executed) 0.04, (blocked %, committed) -0.04
+     least blocked: PE 18 (process 0, rank 18) blocked 20.2%, executed ÷ mean 1.02, committed ÷ mean 1.04, executed ÷ committed 1.001, remote sends 2,039,603
+     least blocked: PE 22 (process 0, rank 22) blocked 26.2%, executed ÷ mean 1.00, committed ÷ mean 1.01, executed ÷ committed 1.001, remote sends 1,862,140
+     least blocked: PE 27 (process 1, rank 4) blocked 28.5%, executed ÷ mean 1.01, committed ÷ mean 1.02, executed ÷ committed 1.005, remote sends 1,355,883
+     least blocked: PE 19 (process 0, rank 19) blocked 33.2%, executed ÷ mean 1.02, committed ÷ mean 1.03, executed ÷ committed 1.006, remote sends 1,443,455
+     least blocked: PE 21 (process 0, rank 21) blocked 33.9%, executed ÷ mean 1.00, committed ÷ mean 1.01, executed ÷ committed 1.003, remote sends 1,915,156
+
+-- Y7: n4/pe2500: 184 PEs; blocked % min 18.7, median 75.9, max 91.1; median PE executed ÷ committed 1.010; corr(blocked %, executed) -0.59, (blocked %, committed) -0.60
+     least blocked: PE 113 (process 4, rank 21) blocked 18.7%, executed ÷ mean 1.50, committed ÷ mean 1.52, executed ÷ committed 1.000, remote sends 3,572,798
+     least blocked: PE 118 (process 5, rank 3) blocked 26.0%, executed ÷ mean 2.73, committed ÷ mean 2.75, executed ÷ committed 1.012, remote sends 1,617,288
+     least blocked: PE 137 (process 5, rank 22) blocked 28.6%, executed ÷ mean 1.44, committed ÷ mean 1.46, executed ÷ committed 1.003, remote sends 1,501,892
+     least blocked: PE 133 (process 5, rank 18) blocked 30.6%, executed ÷ mean 2.74, committed ÷ mean 2.79, executed ÷ committed 1.001, remote sends 1,887,445
+     least blocked: PE 105 (process 4, rank 13) blocked 33.8%, executed ÷ mean 3.44, committed ÷ mean 3.43, executed ÷ committed 1.023, remote sends 2,360,277
+
+perf reports: ['j3677137/perf/charades.report.txt', 'j3677137/perf/deva.report.txt']

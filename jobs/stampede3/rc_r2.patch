@@ -1,0 +1,161 @@
+From bab3df1ea0ecdcae2d518072c56ab725c05a94a3 Mon Sep 17 00:00:00 2001
+From: Ritvik Rao <rsrao2@illinois.edu>
+Date: Tue, 3 Nov 2026 15:38:29 -0600
+Subject: [PATCH] One-process runs skip the scheduler's network poll;
+ CmiPeHasPendingWork()
+
+- A job with one process (job-wide: partitions talk over the network)
+  does not register pollProgress in the slot table: sends within a process
+  use the queues, and the backend's barriers poll it themselves. The poll
+  took about 40 of the 64 slots and one backend call per sweep.
+  +backend_poll_single restores it.
+- CmiPeHasPendingWork(): whether this PE's thread queue, prioritized
+  queue, node queues or shared-memory receive queue hold anything (not
+  the network). For a handler that would rather keep running than return
+  to the scheduler while nothing else waits (Charades --pass-loop).
+  CmiIpcHasPending() for the shared-memory part.
+
+Mac ctest 112/113 (abort_peer-multinode times out, as on main); the first
+version keyed on CmiNumNodes() and hung partitions-four.
+
+Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>
+---
+ include/converse.h           |  7 +++++++
+ src/cmishmem.cpp             |  9 +++++++++
+ src/convcore.cpp             |  3 +++
+ src/converse_internal.h      |  4 ++++
+ src/scheduler.cpp            |  8 ++++++++
+ src/scheduler_registered.cpp | 10 ++++++++--
+ 6 files changed, 39 insertions(+), 2 deletions(-)
+
+diff --git a/include/converse.h b/include/converse.h
+index 3b1887a..4d5aff4 100644
+--- a/include/converse.h
++++ b/include/converse.h
+@@ -550,6 +550,11 @@ void CmiNodeAllBarrier();
+ // scheduler
+ void CsdExitScheduler();
+ int CsdScheduler(int maxmsgs);
++/* Whether this PE has work waiting in its Converse queues: its thread queue,
++ * its prioritized queue, the node queues, or the shared-memory receive queue.
++ * Messages still in the network are not seen. For a handler that would rather
++ * keep running than return to the scheduler while nothing else is waiting. */
++int CmiPeHasPendingWork(void);
+ 
+ /* The scheduler queue: messages ordered by priority value (smaller first,
+  * negative before zero before positive), FIFO within one priority value, or
+@@ -1522,6 +1527,8 @@ void CmiDeliverIpcBlockMsg(CmiIpcBlock*);
+ // takes everything the pool holds for this PE (its receive queue and the
+ // process's node queue) and delivers it, oldest first; returns how many
+ int CmiDeliverIpcInbox(CmiIpcManager*);
++// Whether this PE's shared-memory receive queue (or its inbox) holds a block
++int CmiIpcHasPending(CmiIpcManager*);
+ 
+ inline const std::size_t& CmiRecommendedIpcBlockCutoff(void) {
+   using namespace cmi::ipc;
+diff --git a/src/cmishmem.cpp b/src/cmishmem.cpp
+index 6917062..f1191ba 100644
+--- a/src/cmishmem.cpp
++++ b/src/cmishmem.cpp
+@@ -247,6 +247,15 @@ int CmiDeliverIpcInbox(CmiIpcManager* meta) {
+   return n;
+ }
+ 
++int CmiIpcHasPending(CmiIpcManager* meta) {
++  if (!metadataReady_(meta) || !meta->ready.load(std::memory_order_acquire))
++    return 0;
++  if (!meta->pe[CmiMyRank()].inbox.empty()) return 1;
++  auto* shared = meta->shared[meta->mine].load(std::memory_order_acquire);
++  return shared->rq[CmiMyRank()].head.load(std::memory_order_relaxed) != cmi::ipc::max ||
++         shared->node_rq.head.load(std::memory_order_relaxed) != cmi::ipc::max;
++}
++
+ bool CmiPushIpcBlock(CmiIpcManager* meta, CmiIpcBlock* block) {
+   auto* shared = meta->shared[block->src].load(std::memory_order_acquire);
+   CmiAssert(meta->mine == block->dst);
+diff --git a/src/convcore.cpp b/src/convcore.cpp
+index 5f5c4a8..7b06911 100644
+--- a/src/convcore.cpp
++++ b/src/convcore.cpp
+@@ -114,6 +114,7 @@ int backend_poll_freq;
+ int thread_queue_max; // +thread_queue_max: old scheduler, consecutive thread-queue messages before the priority queue gets a turn
+ int node_queue_max; // +node_queue_max: registered scheduler, consecutive node-queue messages before the PE's own work gets a turn
+ int backend_poll_thread;
++int backend_poll_single;
+ 
+ void (*CmiTraceFn)(char **argv) = nullptr;
+ 
+@@ -598,6 +599,8 @@ void ConverseInit(int argc, char **argv, CmiStartFn fn, int usched,
+   backend_poll_thread = 1; // default to every thread
+   CmiGetArgInt(argv, "+backend_poll_thread", &backend_poll_thread);
+   if (backend_poll_thread < 1) backend_poll_thread = 1;
++  backend_poll_single = CmiGetArgFlagDesc(argv, "+backend_poll_single",
++      "poll the network in the scheduler loop even when the run has one process");
+ 
+   // must precede CmiQueueRegisterInitThread(), and so CmiStartThreads()
+   CmiSchedulerInitArgs(argv);
+diff --git a/src/converse_internal.h b/src/converse_internal.h
+index 337c3f6..7698774 100644
+--- a/src/converse_internal.h
++++ b/src/converse_internal.h
+@@ -68,6 +68,10 @@ extern int backend_poll_freq;
+ extern int thread_queue_max;
+ extern int node_queue_max; // registered scheduler: node messages in a row before local work gets a turn
+ extern int backend_poll_thread; // every backend_poll_thread threads will call progress
++// +backend_poll_single: poll the network in the scheduler even when the run has
++// one process (by default such a run never registers the poll: nothing
++// arrives over the network, and the backend's barriers poll it themselves)
++extern int backend_poll_single;
+ 
+ // Priority of the message QueueTop would return (smaller runs first), or
+ // LLONG_MAX when the queue is empty. queueing.cpp.
+diff --git a/src/scheduler.cpp b/src/scheduler.cpp
+index 3ca9914..ef9d17e 100644
+--- a/src/scheduler.cpp
++++ b/src/scheduler.cpp
+@@ -67,6 +67,14 @@ void CmiSchedulerSetIdle() {
+   }
+ }
+ 
++int CmiPeHasPendingWork() {
++  if (!CmiGetQueue(CmiMyRank())->empty()) return 1;
++  if (!QueueEmpty(CpvAccess(CsdSchedQueue))) return 1;
++  if (!CmiGetNodeQueue()->empty() || CsdNodeQueueLenGet() > 0) return 1;
++  CmiIpcManager *manager = CsvAccess(coreIpcManager_);
++  return manager != nullptr && CmiIpcHasPending(manager);
++}
++
+ // Messages from peer processes on this host arrive in the shared-memory pool
+ // rather than through the network backend, so every loop has to drain it --
+ // including CsdSchedulePoll, or a program that waits inside it would never
+diff --git a/src/scheduler_registered.cpp b/src/scheduler_registered.cpp
+index e06eba7..81c59a7 100644
+--- a/src/scheduler_registered.cpp
++++ b/src/scheduler_registered.cpp
+@@ -118,7 +118,12 @@ void CmiQueueRegisterInitThread() {
+   handlers.push_back(std::make_pair(pollConverseThreadQueue, 16));
+   handlers.push_back(std::make_pair(pollNodePrioQueue, 1));
+   handlers.push_back(std::make_pair(pollThreadPrioQueue, 16));
+-  handlers.push_back(std::make_pair(pollProgress, backend_poll_freq));
++  //one process in the whole job (not per partition: partitions talk over the
++  //network): nothing arrives over the network (sends within a process use
++  //the queues, and the backend's barriers poll it themselves), and the poll
++  //took about 40 of the 64 slots and one call per sweep
++  if (CmiNumNodesGlobal() > 1 || backend_poll_single)
++    handlers.push_back(std::make_pair(pollProgress, backend_poll_freq));
+ #if CMK_TASKQUEUE
+   handlers.push_back(std::make_pair(pollTaskQueue, 1));
+ #endif
+@@ -133,7 +138,8 @@ void CmiQueueRegisterInit() {
+   add_handler(pollConverseThreadQueue, 16);
+   add_handler(pollNodePrioQueue, 1);
+   add_handler(pollThreadPrioQueue, 16);
+-  add_handler(pollProgress, backend_poll_freq);
++  if (CmiNumNodesGlobal() > 1 || backend_poll_single)
++    add_handler(pollProgress, backend_poll_freq);
+ #if CMK_TASKQUEUE
+   add_handler(pollTaskQueue, 1);
+ #endif
+-- 
+2.54.0 (Apple Git-157)
+

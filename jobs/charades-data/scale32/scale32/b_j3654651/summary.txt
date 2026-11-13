@@ -1,0 +1,71 @@
+runs: Charades 315, Devastator 180, ROSS 120; failed or missing results: 0
+
+## σ 500 (M committed ev/s, median of reps; higher is better)
+  N |   Charades ctl   best fixed W |  Devastator best |        ROSS best |     C÷D     C÷R | same events
+  1 |    40.1 pp2048    41.3 W250   |    38.9 (W  1000) |    11.6 (cons) |    1.03    3.47 | yes
+  2 |    77.8 pp2048    80.4 W250   |    75.3 (W  1000) |    20.9 (cons) |    1.03    3.71 | yes
+  4 |   156.1 pp2048   159.0 W250   |   144.3 (W  1000) |    40.0 (cons) |    1.08    3.90 | yes
+  8 |   291.2 pp2048   294.5 W250   |   242.3 (W  1000) |    76.4 (cons) |    1.20    3.81 | yes
+ 16 |   600.1 pp2048   582.9 W250   |   503.5 (W  1000) |   147.3 (cons) |    1.19    4.08 | yes
+   weak-scaling efficiency (per-node rate ÷ 1-node rate; 1.0 is perfect):
+     Charades ctl  1: 1.00  2: 0.97  4: 0.97  8: 0.91  16: 0.93
+     Devastator    1: 1.00  2: 0.97  4: 0.93  8: 0.78  16: 0.81
+     ROSS          1: 1.00  2: 0.90  4: 0.87  8: 0.83  16: 0.80
+   Charades controller rep spread (max ÷ min): up to 1.048
+
+## σ 2,000 (M committed ev/s, median of reps; higher is better)
+  N |   Charades ctl   best fixed W |  Devastator best |        ROSS best |     C÷D     C÷R | same events
+  1 |    37.6 pp512     39.1 W250   |    29.7 (W   500) |     9.3 (cons) |    1.27    4.05 | yes
+  2 |    69.5 pp512     71.3 W250   |    50.6 (W  1000) |    14.6 (cons) |    1.37    4.76 | yes
+  4 |   134.4 pp512    136.8 W250   |   100.0 (W  1000) |    28.2 (cons) |    1.34    4.77 | yes
+  8 |   254.2 pp512    253.2 W250   |   184.1 (W  1000) |    53.6 (cons) |    1.38    4.74 | yes
+ 16 |   494.1 pp512    491.4 W400   |   366.9 (W  1000) |   105.5 (opt ) |    1.35    4.68 | yes
+   weak-scaling efficiency (per-node rate ÷ 1-node rate; 1.0 is perfect):
+     Charades ctl  1: 1.00  2: 0.92  4: 0.89  8: 0.84  16: 0.82
+     Devastator    1: 1.00  2: 0.85  4: 0.84  8: 0.78  16: 0.77
+     ROSS          1: 1.00  2: 0.78  4: 0.76  8: 0.72  16: 0.71
+   Charades controller rep spread (max ÷ min): up to 1.029
+
+## uniform (M committed ev/s, median of reps; higher is better)
+  N |   Charades ctl   best fixed W |  Devastator best |        ROSS best |     C÷D     C÷R | same events
+  1 |    40.5 wps512    41.6 W250   |    29.4 (W   500) |     9.3 (cons) |    1.38    4.35 | yes
+  2 |    72.7 pp512     74.0 W250   |    38.9 (W   500) |    13.9 (cons) |    1.87    5.24 | yes
+  4 |   133.8 pp512    133.5 W250   |    67.3 (W   500) |    25.1 (cons) |    1.99    5.32 | yes
+  8 |   207.3 wps512   206.5 W250   |   106.8 (W  1000) |    47.9 (opt ) |    1.94    4.33 | yes
+ 16 |   355.2 wps512   350.4 W400   |   192.8 (W  1000) |    92.9 (opt ) |    1.84    3.82 | yes
+   weak-scaling efficiency (per-node rate ÷ 1-node rate; 1.0 is perfect):
+     Charades ctl  1: 1.00  2: 0.90  4: 0.83  8: 0.64  16: 0.55
+     Devastator    1: 1.00  2: 0.66  4: 0.57  8: 0.45  16: 0.41
+     ROSS          1: 1.00  2: 0.74  4: 0.67  8: 0.64  16: 0.62
+   Charades controller rep spread (max ÷ min): up to 1.035
+
+## lookahead 10, σ 500 (M committed ev/s, median of reps; higher is better)
+  N |   Charades ctl   best fixed W |  Devastator best |        ROSS best |     C÷D     C÷R | same events
+  1 |    37.0 pp2048    36.7 W50    |    39.0 (W   100) |    10.6 (cons) |    0.95    3.51 | yes
+  2 |    72.8 pp2048    73.3 W50    |    74.8 (W   200) |    19.0 (opt ) |    0.97    3.84 | yes
+  4 |   144.9 pp2048   148.2 W50    |   142.4 (W   200) |    36.8 (opt ) |    1.02    3.94 | yes
+  8 |   272.7 pp2048   275.6 W50    |   236.8 (W   200) |    70.9 (opt ) |    1.15    3.85 | yes
+ 16 |   565.8 pp2048   564.9 W50    |   495.9 (W   200) |   139.7 (opt ) |    1.14    4.05 | yes
+   weak-scaling efficiency (per-node rate ÷ 1-node rate; 1.0 is perfect):
+     Charades ctl  1: 1.00  2: 0.98  4: 0.98  8: 0.92  16: 0.95
+     Devastator    1: 1.00  2: 0.96  4: 0.91  8: 0.76  16: 0.79
+     ROSS          1: 1.00  2: 0.90  4: 0.87  8: 0.84  16: 0.83
+   Charades controller rep spread (max ÷ min): up to 1.053
+
+## σ 1,000, Charades only (PP 512 and PP 2,048) (M committed ev/s, median of reps; higher is better)
+  N |   Charades ctl   best fixed W |  Devastator best |        ROSS best |     C÷D     C÷R | same events
+  1 | ctl pp2048 36.6  ctl pp512 38.9 | best fixed W 40.2 (pp512 w:250)
+  2 | ctl pp2048 74.9  ctl pp512 74.9 | best fixed W 75.5 (pp2048 w:250)
+  4 | ctl pp2048 149.2  ctl pp512 145.8 | best fixed W 149.9 (pp2048 w:250)
+  8 | ctl pp2048 279.3  ctl pp512 285.0 | best fixed W 279.5 (pp2048 w:250)
+ 16 | ctl pp2048 554.6  ctl pp512 543.1 | best fixed W 549.2 (pp2048 w:250)
+   weak-scaling efficiency (per-node rate ÷ 1-node rate; 1.0 is perfect):
+     Charades ctl  1: 1.00  2: 0.96  4: 0.96  8: 0.92  16: 0.89
+   Charades controller rep spread (max ÷ min): up to 1.038
+
+## Controller ÷ best fixed W (higher is better)
+σ 500                    1: 0.97  2: 0.97  4: 0.98  8: 0.99  16: 1.03
+σ 2,000                  1: 0.96  2: 0.97  4: 0.98  8: 1.00  16: 1.01
+uniform                  1: 0.97  2: 0.98  4: 1.00  8: 1.00  16: 1.01
+lookahead 10, σ 500      1: 1.01  2: 0.99  4: 0.98  8: 0.99  16: 1.00
+σ 1,000, Charades only (PP 512 and PP 2,048) 1: 0.97  2: 0.99  4: 1.00  8: 1.02  16: 1.01

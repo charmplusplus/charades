@@ -1,0 +1,168 @@
+
+######## 4 nodes
+counts ['574541914']; digests ['0c800d36f9c2f85c']
+
+| setting | W | run time (s), r1 / r2 / r3 (lower is better) | ÷ D at W 2,500, run time (above 1: slower) | D ÷ this setting at the same W, run time (above 1: this setting is faster) | rolled back (M), median | least-blocked PE waiting at the window (%), range |
+|---|---|---|---|---|---|---|
+| D | 2500 | 5.74 / 5.66 / 5.53 | 1.000 | — | 8.8 | 23.8–26.4 |
+| D | 3750 | 7.41 / 7.45 / 7.22 | 1.291–1.316 | — | 20.7 | 1.7–1.9 |
+| D | 5000 | 7.62 / 7.48 / 7.31 | 1.322–1.328 | — | 14.0 | 1.7–1.8 |
+| G | 2500 | 5.51 / 5.53 / 5.53 | 0.960–1.000 | 1.000–1.042 | 8.7 | 23.9–24.3 |
+| G | 3750 | 7.33 / 7.28 / 7.33 | 1.277–1.325 | 0.985–1.023 | 20.6 | 1.9–2.0 |
+| G | 5000 | 7.55 / 7.42 / 7.32 | 1.311–1.324 | 0.999–1.009 | 14.2 | 1.9–2.3 |
+| E | 2500 | 5.72 / 5.57 / 5.48 | 0.984–0.997 | 1.003–1.016 | 9.8 | 28.2–31.0 |
+| E | 3750 | 7.29 / 5.53 / 5.51 | 0.977–1.270 | 1.016–1.347 | 23.3 | 2.3–4.0 |
+| E | 5000 | 5.94 / 5.74 / 5.64 | 1.014–1.035 | 1.283–1.303 | 15.9 | 2.2–5.1 |
+| GE | 2500 | 5.56 / 5.59 / 5.49 | 0.969–0.993 | 1.007–1.032 | 9.8 | 28.1–28.7 |
+| GE | 3750 | 5.68 / 5.54 / 5.45 | 0.979–0.990 | 1.305–1.345 | 23.4 | 2.4–2.8 |
+| GE | 5000 | 5.75 / 5.65 / 5.61 | 0.998–1.014 | 1.303–1.325 | 16.0 | 2.3–2.7 |
+| B8 | 5000 | 8.28 / 8.31 / 8.00 | 1.443–1.468 | 0.900–0.920 | 11.5 | 1.8–3.1 |
+
+**Per PE** (median over r1–r3 unless noted; per cycle; node = process):
+| setting | W | least-blocked PE: id (node), r1 / r2 / r3 | its waiting share (%) | its working time (ms per cycle) | its events executed per cycle | its events rolled back per cycle | node 2 mean executed per PE per cycle | busiest PE on node 2 ÷ node 2 mean (executed) | least-blocked PE ÷ node 2 mean (executed) | other nodes: mean executed per PE per cycle |
+|---|---|---|---|---|---|---|---|---|---|---|
+| D | 2500 | 105 (2) / 105 (2) / 105 (2) | 25.3 | 0.857 | 2141 | 1 | 867 | 2.47 | 2.47 | 556 |
+| D | 3750 | 105 (2) / 105 (2) / 105 (2) | 1.8 | 1.453 | 2141 | 1 | 890 | 2.40 | 2.40 | 566 |
+| D | 5000 | 105 (2) / 105 (2) / 105 (2) | 1.8 | 1.472 | 2141 | 1 | 888 | 2.41 | 2.41 | 557 |
+| G | 2500 | 105 (2) / 105 (2) / 105 (2) | 24.2 | 0.838 | 2142 | 2 | 867 | 2.47 | 2.47 | 556 |
+| G | 3750 | 105 (2) / 105 (2) / 105 (2) | 1.9 | 1.437 | 2141 | 1 | 891 | 2.40 | 2.40 | 566 |
+| G | 5000 | 105 (2) / 105 (2) / 105 (2) | 1.9 | 1.455 | 2141 | 1 | 889 | 2.41 | 2.41 | 557 |
+| E | 2500 | 105 (2) / 105 (2) / 105 (2) | 28.4 | 0.789 | 2142 | 2 | 871 | 2.46 | 2.46 | 557 |
+| E | 3750 | 105 (2) / 105 (2) / 105 (2) | 2.4 | 1.081 | 2141 | 1 | 895 | 2.39 | 2.39 | 568 |
+| E | 5000 | 105 (2) / 105 (2) / 105 (2) | 2.3 | 1.122 | 2141 | 1 | 895 | 2.39 | 2.39 | 557 |
+| GE | 2500 | 105 (2) / 105 (2) / 105 (2) | 28.1 | 0.797 | 2142 | 2 | 871 | 2.46 | 2.46 | 556 |
+| GE | 3750 | 105 (2) / 105 (2) / 105 (2) | 2.4 | 1.081 | 2141 | 1 | 896 | 2.39 | 2.39 | 568 |
+| GE | 5000 | 105 (2) / 105 (2) / 105 (2) | 2.3 | 1.104 | 2141 | 1 | 895 | 2.39 | 2.39 | 557 |
+| B8 | 5000 | 105 (2) / 105 (2) / 105 (2) | 1.9 | 1.610 | 2141 | 1 | 884 | 2.42 | 2.42 | 555 |
+
+**Node 2, D, rep 1:** waiting share (%) and rolled back per cycle, PEs sorted by executed (top 8):
+  W 2500: pe 105 ex 2141 rb 1 wait 25.3%; pe 127 ex 1751 rb 0 wait 40.0%; pe 133 ex 1744 rb 0 wait 42.6%; pe 118 ex 1729 rb 14 wait 41.2%; pe 101 ex 1263 rb 4 wait 59.4%; pe 96 ex 1194 rb 2 wait 63.4%; pe 136 ex 1109 rb 12 wait 61.5%; pe 103 ex 1064 rb 5 wait 65.5%
+         node 2 holds 35% of all rolled-back events (8.76 M); node 2 waiting share median 75.9%, others 85.4%
+  W 3750: pe 105 ex 2141 rb 1 wait 1.9%; pe 127 ex 1777 rb 26 wait 52.8%; pe 133 ex 1758 rb 14 wait 55.4%; pe 118 ex 1749 rb 33 wait 52.5%; pe 96 ex 1404 rb 213 wait 65.0%; pe 101 ex 1260 rb 0 wait 68.1%; pe 112 ex 1125 rb 127 wait 80.2%; pe 136 ex 1114 rb 17 wait 71.9%
+         node 2 holds 39% of all rolled-back events (21.49 M); node 2 waiting share median 80.8%, others 89.3%
+  W 5000: pe 105 ex 2141 rb 1 wait 1.8%; pe 127 ex 1766 rb 15 wait 50.9%; pe 133 ex 1745 rb 1 wait 52.4%; pe 118 ex 1726 rb 10 wait 49.5%; pe 96 ex 1576 rb 384 wait 61.2%; pe 101 ex 1264 rb 5 wait 67.0%; pe 112 ex 1138 rb 140 wait 77.3%; pe 136 ex 1112 rb 15 wait 70.0%
+         node 2 holds 57% of all rolled-back events (13.97 M); node 2 waiting share median 79.8%, others 88.9%
+
+**Traced rep (t): the least-blocked PE, µs per cycle** (exec_parts; `execute()` = exec_s from pe_stats; outside = total − exec_s):
+| setting | W | PE (node) | total | waiting | in `execute()` | outside `execute()` | loop | send_total | drain | poll | cancel_q | iter_end | rollback | fossil | flush_idle | executed / rolled back per cycle | loop µs per executed event | passes per cycle |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| D | 2500 | 105 (2) | 1453 | 312 | 1362 | 91 | 869 | 158 | 227 | 45 | 6 | 7 | 0 | 32 | 4 | 2141 / 1 | 0.41 | 181 |
+| D | 3750 | 105 (2) | 1776 | 30 | 1730 | 47 | 1070 | 159 | 323 | 281 | 3 | 9 | 0 | 276 | 1 | 2141 / 1 | 0.50 | 96 |
+| D | 5000 | 105 (2) | 1819 | 32 | 1774 | 45 | 1089 | 157 | 341 | 286 | 3 | 9 | 0 | 281 | 1 | 2141 / 1 | 0.51 | 99 |
+| G | 2500 | 105 (2) | 1435 | 296 | 1357 | 78 | 870 | 156 | 228 | 52 | 5 | 6 | 0 | 40 | 3 | 2141 / 1 | 0.41 | 160 |
+| G | 3750 | 105 (2) | 1788 | 31 | 1749 | 38 | 1073 | 160 | 336 | 280 | 3 | 4 | 0 | 271 | 1 | 2141 / 1 | 0.50 | 98 |
+| G | 5000 | 105 (2) | 1808 | 31 | 1768 | 40 | 1073 | 160 | 344 | 291 | 3 | 4 | 0 | 282 | 1 | 2141 / 1 | 0.50 | 98 |
+| E | 2500 | 105 (2) | 1407 | 329 | 1261 | 145 | 810 | 162 | 231 | 122 | 8 | 9 | 0 | 105 | 6 | 2141 / 1 | 0.38 | 249 |
+| E | 3750 | 105 (2) | 1417 | 30 | 1377 | 41 | 870 | 156 | 312 | 137 | 3 | 8 | 0 | 132 | 1 | 2141 / 1 | 0.41 | 97 |
+| E | 5000 | 105 (2) | 1447 | 30 | 1407 | 40 | 877 | 155 | 327 | 143 | 3 | 8 | 0 | 138 | 1 | 2141 / 1 | 0.41 | 98 |
+| GE | 2500 | 105 (2) | 1402 | 329 | 1265 | 137 | 807 | 156 | 234 | 122 | 9 | 9 | 0 | 106 | 7 | 2141 / 1 | 0.38 | 258 |
+| GE | 3750 | 105 (2) | 1405 | 29 | 1372 | 34 | 863 | 151 | 311 | 140 | 3 | 4 | 0 | 130 | 1 | 2141 / 1 | 0.40 | 96 |
+| GE | 5000 | 105 (2) | 1449 | 30 | 1416 | 33 | 879 | 155 | 330 | 147 | 3 | 4 | 0 | 137 | 1 | 2141 / 1 | 0.41 | 98 |
+| B8 | 5000 | 105 (2) | 2035 | 31 | 1863 | 172 | 1103 | 160 | 363 | 296 | 10 | 18 | 0 | 284 | 1 | 2141 / 0 | 0.52 | 299 |
+
+  Node means, D, traced (µs per cycle: total / waiting / loop / drain / rollback / fossil / outside execute(); executed per cycle):
+    W 2500 node 2: 1453 / 1007 / 393 / 145 / 3 / 1 / 512; executed 867, rolled back 13
+    W 2500 others: 1453 / 1193 / 257 / 113 / 2 / 0 / 647; executed 557, rolled back 9
+    W 3750 node 2: 1776 / 1312 / 422 / 158 / 6 / 6 / 675; executed 896, rolled back 43
+    W 3750 others: 1776 / 1523 / 268 / 123 / 3 / 0 / 839; executed 571, rolled back 22
+    W 5000 node 2: 1819 / 1330 / 439 / 159 / 6 / 6 / 682; executed 890, rolled back 36
+    W 5000 others: 1819 / 1554 / 276 / 124 / 2 / 0 / 861; executed 558, rolled back 9
+
+**Count waves, the least-blocked PE (traced; every 4th wave):** reasons (0 at once, 1 starved, 2 after K events, 3 K already reached), median µs pickup→contribution, median events in between
+  D W2500: pe 105: 2548 waves; reasons {'0': 2503, '3': 45}; contrib_us median 120.8; events median 28
+  D W3750: pe 105: 2503 waves; reasons {'0': 25, '1': 1, '2': 2360, '3': 117}; contrib_us median 62.5; events median 64
+  D W5000: pe 105: 2503 waves; reasons {'0': 26, '2': 2263, '3': 214}; contrib_us median 62.0; events median 64
+  G W2500: pe 105: 2546 waves; reasons {'0': 2546}; contrib_us median 712.6; events median 410
+  G W3750: pe 105: 2503 waves; reasons {'0': 2503}; contrib_us median 1072.4; events median 1600
+  G W5000: pe 105: 2502 waves; reasons {'0': 2502}; contrib_us median 12.9; events median 0
+  E W2500: pe 105: 2508 waves; reasons {'0': 2505, '3': 3}; contrib_us median 1.9; events median 0
+  E W3750: pe 105: 2503 waves; reasons {'0': 30, '2': 2244, '3': 229}; contrib_us median 40.3; events median 32
+  E W5000: pe 105: 2501 waves; reasons {'0': 26, '2': 1, '3': 2474}; contrib_us median 1119.4; events median 1824
+  GE W2500: pe 105: 2509 waves; reasons {'0': 2509}; contrib_us median 864.0; events median 1494
+  GE W3750: pe 105: 2503 waves; reasons {'0': 2503}; contrib_us median 1241.9; events median 1888
+  GE W5000: pe 105: 2503 waves; reasons {'0': 2503}; contrib_us median 10.0; events median 0
+  B8 W5000: pe 105: 2501 waves; reasons {'0': 21, '2': 2, '3': 2478}; contrib_us median 1517.1; events median 1888
+
+######## 16 nodes
+counts ['2087384844']; digests ['377d077123c46354']
+
+| setting | W | run time (s), r1 / r2 / r3 (lower is better) | ÷ D at W 2,500, run time (above 1: slower) | D ÷ this setting at the same W, run time (above 1: this setting is faster) | rolled back (M), median | least-blocked PE waiting at the window (%), range |
+|---|---|---|---|---|---|---|
+| D | 2500 | 6.00 / 5.96 / 6.01 | 1.000 | — | 31.7 | 29.5–30.3 |
+| D | 3750 | 7.47 / 8.30 / 7.45 | 1.240–1.393 | — | 69.0 | 2.8–3.2 |
+| D | 5000 | 7.60 / 7.67 / 7.66 | 1.267–1.287 | — | 37.2 | 3.0–4.1 |
+| G | 2500 | 5.97 / 6.01 / 6.06 | 0.995–1.008 | 0.992–1.005 | 31.6 | 29.8–30.2 |
+| G | 3750 | 7.47 / 7.37 / 7.53 | 1.237–1.253 | 0.989–1.126 | 67.8 | 3.0 |
+| G | 5000 | 7.75 / 7.68 / 7.58 | 1.261–1.292 | 0.981–1.011 | 37.2 | 3.0–4.2 |
+| E | 2500 | 6.24 / 6.42 / 6.28 | 1.040–1.077 | 0.928–0.962 | 32.6 | 35.2–36.9 |
+| E | 3750 | 5.84 / 5.70 / 5.67 | 0.943–0.973 | 1.279–1.456 | 73.6 | 4.3–6.7 |
+| E | 5000 | 5.82 / 5.79 / 5.92 | 0.970–0.985 | 1.294–1.325 | 41.1 | 4.1–4.8 |
+| GE | 2500 | 6.33 / 6.36 / 6.27 | 1.043–1.067 | 0.937–0.959 | 32.6 | 35.4–36.4 |
+| GE | 3750 | 5.68 / 5.63 / 7.25 | 0.945–1.206 | 1.028–1.474 | 74.9 | 3.4–4.4 |
+| GE | 5000 | 5.91 / 5.81 / 5.86 | 0.975–0.985 | 1.286–1.320 | 40.5 | 4.1 |
+| B8 | 5000 | 9.20 / 8.31 / 8.32 | 1.384–1.533 | 0.826–0.923 | 28.8 | 2.6–2.9 |
+
+**Per PE** (median over r1–r3 unless noted; per cycle; node = process):
+| setting | W | least-blocked PE: id (node), r1 / r2 / r3 | its waiting share (%) | its working time (ms per cycle) | its events executed per cycle | its events rolled back per cycle | node 2 mean executed per PE per cycle | busiest PE on node 2 ÷ node 2 mean (executed) | least-blocked PE ÷ node 2 mean (executed) | other nodes: mean executed per PE per cycle |
+|---|---|---|---|---|---|---|---|---|---|---|
+| D | 2500 | 105 (2) / 105 (2) / 105 (2) | 29.9 | 0.836 | 2143 | 3 | 867 | 2.47 | 2.47 | 556 |
+| D | 3750 | 105 (2) / 105 (2) / 105 (2) | 3.2 | 1.446 | 2141 | 1 | 887 | 2.41 | 2.41 | 566 |
+| D | 5000 | 105 (2) / 105 (2) / 105 (2) | 3.0 | 1.475 | 2141 | 1 | 885 | 2.42 | 2.42 | 557 |
+| G | 2500 | 105 (2) / 105 (2) / 105 (2) | 30.1 | 0.840 | 2143 | 3 | 867 | 2.47 | 2.47 | 556 |
+| G | 3750 | 105 (2) / 105 (2) / 105 (2) | 3.0 | 1.450 | 2141 | 1 | 887 | 2.41 | 2.41 | 566 |
+| G | 5000 | 105 (2) / 105 (2) / 105 (2) | 3.0 | 1.484 | 2141 | 1 | 885 | 2.42 | 2.42 | 557 |
+| E | 2500 | 105 (2) / 105 (2) / 105 (2) | 36.0 | 0.810 | 2142 | 1 | 871 | 2.46 | 2.46 | 556 |
+| E | 3750 | 105 (2) / 105 (2) / 105 (2) | 4.3 | 1.090 | 2141 | 1 | 891 | 2.40 | 2.40 | 567 |
+| E | 5000 | 105 (2) / 105 (2) / 105 (2) | 4.3 | 1.117 | 2141 | 1 | 891 | 2.40 | 2.40 | 558 |
+| GE | 2500 | 105 (2) / 105 (2) / 105 (2) | 35.7 | 0.810 | 2142 | 1 | 871 | 2.46 | 2.46 | 556 |
+| GE | 3750 | 105 (2) / 105 (2) / 105 (2) | 4.2 | 1.087 | 2141 | 1 | 892 | 2.40 | 2.40 | 567 |
+| GE | 5000 | 105 (2) / 105 (2) / 105 (2) | 4.1 | 1.125 | 2141 | 1 | 891 | 2.40 | 2.40 | 557 |
+| B8 | 5000 | 105 (2) / 105 (2) / 105 (2) | 2.9 | 1.617 | 2141 | 0 | 882 | 2.43 | 2.43 | 555 |
+
+**Node 2, D, rep 1:** waiting share (%) and rolled back per cycle, PEs sorted by executed (top 8):
+  W 2500: pe 105 ex 2144 rb 3 wait 30.3%; pe 127 ex 1751 rb 0 wait 42.2%; pe 133 ex 1744 rb 0 wait 45.4%; pe 118 ex 1728 rb 13 wait 42.7%; pe 101 ex 1263 rb 4 wait 61.8%; pe 96 ex 1194 rb 2 wait 64.1%; pe 136 ex 1109 rb 11 wait 62.5%; pe 103 ex 1063 rb 4 wait 66.6%
+         node 2 holds 9% of all rolled-back events (31.71 M); node 2 waiting share median 76.5%, others 85.9%
+  W 3750: pe 105 ex 2141 rb 1 wait 3.2%; pe 127 ex 1773 rb 22 wait 52.4%; pe 133 ex 1756 rb 12 wait 53.8%; pe 118 ex 1745 rb 30 wait 52.0%; pe 96 ex 1341 rb 149 wait 67.0%; pe 101 ex 1260 rb 0 wait 68.0%; pe 136 ex 1124 rb 27 wait 72.0%; pe 112 ex 1102 rb 104 wait 80.6%
+         node 2 holds 11% of all rolled-back events (68.97 M); node 2 waiting share median 80.9%, others 89.4%
+  W 5000: pe 105 ex 2141 rb 1 wait 3.0%; pe 127 ex 1763 rb 12 wait 50.8%; pe 133 ex 1745 rb 1 wait 51.5%; pe 118 ex 1726 rb 10 wait 49.7%; pe 96 ex 1522 rb 330 wait 62.6%; pe 101 ex 1265 rb 5 wait 67.1%; pe 136 ex 1114 rb 17 wait 69.7%; pe 112 ex 1113 rb 114 wait 77.5%
+         node 2 holds 19% of all rolled-back events (37.17 M); node 2 waiting share median 79.9%, others 88.7%
+
+**Traced rep (t): the least-blocked PE, µs per cycle** (exec_parts; `execute()` = exec_s from pe_stats; outside = total − exec_s):
+| setting | W | PE (node) | total | waiting | in `execute()` | outside `execute()` | loop | send_total | drain | poll | cancel_q | iter_end | rollback | fossil | flush_idle | executed / rolled back per cycle | loop µs per executed event | passes per cycle |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| D | 2500 | 105 (2) | 1498 | 383 | 1362 | 136 | 833 | 158 | 238 | 17 | 9 | 9 | 0 | 0 | 7 | 2142 / 2 | 0.39 | 259 |
+| D | 3750 | 105 (2) | 1841 | 52 | 1789 | 52 | 1093 | 158 | 331 | 292 | 4 | 9 | 0 | 285 | 2 | 2141 / 1 | 0.51 | 118 |
+| D | 5000 | 105 (2) | 1857 | 55 | 1806 | 50 | 1100 | 160 | 341 | 292 | 4 | 8 | 0 | 285 | 2 | 2141 / 1 | 0.51 | 122 |
+| G | 2500 | 105 (2) | 1514 | 380 | 1378 | 136 | 849 | 159 | 238 | 16 | 8 | 9 | 0 | 0 | 6 | 2141 / 1 | 0.40 | 248 |
+| G | 3750 | 105 (2) | 1829 | 54 | 1781 | 48 | 1083 | 159 | 335 | 291 | 4 | 4 | 0 | 281 | 2 | 2141 / 1 | 0.51 | 121 |
+| G | 5000 | 105 (2) | 1854 | 53 | 1813 | 41 | 1088 | 161 | 342 | 307 | 4 | 4 | 0 | 297 | 2 | 2141 / 1 | 0.51 | 122 |
+| E | 2500 | 105 (2) | 1569 | 465 | 1352 | 217 | 831 | 160 | 244 | 131 | 13 | 14 | 0 | 110 | 11 | 2141 / 1 | 0.39 | 388 |
+| E | 3750 | 105 (2) | 1479 | 81 | 1417 | 63 | 877 | 154 | 311 | 149 | 5 | 6 | 0 | 140 | 3 | 2141 / 1 | 0.41 | 150 |
+| E | 5000 | 105 (2) | 1489 | 55 | 1437 | 52 | 891 | 157 | 326 | 154 | 4 | 6 | 0 | 145 | 2 | 2141 / 1 | 0.42 | 121 |
+| GE | 2500 | 105 (2) | 1561 | 470 | 1350 | 212 | 827 | 152 | 241 | 132 | 14 | 14 | 0 | 110 | 11 | 2141 / 1 | 0.39 | 402 |
+| GE | 3750 | 105 (2) | 1458 | 54 | 1413 | 44 | 881 | 159 | 312 | 149 | 4 | 5 | 0 | 138 | 2 | 2141 / 1 | 0.41 | 123 |
+| GE | 5000 | 105 (2) | 1484 | 55 | 1436 | 48 | 886 | 157 | 326 | 152 | 4 | 4 | 0 | 142 | 2 | 2141 / 1 | 0.41 | 122 |
+| B8 | 5000 | 105 (2) | 2100 | 54 | 1911 | 189 | 1131 | 160 | 361 | 302 | 11 | 17 | 0 | 289 | 2 | 2140 / 0 | 0.53 | 322 |
+
+  Node means, D, traced (µs per cycle: total / waiting / loop / drain / rollback / fossil / outside execute(); executed per cycle):
+    W 2500 node 2: 1498 / 1049 / 396 / 148 / 3 / 0 / 532; executed 867, rolled back 13
+    W 2500 others: 1498 / 1236 / 262 / 115 / 2 / 0 / 667; executed 557, rolled back 9
+    W 3750 node 2: 1840 / 1377 / 423 / 160 / 6 / 6 / 703; executed 895, rolled back 41
+    W 3750 others: 1840 / 1588 / 270 / 127 / 3 / 0 / 869; executed 571, rolled back 23
+    W 5000 node 2: 1856 / 1361 / 444 / 172 / 6 / 6 / 686; executed 888, rolled back 34
+    W 5000 others: 1856 / 1593 / 277 / 126 / 2 / 0 / 875; executed 558, rolled back 9
+
+**Count waves, the least-blocked PE (traced; every 4th wave):** reasons (0 at once, 1 starved, 2 after K events, 3 K already reached), median µs pickup→contribution, median events in between
+  D W2500: pe 105: 2552 waves; reasons {'0': 2509, '3': 43}; contrib_us median 156.5; events median 0
+  D W3750: pe 105: 2504 waves; reasons {'0': 29, '1': 1, '2': 1, '3': 2473}; contrib_us median 1260.9; events median 1856
+  D W5000: pe 105: 2503 waves; reasons {'0': 32, '3': 2471}; contrib_us median 1373.8; events median 1856
+  G W2500: pe 105: 2560 waves; reasons {'0': 2560}; contrib_us median 23.6; events median 0
+  G W3750: pe 105: 2503 waves; reasons {'0': 2503}; contrib_us median 11.4; events median 0
+  G W5000: pe 105: 2503 waves; reasons {'0': 2503}; contrib_us median 1255.8; events median 1856
+  E W2500: pe 105: 2510 waves; reasons {'0': 2507, '3': 3}; contrib_us median 1170.3; events median 1933
+  E W3750: pe 105: 2502 waves; reasons {'0': 29, '2': 223, '3': 2250}; contrib_us median 29.2; events median 32
+  E W5000: pe 105: 2501 waves; reasons {'0': 27, '3': 2474}; contrib_us median 1092.0; events median 1728
+  GE W2500: pe 105: 2514 waves; reasons {'0': 2514}; contrib_us median 2.1; events median 0
+  GE W3750: pe 105: 2503 waves; reasons {'0': 2503}; contrib_us median 9.8; events median 0
+  GE W5000: pe 105: 2502 waves; reasons {'0': 2502}; contrib_us median 9.8; events median 0
+  B8 W5000: pe 105: 2502 waves; reasons {'0': 22, '1': 1, '2': 1911, '3': 568}; contrib_us median 19.6; events median 16

@@ -1,0 +1,49 @@
+Rings / mutex inbox (M committed ev/s, mean of reps; per-rep values; higher is better)
+
+  16 nodes, fixed W (400; LA10 50)
+    σ 100          mutex  629.4 rings  630.7 ratio 1.002 | rings 635 633 635 629 622 | mutex 624 625 638 632 629
+    σ 500          mutex  539.2 rings  534.3 ratio 0.991 | rings 544 549 551 487 540 | mutex 547 551 548 542 508
+    σ 1,000        mutex  506.4 rings  504.6 ratio 0.996 | rings 502 503 508 503 508 | mutex 508 503 506 504 511
+    σ 2,000        mutex  435.2 rings  437.7 ratio 1.006 | rings 439 433 441 434 441 | mutex 438 436 435 432 435
+    σ 4,000        mutex  419.4 rings  419.1 ratio 0.999 | rings 415 422 424 418 417 | mutex 430 416 421 410 421
+    uniform        mutex  227.5 rings  250.7 ratio 1.102 | rings 256 246 251 250 250 | mutex 226 229 226 228 228
+    LA10 σ 500     mutex  466.9 rings  474.1 ratio 1.015 | rings 479 478 469 481 463 | mutex 465 463 467 475 465
+    LA10 σ 2,000   mutex  357.7 rings  359.2 ratio 1.004 | rings 360 361 358 364 353 | mutex 362 356 351 362 356
+    uniform WPs    mutex  273.8 rings  330.5 ratio 1.207 | rings 330 327 330 334 331 | mutex 277 268 272 279 274
+    geomean 1.034 min 0.991
+
+  16 nodes, controller
+    σ 100          mutex  614.3 rings  613.6 ratio 0.999 | rings 619 618 613 605 613 | mutex 611 613 618 616 614
+    σ 500          mutex  558.3 rings  554.8 ratio 0.994 | rings 554 552 559 555 554 | mutex 553 567 552 556 563
+    σ 1,000        mutex  497.9 rings  498.3 ratio 1.001 | rings 499 505 499 491 497 | mutex 502 490 494 507 497
+    σ 2,000        mutex  392.4 rings  390.2 ratio 0.994 | rings 395 388 395 379 393 | mutex 391 394 393 386 398
+    σ 4,000        mutex  363.4 rings  360.7 ratio 0.993 | rings 371 328 372 369 364 | mutex 342 361 373 371 369
+    uniform        mutex  203.5 rings  219.4 ratio 1.078 | rings 220 218 219 221 219 | mutex 204 202 204 204 204
+    LA10 σ 500     mutex  454.6 rings  454.1 ratio 0.999 | rings 459 440 461 453 457 | mutex 461 454 455 456 446
+    LA10 σ 2,000   mutex  342.4 rings  345.2 ratio 1.008 | rings 347 346 346 347 341 | mutex 342 344 348 330 348
+    uniform WPs    mutex  260.8 rings  315.0 ratio 1.208 | rings 318 316 316 313 312 | mutex 265 258 265 268 249
+    geomean 1.028 min 0.993
+
+  4 nodes, fixed W (400; LA10 50)
+    σ 100          mutex  167.0 rings  166.7 ratio 0.998 | rings 169 167 164 | mutex 164 168 169
+    σ 500          mutex  145.8 rings  148.0 ratio 1.015 | rings 149 148 147 | mutex 146 147 144
+    σ 1,000        mutex  141.1 rings  141.3 ratio 1.001 | rings 141 142 141 | mutex 142 140 141
+    σ 2,000        mutex  125.7 rings  125.1 ratio 0.996 | rings 125 125 125 | mutex 126 126 125
+    σ 4,000        mutex  114.7 rings  115.3 ratio 1.005 | rings 115 116 115 | mutex 116 116 113
+    uniform        mutex  122.2 rings  120.0 ratio 0.982 | rings 120 120 119 | mutex 122 123 122
+    LA10 σ 500     mutex  143.6 rings  144.7 ratio 1.007 | rings 145 145 144 | mutex 144 143 144
+    LA10 σ 2,000   mutex  109.7 rings  110.7 ratio 1.009 | rings 111 111 110 | mutex 109 110 109
+    uniform WPs    mutex   99.9 rings  114.8 ratio 1.149 | rings 115 115 115 | mutex 98 98 104
+    geomean 1.017 min 0.982
+
+  4 nodes, controller
+    σ 100          mutex  170.3 rings  169.3 ratio 0.994 | rings 168 170 170 | mutex 171 170 170
+    σ 500          mutex  145.7 rings  153.1 ratio 1.051 | rings 153 153 153 | mutex 153 131 153
+    σ 1,000        mutex  146.3 rings  146.6 ratio 1.002 | rings 147 146 146 | mutex 146 146 147
+    σ 2,000        mutex  132.1 rings  130.4 ratio 0.987 | rings 131 131 130 | mutex 132 133 132
+    σ 4,000        mutex  119.0 rings  119.7 ratio 1.006 | rings 120 120 119 | mutex 119 118 119
+    uniform        mutex  130.8 rings  129.3 ratio 0.989 | rings 129 129 130 | mutex 131 131 131
+    LA10 σ 500     mutex  138.7 rings  140.7 ratio 1.014 | rings 140 141 141 | mutex 139 140 137
+    LA10 σ 2,000   mutex  108.8 rings  108.6 ratio 0.998 | rings 109 109 109 | mutex 109 109 109
+    uniform WPs    mutex  104.6 rings  121.1 ratio 1.158 | rings 121 121 121 | mutex 104 105 106
+    geomean 1.021 min 0.987

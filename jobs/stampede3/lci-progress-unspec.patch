@@ -1,0 +1,10 @@
+92,93c92,97
+<   hints->domain_attr->control_progress = FI_PROGRESS_MANUAL;
+<   hints->domain_attr->data_progress = FI_PROGRESS_MANUAL;
+---
+>   // LCI_OFI_PROGRESS_UNSPEC=1: leave the progress modes open, so providers
+>   // that report FI_PROGRESS_AUTO (psm2) are not excluded; LCI polls anyway.
+>   if (getenv("LCI_OFI_PROGRESS_UNSPEC") == nullptr) {
+>     hints->domain_attr->control_progress = FI_PROGRESS_MANUAL;
+>     hints->domain_attr->data_progress = FI_PROGRESS_MANUAL;
+>   }

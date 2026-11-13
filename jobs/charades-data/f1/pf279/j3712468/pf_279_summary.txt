@@ -1,0 +1,153 @@
+part A: runs kept 25, failed or without count waves 0; counts ['180941384'] (F1 180941384) SAME
+
+# Rates at W 300 (M committed ev/s, median of 5; spread fastest / slowest), events per htram message, lowest efficiency %, GVT rounds per s
+  WPs 512          45.5  1.06  ev/msg   82.5  eff 99.980  GVT/s  7751   / F1 46.9 = 0.971 (PF-1 ±5%)
+  PP 512           46.1  1.06  ev/msg  131.2  eff 100.000  GVT/s  7812
+  PP 512 pad 1     46.2  1.06  ev/msg  131.2  eff 100.000  GVT/s  7824
+  local 4 pad 1    42.0  1.07  ev/msg  130.1  eff 100.000  GVT/s  7095
+  local 1 pad 1    34.0  1.04  ev/msg  276.5  eff 100.000  GVT/s  5781
+
+# Ratios to PP 512 (medians, and paired by rep)
+  WPs 512        / PP 512 0.987  paired 0.983 0.989 1.006 1.002 0.962 median 0.989
+  PP 512 pad 1   / PP 512 1.000  paired 1.003 1.011 1.012 1.002 1.000 median 1.003  [PF-3 0.97-1.03: yes]
+  local 4 pad 1  / PP 512 0.911  paired 0.921 0.903 0.921 0.921 0.901 median 0.921  [PF-4 0.90-9.99: yes]
+  local 1 pad 1  / PP 512 0.738  paired 0.740 0.745 0.735 0.742 0.754 median 0.742  [PF-2 0.68-0.80: yes]
+
+# Profiles: share of task 0's user cycles (%%) and µs per committed event (share x 46 PEs / part A rate)
+  group                                  WPs 512                PP 512         local 4 pad 1         local 1 pad 1
+  htram send path                 2.2%   0.023 µs        4.5%   0.044 µs        8.0%   0.088 µs       28.9%   0.390 µs
+  htram receive                   5.0%   0.050 µs        4.4%   0.044 µs        3.7%   0.040 µs        2.8%   0.037 µs
+  scheduler and polling           3.1%   0.032 µs        3.4%   0.033 µs        3.8%   0.042 µs        2.5%   0.033 µs
+  LCI / PSM2 progress             1.2%   0.012 µs        1.0%   0.010 µs        1.8%   0.020 µs        1.0%   0.014 µs
+  engine and model               59.4%   0.600 µs       62.1%   0.619 µs       57.3%   0.627 µs       45.2%   0.611 µs
+  locks                           1.9%   0.019 µs        1.6%   0.016 µs        2.0%   0.022 µs        1.5%   0.021 µs
+  memory                          4.0%   0.041 µs        1.5%   0.015 µs        1.2%   0.013 µs        0.8%   0.010 µs
+  other                          11.6%   0.117 µs       10.8%   0.108 µs       10.9%   0.120 µs        7.4%   0.100 µs
+  below 0.2% each                11.6%   0.117 µs       10.7%   0.107 µs       11.3%   0.124 µs       10.0%   0.135 µs
+  total (µs per event)                     1.010                 0.997                 1.095                 1.351   samples: 689000 674000 745000 923000
+
+# Closure (PF-5): local 1 pad 1 - PP 512, µs per committed event; total 0.354
+  htram send path           +0.346  ( 97.6% of the difference)
+  htram receive             -0.007  ( -1.9% of the difference)
+  scheduler and polling     -0.000  ( -0.1% of the difference)
+  LCI / PSM2 progress       +0.004  (  1.2% of the difference)
+  engine and model          -0.008  ( -2.3% of the difference)
+  locks                     +0.004  (  1.2% of the difference)
+  memory                    -0.005  ( -1.4% of the difference)
+  other                     -0.008  ( -2.3% of the difference)
+  below 0.2% each           +0.028  (  7.9% of the difference)
+
+# Symbols with the largest difference (µs per committed event, local 1 pad 1 - PP 512)
+   +0.359   0.359 vs  0.000  [htram send path] HTram::copyLocalToNodeBuf(int)
+   -0.014   0.000 vs  0.014  [htram send path] HTram::copyToNodeBuf(int, int)
+   -0.006   0.010 vs  0.016  [scheduler and polling] bool moodycamel::ConcurrentQueue<void*, moodycamel::ConcurrentQueueDefaultTraits>::try_deq
+   -0.005   0.059 vs  0.064  [engine and model] fp_push(RemoteEvent*, unsigned long)
+   -0.005   0.010 vs  0.015  [other] PEQueue::push_down(unsigned int)
+   -0.004   0.004 vs  0.008  [memory] CmiFree(void*)
+   -0.003   0.000 vs  0.003  [other] CmiReference(void*)
+   +0.003   0.003 vs  0.000  [scheduler and polling] agg_flush_idle()
+   -0.003   0.013 vs  0.016  [htram receive] HTram::drainInputBuffer()
+   -0.002   0.000 vs  0.002  [engine and model] LP<PHoldLP, PHoldMessage>::commit(Event*)
+   -0.002   0.000 vs  0.002  [htram receive] HTram::receivePerPE(HTramNodeMessage*)
+   -0.002   0.034 vs  0.037  [engine and model] LPChare::recv_remote_event(RemoteEvent*)
+   -0.002   0.000 vs  0.002  [engine and model] BucketGVT::poll()
+   -0.002   0.000 vs  0.002  [other] NodeWaves::contribute_from(int, std::vector<long, std::allocator<long> > const&)
+   -0.002   0.003 vs  0.005  [htram receive] HTramRecv::pushToInputBuffer(int, HTramNodeMessage*)
+
+# Annotations: share of the function's samples on lock-prefixed instructions (atomics) plus the instruction after each (skid), and the 5 hottest lines
+  WPs 512        flushOrder               lock + next   0.0% of 100.0%
+        52.7%  mov    %edx,(%rdi,%rcx,4)
+        10.3%  add    $0x1,%rcx
+         3.3%  nopl   0x0(%rax,%rax,1)
+         3.1%  test   %ebx,%ebx
+         3.0%  ret
+  WPs 512        insert                   lock + next   0.0% of 100.0%
+        43.6%  mov    0x4b8(%rbx),%rdx
+        18.2%  test   %eax,%eax
+         2.1%  cmp    $0x3,%eax
+         2.1%  movups %xmm2,0x20(%rsp)
+         2.0%  movslq %r12d,%r14
+  PP 512         flushDue                 lock + next   0.0% of 100.0%
+        41.4%  cmp    %rax,%r13
+        14.0%  add    $0x4,%rbx
+         4.9%  add    $0x4,%rbx
+         4.0%  mov    0x1c8(%rdx),%rdx
+         3.5%  mov    (%r12),%rbx
+  PP 512         flushOrder               lock + next   0.0% of 100.0%
+        51.4%  mov    %edx,(%rdi,%rcx,4)
+        10.9%  add    $0x1,%rcx
+         3.3%  ret
+         3.1%  pop    %r12
+         3.0%  lea    0x4d0(%r12),%rbp
+  PP 512         insert                   lock + next   0.0% of 100.0%
+        41.4%  mov    0x4b8(%rbx),%rdx
+        20.0%  test   %eax,%eax
+        10.0%  mov    %r13,(%rdx)
+         2.0%  movdqu 0x10(%rbp),%xmm5
+         1.8%  movups %xmm5,0x10(%rsp)
+  PP 512         insertValue              lock + next   0.0% of 100.0%
+        18.9%  mov    %eax,%r12d
+        17.9%  movdqu 0xb0(%rsp),%xmm5
+        10.7%  mov    0xd0(%rsp),%rcx
+         6.6%  movups %xmm5,0x28(%rax)
+         4.5%  movups %xmm6,0x38(%rax)
+  local 4 pad 1  copyLocalToNodeBuf       lock + next  68.4% of 100.0%
+        40.5%  movabs $0x7fffffffffffffff,%rsi
+        25.2%  mov    %eax,%r9d
+        18.8%  mov    (%r14),%r8d
+         2.7%  jne    5621e9 <HTram::copyLocalToNodeBuf(int)+0x119>
+         1.8%  cmp    %rax,%rdx
+  local 4 pad 1  flushDue                 lock + next   0.0% of 100.0%
+        41.4%  cmp    %rax,%r13
+        23.2%  mov    0x438(%rbp),%rdx
+         3.8%  mov    0x4b8(%rbp),%rdx
+         3.7%  cmpl   $0xf,0x20340d(%rip)        # 76eaec <htram_pp_local_size>
+         3.5%  movslq (%rbx),%rax
+  local 4 pad 1  flushOrder               lock + next   0.0% of 100.0%
+        55.2%  mov    %edx,(%rdi,%rcx,4)
+         9.9%  add    $0x1,%rcx
+         3.1%  mov    %eax,%ebx
+         2.9%  ret
+         2.8%  test   %ebx,%ebx
+  local 4 pad 1  insert                   lock + next   0.0% of 100.0%
+        34.2%  mov    0x4b8(%rbx),%rdx
+        18.8%  test   %eax,%eax
+        15.2%  mov    %r13,(%rdx)
+         4.4%  movdqu 0x10(%rbp),%xmm5
+         2.6%  cmp    $0x3,%eax
+  local 4 pad 1  insertValue              lock + next   0.0% of 100.0%
+        27.4%  mov    %eax,%r12d
+        14.8%  movdqu 0xb0(%rsp),%xmm6
+        12.3%  mov    0xd0(%rsp),%rcx
+         3.9%  jg     568038 <HTram::insertValue(PdesItem, int)+0x178>
+         3.7%  movdqu 0xc0(%rsp),%xmm7
+  local 1 pad 1  copyLocalToNodeBuf       lock + next  79.5% of 100.0%
+        40.2%  movabs $0x7fffffffffffffff,%rsi
+        38.6%  mov    %eax,%r9d
+        17.2%  mov    (%r14),%r8d
+         0.7%  jne    5621e9 <HTram::copyLocalToNodeBuf(int)+0x119>
+         0.7%  cmp    %rax,%rdx
+  local 1 pad 1  flushDue                 lock + next   0.0% of 100.0%
+        53.2%  cmp    %rax,%r13
+        10.8%  mov    0x438(%rbp),%rdx
+         4.6%  add    $0x4,%rbx
+         4.1%  mov    (%rdx,%rax,1),%rax
+         3.2%  mov    0x4b8(%rbp),%rdx
+  local 1 pad 1  flushOrder               lock + next   0.0% of 100.0%
+        54.3%  mov    %edx,(%rdi,%rcx,4)
+        10.2%  add    $0x1,%rcx
+         3.3%  add    $0x28,%rsp
+         2.8%  mov    %eax,%ebx
+         2.7%  idiv   %ebx
+  local 1 pad 1  insert                   lock + next   0.0% of 100.0%
+        46.5%  mov    0x4b8(%rbx),%rdx
+        16.1%  mov    %r13,(%rdx)
+         6.8%  test   %eax,%eax
+         2.6%  movdqu 0x10(%rbp),%xmm5
+         2.2%  sub    $0x50,%rsp
+  local 1 pad 1  insertValue              lock + next   0.0% of 100.0%
+        15.6%  add    0x3e8(%rbx),%rdx
+        15.0%  mov    %eax,%r12d
+        12.9%  movdqu 0xb0(%rsp),%xmm6
+         9.7%  mov    0xd0(%rsp),%rcx
+         6.3%  movups %xmm6,0x28(%rax)

@@ -1,0 +1,160 @@
+From 9063017bddd534f46f93558a855bffa5ced38f32 Mon Sep 17 00:00:00 2001
+From: Ritvik Rao <rsrao2@illinois.edu>
+Date: Fri, 23 Oct 2026 14:27:23 -0500
+Subject: [PATCH] Controller: --ctl-sparse-waves sends its counters and
+ histogram only on the count wave that ends a round
+
+Under the shared reduction every bucketed-GVT count wave carried the
+controller's counters (and every 8th its histogram), though it decides once
+per --ctl-interval waves. On full nodes a fixed window with the controller
+running ran at 0.94 of the same window without it; perf put about 1% in the
+controller's own code and the rest in PEs waiting (network polling, idle
+flushes), i.e. slower waves. The counters are deltas, so a round's sums are
+unchanged; other waves keep the GVT's two-element tuple. Off by default
+until measured. Mac: --repeat 3 on agg_ctl_sparse_bucket_pp (new),
+agg_ctl_shared_bucket_pp and ctl_quantile_shared 162/162.
+
+Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>
+---
+ src/globals.C                               |  2 ++
+ src/globals.h                               |  1 +
+ src/gvt/bucketed.C                          | 12 +++++++----
+ src/scheduler/controller.C                  | 22 ++++++++++++++++++---
+ src/util/command_line.C                     |  1 +
+ tests/test_configs/agg_ctl_sparse_bucket_pp | 15 ++++++++++++++
+ 6 files changed, 46 insertions(+), 7 deletions(-)
+ create mode 100644 tests/test_configs/agg_ctl_sparse_bucket_pp
+
+diff --git a/src/globals.C b/src/globals.C
+index 702f091..b97e037 100644
+--- a/src/globals.C
++++ b/src/globals.C
+@@ -66,6 +66,7 @@ unsigned g_tw_ctl_floor;
+ double   g_tw_ctl_alpha_gain;
+ double   g_tw_ctl_alpha_init;
+ double   g_tw_ctl_agg_kappa;
++unsigned g_tw_ctl_sparse_waves;
+ unsigned g_tw_ctl_interval;
+ unsigned g_tw_ctl_dry;
+ unsigned g_tw_ctl_log;
+@@ -145,6 +146,7 @@ void clear_globals() {
+   g_tw_ctl_alpha_gain     = 0.25;
+   g_tw_ctl_alpha_init     = 1;
+   g_tw_ctl_agg_kappa      = 0;
++  g_tw_ctl_sparse_waves   = 0;
+   g_tw_ctl_interval       = 8;
+   g_tw_ctl_dry            = 0;
+   g_tw_ctl_log            = 0;
+diff --git a/src/globals.h b/src/globals.h
+index 700a7aa..dd13bd1 100644
+--- a/src/globals.h
++++ b/src/globals.h
+@@ -80,6 +80,7 @@ extern unsigned g_tw_ctl_calibrate;   ///< quantile rule: scale the bound by the
+ extern unsigned g_tw_ctl_floor;       ///< quantile rule: calibrate only on stragglers the window can cause
+ extern double   g_tw_ctl_alpha_gain;  ///< quantile rule: share of the way (in log) alpha moves per fold
+ extern double   g_tw_ctl_alpha_init;  ///< quantile rule: alpha's starting value
++extern unsigned g_tw_ctl_sparse_waves; ///< controller data rides only on the count wave that ends a round
+ extern double   g_tw_ctl_agg_kappa;   ///< quantile rule with htram's deadline policy: remote sends inside the window per executed event, at most (0: off)
+ extern unsigned g_tw_ctl_interval;    ///< GVT updates per controller round
+ extern unsigned g_tw_ctl_dry;         ///< run the controller but never change the window
+diff --git a/src/gvt/bucketed.C b/src/gvt/bucketed.C
+index fd7f81d..1e99b6b 100644
+--- a/src/gvt/bucketed.C
++++ b/src/gvt/bucketed.C
+@@ -230,10 +230,14 @@ void BucketGVT::contribute_counts(int num_buckets) {
+   std::vector<uint64_t> ctl_counters, ctl_hist;
+   if (ctl_shared()) {
+     ctl_wave_contribute(&ctl_counters, &ctl_hist);
+-    tuple[elements++] = CkReduction::tupleElement(
+-        sizeof(uint64_t) * ctl_counters.size(), ctl_counters.data(),
+-        CkReduction::sum_ulong_long);
+-    if (!ctl_hist.empty()) {
++    // Empty on the waves that carry nothing (--ctl-sparse-waves); every PE
++    // makes the same choice for the same wave, so the tuples match
++    if (!ctl_counters.empty()) {
++      tuple[elements++] = CkReduction::tupleElement(
++          sizeof(uint64_t) * ctl_counters.size(), ctl_counters.data(),
++          CkReduction::sum_ulong_long);
++    }
++    if (!ctl_counters.empty() && !ctl_hist.empty()) {
+       tuple[elements++] = CkReduction::tupleElement(
+           sizeof(uint64_t) * ctl_hist.size(), ctl_hist.data(),
+           CkReduction::sum_ulong_long);
+diff --git a/src/scheduler/controller.C b/src/scheduler/controller.C
+index 8e93f9f..763dbbd 100644
+--- a/src/scheduler/controller.C
++++ b/src/scheduler/controller.C
+@@ -203,10 +203,25 @@ void Controller::read_counters(uint64_t* v) {
+  */
+ void Controller::wave_contribute(std::vector<uint64_t>* counters,
+                                  std::vector<uint64_t>* h) {
++  h->clear();
++  bool with_hist;
++  if (g_tw_ctl_sparse_waves) {
++    // Only the waves that end a round carry anything: the counters are
++    // deltas, so a round's sum is the same, and the other waves keep the
++    // GVT's plain two-element tuple (full nodes: a fixed window with the
++    // controller running cost 6%, mostly in PEs waiting on slower waves)
++    unsigned w = waves++, interval = std::max(1u, g_tw_ctl_interval);
++    if ((w + 1) % interval != 0) {
++      counters->clear();
++      return;
++    }
++    unsigned every = std::max(1u, g_tw_ctl_hist_waves / interval);
++    with_hist = ((w + 1) / interval - 1) % every == 0;
++  } else {
++    with_hist = waves++ % g_tw_ctl_hist_waves == 0;
++  }
+   counters->assign(COUNTERS, 0);
+   read_counters(counters->data());
+-  bool with_hist = waves++ % g_tw_ctl_hist_waves == 0;
+-  h->clear();
+   if (!with_hist) return;
+   if (g_tw_ctl_hist_coarse) {
+     h->assign(COARSE_BINS, 0);
+@@ -237,7 +252,8 @@ void Controller::wave_result(const uint64_t* counters, const uint64_t* h,
+     for (int b = 0; b < BINS; b++) wave_sum[b] += h[b];
+   }
+   for (int i = 0; i < COUNTERS; i++) wave_sum[BINS + i] += counters[i];
+-  if (++waves_since < g_tw_ctl_interval) return;
++  // --ctl-sparse-waves: counters arrive only on the wave that ends a round
++  if (!g_tw_ctl_sparse_waves && ++waves_since < g_tw_ctl_interval) return;
+   waves_since = 0;
+   decide(wave_sum.data());
+   std::fill(wave_sum.begin(), wave_sum.end(), 0);
+diff --git a/src/util/command_line.C b/src/util/command_line.C
+index ca8a49c..aaaad12 100644
+--- a/src/util/command_line.C
++++ b/src/util/command_line.C
+@@ -53,6 +53,7 @@ void parse_command_line(int argc, char** argv) {
+   kernel.register_argument("ctl-alpha-gain",       "Delay quantile rule: share of the way (in log) the calibration moves per fold, at most 1.25x (default 0.25)", g_tw_ctl_alpha_gain);
+   kernel.register_argument("ctl-alpha-init",       "Delay quantile rule: starting value of the calibration alpha (default 1)", g_tw_ctl_alpha_init);
+   kernel.register_argument("ctl-agg-kappa",        "Delay quantile rule with htram's deadline policy: at most this many remote sends per executed event with a delay inside the window, W = F^-1(min(kappa / r, ...)) (default 0 = off)", g_tw_ctl_agg_kappa);
++  kernel.register_argument("ctl-sparse-waves",     "With --ctl-reduction=1: the controller's counters (and histogram) ride only on the count wave that ends a round, not on every wave - NO=0 (default), YES=1", g_tw_ctl_sparse_waves);
+   kernel.register_argument("ctl-interval",         "Controller round: count waves under the bucketed GVT (shared reduction), else GVT updates; at least 1", g_tw_ctl_interval);
+   kernel.register_argument("ctl-dry",              "Run the controller but keep the window fixed (measures its cost) - NO=0, YES=1", g_tw_ctl_dry);
+   kernel.register_argument("ctl-log",              "Print every controller round - NO=0, YES=1", g_tw_ctl_log);
+diff --git a/tests/test_configs/agg_ctl_sparse_bucket_pp b/tests/test_configs/agg_ctl_sparse_bucket_pp
+new file mode 100644
+index 0000000..a248101
+--- /dev/null
++++ b/tests/test_configs/agg_ctl_sparse_bucket_pp
+@@ -0,0 +1,15 @@
++# Optimistic w/Bucketed GVT, htram (PP), deadline flush policy, the window
++# set by the delay-quantile rule with the aggregation bound (kappa) and sparse
++# controller waves (counters only on the wave that ends a round)
++sync=3
++gvt=4
++buffer-size=655360
++optimism-window=2000
++aggregation=1
++agg-mode=2
++agg-buffer=16
++agg-policy=1
++ctl=1
++ctl-agg-kappa=0.2
++ctl-sparse-waves=1
++ctl-hist-waves=32
+-- 
+2.54.0 (Apple Git-157)
+

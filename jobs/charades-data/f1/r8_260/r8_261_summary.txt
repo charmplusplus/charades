@@ -1,0 +1,52 @@
+R8 8-node PHOLD: Charades 99, Devastator 72, ROSS 69 runs; failed: 0
+
+# 8 nodes, PHOLD (this job; F1 in brackets)
+workload               | Charades ctl    | Devastator best (W)      | ROSS best       | C/D           | C/R           | this / F1: C, D, R
+σ 100                  |  404.6 [ 393.8] |  332.7 (W500 ) [ 304.0 W1000] | 116.4 [113.4] | 1.22 [1.30] | 3.48 [3.47] | 1.027 1.095 1.027
+   Devastator per W: W500 332.7 s1.01  W1000 330.6 s1.02  W2000 322.4 s1.01; counts one and = F1: True
+σ 500                  |  357.4 [ 357.1] |  270.4 (W1000) [ 245.3 W1000] |  76.3 [ 76.5] | 1.32 [1.46] | 4.68 [4.67] | 1.001 1.102 0.998
+   Devastator per W: W500 251.2 s1.01  W1000 270.4 s1.02  W2000 237.7 s1.01; counts one and = F1: True
+σ 1,000                |  337.9 [ 331.3] |  228.3 (W1000) [ 214.4 W1000] |  63.9 [ 62.8] | 1.48 [1.55] | 5.29 [5.28] | 1.020 1.065 1.018
+   Devastator per W: W500 205.1 s1.00  W1000 228.3 s1.00  W2000 205.9 s1.03; counts one and = F1: True
+σ 2,000                |  304.0 [ 302.8] |  192.9 (W1000) [ 187.6 W1000] |  53.6 [ 54.3] | 1.58 [1.61] | 5.67 [5.58] | 1.004 1.028 0.987
+   Devastator per W: W500 170.0 s1.01  W1000 192.9 s1.00  W2000 158.2 s1.04; counts one and = F1: True
+σ 4,000                |  278.4 [ 266.8] |  153.2 (W1000) [ 139.6 W1000] |  50.9 [ 50.6] | 1.82 [1.91] | 5.47 [5.28] | 1.043 1.097 1.006
+   Devastator per W: W500 144.5 s1.02  W1000 153.2 s1.00  W2000 91.3 s1.01; counts one and = F1: True
+uniform                |  229.0 [ 227.5] |  115.4 (W1000) [ 106.2 W500 ] |  46.8 [ 48.1] | 1.99 [2.14] | 4.90 [4.73] | 1.007 1.087 0.972
+   Devastator per W: W500 111.7 s1.00  W1000 115.4 s1.00  W2000 71.8 s1.02; counts one and = F1: True
+lookahead 10, σ 500    |  321.1 [ 323.7] |  267.3 (W200 ) [ 248.8 W200 ] |  72.6 [ 73.4] | 1.20 [1.30] | 4.42 [4.41] | 0.992 1.074 0.988
+   Devastator per W: W100 245.9 s1.00  W200 267.3 s1.00  W400 233.1 s1.01; counts one and = F1: True
+lookahead 10, σ 2,000  |  260.8 [ 253.9] |  179.1 (W200 ) [ 174.8 W200 ] |  52.7 [ 52.1] | 1.46 [1.45] | 4.95 [4.87] | 1.027 1.025 1.011
+   Devastator per W: W100 162.2 s1.79  W200 179.1 s4.01  W400 136.0 s1.03; counts one and = F1: True
+
+# 8 nodes, F5 (this job; F5 in brackets)
+df        Charades ctl 234.5 [233.2] (ctl / best fixed 1.031 [1.036]); Devastator 138.7 W20000 [122.1 W10000]; ROSS 74.7 w5000 [74.4 w5000]
+          C/D 1.69 [1.91]; C/R 3.14 [3.13]; this / F5: C 1.006 D 1.135 R 1.003; counts one and = F5: True
+          Devastator per W: W10000 124.8 s2.08  W20000 138.7 s1.00  W40000 114.6 s2.02
+tr        Charades ctl 574.9 [560.8] (ctl / best fixed 1.005 [0.975]); Devastator 455.9 W2000 [446.2 W1000]; ROSS 270.1 w2000 [267.9 w2000]
+          C/D 1.26 [1.26]; C/R 2.13 [2.09]; this / F5: C 1.025 D 1.022 R 1.008; counts one and = F5: True
+          Devastator per W: W1000 448.2 s1.00  W2000 455.9 s1.00  W4000 411.0 s1.00
+
+# Check: uniform at 8 nodes, alone vs with load streams on nodes 9-14 (paired per rep)
+  D W500   r1 112.3 / 112.0 = 1.002  r2 112.4 / 112.1 = 1.003  r3 112.9 / 112.1 = 1.008; load / alone median 1.003
+  D W1000  r1 115.6 / 115.4 = 1.002  r2 115.5 / 116.0 = 0.995  r3 115.5 / 114.2 = 1.011; load / alone median 1.002
+  C ctl    r1 230.0 / 227.4 = 1.012  r2 231.9 / 230.6 = 1.006  r3 230.1 / 230.5 = 0.998; load / alone median 1.006
+  load runs: Devastator 4-node 15, Charades 2-node 9
+  Devastator uniform W 1,000 in phase 1 (same nodes, median): 115.4
+
+# Spread between reps (fastest / slowest), 8-node arms
+arms 102; median 1.011; above 1.10: 4
+  ('l10g2000', 8, 200) 4.01 (without the slowest 1.03)
+  ('df', '10000') 2.08 (without the slowest 1.01)
+  ('df', '40000') 2.02 (without the slowest 1.03)
+  ('l10g2000', 8, 100) 1.79 (without the slowest 1.00)
+
+# Charades / Devastator at 8 nodes, 3 decimals: this job, F1, change
+  g100      1.216  1.296  0.939   C/R 3.475 3.474  uniform count 
+  g500      1.322  1.456  0.908   C/R 4.683 4.670  uniform count 
+  g1000     1.480  1.545  0.958   C/R 5.292 5.279  uniform count 
+  g2000     1.576  1.614  0.976   C/R 5.674 5.576  uniform count 
+  g4000     1.818  1.912  0.951   C/R 5.474 5.277  uniform count 
+  uni       1.985  2.143  0.926   C/R 4.898 4.728  uniform count [1447683514]
+  l10g500   1.201  1.301  0.923   C/R 4.424 4.409  uniform count 
+  l10g2000  1.456  1.453  1.003   C/R 4.950 4.873  uniform count 

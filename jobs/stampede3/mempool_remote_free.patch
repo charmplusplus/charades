@@ -1,0 +1,158 @@
+From e9a66680e969bcb0c9114e7eae96972be173b4f2 Mon Sep 17 00:00:00 2001
+From: Ritvik Rao <rsrao2@illinois.edu>
+Date: Tue, 27 Oct 2026 09:22:57 -0500
+Subject: [PATCH] +mempool_remote_free: free blocks of another PE's message
+ pool through a lock-free list the owner drains at its next allocation
+
+Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>
+---
+ src/comm_backend/lci2/comm_backend_lci2.cpp | 13 ++++++-
+ src/comm_backend/lci2/comm_backend_lci2.h   |  1 +
+ src/mempool.C                               | 40 +++++++++++++++++++++
+ src/mempool.h                               |  8 ++++-
+ 4 files changed, 60 insertions(+), 2 deletions(-)
+
+diff --git a/src/comm_backend/lci2/comm_backend_lci2.cpp b/src/comm_backend/lci2/comm_backend_lci2.cpp
+index a80854a..e82e446 100644
+--- a/src/comm_backend/lci2/comm_backend_lci2.cpp
++++ b/src/comm_backend/lci2/comm_backend_lci2.cpp
+@@ -181,7 +181,16 @@ void CommBackendLCI2::free(void *msg)
+   }
+   else
+   {
+-    // For in-pool messages, free from mempool_header position
++    // For in-pool messages, free from mempool_header position. A block of
++    // another PE's pool (a receive buffer this PE did not drain, a message
++    // another PE allocated) goes back without taking that pool's lock
++    if (m_remote_free) {
++      mempool_type* owner = mempool_owner(aligned_addr);
++      if (owner != CpvAccess(mempool)) {
++        mempool_free_remote(owner, aligned_addr);
++        return;
++      }
++    }
+     mempool_free_thread(aligned_addr);
+   }
+ }
+@@ -190,6 +199,8 @@ void CommBackendLCI2::init(char **argv) {
+   int num_devices = 1;
+   CmiGetArgInt(argv, "+lci_ndevices", (int *)&num_devices);
+   CmiAssert(num_devices >= 1);
++  m_remote_free = CmiGetArgFlagDesc(argv, "+mempool_remote_free",
++      "free blocks of another PE's message pool through a lock-free list it drains, not under its lock");
+   m_dest_device = CmiGetArgFlagDesc(argv, "+lci_dest_device",
+       "send each PE-directed message on the device its destination PE polls");
+ 
+diff --git a/src/comm_backend/lci2/comm_backend_lci2.h b/src/comm_backend/lci2/comm_backend_lci2.h
+index 799e92d..16715d8 100644
+--- a/src/comm_backend/lci2/comm_backend_lci2.h
++++ b/src/comm_backend/lci2/comm_backend_lci2.h
+@@ -95,6 +95,7 @@ private:
+   // another), instead of on the sending thread's device. Assumes every process
+   // has the same number of PE threads.
+   bool m_dest_device = false;
++  bool m_remote_free = false;  // +mempool_remote_free
+   int m_nthreads_per_device = 1;
+   bool progressDevice(int dev_idx);
+ 
+diff --git a/src/mempool.C b/src/mempool.C
+index 510d997..955cc00 100644
+--- a/src/mempool.C
++++ b/src/mempool.C
+@@ -247,6 +247,7 @@ mempool_type* mempool_init(size_t pool_size, mempool_newblockfn allocfn, mempool
+   mptr->limit = limit;
+   mptr->size = pool_size;
+   mptr->mempoolLock = CmiCreateLock();
++  mptr->remote_free = NULL;
+   mptr->block_head.mptr = (struct mempool_type*)pool;
+   mptr->block_head.mem_hndl = mem_hndl;
+   mptr->block_head.size = pool_size;
+@@ -282,6 +283,43 @@ void mempool_destroy(mempool_type* mptr)
+ }
+ 
+ // append slot_header size before the real memory buffer
++/** The pool a block belongs to */
++mempool_type* mempool_owner(void* ptr_free)
++{
++  slot_header* to_free = (slot_header*)((char*)ptr_free - sizeof(used_header));
++  return to_free->status == -1
++             ? (mempool_type*)(((large_block_header*)(to_free->block_ptr))->mptr)
++             : (mempool_type*)(((block_header*)(to_free->block_ptr))->mptr);
++}
++
++/**
++ * Free a block of another thread's pool without taking its lock: push it on
++ * the pool's remote_free stack (one compare-and-swap). The owner takes the
++ * whole stack (an exchange, so no ABA) and frees each block in its next
++ * allocation, under the lock it takes anyway.
++ */
++void mempool_free_remote(mempool_type* mptr, void* ptr_free)
++{
++  void* head = __atomic_load_n(&mptr->remote_free, __ATOMIC_RELAXED);
++  do {
++    *(void**)ptr_free = head;
++  } while (!__atomic_compare_exchange_n(&mptr->remote_free, &head, ptr_free, 1,
++                                        __ATOMIC_RELEASE, __ATOMIC_RELAXED));
++}
++
++/** With the pool's lock held: free every block other threads handed back */
++static void take_remote_frees(mempool_type* mptr)
++{
++  if (!__atomic_load_n(&mptr->remote_free, __ATOMIC_RELAXED))
++    return;
++  void* p = __atomic_exchange_n(&mptr->remote_free, NULL, __ATOMIC_ACQUIRE);
++  while (p) {
++    void* next = *(void**)p;
++    mempool_free(mptr, p);
++    p = next;
++  }
++}
++
+ void* mempool_malloc(mempool_type* mptr, size_t size, int expand)
+ {
+   size_t size_with_used_header = size + sizeof(used_header); // "bestfit"?
+@@ -293,6 +331,7 @@ void* mempool_malloc(mempool_type* mptr, size_t size, int expand)
+   }
+ 
+   CmiLock(mptr->mempoolLock);
++  take_remote_frees(mptr);
+ 
+   size_t bestfit_size = cutOffPoints[power];
+   DEBUG_PRINT("Request size is %d, power value is %d, size is %d\n", size, power, bestfit_size);
+@@ -385,6 +424,7 @@ void* mempool_malloc(mempool_type* mptr, size_t size, int expand)
+ void* mempool_large_malloc(mempool_type* mptr, size_t size, int expand)
+ {
+   CmiLock(mptr->mempoolLock);
++  take_remote_frees(mptr);
+ 
+   size_t expand_size = size + sizeof(large_block_header) + sizeof(used_header);
+   DEBUG_PRINT("Mempool-Large block allocation\n");
+diff --git a/src/mempool.h b/src/mempool.h
+index 6b693f4..97b540b 100644
+--- a/src/mempool.h
++++ b/src/mempool.h
+@@ -104,7 +104,11 @@ typedef struct mempool_type
+   size_t limit;
+   size_t size;
+   CmiNodeLock mempoolLock;
+-  char padding[CMIPADDING((6 * sizeof(size_t) + sizeof(CmiNodeLock)), 16)];
++  // Blocks freed by other threads (+mempool_remote_free): a lock-free stack,
++  // linked through each block's first word, that the owner takes whole and
++  // frees under its own lock at its next allocation
++  void* remote_free;
++  char padding[CMIPADDING((6 * sizeof(size_t) + sizeof(CmiNodeLock) + sizeof(void*)), 16)];
+ } mempool_type;
+ 
+ #ifdef __cplusplus
+@@ -124,6 +128,8 @@ void* mempool_large_malloc(mempool_type* mptr, size_t size, int expand);
+ void mempool_free(mempool_type* mptr, void* ptr_free);
+ 
+ void mempool_free_thread(void* ptr_free);
++mempool_type* mempool_owner(void* ptr_free);
++void mempool_free_remote(mempool_type* mptr, void* ptr_free);
+ 
+ #if defined(__cplusplus)
+ }
+-- 
+2.54.0 (Apple Git-157)
+

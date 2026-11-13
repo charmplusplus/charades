@@ -1,0 +1,106 @@
+==== Q1: counts and digests (this job, and job a)
+   1 nodes: counts [125998590]; digests C3 ['87c11aec982ad656']; Ca ['87c11aec982ad656']
+   2 nodes: counts [252049665]; digests C3 ['0002eae9d53c29c1']; Ca ['0002eae9d53c29c1']
+   4 nodes: counts [574541914]; digests C3 ['0c800d36f9c2f85c']; Ca ['0c800d36f9c2f85c']
+   8 nodes: counts [1078843202]; digests C3 ['089e4484b57d78a8']; Ca ['089e4484b57d78a8']
+  16 nodes: counts [2087384844]; digests C3 ['377d077123c46354']; Ca ['377d077123c46354']
+  32 nodes: counts [4104430712]; digests C3 ['6331beff81bcbf02']; C ['6331beff81bcbf02']
+
+==== per arm (M ev/s: median, reps; max/min)
+--- 1 node(s)
+   C3  W5000           61.76  62.07/61.76/61.46                            spread  1.01  blocked 53.9%
+   C3  W2500           52.07  52.07/51.85/52.50                            spread  1.01  blocked 63.2%
+   C3  mb              51.43  51.43/51.43/51.22                            spread  1.00  blocked 63.4%
+   D   d2 W10000       45.26  45.44/44.73/45.26                            spread  1.02
+   D   d2 W5000        44.57  44.62/44.56/44.57                            spread  1.00
+   D   d2 W2500        41.60  41.65/41.45/41.60                            spread  1.00
+--- 2 node(s)
+   C3  W5000          108.18  108.18/109.11/107.71                         spread  1.01  blocked 58.4%
+   C3  W2500           79.01  79.01/79.76/78.28                            spread  1.02  blocked 71.7%
+   C3  mb              77.55  77.55/77.79/77.55                            spread  1.00  blocked 71.8%
+   D   d2 W10000       85.43  85.62/85.43/84.99                            spread  1.01
+   D   d2 W5000        79.04  79.26/78.58/79.04                            spread  1.01
+   D   d2 W2500        67.17  67.50/67.02/67.17                            spread  1.01
+--- 4 node(s)
+   C3  W2500          103.33  103.33/103.52/101.33                         spread  1.02  blocked 80.7%
+   C3  mb             101.33  101.33/102.60/101.33                         spread  1.01  blocked 80.8%
+   C3  W5000           76.81  77.64/76.81/75.50                            spread  1.03  blocked 84.8%
+   D   d2 W2500        83.75  83.75/84.01/83.35                            spread  1.01
+   D   d2 W5000        83.41  83.72/83.02/83.41                            spread  1.01
+   D   d2 W10000       82.72  82.71/83.55/82.72                            spread  1.01
+--- 8 node(s)
+   C3  W2500          192.31  192.31/192.65/187.95                         spread  1.03  blocked 82.2%
+   C3  mb             189.60  190.27/189.60/186.97                         spread  1.02  blocked 82.3%
+   C3  W5000          143.46  143.46/144.23/142.33                         spread  1.01  blocked 86.2%
+   D   d2 W10000      149.05  150.66/149.05/144.02                         spread  1.05
+   D   d2 W5000       147.56  150.11/146.28/147.56                         spread  1.03
+   D   d2 W2500       145.60  145.60/138.16/146.32                         spread  1.06
+--- 16 node(s)
+   C3  mb             351.41  353.79/347.90/351.41                         spread  1.02  blocked 83.8%
+   C3  W2500          347.32  353.20/341.08/347.32                         spread  1.04  blocked 84.1%
+   C3  W5000          279.06  279.06/275.02/279.81                         spread  1.02  blocked 86.8%
+   D   d2 W5000       295.49  295.49/296.11/291.46                         spread  1.02
+   D   d2 W10000      293.69  291.20/294.62/293.69                         spread  1.01
+   D   d2 W2500       290.89  290.89/289.74/291.97                         spread  1.01
+--- 32 node(s)
+   C3  W2500          603.59  553.90/604.48/603.59/518.24/615.36           spread  1.19  blocked 86.2%
+   C3  mb             561.48  496.30/602.71/564.57/496.30/561.48           spread  1.21  blocked 87.1%
+   C3  W5000          550.93  550.93/546.53/546.53/560.71/559.19           spread  1.03  blocked 87.1%
+   C   W5000          504.23  514.99/504.23/474.50/501.76/509.87           spread  1.09  blocked 83.4%
+   C   mb             448.08  448.08/446.13/443.24/452.53/452.03           spread  1.02  blocked 86.2%
+   C   W2500          431.59  424.01/438.04/431.59/417.97/450.05           spread  1.08  blocked 86.5%
+   D   d2 W10000      576.93  578.27/571.08/578.04/576.93/574.14           spread  1.01
+   D   d2 W5000       565.77  560.31/565.77/535.71/571.49/577.53           spread  1.08
+   D   d2 W2500       467.08  119.89/490.97/529.16/467.08/453.84           spread  4.41
+   D   d1 W10000      462.69  454.84/462.69/473.80/457.19/464.68           spread  1.04
+   D   d1 W5000       437.37  437.37/438.08/427.38/454.42/429.32           spread  1.06
+   D   d1 W2500       408.88  374.73/417.85/408.88/370.52/414.58           spread  1.13
+   R   b8m2500         40.50  40.50/39.86/40.26/40.67/40.83                spread  1.02
+   R   b2m5000         37.35  37.54/37.78/36.68/37.26/37.35                spread  1.03
+   R   b8m5000         34.16  33.57/34.47/33.91/34.16/34.73                spread  1.03
+
+==== Q2, Q3 (higher is better; ms per clock cycle of each best, lower is better)
+  nodes          C3 best         old best    D best (this job)  C3÷old   C3÷D  mb÷W2500    ms/cycle C3 / old / D
+      1      W5000 61.76      W5000 38.30      d2 W10000 45.26   1.613  1.365     0.988    0.408 / 0.658 / 0.557
+      2     W5000 108.18      W5000 78.03      d2 W10000 85.43   1.386  1.266     0.982    0.466 / 0.646 / 0.590
+      4     W2500 103.33      W2500 82.55       d2 W2500 83.75   1.252  1.234     0.981    1.112 / 1.392 / 1.372
+      8     W2500 192.31     W2500 149.84     d2 W10000 149.05   1.283  1.290     0.986    1.122 / 1.440 / 1.448
+     16        mb 351.41     W2500 265.23      d2 W5000 295.49   1.325  1.189     1.012    1.188 / 1.574 / 1.413
+     32     W2500 603.59     W5000 504.23     d2 W10000 576.93   1.197  1.046     0.930    1.360 / 1.628 / 1.423
+
+==== per rep, same allocation (engines interleaved in each rep): C3 best ÷ D best; C3 controller ÷ C3 W 2,500; C3 W 5,000 ÷ D W 10,000
+   1 nodes: r1 1.366 0.988 1.366  r2 1.381 0.992 1.381  r3 1.358 0.976 1.358  | medians 1.366 0.988 1.366
+   2 nodes: r1 1.263 0.982 1.263  r2 1.277 0.975 1.277  r3 1.267 0.991 1.267  | medians 1.267 0.982 1.267
+   4 nodes: r1 1.234 0.981 0.939  r2 1.232 0.991 0.919  r3 1.215 1.000 0.913  | medians 1.232 0.991 0.919
+   8 nodes: r1 1.276 0.989 0.952  r2 1.293 0.984 0.968  r3 1.274 0.995 0.988  | medians 1.276 0.989 0.968
+  16 nodes: r1 1.197 1.002 0.958  r2 1.175 1.020 0.933  r3 1.197 1.012 0.953  | medians 1.197 1.012 0.953
+  32 nodes: r1 0.958 0.896 0.953  r2 1.058 0.997 0.957  r3 1.044 0.935 0.945  r4 0.972 0.958 0.972  r5 1.065 0.912 0.974  | medians 1.044 0.935 0.957
+
+==== Q4: per-node rate ÷ at the first node count (C3 / old / Devastator)
+   1 nodes: 1.000  1.000  1.000
+   2 nodes: 0.876  1.019  0.944
+   4 nodes: 0.418  0.539  0.463
+   8 nodes: 0.389  0.489  0.412
+  16 nodes: 0.356  0.433  0.408
+  32 nodes: 0.305  0.411  0.398
+  4 -> 8: 0.931  0.908  0.890
+  4 -> 16: 0.850  0.803  0.882
+  4 -> 32: 0.730  0.764  0.861
+
+==== Q5: each cycle split by the count waves (C3, W 2,500, --gvt-trace=1; buckets 1000-4000)
+   1 nodes: 0.466 ms per cycle; waves 6578 (6022 valid) = 2.19 per cycle; wave in flight 0.059 ms per cycle (12.7%), between waves 0.407 ms
+  16 nodes: 1.173 ms per cycle; waves 6060 (6002 valid) = 2.02 per cycle; wave in flight 0.215 ms per cycle (18.3%), between waves 0.958 ms
+   2 nodes: 0.617 ms per cycle; waves 6482 (6014 valid) = 2.16 per cycle; wave in flight 0.115 ms per cycle (18.6%), between waves 0.502 ms
+   4 nodes: 1.172 ms per cycle; waves 6092 (6002 valid) = 2.03 per cycle; wave in flight 0.149 ms per cycle (12.7%), between waves 1.023 ms
+   8 nodes: 1.111 ms per cycle; waves 6088 (6002 valid) = 2.03 per cycle; wave in flight 0.169 ms per cycle (15.2%), between waves 0.941 ms
+  32 nodes: 1.284 ms per cycle; waves 6098 (6006 valid) = 2.03 per cycle; wave in flight 0.319 ms per cycle (24.8%), between waves 0.965 ms
+
+==== Q6: layout, round 3 at 1 x 46 ÷ 2 x 23 (M ev/s, median of 2; higher favours one process)
+  1 node(s) g100     1x46   51.48 (51.40/51.55)  2x23   54.26 (54.34/54.17)  ratio 0.949  counts [180941045]
+  1 node(s) uni      1x46   44.85 (45.24/44.46)  2x23   46.63 (46.51/46.75)  ratio 0.962  counts [180941384]
+  1 node(s) traffic  1x46   77.37 (77.47/77.26)  2x23   76.12 (75.61/76.63)  ratio 1.016  counts [282779063]
+  1 node(s) df       1x46   57.31 (57.56/57.05)  2x23   44.39 (44.44/44.34)  ratio 1.291  counts [191112383]
+  4 node(s) g100     1x46  179.18 (180.95/177.41)  2x23  211.95 (211.64/212.26)  ratio 0.845  counts [723814576]
+  4 node(s) uni      1x46   96.25 (95.87/96.64)  2x23  137.35 (137.09/137.61)  ratio 0.701  counts [723815947]
+  4 node(s) traffic  1x46  250.54 (267.39/233.69)  2x23  291.96 (287.07/296.86)  ratio 0.858  counts [1131043125]
+  4 node(s) df       1x46   71.34 (71.03/71.66)  2x23  121.40 (121.81/120.99)  ratio 0.588  counts [722330219]

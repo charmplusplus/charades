@@ -1,0 +1,13 @@
+A. Uniform, WPs 512, W 400, long runs (M committed ev/s, mean of 2 reps; higher is better)
+   4 nodes: send progress on  112.3 (113.0, 111.5), off  111.7 (111.1, 112.3), off ÷ on 0.995
+  16 nodes: send progress on  357.5 (355.7, 359.4), off  336.6 (337.7, 335.6), off ÷ on 0.942
+
+B. Inside a send (traced; µs per htram send or per issueAm call, mean over PEs and 2 reps; lower is better)
+   4 nodes, send progress on : a send 6.55; issueAm 6.01 = post 1.46 (1.28 posts per call) + progress 4.81 (1.28 calls per issueAm, 3.77 each, 0.47 of them completed something) | GVT-time flush 24.1 µs per update (3.48 messages), whole GVT step 40.5
+   4 nodes, send progress off: a send 5.83; issueAm 1.51 = post 1.65 (1.33 posts per call) + progress 0.00 (0.00 calls per issueAm, 0.00 each, 0.00 of them completed something) | GVT-time flush 22.0 µs per update (3.52 messages), whole GVT step 38.5
+  16 nodes, send progress on : a send 4.25; issueAm 3.85 = post 0.83 (1.06 posts per call) + progress 3.00 (1.06 calls per issueAm, 2.82 each, 0.55 of them completed something) | GVT-time flush 44.5 µs per update (9.96 messages), whole GVT step 61.1
+  16 nodes, send progress off: a send 3.70; issueAm 0.88 = post 0.86 (1.13 posts per call) + progress 0.00 (0.00 calls per issueAm, 0.00 each, 0.00 of them completed something) | GVT-time flush 39.0 µs per update (9.93 messages), whole GVT step 55.4
+
+C. Other workloads, 16 nodes, long runs (off ÷ on; higher is better)
+  σ 2,000, PP 512, W 400      : on  488.0 (490.9, 485.2), off  492.5 (496.0, 489.0), 1.009
+  σ 100, PP 2,048, controller : on  679.6 (676.9, 682.2), off  669.1 (657.0, 681.3), 0.985

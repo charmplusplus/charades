@@ -1,0 +1,242 @@
+From 31c63fde6b705d5d6ff15e04d5d5905face5cb84 Mon Sep 17 00:00:00 2001
+From: Ritvik Rao <rsrao2@illinois.edu>
+Date: Sat, 24 Oct 2026 11:42:39 -0500
+Subject: [PATCH] Bucketed GVT: --gvt-node-waves is the default; *_msgwaves
+ test configs keep the message path covered
+
+Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>
+---
+ RESULTS.md                                        |  2 ++
+ src/globals.C                                     |  2 +-
+ src/util/command_line.C                           |  2 +-
+ tests/test_configs/agg_bucket_pp_msgwaves         |  9 +++++++++
+ tests/test_configs/agg_bucket_pp_nodewaves        |  8 --------
+ ...odewaves => agg_ctl_shared_bucket_pp_msgwaves} |  5 +++--
+ .../agg_ctl_sparse_bucket_pp_msgwaves             | 15 +++++++++++++++
+ .../agg_ctl_sparse_bucket_pp_nodewaves            | 14 --------------
+ tests/test_configs/bucket_hold_msgwaves           |  8 ++++++++
+ tests/test_configs/bucket_hold_nodewaves          |  7 -------
+ tests/test_configs/bucket_msgwaves                |  6 ++++++
+ tests/test_configs/bucket_nodewaves               |  5 -----
+ tests/test_configs/bucket_window_msgwaves         |  7 +++++++
+ tests/test_configs/bucket_window_nodewaves        |  6 ------
+ 14 files changed, 52 insertions(+), 44 deletions(-)
+ create mode 100644 tests/test_configs/agg_bucket_pp_msgwaves
+ delete mode 100644 tests/test_configs/agg_bucket_pp_nodewaves
+ rename tests/test_configs/{agg_ctl_shared_bucket_pp_nodewaves => agg_ctl_shared_bucket_pp_msgwaves} (51%)
+ create mode 100644 tests/test_configs/agg_ctl_sparse_bucket_pp_msgwaves
+ delete mode 100644 tests/test_configs/agg_ctl_sparse_bucket_pp_nodewaves
+ create mode 100644 tests/test_configs/bucket_hold_msgwaves
+ delete mode 100644 tests/test_configs/bucket_hold_nodewaves
+ create mode 100644 tests/test_configs/bucket_msgwaves
+ delete mode 100644 tests/test_configs/bucket_nodewaves
+ create mode 100644 tests/test_configs/bucket_window_msgwaves
+ delete mode 100644 tests/test_configs/bucket_window_nodewaves
+
+diff --git a/RESULTS.md b/RESULTS.md
+index 6290983..d031211 100644
+--- a/RESULTS.md
++++ b/RESULTS.md
+@@ -2432,6 +2432,8 @@ On the Mac (one process, 8 PEs): the GVT's tuple 7.9 µs per wave, one int 5.1,
+ - N3. Right: identical committed counts.
+ - N4. Right: the best W at 16 nodes is back to 250 (σ 2,000) or 250–400 (σ 100).
+ 
++**Default since 2026-10-24** (user decision): `--gvt-node-waves=1`. The message path stays reachable with `=0` and is covered by the `*_msgwaves` test configs. Mac gate for the switch: every bucketed config 612/612 (quick shapes), engine tier 940/942 with the 2 non-passes caused by a second `lcrun` I started during the run, both 20/20 when rerun alone.
++
+ **What this means:** `--gvt-node-waves` is the largest single gain since psm2, and it is free of any runtime change. The cross-engine numbers in "Current numbers" (message path) understate Charades by about 1.3× at 4 nodes; the paper-grade comparison should be rerun with it on. What is left at 16 nodes is the reduction across processes (32 members, about 180–230 µs per advance), next to try: a flatter or wider tree across processes, or contributing as soon as a process is complete rather than through an entry method.
+ 
+ ## Baseline verification on the Mac
+diff --git a/src/globals.C b/src/globals.C
+index e1e4eb7..601b601 100644
+--- a/src/globals.C
++++ b/src/globals.C
+@@ -124,7 +124,7 @@ void clear_globals() {
+   // Paced count waves are 1.0-1.38x faster on 4 nodes and remove the
+   // run-to-run flip between two GVT paces (RESULTS.md, "Two speeds")
+   g_tw_gvt_wave_events    = 128;
+-  g_tw_gvt_node_waves     = 0;
++  g_tw_gvt_node_waves     = 1;
+   g_tw_sched_park         = 0;
+   g_tw_optimism_window    = 0;
+   g_tw_comm_stats         = 0;
+diff --git a/src/util/command_line.C b/src/util/command_line.C
+index cd9bbf2..4cf7595 100644
+--- a/src/util/command_line.C
++++ b/src/util/command_line.C
+@@ -25,7 +25,7 @@ void parse_command_line(int argc, char** argv) {
+   kernel.register_argument("gvt-bucket-size",      "Bucket size for bucketed GVT algorithm", g_tw_gvt_bucket_size);
+   kernel.register_argument("gvt-min-buckets",      "Bucketed GVT: buckets a PE must pass before it starts a GVT round", g_tw_gvt_min_buckets);
+   kernel.register_argument("gvt-wave-events",      "Bucketed GVT: a PE contributes to the next count wave after executing this many events, or when it cannot execute (0 = at once; default 128)", g_tw_gvt_wave_events);
+-  kernel.register_argument("gvt-node-waves",       "Optimistic, bucketed GVT, not --sched-park: each process combines its PEs' count-wave contributions in shared memory and contributes once; the result comes back once per process - NO=0, YES=1", g_tw_gvt_node_waves);
++  kernel.register_argument("gvt-node-waves",       "Optimistic, bucketed GVT, not --sched-park: each process combines its PEs' count-wave contributions in shared memory and contributes once; the result comes back once per process - NO=0, YES=1 (default)", g_tw_gvt_node_waves);
+   kernel.register_argument("gvt-trace",            "Bucketed GVT: PE 0 writes every count wave to gvt_trace.csv, and execute() is timed - NO=0, YES=1", g_tw_gvt_trace);
+   kernel.register_argument("gvt-adaptive-buckets", "Bucketed GVT: hold remote events far ahead of GVT in the sender - NO=0, YES=1", g_tw_adaptive_buckets);
+   kernel.register_argument("gvt-reserve-buckets",  "Bucketed GVT: hold events more than this many buckets ahead of GVT (0 = no offset cutoff)", g_tw_reserve_buckets);
+diff --git a/tests/test_configs/agg_bucket_pp_msgwaves b/tests/test_configs/agg_bucket_pp_msgwaves
+new file mode 100644
+index 0000000..dbaa96b
+--- /dev/null
++++ b/tests/test_configs/agg_bucket_pp_msgwaves
+@@ -0,0 +1,9 @@
++# agg_bucket_pp on the message path (--gvt-node-waves=0): every PE contributes to
++# each count wave and gets the result as a message (the default before 2026-10-24)
++sync=3
++gvt=4
++buffer-size=655360
++aggregation=1
++agg-mode=2
++agg-buffer=16
++gvt-node-waves=0
+diff --git a/tests/test_configs/agg_bucket_pp_nodewaves b/tests/test_configs/agg_bucket_pp_nodewaves
+deleted file mode 100644
+index 7a1c25f..0000000
+--- a/tests/test_configs/agg_bucket_pp_nodewaves
++++ /dev/null
+@@ -1,8 +0,0 @@
+-# agg_bucket_pp with --gvt-node-waves=1: count waves combined per process in shared memory
+-sync=3
+-gvt=4
+-buffer-size=655360
+-aggregation=1
+-agg-mode=2
+-agg-buffer=16
+-gvt-node-waves=1
+diff --git a/tests/test_configs/agg_ctl_shared_bucket_pp_nodewaves b/tests/test_configs/agg_ctl_shared_bucket_pp_msgwaves
+similarity index 51%
+rename from tests/test_configs/agg_ctl_shared_bucket_pp_nodewaves
+rename to tests/test_configs/agg_ctl_shared_bucket_pp_msgwaves
+index 1818e7a..ecadf75 100644
+--- a/tests/test_configs/agg_ctl_shared_bucket_pp_nodewaves
++++ b/tests/test_configs/agg_ctl_shared_bucket_pp_msgwaves
+@@ -1,4 +1,5 @@
+-# agg_ctl_shared_bucket_pp with --gvt-node-waves=1: count waves combined per process in shared memory
++# agg_ctl_shared_bucket_pp on the message path (--gvt-node-waves=0): every PE contributes to
++# each count wave and gets the result as a message (the default before 2026-10-24)
+ sync=3
+ gvt=4
+ buffer-size=655360
+@@ -13,4 +14,4 @@ ctl-epsilon=0.003
+ ctl-reduction=1
+ ctl-hist-waves=1
+ ctl-hist-coarse=1
+-gvt-node-waves=1
++gvt-node-waves=0
+diff --git a/tests/test_configs/agg_ctl_sparse_bucket_pp_msgwaves b/tests/test_configs/agg_ctl_sparse_bucket_pp_msgwaves
+new file mode 100644
+index 0000000..0c7bf49
+--- /dev/null
++++ b/tests/test_configs/agg_ctl_sparse_bucket_pp_msgwaves
+@@ -0,0 +1,15 @@
++# agg_ctl_sparse_bucket_pp on the message path (--gvt-node-waves=0): every PE contributes to
++# each count wave and gets the result as a message (the default before 2026-10-24)
++sync=3
++gvt=4
++buffer-size=655360
++optimism-window=2000
++aggregation=1
++agg-mode=2
++agg-buffer=16
++agg-policy=1
++ctl=1
++ctl-agg-kappa=0.2
++ctl-sparse-waves=1
++ctl-hist-waves=32
++gvt-node-waves=0
+diff --git a/tests/test_configs/agg_ctl_sparse_bucket_pp_nodewaves b/tests/test_configs/agg_ctl_sparse_bucket_pp_nodewaves
+deleted file mode 100644
+index b611b78..0000000
+--- a/tests/test_configs/agg_ctl_sparse_bucket_pp_nodewaves
++++ /dev/null
+@@ -1,14 +0,0 @@
+-# agg_ctl_sparse_bucket_pp with --gvt-node-waves=1: count waves combined per process in shared memory
+-sync=3
+-gvt=4
+-buffer-size=655360
+-optimism-window=2000
+-aggregation=1
+-agg-mode=2
+-agg-buffer=16
+-agg-policy=1
+-ctl=1
+-ctl-agg-kappa=0.2
+-ctl-sparse-waves=1
+-ctl-hist-waves=32
+-gvt-node-waves=1
+diff --git a/tests/test_configs/bucket_hold_msgwaves b/tests/test_configs/bucket_hold_msgwaves
+new file mode 100644
+index 0000000..dc68c8d
+--- /dev/null
++++ b/tests/test_configs/bucket_hold_msgwaves
+@@ -0,0 +1,8 @@
++# bucket_hold on the message path (--gvt-node-waves=0): every PE contributes to
++# each count wave and gets the result as a message (the default before 2026-10-24)
++sync=3
++gvt=4
++buffer-size=655360
++gvt-adaptive-buckets=1
++gvt-reserve-buckets=1
++gvt-node-waves=0
+diff --git a/tests/test_configs/bucket_hold_nodewaves b/tests/test_configs/bucket_hold_nodewaves
+deleted file mode 100644
+index b1c89cd..0000000
+--- a/tests/test_configs/bucket_hold_nodewaves
++++ /dev/null
+@@ -1,7 +0,0 @@
+-# bucket_hold with --gvt-node-waves=1: count waves combined per process in shared memory
+-sync=3
+-gvt=4
+-buffer-size=655360
+-gvt-adaptive-buckets=1
+-gvt-reserve-buckets=1
+-gvt-node-waves=1
+diff --git a/tests/test_configs/bucket_msgwaves b/tests/test_configs/bucket_msgwaves
+new file mode 100644
+index 0000000..e1d9f9a
+--- /dev/null
++++ b/tests/test_configs/bucket_msgwaves
+@@ -0,0 +1,6 @@
++# bucket on the message path (--gvt-node-waves=0): every PE contributes to
++# each count wave and gets the result as a message (the default before 2026-10-24)
++sync=3
++gvt=4
++buffer-size=655360
++gvt-node-waves=0
+diff --git a/tests/test_configs/bucket_nodewaves b/tests/test_configs/bucket_nodewaves
+deleted file mode 100644
+index 2b33c03..0000000
+--- a/tests/test_configs/bucket_nodewaves
++++ /dev/null
+@@ -1,5 +0,0 @@
+-# bucket with --gvt-node-waves=1: count waves combined per process in shared memory
+-sync=3
+-gvt=4
+-buffer-size=655360
+-gvt-node-waves=1
+diff --git a/tests/test_configs/bucket_window_msgwaves b/tests/test_configs/bucket_window_msgwaves
+new file mode 100644
+index 0000000..0f80e19
+--- /dev/null
++++ b/tests/test_configs/bucket_window_msgwaves
+@@ -0,0 +1,7 @@
++# bucket_window on the message path (--gvt-node-waves=0): every PE contributes to
++# each count wave and gets the result as a message (the default before 2026-10-24)
++sync=3
++gvt=4
++buffer-size=655360
++optimism-window=2000
++gvt-node-waves=0
+diff --git a/tests/test_configs/bucket_window_nodewaves b/tests/test_configs/bucket_window_nodewaves
+deleted file mode 100644
+index 47597d6..0000000
+--- a/tests/test_configs/bucket_window_nodewaves
++++ /dev/null
+@@ -1,6 +0,0 @@
+-# bucket_window with --gvt-node-waves=1: count waves combined per process in shared memory
+-sync=3
+-gvt=4
+-buffer-size=655360
+-optimism-window=2000
+-gvt-node-waves=1
+-- 
+2.54.0 (Apple Git-157)
+

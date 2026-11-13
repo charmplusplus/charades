@@ -1,0 +1,89 @@
+runs: Charades 150, Devastator 150, ROSS 115; failed or missing: 0
+
+Rates: M committed ev/s, median of reps (higher is better). Ratios: Charades ÷ other (higher is better).
+C/D ctl: Charades controller ÷ Devastator best W (as the old table); C/D best: Charades best arm (controller or fixed) ÷ Devastator best.
+new/old: this C/D ctl ÷ the old table's; C n/o, D n/o, R n/o: that engine's rate (Charades: controller) ÷ its own in the old job.
+
+## σ 100
+  N | Charades ctl     best fixed         ctl/fx | Devastator    ROSS             | C/D ct C/D bs    C/R |    old new/old |  C n/o  D n/o  R n/o |  sprd same events
+ 32 | 1532.3 pp2048    1629.7 pp2048 W400  0.940 | 1216.0 W1000   378.3 cons      |   1.26   1.34   4.05 |   0.89   1.414 |  1.384  0.979  1.033 | 1.240 yes
+   per-node rate ÷ 1-node rate (1.0 is perfect):
+     Charades ctl  32: 1.00
+     Devastator    32: 1.00
+     ROSS          32: 1.00
+   ROSS arms (M ev/s): 32: cons 378.3 opt 367.3 optw250 374.5
+
+## σ 500
+  N | Charades ctl     best fixed         ctl/fx | Devastator    ROSS             | C/D ct C/D bs    C/R |    old new/old |  C n/o  D n/o  R n/o |  sprd same events
+ 32 | 1358.5 pp2048    1425.0 pp2048 W400  0.953 |  927.5 W1000   272.9 optw500   |   1.46   1.54   4.98 |   1.04   1.403 |  1.390  0.991  1.044 | 1.113 yes
+   per-node rate ÷ 1-node rate (1.0 is perfect):
+     Charades ctl  32: 1.00
+     Devastator    32: 1.00
+     ROSS          32: 1.00
+   ROSS arms (M ev/s): 32: cons 262.2 opt 264.2 optw500 272.9
+
+## σ 1,000
+  N | Charades ctl     best fixed         ctl/fx | Devastator    ROSS             | C/D ct C/D bs    C/R |    old new/old |  C n/o  D n/o  R n/o |  sprd same events
+ 32 | 1279.7 pp2048    1324.0 pp2048 W400  0.967 |  810.2 W1000   234.6 optw500   |   1.58   1.63   5.46 |   1.14   1.383 |  1.379  0.997  1.051 | 1.086 yes
+   per-node rate ÷ 1-node rate (1.0 is perfect):
+     Charades ctl  32: 1.00
+     Devastator    32: 1.00
+     ROSS          32: 1.00
+   ROSS arms (M ev/s): 32: cons 225.4 opt 226.2 optw500 234.6
+
+## σ 2,000
+  N | Charades ctl     best fixed         ctl/fx | Devastator    ROSS             | C/D ct C/D bs    C/R |    old new/old |  C n/o  D n/o  R n/o |  sprd same events
+ 32 | 1163.5 pp512     1228.6 pp512 W400   0.947 |  699.5 W1000   195.8 optw500   |   1.66   1.76   5.94 |   1.24   1.339 |  1.356  1.013  1.031 | 1.118 yes
+   per-node rate ÷ 1-node rate (1.0 is perfect):
+     Charades ctl  32: 1.00
+     Devastator    32: 1.00
+     ROSS          32: 1.00
+   ROSS arms (M ev/s): 32: cons 185.6 opt 192.7 optw500 195.8
+
+## σ 4,000
+  N | Charades ctl     best fixed         ctl/fx | Devastator    ROSS             | C/D ct C/D bs    C/R |    old new/old |  C n/o  D n/o  R n/o |  sprd same events
+ 32 | 1067.6 pp512     1113.9 pp512 W400   0.958 |  540.2 W1000   175.6 optw1000  |   1.98   2.06   6.08 |   1.39   1.427 |  1.379  0.966  0.963 | 1.049 yes
+   per-node rate ÷ 1-node rate (1.0 is perfect):
+     Charades ctl  32: 1.00
+     Devastator    32: 1.00
+     ROSS          32: 1.00
+   ROSS arms (M ev/s): 32: cons 164.3 opt 169.6 optw1000 175.6
+
+## uniform
+  N | Charades ctl     best fixed         ctl/fx | Devastator    ROSS             | C/D ct C/D bs    C/R |    old new/old |  C n/o  D n/o  R n/o |  sprd same events
+ 32 |  627.8 wps512     639.5 wps512 W400  0.982 |  312.4 W1000   162.4 opt       |   2.01   2.05   3.87 |   1.66   1.212 |  1.234  1.018  1.323 | 1.015 yes
+   per-node rate ÷ 1-node rate (1.0 is perfect):
+     Charades ctl  32: 1.00
+     Devastator    32: 1.00
+     ROSS          32: 1.00
+   ROSS arms (M ev/s): 32: cons 145.2 opt 162.4
+
+## lookahead 10, σ 500
+  N | Charades ctl     best fixed         ctl/fx | Devastator    ROSS             | C/D ct C/D bs    C/R |    old new/old |  C n/o  D n/o  R n/o |  sprd same events
+ 32 | 1222.4 pp2048    1148.2 pp2048 W100  1.065 |  930.8 W200    269.4 optw100   |   1.31   1.31   4.54 |   0.99   1.332 |  1.333  1.000  1.081 | 1.135 yes
+   per-node rate ÷ 1-node rate (1.0 is perfect):
+     Charades ctl  32: 1.00
+     Devastator    32: 1.00
+     ROSS          32: 1.00
+   ROSS arms (M ev/s): 32: cons 213.9 opt 259.8 optw100 269.4
+
+## lookahead 10, σ 2,000
+  N | Charades ctl     best fixed         ctl/fx | Devastator    ROSS             | C/D ct C/D bs    C/R |    old new/old |  C n/o  D n/o  R n/o |  sprd same events
+ 32 | 1012.8 wps512     967.2 wps512 W50   1.047 |  669.6 W200    195.6 optw100   |   1.51   1.51   5.18 |   1.11   1.360 |  1.366  1.004  1.099 | 1.113 yes
+   per-node rate ÷ 1-node rate (1.0 is perfect):
+     Charades ctl  32: 1.00
+     Devastator    32: 1.00
+     ROSS          32: 1.00
+   ROSS arms (M ev/s): 32: cons 156.4 opt 193.9 optw100 195.6
+
+## Controller ÷ best fixed W (higher is better)
+σ 100                          32: 0.940
+σ 500                          32: 0.953
+σ 1,000                        32: 0.967
+σ 2,000                        32: 0.947
+σ 4,000                        32: 0.958
+uniform                        32: 0.982
+lookahead 10, σ 500            32: 1.065
+lookahead 10, σ 2,000          32: 1.047
+
+Charades controller ahead of Devastator in 8 of 8 cells; lowest 1.26 (g100 32 nodes)

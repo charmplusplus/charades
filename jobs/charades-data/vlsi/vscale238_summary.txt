@@ -1,0 +1,71 @@
+# Counts and digests
+n 1: Charades ['125998590'] ['87c11aec982ad656']; Devastator ['125998590'] deterministic ['1'] -> same
+n 2: Charades ['252049665'] ['0002eae9d53c29c1']; Devastator ['252049665'] deterministic ['1'] -> same
+n 4: Charades ['574541914'] ['0c800d36f9c2f85c']; Devastator ['574541914'] deterministic ['1'] -> same
+n 8: Charades ['1078843202'] ['089e4484b57d78a8']; Devastator ['1078843202'] deterministic ['1'] -> same
+n16: Charades ['2087384844'] ['377d077123c46354']; Devastator ['2087384844'] deterministic ['1'] -> same
+
+# Rates (M committed ev/s, median of 3; higher is better)
+| nodes | Charades E W 5000 | Charades E W 2500 | Charades L W 2500 | Charades E controller | Devastator W 2500 | Devastator W 5000 | Devastator W 10000 |
+|---|---|---|---|---|---|---|---|
+| 1 | 69.06 | 51.67 | 53.42 | 66.72 | 41.45 | 44.84 | 45.69 |
+| 2 | 122.11 | 79.73 | 80.42 | 115.65 | 67.74 | 79.77 | 87.05 |
+| 4 | 102.85 | 105.96 | 104.60 | 105.13 | 84.50 | 82.47 | 82.98 |
+| 8 | 192.15 | 185.39 | 193.30 | 195.95 | 142.68 | 146.12 | 148.74 |
+| 16 | 364.54 | 338.91 | 353.24 | 369.01 | 288.42 | 292.89 | 291.03 |
+
+# Each engine at its best fixed arm, per rep; Charades ÷ Devastator (higher is better)
+| nodes | Charades best fixed (arm, M ev/s), r1 / r2 / r3 | Devastator best (W, M ev/s), r1 / r2 / r3 | Charades ÷ Devastator per rep | ratio of medians | controller ÷ Charades best fixed, per rep | E W 5,000 ÷ L W 2,500 | E W 2,500 ÷ L W 2,500 | per-node rate ÷ 4 nodes, Charades / Devastator |
+|---|---|---|---|---|---|---|---|---|
+| 1 | E W 5000 70.0 / E W 5000 69.1 / E W 5000 68.9 | 10000 45.7 / 10000 45.4 / 10000 45.7 | 1.506–1.532 | 1.512 | 0.945–0.971 | 1.283–1.315 | 0.963–0.975 | nan / nan |
+| 2 | E W 5000 123.0 / E W 5000 122.1 / E W 5000 120.1 | 10000 87.4 / 10000 87.0 / 10000 86.9 | 1.381–1.407 | 1.403 | 0.947–0.961 | 1.500–1.529 | 0.966–0.995 | nan / nan |
+| 4 | L W 2500 106.3 / E W 2500 105.9 / E W 2500 106.2 | 2500 84.5 / 2500 83.6 / 2500 85.0 | 1.249–1.267 | 1.257 | 0.986–1.007 | 0.968–0.989 | 0.997–1.015 | 1.000 / 1.000 |
+| 8 | L W 2500 193.2 / E W 5000 195.0 / L W 2500 194.9 | 10000 148.7 / 10000 149.8 / 2500 149.8 | 1.299–1.302 | 1.301 | 0.993–1.014 | 0.968–1.009 | 0.957–0.959 | 0.917 / 0.886 |
+| 16 | E W 5000 369.5 / E W 5000 363.3 / E W 5000 364.5 | 5000 292.9 / 10000 292.2 / 5000 294.0 | 1.240–1.261 | 1.245 | 0.990–1.016 | 1.009–1.063 | 0.948–0.988 | 0.858 / 0.867 |
+
+# The controller (eager, buckets of 2,500, reach 2): time-weighted mean W, trials kept, trials past the delay range, least 0.99 quantile
+  n1: r1: mean W 4250.0, final 3296, kept 16/63, past 100, p99 27.8; r2: mean W 3560.7, final 3841, kept 19/61, past 65, p99 27.8; r3: mean W 3951.8, final 3962, kept 14/63, past 69, p99 27.8
+  n2: r1: mean W 4626.6, final 5000, kept 2/67, past 130, p99 27.8; r2: mean W 4599.5, final 3906, kept 6/66, past 126, p99 27.8; r3: mean W 4631.6, final 5000, kept 2/67, past 132, p99 27.8
+  n4: r1: mean W 2837.7, final 2682, kept 8/59, past 69, p99 27.8; r2: mean W 4405.4, final 4456, kept 12/57, past 58, p99 27.8; r3: mean W 3703.2, final 2778, kept 14/56, past 57, p99 27.8
+  n8: r1: mean W 3284.7, final 2605, kept 11/57, past 58, p99 27.8; r2: mean W 3083.9, final 2500, kept 8/59, past 60, p99 27.8; r3: mean W 3219.6, final 2561, kept 12/57, past 58, p99 27.8
+  n16: r1: mean W 4226.7, final 4365, kept 17/54, past 54, p99 27.8; r2: mean W 4259.9, final 4675, kept 15/55, past 55, p99 27.8; r3: mean W 3403.4, final 2606, kept 11/57, past 57, p99 27.8
+
+# Slow reps and core 28 on copy 2's node (4-16 nodes; whole ctl_sweep call; jiffies of 10 ms)
+| nodes | arm | rep | run time (s) ÷ arm median | PE 105 working ms/cycle | core 28 user / system / irq / softirq / idle | core 28 interrupts | top interrupts on core 28 |
+|---|---|---|---|---|---|---|---|
+| 4 | E W 5000 | r1 | 1.000 | 1.092 | 681 / 10 / 3 / 0 / 1109 | 7481 | 7062 LOC Local timer interrupts; 289 CAL Function call interrupts; 58 10 IO-APIC 10-edge ipmi_si |
+| 4 | E W 5000 | r2 | 1.002 | 1.092 | 700 / 10 / 3 / 0 / 1114 | 7761 | 7277 LOC Local timer interrupts; 331 CAL Function call interrupts; 58 10 IO-APIC 10-edge ipmi_si |
+| 4 | E W 5000 | r3 | 0.995 | 1.085 | 687 / 10 / 3 / 0 / 1139 | 7645 | 7172 LOC Local timer interrupts; 251 CAL Function call interrupts; 80 RES Rescheduling interrupts |
+| 4 | E W 2500 | r1 | 1.000 | 0.777 | 668 / 9 / 3 / 0 / 1096 | 7422 | 6960 LOC Local timer interrupts; 271 CAL Function call interrupts; 60 RES Rescheduling interrupts |
+| 4 | E W 2500 | r2 | 1.000 | 0.779 | 652 / 10 / 3 / 0 / 1152 | 7347 | 6903 LOC Local timer interrupts; 292 CAL Function call interrupts; 58 10 IO-APIC 10-edge ipmi_si |
+| 4 | E W 2500 | r3 | 0.998 | 0.776 | 672 / 10 / 3 / 0 / 1157 | 7464 | 7012 LOC Local timer interrupts; 283 CAL Function call interrupts; 58 10 IO-APIC 10-edge ipmi_si |
+| 4 | L W 2500 | r1 | 0.985 | 0.821 | 687 / 9 / 3 / 0 / 1087 | 7531 | 7129 LOC Local timer interrupts; 244 CAL Function call interrupts; 58 10 IO-APIC 10-edge ipmi_si |
+| 4 | L W 2500 | r2 | 1.002 | 0.837 | 679 / 8 / 3 / 0 / 1151 | 7426 | 7035 LOC Local timer interrupts; 221 CAL Function call interrupts; 58 10 IO-APIC 10-edge ipmi_si |
+| 4 | L W 2500 | r3 | 1.000 | 0.835 | 709 / 12 / 3 / 0 / 1119 | 8643 | 7640 LOC Local timer interrupts; 785 CAL Function call interrupts; 72 TLB TLB shootdowns |
+| 4 | E controller | r1 | 0.982 | 0.894 | 646 / 10 / 3 / 0 / 1166 | 7152 | 6681 LOC Local timer interrupts; 313 CAL Function call interrupts; 58 10 IO-APIC 10-edge ipmi_si |
+| 4 | E controller | r2 | 1.000 | 1.055 | 663 / 10 / 3 / 0 / 1103 | 7276 | 6885 LOC Local timer interrupts; 234 CAL Function call interrupts; 58 10 IO-APIC 10-edge ipmi_si |
+| 4 | E controller | r3 | 1.004 | 1.038 | 660 / 10 / 3 / 0 / 1180 | 7461 | 6986 LOC Local timer interrupts; 297 CAL Function call interrupts; 58 10 IO-APIC 10-edge ipmi_si |
+| 8 | E W 5000 | r1 | 1.000 | 1.082 | 736 / 12 / 2 / 0 / 1156 | 8360 | 7778 LOC Local timer interrupts; 365 CAL Function call interrupts; 119 39 PCI-MSIX-0000:04:00.0 4-edge eth0-TxRx-3 |
+| 8 | E W 5000 | r2 | 0.986 | 1.069 | 732 / 10 / 3 / 0 / 1172 | 8366 | 7876 LOC Local timer interrupts; 334 CAL Function call interrupts; 62 RES Rescheduling interrupts |
+| 8 | E W 5000 | r3 | 1.020 | 1.104 | 715 / 9 / 3 / 0 / 1205 | 7890 | 7400 LOC Local timer interrupts; 293 CAL Function call interrupts; 109 39 PCI-MSIX-0000:04:00.0 4-edge eth0-TxRx-3 |
+| 8 | E W 2500 | r1 | 1.002 | 0.784 | 750 / 11 / 3 / 0 / 1165 | 8521 | 7915 LOC Local timer interrupts; 460 CAL Function call interrupts; 58 39 PCI-MSIX-0000:04:00.0 4-edge eth0-TxRx-3 |
+| 8 | E W 2500 | r2 | 1.000 | 0.787 | 725 / 10 / 3 / 1 / 1193 | 8023 | 7650 LOC Local timer interrupts; 282 CAL Function call interrupts; 34 TLB TLB shootdowns |
+| 8 | E W 2500 | r3 | 0.993 | 0.779 | 719 / 11 / 3 / 0 / 1205 | 8070 | 7605 LOC Local timer interrupts; 331 CAL Function call interrupts; 53 RES Rescheduling interrupts |
+| 8 | L W 2500 | r1 | 1.000 | 0.810 | 750 / 9 / 3 / 0 / 1169 | 8342 | 7911 LOC Local timer interrupts; 303 CAL Function call interrupts; 46 39 PCI-MSIX-0000:04:00.0 4-edge eth0-TxRx-3 |
+| 8 | L W 2500 | r2 | 1.000 | 0.809 | 703 / 11 / 3 / 0 / 1204 | 7875 | 7372 LOC Local timer interrupts; 397 CAL Function call interrupts; 34 TLB TLB shootdowns |
+| 8 | L W 2500 | r3 | 0.993 | 0.812 | 720 / 11 / 3 / 0 / 1157 | 7882 | 7408 LOC Local timer interrupts; 337 CAL Function call interrupts; 51 39 PCI-MSIX-0000:04:00.0 4-edge eth0-TxRx-3 |
+| 8 | E controller | r1 | 1.000 | 1.016 | 706 / 10 / 3 / 0 / 1155 | 7911 | 7466 LOC Local timer interrupts; 304 CAL Function call interrupts; 50 RES Rescheduling interrupts |
+| 8 | E controller | r2 | 0.995 | 0.978 | 733 / 10 / 3 / 0 / 1179 | 8264 | 7685 LOC Local timer interrupts; 338 CAL Function call interrupts; 102 RES Rescheduling interrupts |
+| 8 | E controller | r3 | 1.011 | 0.979 | 712 / 10 / 3 / 0 / 1177 | 8155 | 7483 LOC Local timer interrupts; 469 CAL Function call interrupts; 89 TLB TLB shootdowns |
+| 16 | E W 5000 | r1 | 0.986 | 1.081 | 796 / 10 / 3 / 0 / 1246 | 8679 | 8182 LOC Local timer interrupts; 328 CAL Function call interrupts; 98 39 PCI-MSIX-0000:04:00.0 4-edge eth0-TxRx-3 |
+| 16 | E W 5000 | r2 | 1.003 | 1.087 | 819 / 10 / 3 / 0 / 1268 | 8898 | 8401 LOC Local timer interrupts; 342 CAL Function call interrupts; 70 RES Rescheduling interrupts |
+| 16 | E W 5000 | r3 | 1.000 | 1.091 | 809 / 10 / 3 / 0 / 1276 | 8728 | 8318 LOC Local timer interrupts; 281 CAL Function call interrupts; 56 RES Rescheduling interrupts |
+| 16 | E W 2500 | r1 | 1.011 | 0.788 | 862 / 10 / 4 / 0 / 1236 | 9279 | 8843 LOC Local timer interrupts; 282 CAL Function call interrupts; 69 RES Rescheduling interrupts |
+| 16 | E W 2500 | r2 | 0.992 | 0.787 | 851 / 10 / 4 / 1 / 1261 | 9268 | 8778 LOC Local timer interrupts; 344 CAL Function call interrupts; 57 39 PCI-MSIX-0000:04:00.0 4-edge eth0-TxRx-3 |
+| 16 | E W 2500 | r3 | 1.000 | 0.799 | 852 / 10 / 4 / 0 / 1241 | 9152 | 8731 LOC Local timer interrupts; 280 CAL Function call interrupts; 62 39 PCI-MSIX-0000:04:00.0 4-edge eth0-TxRx-3 |
+| 16 | L W 2500 | r1 | 1.000 | 0.826 | 842 / 9 / 3 / 0 / 1233 | 9171 | 8627 LOC Local timer interrupts; 377 CAL Function call interrupts; 78 39 PCI-MSIX-0000:04:00.0 4-edge eth0-TxRx-3 |
+| 16 | L W 2500 | r2 | 0.981 | 0.798 | 839 / 10 / 3 / 0 / 1225 | 9146 | 8617 LOC Local timer interrupts; 347 CAL Function call interrupts; 84 39 PCI-MSIX-0000:04:00.0 4-edge eth0-TxRx-3 |
+| 16 | L W 2500 | r3 | 1.030 | 0.826 | 815 / 10 / 3 / 0 / 1280 | 9332 | 8380 LOC Local timer interrupts; 770 CAL Function call interrupts; 79 39 PCI-MSIX-0000:04:00.0 4-edge eth0-TxRx-3 |
+| 16 | E controller | r1 | 1.009 | 1.063 | 776 / 11 / 3 / 0 / 1264 | 8483 | 7965 LOC Local timer interrupts; 341 CAL Function call interrupts; 88 39 PCI-MSIX-0000:04:00.0 4-edge eth0-TxRx-3 |
+| 16 | E controller | r2 | 1.000 | 1.050 | 774 / 10 / 4 / 0 / 1265 | 8355 | 7954 LOC Local timer interrupts; 263 CAL Function call interrupts; 59 RES Rescheduling interrupts |
+| 16 | E controller | r3 | 0.996 | 1.004 | 804 / 10 / 3 / 0 / 1223 | 8844 | 8308 LOC Local timer interrupts; 339 CAL Function call interrupts; 102 39 PCI-MSIX-0000:04:00.0 4-edge eth0-TxRx-3 |

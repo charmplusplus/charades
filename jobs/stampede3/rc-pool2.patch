@@ -1,0 +1,53 @@
+From b127a67b0e62659df7ea4daf0bb6bdca33a932a0 Mon Sep 17 00:00:00 2001
+From: Ritvik Rao <rsrao2@illinois.edu>
+Date: Tue, 3 Nov 2026 12:05:30 -0600
+Subject: [PATCH] Shared-memory pool: touch a peer's segment only once its
+ owner has initialized it
+
+A peer maps a segment before its owner initializes it, and the zeroed
+segment's lists read as holding a block at offset 0: taking one wrote a
+block header over the segment's heap and bound (runtime_modes: 4/6 runs
+crashed or aborted on the Mac). The heap pointer, published last, says
+whether the segment is ready; check it before taking a return list.
+Mac ctest 112/113 (abort_peer-multinode times out as on main); the
+19 pool tests 10 times each, all passed.
+
+Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>
+---
+ src/cmishmem.cpp | 13 ++++++++-----
+ 1 file changed, 8 insertions(+), 5 deletions(-)
+
+diff --git a/src/cmishmem.cpp b/src/cmishmem.cpp
+index 90146b0..6917062 100644
+--- a/src/cmishmem.cpp
++++ b/src/cmishmem.cpp
+@@ -286,6 +286,13 @@ std::pair<CmiIpcBlock*, CmiIpcAllocStatus> CmiAllocIpcBlock(CmiIpcManager* meta,
+   auto& st = meta->pe[CmiMyRank()];
+   auto& head = st.cache[dstProc][bin];
+   if (head == cmi::ipc::max) {
++    // A peer maps the segment before its owner initializes it, and an
++    // uninitialized segment is all zeros, which no list here reads as empty.
++    // The owner publishes the heap last, so until it is set nothing in the
++    // segment may be touched.
++    if (shared->heap.load(std::memory_order_acquire) == cmi::ipc::nil) {
++      return std::make_pair((CmiIpcBlock*)nullptr, CMI_IPC_TIMEOUT);
++    }
+     head = shared->ret[st.hostIdx].bin[bin].exchange(
+         cmi::ipc::max, std::memory_order_acquire);
+   }
+@@ -294,11 +301,7 @@ std::pair<CmiIpcBlock*, CmiIpcAllocStatus> CmiAllocIpcBlock(CmiIpcManager* meta,
+     block = (CmiIpcBlock*)((char*)shared + head);
+     head = block->next;
+   } else {
+-    // a new block from the segment's heap
+-    if (shared->heap.load(std::memory_order_acquire) == cmi::ipc::nil) {
+-      // the owner has not initialized its segment yet
+-      return std::make_pair((CmiIpcBlock*)nullptr, CMI_IPC_TIMEOUT);
+-    }
++    // a new block from the segment's heap (initialized: checked above)
+     auto totalSize = kCutOffPoints[bin];
+     auto stride = sizeof(CmiIpcBlock) + totalSize;
+     stride += (alignof(CmiIpcBlock) - stride % alignof(CmiIpcBlock)) %
+-- 
+2.54.0 (Apple Git-157)
+

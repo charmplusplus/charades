@@ -1,0 +1,35 @@
+Median of 2. deadline: def = W + 8, held = 408. rolled % lower is better; M ev/s higher is better;
+prim/Mev = primary stragglers per million executed; held% = share of them htram held
+
+workload  LPC deadline      W  rolled%   M ev/s prim/Mev  held% ev/msg   GVTs
+σ 100       4 def         400    0.017    662.7     77.2   52.8   34.3   7291
+σ 100       4 def         800    0.726    477.1   1216.7    2.7   10.0   6459
+σ 100       4 held        800    3.446    438.4   4736.4   55.1  119.6   4791
+σ 100       4 held       1600   49.312    104.2  20130.3   18.5  418.3   4389
+σ 100       1 def         400    0.005    583.7     34.2   39.0   33.2   7265
+σ 100       1 def         800    0.255    472.8    959.8    1.0    9.7   6432
+σ 100       1 held        800    0.691    574.2   2968.9   65.4  109.5   5166
+σ 100       1 held       1600   11.259    189.8  15502.0   43.9  345.1   3829
+   same committed events in every run: yes
+σ 2,000     4 def         400    0.037    437.6    203.4   72.5   49.1   6748
+σ 2,000     4 def         800    1.773    326.6   2067.3    7.7   26.0   6376
+σ 2,000     4 held        800    8.643    409.1  12337.0   88.3  128.3   4891
+σ 2,000     4 held       1600   30.067    258.9  23196.4   73.8  157.8   4353
+σ 2,000     1 def         400    0.009    399.6     71.6   65.4   46.8   6635
+σ 2,000     1 def         800    0.466    343.9   1566.7    3.0   24.5   6167
+σ 2,000     1 held        800    2.255    445.7   7986.0   91.4  129.8   5244
+σ 2,000     1 held       1600    9.144    402.1  20753.0   79.6  153.0   4599
+   same committed events in every run: yes
+uniform     4 def         400    0.134    333.3    905.5   90.4   12.6   7256
+uniform     4 def         800    2.647    267.6   2946.0   28.3   11.2   7381
+uniform     4 held        800   44.829    121.7  67685.6   98.5   27.4   5084
+uniform     4 held       1600   63.091     68.8  69210.4   98.0   41.1   5019
+uniform     1 def         400    0.036    310.8    309.4   83.5   12.6   7285
+uniform     1 def         800    0.536    263.2   1683.6   15.0   11.2   7365
+uniform     1 held        800   15.837    251.7  70847.4   99.4   22.2   4797
+uniform     1 held       1600   57.827     77.4 139028.1   97.9   47.1   4486
+   same committed events in every run: yes
+
+GVT delay 20 us, σ 2,000, 1 LP per chare (M ev/s, median of 2; ratio = with delay ÷ without):
+  W 400   deadline def : 364.8 with delay, 399.6 without, ratio 0.913
+  W 1600  deadline held: 389.8 with delay, 402.1 without, ratio 0.969

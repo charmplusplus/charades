@@ -1,0 +1,162 @@
+runs: Charades 420, Devastator 305; not ok: 0
+
+# Part C: Charades, F4b's cells (M committed ev/s, median of 5; spread = fastest / slowest rep)
+
+lookahead 10, σ 500, 4 nodes: W 40 159.7 s1.02  W 50 163.1 s1.02  W 60 163.6 s1.03  W 75 154.9 s1.03  W 100 141.6 s1.03  ctl 159.0 s1.03
+  best W 60; best at F4b grid points W 50; best / that 1.003; controller mean W 58
+  controller / best fixed: per rep (F4b def) median 0.967 (0.965-0.980); vs F4b-grid points only 0.974; ratio of medians 0.972; F4b had 0.972 (0.969-0.980)
+  this job / F4b (cross-job): controller 0.989, W 50 0.986
+
+σ 100, 4 nodes: W 250 206.2 s1.02  W 300 207.8 s1.02  W 350 204.2 s1.02  W 400 196.7 s1.03  ctl 202.8 s1.04
+  best W 300; best at F4b grid points W 300; best / that 1.000; controller mean W 315
+  controller / best fixed: per rep (F4b def) median 0.971 (0.949-0.978); vs F4b-grid points only 0.971; ratio of medians 0.976; F4b had 0.966 (0.948-0.979)
+  this job / F4b (cross-job): controller 0.991, W 300 0.981
+
+σ 2,000, 4 nodes: W 250 153.8 s1.03  W 300 157.9 s1.02  W 350 152.5 s1.03  W 400 145.5 s1.04  ctl 151.6 s1.02
+  best W 300; best at F4b grid points W 300; best / that 1.000; controller mean W 322
+  controller / best fixed: per rep (F4b def) median 0.960 (0.954-0.968); vs F4b-grid points only 0.960; ratio of medians 0.960; F4b had 0.965 (0.959-0.966)
+  this job / F4b (cross-job): controller 0.979, W 300 0.979
+
+uniform, 4 nodes: W 250 134.5 s1.01  W 300 137.3 s1.01  W 350 132.6 s1.02  W 400 124.4 s1.01  ctl 132.9 s1.01
+  best W 300; best at F4b grid points W 300; best / that 1.000; controller mean W 311
+  controller / best fixed: per rep (F4b def) median 0.967 (0.962-0.972); vs F4b-grid points only 0.967; ratio of medians 0.968; F4b had 0.959 (0.958-0.976)
+  this job / F4b (cross-job): controller 1.008, W 300 1.005
+
+traffic, 4 nodes: W 350 278.7 s1.01  W 425 296.6 s1.00  W 500 300.2 s1.00  W 600 297.0 s1.00  ctl 289.7 s1.02
+  best W 500; best at F4b grid points W 500; best / that 1.000; controller mean W 534
+  controller / best fixed: per rep (F4b def) median 0.965 (0.958-0.970); vs F4b-grid points only 0.965; ratio of medians 0.965; F4b had 0.963 (0.952-0.968)
+  this job / F4b (cross-job): controller 1.016, W 500 1.002
+
+dragonfly, 4 nodes: W 12500 128.4 s1.01  W 15000 129.2 s1.01  W 17500 127.9 s1.01  W 20000 123.4 s1.02  ctl 127.6 s1.01
+  best W 15000; best at F4b grid points W 20000; best / that 1.048; controller mean W 14316
+  controller / best fixed: per rep (F4b def) median 0.983 (0.973-0.993); vs F4b-grid points only 1.036; ratio of medians 0.987; F4b had 1.034 (1.030-1.035)
+  this job / F4b (cross-job): controller 1.006, W 20000 1.005
+
+lookahead 10, σ 500, 16 nodes: W 40 606.3 s1.01  W 50 643.6 s1.07  W 60 667.3 s1.15  W 75 631.2 s1.03  W 100 575.6 s1.02  ctl 644.9 s1.02
+  best W 60; best at F4b grid points W 50; best / that 1.037; controller mean W 61
+  controller / best fixed: per rep (F4b def) median 0.964 (0.957-1.005); vs F4b-grid points only 1.000; ratio of medians 0.966; F4b had 1.005 (1.002-1.008)
+  this job / F4b (cross-job): controller 0.998, W 50 1.003
+
+σ 100, 16 nodes: W 250 790.4 s1.02  W 300 823.0 s1.02  W 350 835.3 s1.04  W 400 799.8 s1.04  W 450 759.1 s1.04  ctl 802.5 s1.03
+  best W 350; best at F4b grid points W 300; best / that 1.015; controller mean W 376
+  controller / best fixed: per rep (F4b def) median 0.960 (0.943-0.985); vs F4b-grid points only 0.975; ratio of medians 0.961; F4b had 0.963 (0.954-0.966)
+  this job / F4b (cross-job): controller 0.994, W 300 0.983
+
+σ 2,000, 16 nodes: W 250 585.1 s1.01  W 300 609.8 s1.01  W 350 619.3 s1.01  W 400 606.3 s1.04  W 450 574.2 s1.01  ctl 608.5 s1.02
+  best W 350; best at F4b grid points W 300; best / that 1.015; controller mean W 371
+  controller / best fixed: per rep (F4b def) median 0.987 (0.972-0.990); vs F4b-grid points only 0.996; ratio of medians 0.983; F4b had 0.990 (0.987-0.996)
+  this job / F4b (cross-job): controller 1.001, W 300 0.996
+
+uniform, 16 nodes: W 250 375.4 s1.04  W 300 389.0 s1.01  W 350 394.2 s1.02  W 400 382.5 s1.03  ctl 384.2 s1.01
+  best W 350; best at F4b grid points W 300; best / that 1.013; controller mean W 358
+  controller / best fixed: per rep (F4b def) median 0.975 (0.971-0.978); vs F4b-grid points only 0.989; ratio of medians 0.975; F4b had 0.989 (0.984-0.997)
+  this job / F4b (cross-job): controller 1.001, W 300 1.003
+
+traffic, 16 nodes: W 600 1196.4 s1.01  W 675 1197.4 s1.01  W 750 1186.8 s1.04  W 875 1114.5 s1.05  ctl 1160.5 s1.01
+  best W 675; best at F4b grid points W 750; best / that 1.009; controller mean W 704
+  controller / best fixed: per rep (F4b def) median 0.968 (0.963-0.979); vs F4b-grid points only 0.983; ratio of medians 0.969; F4b had 0.980 (0.967-1.014)
+  this job / F4b (cross-job): controller 1.000, W 750 1.001
+
+dragonfly, 16 nodes: W 12500 430.4 s1.02  W 15000 435.4 s1.01  W 17500 430.3 s1.00  W 20000 416.6 s1.01  ctl 425.4 s1.01
+  best W 15000; best at F4b grid points W 20000; best / that 1.045; controller mean W 14892
+  controller / best fixed: per rep (F4b def) median 0.979 (0.977-0.981); vs F4b-grid points only 1.025; ratio of medians 0.977; F4b had 1.015 (1.014-1.021)
+  this job / F4b (cross-job): controller 1.009, W 20000 1.002
+
+Part C counts equal to F4b (one per cell): True []
+controller / refined best, per-rep definition, medians over cells: 0.960-0.987
+ratio of medians over cells: 0.960-0.987
+gain of refined grid over F4b points: 1.000-1.048
+
+# Part D: Devastator's grid on F1's cells (M committed ev/s, median of 5; spread = fastest / slowest rep)
+
+σ 100, 1 node: W1000 35.0 s1.25  W1400 36.3 s1.15  W2000 36.4 s1.22  W2800 31.9 s1.18  W4000 29.4 s1.27
+  Devastator best W 2000; best at F1 grid points W 2000; best / that 1.000
+  Charades controller pp2048 51.0 s1.05:  (better pp2048; F1 better pp2048)
+  C/D: this job vs refined best 1.401; vs F1-grid best 1.401; F1 1.257 | this job / F1: Charades ctl 0.968, Devastator W2000 0.869 | counts one and = F1: True
+
+σ 500, 1 node: W250 27.8 s1.29  W350 29.8 s1.37  W500 30.3 s1.05  W700 31.2 s1.21  W1000 31.4 s1.14
+  Devastator best W 1000 (GRID END); best at F1 grid points W 1000; best / that 1.000
+  Charades controller pp2048 43.9 s1.08:  (better pp2048; F1 better pp2048)
+  C/D: this job vs refined best 1.400; vs F1-grid best 1.400; F1 1.194 | this job / F1: Charades ctl 0.947, Devastator W1000 0.813 | counts one and = F1: True
+
+σ 500, 2 nodes: W700 75.2 s1.04  W1000 76.6 s1.01  W1400 74.9 s1.01
+  Devastator best W 1000; best at F1 grid points W 1000; best / that 1.000
+  Charades controller pp2048 91.2 s1.01:  (better pp2048; F1 better pp2048)
+  C/D: this job vs refined best 1.190; vs F1-grid best 1.190; F1 1.194 | this job / F1: Charades ctl 1.020, Devastator W1000 1.022 | counts one and = F1: True
+
+σ 1,000, 1 node: W700 29.4 s1.13  W1000 29.8 s1.12  W1400 29.0 s1.17
+  Devastator best W 1000; best at F1 grid points W 1000; best / that 1.000
+  Charades controller pp2048 40.2 s1.04 pp512 42.0 s1.03:  (better pp512; F1 better pp512)
+  C/D: this job vs refined best 1.409; vs F1-grid best 1.409; F1 1.198 | this job / F1: Charades ctl 0.949, Devastator W1000 0.807 | counts one and = F1: True
+
+σ 2,000, 1 node: W250 22.3 s1.16  W350 25.4 s1.15  W500 27.1 s1.08  W700 26.8 s1.12
+  Devastator best W 500; best at F1 grid points W 500; best / that 1.000
+  Charades controller pp512 39.9 s1.05:  (better pp512; F1 better pp512)
+  C/D: this job vs refined best 1.473; vs F1-grid best 1.473; F1 1.441 | this job / F1: Charades ctl 0.942, Devastator W500 0.922 | counts one and = F1: True
+
+σ 4,000, 1 node: W175 24.8 s1.05  W250 26.2 s1.03  W350 27.0 s1.01  W500 28.4 s1.02  W700 26.9 s1.02
+  Devastator best W 500; best at F1 grid points W 500; best / that 1.000
+  Charades controller pp512 41.5 s1.02:  (better pp512; F1 better pp512)
+  C/D: this job vs refined best 1.463; vs F1-grid best 1.463; F1 1.464 | this job / F1: Charades ctl 0.994, Devastator W500 0.994 | counts one and = F1: True
+
+σ 4,000, 2 nodes: W250 35.3 s1.02  W350 38.7 s1.01  W500 40.8 s1.01  W700 41.3 s1.02
+  Devastator best W 700 (GRID END); best at F1 grid points W 500; best / that 1.011
+  Charades controller pp512 77.2 s1.01:  (better pp512; F1 better pp512)
+  C/D: this job vs refined best 1.870; vs F1-grid best 1.891; F1 1.896 | this job / F1: Charades ctl 0.997, Devastator W500 1.000 | counts one and = F1: True
+
+uniform, 1 node: W175 24.8 s1.05  W250 26.6 s1.02  W350 27.8 s1.01  W500 29.1 s1.01  W700 27.6 s1.01
+  Devastator best W 500; best at F1 grid points W 500; best / that 1.000
+  Charades controller pp512 44.5 s1.01 wps512 45.5 s1.01:  (better wps512; F1 better wps512)
+  C/D: this job vs refined best 1.563; vs F1-grid best 1.563; F1 1.571 | this job / F1: Charades ctl 0.993, Devastator W500 0.998 | counts one and = F1: True
+
+uniform, 2 nodes: W175 31.2 s1.01  W250 34.2 s1.02  W350 38.1 s1.02  W500 39.7 s1.03  W700 40.2 s1.01
+  Devastator best W 700 (GRID END); best at F1 grid points W 500; best / that 1.011
+  Charades controller pp512 82.1 s1.02 wps512 76.8 s1.01:  (better pp512; F1 better pp512)
+  C/D: this job vs refined best 2.044; vs F1-grid best 2.067; F1 2.030 | this job / F1: Charades ctl 1.036, Devastator W500 1.017 | counts one and = F1: True
+
+uniform, 4 nodes: W250 55.6 s1.03  W350 63.1 s1.02  W500 67.6 s1.02  W700 68.6 s1.04
+  Devastator best W 700 (GRID END); best at F1 grid points W 500; best / that 1.014
+  Charades controller pp512 152.7 s1.02 wps512 132.2 s1.02:  (better pp512; F1 better pp512)
+  C/D: this job vs refined best 2.226; vs F1-grid best 2.257; F1 2.249 | this job / F1: Charades ctl 1.005, Devastator W500 1.002 | counts one and = F1: True
+
+uniform, 8 nodes: W250 95.8 s1.03  W350 104.8 s1.03  W500 111.9 s1.02  W700 115.6 s1.01  W1000 114.5 s1.09
+  Devastator best W 700; best at F1 grid points W 1000; best / that 1.009
+  Charades controller pp512 230.1 s1.01 wps512 228.7 s1.02:  (better pp512; F1 better pp512)
+  C/D: this job vs refined best 1.991; vs F1-grid best 2.010; F1 2.143 | this job / F1: Charades ctl 1.011, Devastator W1000 1.085 | counts one and = F1: True
+
+lookahead 10, σ 500, 1 node: W50 37.1 s1.03  W70 38.1 s1.01  W100 38.9 s1.03  W140 38.7 s1.01  W200 38.7 s1.01
+  Devastator best W 100; best at F1 grid points W 100; best / that 1.000
+  Charades controller pp2048 41.6 s1.01:  (better pp2048; F1 better pp2048)
+  C/D: this job vs refined best 1.069; vs F1-grid best 1.069; F1 1.076 | this job / F1: Charades ctl 0.998, Devastator W100 1.004 | counts one and = F1: True
+
+lookahead 10, σ 500, 2 nodes: W140 74.4 s1.01  W200 76.0 s1.01  W280 74.5 s1.08
+  Devastator best W 200; best at F1 grid points W 200; best / that 1.000
+  Charades controller pp2048 82.8 s1.01:  (better pp2048; F1 better pp2048)
+  C/D: this job vs refined best 1.089; vs F1-grid best 1.089; F1 1.091 | this job / F1: Charades ctl 1.031, Devastator W200 1.033 | counts one and = F1: True
+
+lookahead 10, σ 2,000, 1 node: W35 24.8 s1.02  W50 26.3 s1.03  W70 26.8 s1.01  W100 28.6 s1.01  W140 26.5 s1.02
+  Devastator best W 100; best at F1 grid points W 100; best / that 1.000
+  Charades controller pp512 36.1 s1.01 wps512 36.6 s1.01:  (better wps512; F1 better wps512)
+  C/D: this job vs refined best 1.281; vs F1-grid best 1.281; F1 1.269 | this job / F1: Charades ctl 0.999, Devastator W100 0.990 | counts one and = F1: True
+
+Part D: Devastator gain range 1.000-1.014; C/D (refined) 1.069-2.226; cells where gain > 1.03: []; best still at grid end: ['g500_1', 'g4000_2', 'uni_2', 'uni_4']
+Charades ctl this job / F1: 0.942-1.036; Devastator F1-grid best this job / F1: 0.807-1.085; counts all one and = F1: True
+
+# Spread between reps (fastest / slowest), every arm
+arms 145; median spread 1.021; above 1.10: 16
+  ('D', 1, 'd_g500_1', 350) 1.37 (without the slowest 1.28)
+  ('D', 1, 'd_g500_1', 250) 1.29 (without the slowest 1.26)
+  ('D', 1, 'd_g100_1', 4000) 1.27 (without the slowest 1.20)
+  ('D', 1, 'd_g100_1', 1000) 1.25 (without the slowest 1.17)
+  ('D', 1, 'd_g100_1', 2000) 1.22 (without the slowest 1.16)
+  ('D', 1, 'd_g500_1', 700) 1.21 (without the slowest 1.11)
+  ('D', 1, 'd_g100_1', 2800) 1.18 (without the slowest 1.17)
+  ('D', 1, 'd_g1000_1', 1400) 1.17 (without the slowest 1.15)
+  ('D', 1, 'd_g2000_1', 250) 1.16 (without the slowest 1.14)
+  ('D', 1, 'd_g100_1', 1400) 1.15 (without the slowest 1.14)
+  ('C', 16, 'c_la10', 'w:60') 1.15 (without the slowest 1.02)
+  ('D', 1, 'd_g2000_1', 350) 1.15 (without the slowest 1.11)
+  ('D', 1, 'd_g500_1', 1000) 1.14 (without the slowest 1.14)
+  ('D', 1, 'd_g1000_1', 700) 1.13 (without the slowest 1.12)
+  ('D', 1, 'd_g1000_1', 1000) 1.12 (without the slowest 1.11)
+  ('D', 1, 'd_g2000_1', 700) 1.12 (without the slowest 1.12)

@@ -1,0 +1,137 @@
+
+===== dragonfly, 1 node(s), a_j3673108: reps [1, 2, 3]; counts ['382524695']; digests ['08f17bb7d4f828d1']
+  charades   wps512 mb:0 38.7  wps512 w:10000 38.6  wps512 w:20000 37.4  direct w:10000 36.4  direct w:20000 34.7
+  devastator 10000 41.1  20000 40.1  40000 36.7
+  ross       df_b2g64 10.2  df_b4g64 10.1
+
+===== dragonfly, 2 node(s), a_j3673108: reps [1, 2, 3]; counts ['763505232']; digests ['86ad6ff40864398b']
+  charades   wps512 mb:0 66.7  wps512 w:20000 63.8  wps512 w:10000 63.4  direct w:20000 61.8  direct w:10000 61.8
+  devastator 20000 64.4  10000 61.9  40000 55.3
+  ross       df_b4g64 18.1  df_b2g64 17.2
+
+===== dragonfly, 4 node(s), a_j3673108: reps [1, 2, 3]; counts ['1445988962']; digests ['bdaedbeb3f00545f']
+  charades   wps512 mb:0 112.2  wps512 w:20000 110.7  wps512 w:10000 107.7  direct w:20000 101.0  direct w:10000 100.6
+  devastator 20000 87.1  10000 82.6  40000 69.2
+  ross       df_b2g64 27.8  df_b4g64 25.4
+
+===== dragonfly, 8 node(s), a_j3673108: reps [1, 2, 3]; counts ['3298165033']; digests ['d06182d17e786b18']
+  charades   wps512 mb:0 209.4  wps512 w:10000 206.8  wps512 w:20000 203.0  direct w:10000 184.8  direct w:20000 181.6
+  devastator 20000 138.6  10000 124.2  40000 117.9
+  ross       df_b2g64 52.2  df_b4g64 33.2
+
+===== dragonfly, 16 node(s), a_j3673108: reps [1, 2, 3]; counts ['6252883131']; digests ['c439ad414c55e3d3']
+  charades   wps512 mb:0 384.6  wps512 w:20000 374.4  wps512 w:10000 370.9  direct w:20000 339.6  direct w:10000 333.7
+  devastator 20000 213.7  40000 201.8  10000 187.8
+  ross       df_b2g64 97.5  df_b4g64 51.8
+
+===== dragonfly, 1 node(s), f5a_j3689887: reps [1, 2, 3]; counts ['382524695']; digests ['08f17bb7d4f828d1']
+  charades   wps512 w:10000 44.2  wps512 mb:0 43.8  wps512 w:20000 41.4  direct w:10000 39.9  direct w:20000 38.3
+  devastator 10000 40.4  20000 39.4  40000 35.5
+  ross       df_w2500 14.1  df_w5000 13.5  df_w7500 10.4
+
+===== dragonfly, 2 node(s), f5a_j3689887: reps [1, 2, 3]; counts ['763505232']; digests ['86ad6ff40864398b']
+  charades   wps512 mb:0 74.6  wps512 w:10000 73.1  wps512 w:20000 72.3  direct w:10000 67.7  direct w:20000 66.8
+  devastator 20000 63.5  10000 61.6  40000 54.9
+  ross       df_w5000 25.7  df_w2500 25.2  df_w7500 19.2
+
+===== dragonfly, 4 node(s), f5a_j3689887: reps [1, 2, 3]; counts ['1445988962']; digests ['bdaedbeb3f00545f']
+  charades   wps512 mb:0 126.8  wps512 w:20000 123.5  wps512 w:10000 121.5  direct w:20000 110.2  direct w:10000 110.0
+  devastator 20000 87.3  10000 83.0  40000 68.4
+  ross       df_w5000 41.7  df_w2500 39.7  df_w7500 31.2
+
+===== dragonfly, 8 node(s), f5a_j3689887: reps [1, 2, 3]; counts ['3298165033']; digests ['d06182d17e786b18']
+  charades   wps512 mb:0 231.8  wps512 w:10000 225.0  wps512 w:20000 221.8  direct w:10000 199.3  direct w:20000 197.0
+  devastator 20000 136.2  10000 119.0  40000 117.7
+  ross       df_w5000 75.5  df_w2500 73.9  df_w7500 56.2
+
+===== dragonfly, 16 node(s), f5a_j3689887: reps [1, 2, 3]; counts ['6252883131']; digests ['c439ad414c55e3d3']
+  charades   wps512 mb:0 427.4  wps512 w:20000 415.8  wps512 w:10000 404.5  direct w:20000 369.8  direct w:10000 362.7
+  devastator 20000 213.9  40000 200.8  10000 189.3
+  ross       df_w5000 144.1  df_w2500 136.1  df_w7500 106.4
+
+===== traffic, 1 node(s), a_j3673108: reps [1, 2, 3]; counts ['565555392']; digests ['13c2ce246f87fe69']
+  charades   wps512 w:500 66.5  pp2048 w:500 65.2  pp2048 mb:0 61.5  pp2048 w:1000 58.1  direct w:500 49.7
+  devastator 2000 59.7  1000 58.5  4000 57.7
+  ross       tr_b64g64 36.3  tr_cons 35.3  tr_b128g64 32.5
+
+===== traffic, 2 node(s), a_j3673108: reps [1, 2, 3]; counts ['1131048282']; digests ['d6c433cf1a0fa572']
+  charades   wps512 w:500 124.2  pp2048 w:500 123.2  pp2048 mb:0 122.1  pp2048 w:1000 114.7  direct w:500 96.5
+  devastator 1000 116.6  2000 116.0  4000 110.3
+  ross       tr_b64g64 61.3  tr_cons 61.0  tr_b128g64 38.9
+
+===== traffic, 4 node(s), a_j3673108: reps [1, 2, 3]; counts ['2262103209']; digests ['f4babdcd41892605']
+  charades   pp2048 w:500 244.6  wps512 w:500 239.1  pp2048 mb:0 234.4  pp2048 w:1000 223.5  direct w:500 180.1
+  devastator 2000 230.0  1000 219.7  4000 209.5
+  ross       tr_b64g64 117.6  tr_cons 108.2  tr_b128g64 69.1
+
+===== traffic, 8 node(s), a_j3673108: reps [1, 2, 3]; counts ['4524262564']; digests ['92ea25f2ca6484ea']
+  charades   pp2048 w:500 482.8  wps512 w:500 478.3  pp2048 mb:0 462.6  pp2048 w:1000 445.3  direct w:500 356.8
+  devastator 2000 444.1  1000 431.9  4000 383.6
+  ross       tr_b64g64 226.3  tr_cons 195.2  tr_b128g64 137.9
+
+===== traffic, 16 node(s), a_j3673108: reps [1, 2, 3]; counts ['9048375910']; digests ['58f089905cadc8ce']
+  charades   pp2048 w:500 949.5  wps512 w:500 943.5  pp2048 mb:0 929.0  pp2048 w:1000 881.0  direct w:500 701.4
+  devastator 2000 898.7  1000 865.8  4000 795.4
+  ross       tr_b64g64 438.5  tr_cons 350.7  tr_b128g64 247.7
+
+===== traffic, 1 node(s), f5a_j3689887: reps [1, 2, 3]; counts ['565555392']; digests ['13c2ce246f87fe69']
+  charades   wps512 w:500 76.8  pp2048 w:500 76.5  pp2048 mb:0 73.2  pp2048 w:1000 66.2  direct w:500 53.6
+  devastator 2000 58.7  1000 57.7  4000 56.1
+  ross       tr_w1000 40.3  tr_w2000 39.9  tr_cons 34.6
+
+===== traffic, 2 node(s), f5a_j3689887: reps [1, 2, 3]; counts ['1131048282']; digests ['d6c433cf1a0fa572']
+  charades   pp2048 w:500 150.0  wps512 w:500 148.4  pp2048 mb:0 141.9  pp2048 w:1000 134.5  direct w:500 104.8
+  devastator 2000 116.1  1000 113.3  4000 108.9
+  ross       tr_w1000 73.9  tr_w2000 73.0  tr_cons 60.8
+
+===== traffic, 4 node(s), f5a_j3689887: reps [1, 2, 3]; counts ['2262103209']; digests ['f4babdcd41892605']
+  charades   pp2048 w:500 295.7  wps512 w:500 288.9  pp2048 mb:0 277.2  pp2048 w:1000 268.0  direct w:500 203.6
+  devastator 1000 232.4  2000 232.3  4000 213.8
+  ross       tr_w2000 141.3  tr_w1000 140.9  tr_cons 109.8
+
+===== traffic, 8 node(s), f5a_j3689887: reps [1, 2, 3]; counts ['4524262564']; digests ['92ea25f2ca6484ea']
+  charades   pp2048 w:500 576.3  wps512 w:500 559.2  pp2048 mb:0 543.1  pp2048 w:1000 526.7  direct w:500 397.9
+  devastator 2000 454.4  1000 444.8  4000 388.9
+  ross       tr_w2000 270.1  tr_w1000 264.8  tr_cons 194.4
+
+===== traffic, 16 node(s), f5a_j3689887: reps [1, 2, 3]; counts ['9048375910']; digests ['58f089905cadc8ce']
+  charades   pp2048 mb:0 1114.3  pp2048 w:500 1077.2  pp2048 w:1000 1069.5  wps512 w:500 1059.5  direct w:500 760.4
+  devastator 2000 904.0  4000 796.9  1000 245.6
+  ross       tr_w2000 528.0  tr_w1000 513.5  tr_cons 349.2
+
+
+===== Summary (M committed ev/s, medians; ratios higher is better for Charades)
+
+dragonfly
+job            N      ctl             C best fixed          Deva best          ROSS best  ctl÷D  ctl÷R  Cfx÷D       ctl÷fixed (reps)   agg ctl/node
+a_j3673108     1     38.7      wps512 w:10000 38.6         10000 41.1      df_b2g64 10.2   0.94   3.80   0.94         1.01/0.93/1.01  1.06     1.00
+a_j3673108     2     66.7      wps512 w:20000 63.8         20000 64.4      df_b4g64 18.1   1.04   3.69   0.99         1.03/1.03/1.02  1.03     0.86
+a_j3673108     4    112.2     wps512 w:20000 110.7         20000 87.1      df_b2g64 27.8   1.29   4.03   1.27         1.01/1.04/1.01  1.10     0.73
+a_j3673108     8    209.4     wps512 w:10000 206.8        20000 138.6      df_b2g64 52.2   1.51   4.01   1.49         1.02/1.01/1.02  1.12     0.68
+a_j3673108    16    384.6     wps512 w:20000 374.4        20000 213.7      df_b2g64 97.5   1.80   3.94   1.75         1.04/1.01/1.03  1.10     0.62
+f5a_j3689887   1     43.8      wps512 w:10000 44.2         10000 40.4      df_w2500 14.1   1.08   3.10   1.09         0.99/0.99/0.99  1.11     1.00
+f5a_j3689887   2     74.6      wps512 w:10000 73.1         20000 63.5      df_w5000 25.7   1.18   2.90   1.15         1.02/1.02/1.02  1.08     0.85
+f5a_j3689887   4    126.8     wps512 w:20000 123.5         20000 87.3      df_w5000 41.7   1.45   3.04   1.41         1.02/1.03/1.03  1.12     0.72
+f5a_j3689887   8    231.8     wps512 w:10000 225.0        20000 136.2      df_w5000 75.5   1.70   3.07   1.65         1.03/1.03/1.02  1.13     0.66
+f5a_j3689887  16    427.4     wps512 w:20000 415.8        20000 213.9     df_w5000 144.1   2.00   2.97   1.94         1.02/1.03/1.03  1.12     0.61
+  per-node rate ÷ 1-node rate, each engine at its best (Charades: controller):
+    charades   a_j1:1.00 a_j2:0.86 a_j4:0.73 a_j8:0.68 a_j16:0.62 f5a1:1.13 f5a2:0.96 f5a4:0.82 f5a8:0.75 f5a16:0.69
+    devastator a_j1:1.00 a_j2:0.78 a_j4:0.53 a_j8:0.42 a_j16:0.32 f5a1:0.98 f5a2:0.77 f5a4:0.53 f5a8:0.41 f5a16:0.33
+    ross       a_j1:1.00 a_j2:0.89 a_j4:0.68 a_j8:0.64 a_j16:0.60 f5a1:1.39 f5a2:1.26 f5a4:1.02 f5a8:0.93 f5a16:0.88
+
+traffic
+job            N      ctl             C best fixed          Deva best          ROSS best  ctl÷D  ctl÷R  Cfx÷D       ctl÷fixed (reps)   agg ctl/node
+a_j3673108     1     61.5        wps512 w:500 66.5          2000 59.7     tr_b64g64 36.3   1.03   1.70   1.11         0.90/0.98/0.95  1.34     1.00
+a_j3673108     2    122.1       wps512 w:500 124.2         1000 116.6     tr_b64g64 61.3   1.05   1.99   1.06         0.95/0.99/0.95  1.29     0.99
+a_j3673108     4    234.4       pp2048 w:500 244.6         2000 230.0    tr_b64g64 117.6   1.02   1.99   1.06         0.97/0.96/0.94  1.36     0.95
+a_j3673108     8    462.6       pp2048 w:500 482.8         2000 444.1    tr_b64g64 226.3   1.04   2.04   1.09         0.96/1.01/0.95  1.35     0.94
+a_j3673108    16    929.0       pp2048 w:500 949.5         2000 898.7    tr_b64g64 438.5   1.03   2.12   1.06         0.98/0.97/0.98  1.35     0.94
+f5a_j3689887   1     73.2        wps512 w:500 76.8          2000 58.7      tr_w1000 40.3   1.25   1.82   1.31         0.96/0.96/0.93  1.43     1.00
+f5a_j3689887   2    141.9       pp2048 w:500 150.0         2000 116.1      tr_w1000 73.9   1.22   1.92   1.29         0.96/0.95/0.95  1.43     0.97
+f5a_j3689887   4    277.2       pp2048 w:500 295.7         1000 232.4     tr_w2000 141.3   1.19   1.96   1.27         0.95/0.94/0.94  1.45     0.95
+f5a_j3689887   8    543.1       pp2048 w:500 576.3         2000 454.4     tr_w2000 270.1   1.20   2.01   1.27         0.93/0.95/0.98  1.45     0.93
+f5a_j3689887  16   1114.3      pp2048 w:500 1077.2         2000 904.0     tr_w2000 528.0   1.23   2.11   1.19         1.06/1.03/0.98  1.42     0.95
+  per-node rate ÷ 1-node rate, each engine at its best (Charades: controller):
+    charades   a_j1:1.00 a_j2:0.99 a_j4:0.95 a_j8:0.94 a_j16:0.94 f5a1:1.19 f5a2:1.15 f5a4:1.13 f5a8:1.10 f5a16:1.13
+    devastator a_j1:1.00 a_j2:0.98 a_j4:0.96 a_j8:0.93 a_j16:0.94 f5a1:0.98 f5a2:0.97 f5a4:0.97 f5a8:0.95 f5a16:0.95
+    ross       a_j1:1.00 a_j2:0.85 a_j4:0.81 a_j8:0.78 a_j16:0.76 f5a1:1.11 f5a2:1.02 f5a4:0.97 f5a8:0.93 f5a16:0.91

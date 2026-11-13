@@ -1,0 +1,30 @@
+A/B. σ 2,000, W 400, PP 512 (M committed ev/s, mean of 2 reps; higher is better); exec_s in s (lower is better)
+  short (end 512,000)    warm-up 0: 4 nodes  121.3 (125.6, 116.9), 16 nodes  442.1 (441.3, 443.0), efficiency 4->16 0.912 | exec_s 1.495 / 1.635, wall_s 3.14 / 3.58
+  short (end 512,000)    warm-up 1: 4 nodes  126.5 (125.6, 127.4), 16 nodes  444.3 (444.7, 443.8), efficiency 4->16 0.878 | exec_s 1.430 / 1.630, wall_s 3.12 / 3.48
+  long (end 2,048,000)   warm-up 0: 4 nodes  131.8 (132.2, 131.4), 16 nodes  512.4 (512.9, 512.0), efficiency 4->16 0.972 | exec_s 5.495 / 5.655, wall_s 7.25 / 7.51
+  long (end 2,048,000)   warm-up 1: 4 nodes  131.8 (132.2, 131.4), 16 nodes  505.0 (510.7, 499.3), efficiency 4->16 0.958 | exec_s 5.490 / 5.735, wall_s 7.19 / 7.62
+   4 nodes, short warm-up 1 ÷ short warm-up 0: 1.043
+  16 nodes, short warm-up 1 ÷ short warm-up 0: 1.005
+   4 nodes, long warm-up 0 ÷ short warm-up 0: 1.087
+  16 nodes, long warm-up 0 ÷ short warm-up 0: 1.159
+   4 nodes, long warm-up 1 ÷ short warm-up 0: 1.087
+  16 nodes, long warm-up 1 ÷ short warm-up 0: 1.142
+
+Closure (traced, mean of 2 reps; s; lower is better): exec_s | first 10% of waves | waves 10-95% | last 5%
+  AT_w0_n16  : 1.645 | 0.339 | 1.238 | 0.062
+  AT_w1_n16  : 1.665 | 0.333 | 1.264 | 0.065
+  BT_w0_n16  : 5.725 | 0.853 | 4.623 | 0.248
+  CT_s4k_n4  : 1.560 | 0.227 | 1.265 | 0.066
+  CT_s4k_n16 : 1.670 | 0.336 | 1.268 | 0.064
+  CT_uni_n4  : 1.570 | 0.161 | 1.334 | 0.077
+  CT_uni_n16 : 2.055 | 0.233 | 1.724 | 0.094
+  s4k: 16 - 4 nodes: exec_s +0.110 s; first 10% +0.109 (99%), 10-95% +0.004 (3%), last 5% -0.002; steady efficiency 0.997
+  uni: 16 - 4 nodes: exec_s +0.485 s; first 10% +0.073 (15%), 10-95% +0.391 (81%), last 5% +0.017; steady efficiency 0.773
+
+C. Warm-up on uniform (WPs 512) and σ 4,000 (PP 512), W 400, short runs (M committed ev/s; higher is better)
+  uni  4 nodes: warm-up 0  116.4 (116.7, 116.1), 1  114.9 (115.0, 114.8), ratio 0.987
+  uni 16 nodes: warm-up 0  351.3 (355.2, 347.4), 1  352.5 (353.9, 351.2), ratio 1.004
+  uni efficiency 4->16: warm-up 0 0.754, warm-up 1 0.767
+  s4k  4 nodes: warm-up 0  116.8 (116.4, 117.1), 1  115.8 (115.6, 116.1), ratio 0.992
+  s4k 16 nodes: warm-up 0  425.2 (433.9, 416.4), 1  421.0 (434.3, 407.7), ratio 0.990
+  s4k efficiency 4->16: warm-up 0 0.910, warm-up 1 0.909

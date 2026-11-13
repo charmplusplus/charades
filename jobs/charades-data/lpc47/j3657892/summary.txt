@@ -1,0 +1,43 @@
+Median of 2. rolled % = rolled back / executed (lower is better); M ev/s committed (higher is better);
+prim/Mev = primary stragglers per million executed; rb/strag = events rolled back per rollback call
+
+workload   LPC      W  rolled %    M ev/s  prim/Mev  rb/strag  ev/msg   GVTs
+σ 100       16    400     0.054     665.7     126.0       4.3    34.6   7355
+σ 100       16    800     1.420     470.7    1019.5      12.2     9.1   6309
+σ 100       16   1600     5.138     301.5    2097.1      16.2     7.2   6129
+σ 100        4    400     0.017     664.7      78.8       2.1    34.3   7339
+σ 100        4    800     0.786     490.3    1304.2       5.4     9.2   6472
+σ 100        4   1600     5.180     352.8    5128.5       7.1     4.1   5475
+σ 100        1    400     0.004     597.0      29.4       1.3    33.3   7182
+σ 100        1    800     0.277     499.7    1058.7       2.5     9.2   6291
+σ 100        1   1600     1.998     333.3    4045.0       3.5     5.5   5711
+σ 100        -    400     0.000     635.2   (Devastator, job R)
+σ 100        -    800     0.022     661.9   (Devastator, job R)
+σ 100        -   1600     0.309     656.6   (Devastator, job R)
+   same committed events in every run (incl. Devastator): yes
+σ 2,000     16    400     0.144     430.9     374.5       3.8    49.3   6740
+σ 2,000     16    800     4.164     289.1    2606.1      13.2    20.0   6350
+σ 2,000     16   1600    71.653      23.1   17172.3      20.3     4.4   3918
+σ 2,000      4    400     0.038     429.8     205.1       1.9    49.2   6741
+σ 2,000      4    800     1.738     339.1    2088.0       6.5    25.3   6344
+σ 2,000      4   1600    17.508     113.8   12929.1       8.4     7.4   2717
+σ 2,000      1    400     0.009     411.0      75.0       1.2    48.2   6703
+σ 2,000      1    800     0.451     359.6    1513.1       2.7    24.8   6211
+σ 2,000      1   1600     5.652     196.8   10562.8       3.6    12.9   6300
+σ 2,000      -    400     0.062     300.7   (Devastator, job R)
+σ 2,000      -    800     0.737     357.6   (Devastator, job R)
+σ 2,000      -   1600     4.506     375.4   (Devastator, job R)
+   same committed events in every run (incl. Devastator): yes
+uniform     16    400     0.535     335.3    2101.2       2.5    12.7   7249
+uniform     16    800    12.209     237.8    5779.8      14.3    11.1   6300
+uniform     16   1600    16.946     116.1    7095.8      16.1     1.7   7098
+uniform      4    400     0.133     338.0     903.9       1.5    12.7   7227
+uniform      4    800     2.677     264.7    2885.8       6.5    11.8   7466
+uniform      4   1600    19.704     135.5   13253.3       8.1     2.6   7195
+uniform      1    400     0.035     322.5     301.6       1.2    12.6   7196
+uniform      1    800     0.541     263.2    1705.6       2.7    11.3   7409
+uniform      1   1600    10.964     184.2   12785.8       4.2     7.6   7173
+uniform      -    400     0.759     178.3   (Devastator, job R)
+uniform      -    800     4.818     199.0   (Devastator, job R)
+uniform      -   1600    17.825     166.1   (Devastator, job R)
+   same committed events in every run (incl. Devastator): yes

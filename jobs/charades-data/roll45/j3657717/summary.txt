@@ -1,0 +1,37 @@
+Rolled back as % of executed, and M committed ev/s (median of 2; higher rate is better)
+workload  engine            W  rolled %    M ev/s prim/Mev   held %   late % anti rb%  ev/msg    GVTs
+σ 100     Ch htram        400     0.058     657.6    129.9     68.3      1.7      0.0    35.1    7461
+σ 100     Ch htram        600     0.478     551.5    483.7     12.8      0.2      4.1    14.0    6783
+σ 100     Ch htram        800     1.193     477.4    886.9      6.7      0.1     11.7     9.9    6425
+σ 100     Ch direct       400     0.083     339.0     90.6      0.0      0.0      0.1       -    7523
+σ 100     Ch direct       800     2.661     298.6   1347.4      0.0      0.0     19.9       -    6587
+σ 100     Ch direct      1600     9.597     303.8   3871.5      0.0      0.0     32.1       -    6260
+σ 100     Devastator      400     0.000     635.2
+σ 100     Devastator      800     0.022     661.9
+σ 100     Devastator     1600     0.309     656.6
+   same committed events in every run: yes
+σ 2,000   Ch htram        400     0.155     430.2    388.8     79.8      6.7      0.1    49.9    6770
+σ 2,000   Ch htram        600     1.107     378.6    936.8     32.7      1.2     11.2    29.9    6330
+σ 2,000   Ch htram        800     4.098     282.1   2501.8     12.2      0.2     18.6    20.2    6271
+σ 2,000   Ch direct       400     0.152     204.7    140.1      0.0      0.0      0.2       -    7617
+σ 2,000   Ch direct       800     3.678     188.0   2153.2      0.0      0.0     20.2       -    7338
+σ 2,000   Ch direct      1600     9.400     184.3   5825.7      0.0      0.0     19.8       -    6675
+σ 2,000   Ch spin         400     0.142     393.4    379.8     82.1      6.8      0.1    49.1    6751
+σ 2,000   Ch spin         800     4.113     274.2   2557.8     11.9      0.2     18.1    20.7    6349
+σ 2,000   Devastator      400     0.062     300.7
+σ 2,000   Devastator      800     0.737     357.6
+σ 2,000   Devastator     1600     4.506     375.4
+   same committed events in every run: yes
+uniform   Ch htram        400     0.514     338.1   2067.5     95.3      0.8      0.0    12.7    7218
+uniform   Ch htram        600     2.824     298.7   3042.0     67.1      0.0     12.4    12.3    7225
+uniform   Ch htram        800     9.754     253.5   5060.2     25.0      0.0     29.0    10.2    5976
+uniform   Ch direct       400     0.157     142.6    140.0      0.0      0.0      0.2       -    7612
+uniform   Ch direct       800     8.225     132.8   3791.1      0.0      0.0     28.6       -    7328
+uniform   Ch direct      1600     8.815     131.6   4110.5      0.0      0.0     27.7       -    7276
+uniform   Devastator      400     0.759     178.3
+uniform   Devastator      800     4.818     199.0
+uniform   Devastator     1600    17.825     166.1
+   same committed events in every run: yes
+
+(prim/Mev = primary stragglers (timestamp rollback calls) per million executed events; held % and late % = shares of them;
+ anti rb% = rollbacks caused by anti-messages as a share of all rollback calls)

@@ -1,0 +1,19 @@
+== Charades, 32 nodes (M ev/s; paired = loc ÷ bal of the same rep)
+workload arm    M ev/s: median (reps)            spread loc ÷ bal paired (reps)          dip  TLB burst  max gap   rolled committed equal
+g100     loc    1382.1 (1398.1, 1135.2, 1382.1)     1.23 1.060 (1.066, 0.909, 1.060)  0.98-0.99   0.0-1.0x    0.041 82901,161691,88509 False
+g100     bal    1303.5 (1311.2, 1248.2, 1303.5)     1.05                              0.70-0.74 14.4-15.4x    0.050 81522,103159,87387 False
+g100     ctl    1297.3 (1261.1, 1297.7, 1297.3)     1.03 0.995 (0.962, 1.040, 0.995)  0.98-1.04   0.0-0.8x    0.022 94660,92682,94020 False
+g2000    loc    1062.7 (1061.2, 1062.9, 1062.7)     1.00 1.124 (1.124, 1.126, 1.112)  0.93-1.01  0.2-26.7x    0.045 423279,402391,417529 True
+g2000    bal    944.1 (944.1, 944.0, 955.5)        1.01                              0.63-0.67 14.6-15.6x    0.062 476578,411917,398166 True
+g2000    ctl    1011.4 (1011.4, 1007.3, 1013.0)     1.01 1.067 (1.071, 1.067, 1.060)  0.96-0.99   0.6-3.8x    0.037 391805,396896,419134 True
+uni      loc    580.2 (589.3, 580.2, 579.9)        1.02 1.028 (1.028, 1.036, 1.027)  0.95-1.01   0.4-0.5x    0.053 2296886,2375689,2641411 True
+uni      bal    564.4 (573.4, 559.8, 564.4)        1.02                              0.71-0.72   4.8-4.9x    0.164 2220621,2304720,2236685 True
+
+M6 controller ÷ W 400 (both --localalloc), medians: σ 100 0.939, σ 2,000 0.952
+M5 per-node efficiency 16 -> 32, σ 100 --localalloc: 1382.1 ÷ (2 × 582.3) = 1.187 (16-node reps 676.5, 488.2)
+
+== Devastator, W 1,000 (M ev/s)
+  g100  loc 751.7, 810.5 | bal 838.4, 835.3 | loc ÷ bal paired 0.897, 0.970 | Charades ÷ Devastator: both loc 1.77, both bal 1.56, each at its better 1.65
+        committed: ['5790765380']
+  uni   loc 237.2, 235.0 | bal 234.9, 233.2 | loc ÷ bal paired 1.010, 1.008 | Charades ÷ Devastator: both loc 2.46, both bal 2.41, each at its better 2.46
+        committed: ['5790767104']

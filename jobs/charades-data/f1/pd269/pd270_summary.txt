@@ -1,0 +1,79 @@
+runs kept: 60; dropped without count waves: 0; failed/stalled/missing log/pad mismatch: 0
+
+# Counts (one per workload; F1-16 in brackets)
+  uniform   ['2895361579'] [2895361579] SAME
+  σ 4,000   ['2895358752'] [2895358752] SAME
+
+# Rates (M committed ev/s, median of 5; spread = fastest / slowest rep), events per htram message, efficiency %, PL16 median and this / PL16
+  uniform   WPs 512           387.9  1.03  ev/msg   12.6  eff 99.970  rb/com 0.00029  PL16 381.5  ratio 1.017
+  uniform   PP 512 pad 0      334.5  1.04  ev/msg   14.4  eff 99.970  rb/com 0.00031  PL16 336.7  ratio 0.994
+  uniform   PP 512 pad 1      334.9  1.04  ev/msg   14.3  eff 99.970  rb/com 0.00030
+  uniform   PP 512 pad 2      337.5  1.03  ev/msg   14.3  eff 99.970  rb/com 0.00030
+  uniform   local 1 pad 0     302.6  1.13  ev/msg  111.5  eff 99.960  rb/com 0.00037  PL16 303.4  ratio 0.997
+  uniform   local 1 pad 1     427.6  1.05  ev/msg  105.5  eff 99.950  rb/com 0.00048
+  uniform   local 1 pad 2     381.6  1.10  ev/msg  109.5  eff 99.950  rb/com 0.00051
+  σ 4,000   PP 512 pad 0      553.9  1.05  ev/msg   50.0  eff 99.970  rb/com 0.00028  PL16 542.4  ratio 1.021
+  σ 4,000   PP 512 pad 2      555.7  1.01  ev/msg   49.8  eff 99.970  rb/com 0.00028
+  σ 4,000   local 1 pad 0     283.4  1.13  ev/msg  247.7  eff 99.990  rb/com 0.00014  PL16 276.6  ratio 1.025
+  σ 4,000   local 1 pad 1     467.6  1.03  ev/msg  198.9  eff 99.990  rb/com 0.00014
+  σ 4,000   local 1 pad 2     416.6  1.06  ev/msg  216.4  eff 99.990  rb/com 0.00014
+
+# Ratios (medians; higher is better for the first named)
+  uniform:
+    PP 512 pad 1 / PP 512 pad 0 1.001
+    PP 512 pad 2 / PP 512 pad 0 1.009
+    local 1 pad 1 / local 1 pad 0 1.413
+    local 1 pad 2 / local 1 pad 0 1.261
+    local 1 pad 2 / pad 1 0.892
+    best local 1 (local 1 pad 1) / PP 512 pad 0 1.278
+    best local 1 / WPs 512 1.102
+    best padded local 1 / WPs 512 1.102
+    PP 512 pad 0 / WPs 512 0.862
+  σ 4,000:
+    PP 512 pad 2 / PP 512 pad 0 1.003
+    local 1 pad 1 / local 1 pad 0 1.650
+    local 1 pad 2 / local 1 pad 0 1.470
+    local 1 pad 2 / pad 1 0.891
+    best local 1 (local 1 pad 1) / PP 512 pad 0 0.844
+
+# Message triggers (share of htram messages, medians); messages per event; bypass per message
+  uniform   WPs 512         msgs/event 0.0792  GVT 0.989  urgent 0.0105  full 0.0000  idle 0.0000  bypass/msgs 0.0000
+  uniform   PP 512 pad 0    msgs/event 0.0696  GVT 0.980  urgent 0.0187  full 0.0009  idle 0.0000  bypass/msgs 0.0009
+  uniform   PP 512 pad 1    msgs/event 0.0697  GVT 0.980  urgent 0.0188  full 0.0009  idle 0.0000  bypass/msgs 0.0009
+  uniform   PP 512 pad 2    msgs/event 0.0697  GVT 0.979  urgent 0.0197  full 0.0009  idle 0.0001  bypass/msgs 0.0009
+  uniform   local 1 pad 0   msgs/event 0.0090  GVT 0.955  urgent 0.0381  full 0.0000  idle 0.0057  bypass/msgs 0.0193
+  uniform   local 1 pad 1   msgs/event 0.0095  GVT 0.907  urgent 0.0909  full 0.0000  idle 0.0018  bypass/msgs 0.0261
+  uniform   local 1 pad 2   msgs/event 0.0091  GVT 0.938  urgent 0.0592  full 0.0000  idle 0.0032  bypass/msgs 0.0263
+  σ 4,000   PP 512 pad 0    msgs/event 0.0200  GVT 0.749  urgent 0.0765  full 0.1752  idle 0.0002  bypass/msgs 0.1335
+  σ 4,000   PP 512 pad 2    msgs/event 0.0201  GVT 0.748  urgent 0.0779  full 0.1747  idle 0.0002  bypass/msgs 0.1330
+  σ 4,000   local 1 pad 0   msgs/event 0.0040  GVT 0.671  urgent 0.0684  full 0.2418  idle 0.0184  bypass/msgs 0.0384
+  σ 4,000   local 1 pad 1   msgs/event 0.0050  GVT 0.555  urgent 0.2453  full 0.1864  idle 0.0134  bypass/msgs 0.1111
+  σ 4,000   local 1 pad 2   msgs/event 0.0046  GVT 0.597  urgent 0.1842  full 0.2043  idle 0.0145  bypass/msgs 0.0837
+
+# PE time per event sent to another process (µs; 736 PEs x execution time / events through htram), and difference from the packed layout
+  uniform   WPs 512         1.958
+  uniform   PP 512 pad 0    2.270
+  uniform   PP 512 pad 1    2.270
+  uniform   PP 512 pad 2    2.252
+  uniform   local 1 pad 0   2.512
+  uniform   local 1 pad 1   1.776
+  uniform   local 1 pad 2   1.992
+  σ 4,000   PP 512 pad 0    1.850
+  σ 4,000   PP 512 pad 2    1.843
+  σ 4,000   local 1 pad 0   3.615
+  σ 4,000   local 1 pad 1   2.189
+  σ 4,000   local 1 pad 2   2.458
+
+# Per rep (M ev/s, by rep 1-5)
+  uniform   WPs 512           395.1   387.9   388.1   382.3   384.3
+  uniform   PP 512 pad 0      334.5   338.9   340.8   329.2   332.8
+  uniform   PP 512 pad 1      334.9   335.6   334.8   343.6   331.7
+  uniform   PP 512 pad 2      342.0   332.3   337.5   338.6   336.2
+  uniform   local 1 pad 0     310.8   275.3   277.4   308.4   302.6
+  uniform   local 1 pad 1     415.5   434.5   412.0   427.6   430.0
+  uniform   local 1 pad 2     380.1   395.1   381.6   358.2   391.3
+  σ 4,000   PP 512 pad 0      537.7   529.3   555.5   553.9   555.9
+  σ 4,000   PP 512 pad 2      558.8   555.7   552.3   553.0   555.8
+  σ 4,000   local 1 pad 0     287.4   283.4   299.2   276.1   265.8
+  σ 4,000   local 1 pad 1     470.6   468.4   457.5   467.5   467.6
+  σ 4,000   local 1 pad 2     416.8   427.6   407.8   416.6   404.8

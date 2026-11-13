@@ -1,0 +1,50 @@
+runs kept: 60; dropped without count waves: 0; failed/missing log/pad or setting mismatch: 0
+probe at 16 nodes: 395.3 M ev/s (F1 WPs 512 W 400: 383.3)
+
+# Counts (one per node count; F1 in brackets)
+   1 nodes ['180941384'] [180941384] SAME
+   2 nodes ['361891305'] [361891305] SAME
+   4 nodes ['723815947'] [723815947] SAME
+   8 nodes ['1447683514'] [1447683514] SAME
+  16 nodes ['2895361579'] [2895361579] SAME
+
+# Rates (M committed ev/s, median; spread = fastest / slowest rep), events per htram message, lowest efficiency %, controller mean W
+   1 new  local 1 pad 1 mb:0      34.5  1.01  ev/msg  227.8  eff 99.850  W   290
+   1 new  local 1 pad 1 w:300     34.4  1.01  ev/msg  283.9  eff 100.000  W   300
+   1 new  local 1 pad 1 w:400     27.2  1.02  ev/msg   84.7  eff 99.760  W   400
+   1 ref  wps:512    mb:0      45.5  1.00  ev/msg   74.5  eff 99.860  W   295
+   2 new  local 1 pad 1 mb:0      50.2  1.18  ev/msg  327.0  eff 99.920  W   286
+   2 new  local 1 pad 1 w:300     41.3  1.18  ev/msg  381.5  eff 100.000  W   300
+   2 new  local 1 pad 1 w:400     43.5  1.47  ev/msg  244.0  eff 99.890  W   400
+   2 ref  pp:512     mb:0      81.8  1.03  ev/msg  104.5  eff 99.900  W   299
+   4 new  local 1 pad 1 mb:0     117.5  1.16  ev/msg  300.7  eff 99.950  W   288
+   4 new  local 1 pad 1 w:300    109.7  1.05  ev/msg  347.7  eff 99.990  W   300
+   4 new  local 1 pad 1 w:400     92.7  1.09  ev/msg  278.2  eff 99.940  W   400
+   4 ref  pp:512     mb:0     153.2  1.02  ev/msg   99.5  eff 99.810  W   324
+   8 new  local 1 pad 1 mb:0     185.8  1.29  ev/msg  188.4  eff 99.920  W   293
+   8 new  local 1 pad 1 w:300    199.9  1.06  ev/msg  195.1  eff 99.950  W   300
+   8 new  local 1 pad 1 w:400    173.8  1.08  ev/msg  186.6  eff 99.930  W   400
+   8 ref  pp:512     mb:0     232.1  1.01  ev/msg   36.6  eff 99.910  W   301
+  16 new  local 1 pad 1 mb:0     450.5  1.02  ev/msg  104.7  eff 99.950  W   336
+  16 new  local 1 pad 1 w:300    463.5  1.02  ev/msg  113.1  eff 99.960  W   300
+  16 new  local 1 pad 1 w:400    415.0  1.11  ev/msg  108.9  eff 99.950  W   400
+  16 ref  wps:512    mb:0     386.1  1.02  ev/msg   12.6  eff 99.950  W   355
+
+# Checks and ratios (controller medians unless named; higher is better for the first named)
+  nodes | ref / table (UL-2 ±5%) | local 1 / ref: medians, paired median [UL-3 range] | ctl / best fixed (UL-5) | local 1 ev/msg (UL-4) | local 1 ctl spread
+      1 | 0.992 yes | 0.758, paired 0.759 (0.751 0.759 0.760) [0.90-1.02 NO] | 1.002 of w:300 (yes) | 227.8 | 1.01
+      2 | 1.032 yes | 0.614, paired 0.610 (0.610 0.626 0.520) [0.93-1.05 NO] | 1.155 of w:400 (NO) | 327.0 | 1.18
+      4 | 1.009 yes | 0.767, paired 0.774 (0.718 0.820 0.774) [0.93-1.05 NO] | 1.071 of w:300 (NO) | 300.7 | 1.16
+      8 | 1.014 yes | 0.801, paired 0.800 (0.685 0.800 0.896) [0.98-1.15 NO] | 0.930 of w:300 (NO) | 188.4 | 1.29
+     16 | 1.004 yes | 1.167, paired 1.172 (1.172 1.177 1.167) [1.03-1.20 yes] | 0.972 of w:300 (yes) | 104.7 [80-130 yes] | 1.02
+
+# The table's uniform cell (section 277: local 1 replaces F1's value where its controller median is higher, if the reference passed UL-2)
+  nodes | F1 cell (M ev/s) | local 1 ctl | ref ok | cell | Charades / Devastator (old -> new) | Charades / ROSS (old -> new)
+      1 |    45.9 |    34.5 | yes | F1      45.9 | 1.57 -> 1.57 | 4.88 -> 4.88
+      2 |    79.3 |    50.2 | yes | F1      79.3 | 2.03 -> 2.03 | 5.75 -> 5.75
+      4 |   151.9 |   117.5 | yes | F1      151.9 | 2.25 -> 2.25 | 5.96 -> 5.96
+      8 |   229.0 |   185.8 | yes | F1      229.0 | 1.98 -> 1.98 | 4.89 -> 4.89
+     16 |   384.5 |   450.5 | yes | local 1 450.5 | 2.01 -> 2.36 | 4.23 -> 4.96
+     32 |   627.8 |    -    | NO  | F1      627.8 | 2.01 -> 2.01 | 3.87 -> 3.87
+     64 |   980.0 |    -    | NO  | F1      980.0 | 2.00 -> 2.00 | 3.32 -> 3.32
+  per-node rate 16->32 0.70, 32->64 0.78, 1->64 0.33 (old 0.82, 0.78, 0.33; Devastator 0.82, 0.78, 0.26; ROSS 0.89, 0.91, 0.49)

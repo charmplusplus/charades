@@ -1,0 +1,92 @@
+Throughput, untraced (M ev/s, reps; ratio = arm / m0)
+  gauss_100_1000_100 m0    :  167.6 (167.7, 167.5) ratio 1.000
+  gauss_100_1000_100 mtrim :  181.5 (182.1, 181.0) ratio 1.083
+  gauss_100_1000_100 mall  :  180.0 (179.8, 180.2) ratio 1.074
+  gauss_100_1000_2000 m0    :  125.3 (125.7, 124.9) ratio 1.000
+  gauss_100_1000_2000 mtrim :  132.2 (132.7, 131.8) ratio 1.055
+  gauss_100_1000_2000 mall  :  133.1 (133.4, 132.7) ratio 1.062
+Lateness (traced): mean delay us r0 / r1 / median rest; r0 last-PE share
+  gauss_100_1000_100 m0    : r0 22 r1 13 rest 12; r0 last 0.53; slowest-PE delay 110
+  gauss_100_1000_100 mtrim : r0 19 r1 12 rest 9; r0 last 0.49; slowest-PE delay 103
+  gauss_100_1000_100 mall  : r0 18 r1 12 rest 9; r0 last 0.47; slowest-PE delay 106
+  gauss_100_1000_2000 m0    : r0 30 r1 24 rest 23; r0 last 0.22; slowest-PE delay 160
+  gauss_100_1000_2000 mtrim : r0 22 r1 23 rest 21; r0 last 0.04; slowest-PE delay 151
+  gauss_100_1000_2000 mall  : r0 25 r1 22 rest 20; r0 last 0.20; slowest-PE delay 155
+S_m0_gauss_100_1000_100_w400_r1: 23 ranks, 184 PE threads, 16 other threads
+    rank 0        wait_ms_per_s=4.02 nvcsw_s=111 vcsw_s=115 run_frac=0.976 stime_frac=0.245 minflt_s=3.66e+04
+    ranks 2-21 median: wait_ms_per_s=0.0158 stime_frac=0 minflt_s=226
+      phold: run_frac=0.0003 vcsw/s=23.4 last cores (first 3 processes)=[[(1, 2), (13, 1)], [(0, 2), (10, 1)], [(1, 2), (29, 1)]]
+S_m0_gauss_100_1000_2000_w400_r1: 23 ranks, 184 PE threads, 16 other threads
+    rank 0        wait_ms_per_s=0.0642 nvcsw_s=1.24 vcsw_s=61.8 run_frac=0.988 stime_frac=0.00743 minflt_s=322
+    ranks 2-21 median: wait_ms_per_s=0.0148 stime_frac=0.0099 minflt_s=196
+      phold: run_frac=0.0015 vcsw/s=84.9 last cores (first 3 processes)=[[(0, 3)], [(8, 3)], [(1, 3)]]
+S_mall_gauss_100_1000_100_w400_r1: 23 ranks, 184 PE threads, 16 other threads
+    rank 0        wait_ms_per_s=4.07 nvcsw_s=112 vcsw_s=56.8 run_frac=0.978 stime_frac=0.222 minflt_s=1.01e+04
+    ranks 2-21 median: wait_ms_per_s=0 stime_frac=0 minflt_s=58.8
+      phold: run_frac=0.0005 vcsw/s=22.6 last cores (first 3 processes)=[[(25, 2), (11, 1)], [(0, 2), (10, 1)], [(0, 2), (12, 1)]]
+S_mall_gauss_100_1000_2000_w400_r1: 23 ranks, 184 PE threads, 16 other threads
+    rank 0        wait_ms_per_s=0.166 nvcsw_s=3.09 vcsw_s=67.8 run_frac=0.988 stime_frac=0.00619 minflt_s=101
+    ranks 2-21 median: wait_ms_per_s=0.0122 stime_frac=0.0099 minflt_s=143
+      phold: run_frac=0.0011 vcsw/s=53.4 last cores (first 3 processes)=[[(0, 2), (14, 1)], [(0, 2), (6, 1)], [(5, 3)]]
+S_mtrim_gauss_100_1000_100_w400_r1: 23 ranks, 184 PE threads, 16 other threads
+    rank 0        wait_ms_per_s=5.38 nvcsw_s=110 vcsw_s=56.6 run_frac=0.98 stime_frac=0.234 minflt_s=1.56e+04
+    ranks 2-21 median: wait_ms_per_s=0.0128 stime_frac=0 minflt_s=67.3
+      phold: run_frac=0.0002 vcsw/s=16.3 last cores (first 3 processes)=[[(0, 2), (4, 1)], [(9, 3)], [(11, 3)]]
+S_mtrim_gauss_100_1000_2000_w400_r1: 23 ranks, 184 PE threads, 16 other threads
+    rank 0        wait_ms_per_s=0.0758 nvcsw_s=2.35 vcsw_s=72.2 run_frac=0.988 stime_frac=0.00495 minflt_s=137
+    ranks 2-21 median: wait_ms_per_s=0.0144 stime_frac=0.0099 minflt_s=146
+      phold: run_frac=0.0010 vcsw/s=44.8 last cores (first 3 processes)=[[(0, 2), (10, 1)], [(0, 2), (10, 1)], [(1, 2), (13, 1)]]
+S_m0_gauss_100_1000_100_w400_r1.csv: no data
+S_m0_gauss_100_1000_2000_w400_r1.csv: no data
+S_mall_gauss_100_1000_100_w400_r1.csv: no data
+S_mall_gauss_100_1000_2000_w400_r1.csv: no data
+S_mtrim_gauss_100_1000_100_w400_r1.csv: no data
+S_mtrim_gauss_100_1000_2000_w400_r1.csv: no data
+S_m0_gauss_100_1000_100_w400_r2: 23 ranks, 184 PE threads, 16 other threads
+    rank 0        wait_ms_per_s=4.56 nvcsw_s=107 vcsw_s=125 run_frac=0.973 stime_frac=0.296 minflt_s=4.49e+04
+    ranks 2-21 median: wait_ms_per_s=0.00871 stime_frac=0 minflt_s=218
+      phold: run_frac=0.0003 vcsw/s=18.2 last cores (first 3 processes)=[[(0, 2), (8, 1)], [(9, 3)], [(0, 2), (6, 1)]]
+S_m0_gauss_100_1000_2000_w400_r2: 23 ranks, 184 PE threads, 16 other threads
+    rank 0        wait_ms_per_s=0.109 nvcsw_s=4.08 vcsw_s=62.5 run_frac=0.988 stime_frac=0.0111 minflt_s=399
+    ranks 2-21 median: wait_ms_per_s=0.0146 stime_frac=0.0099 minflt_s=198
+      phold: run_frac=0.0015 vcsw/s=89.2 last cores (first 3 processes)=[[(0, 3)], [(9, 2), (11, 1)], [(1, 3)]]
+S_mall_gauss_100_1000_100_w400_r2: 23 ranks, 184 PE threads, 16 other threads
+    rank 0        wait_ms_per_s=3.79 nvcsw_s=110 vcsw_s=61.1 run_frac=0.982 stime_frac=0.222 minflt_s=9.75e+03
+    ranks 2-21 median: wait_ms_per_s=0.00744 stime_frac=0 minflt_s=58.8
+      phold: run_frac=0.0002 vcsw/s=17.0 last cores (first 3 processes)=[[(0, 2), (6, 1)], [(1, 2), (5, 1)], [(0, 2), (40, 1)]]
+S_mall_gauss_100_1000_2000_w400_r2: 23 ranks, 184 PE threads, 16 other threads
+    rank 0        wait_ms_per_s=0.984 nvcsw_s=10.5 vcsw_s=65.6 run_frac=0.987 stime_frac=0.00743 minflt_s=117
+    ranks 2-21 median: wait_ms_per_s=0.0144 stime_frac=0.0099 minflt_s=142
+      phold: run_frac=0.0015 vcsw/s=71.0 last cores (first 3 processes)=[[(1, 2), (7, 1)], [(0, 2), (6, 1)], [(1, 2), (5, 1)]]
+S_mtrim_gauss_100_1000_100_w400_r2: 23 ranks, 184 PE threads, 16 other threads
+    rank 0        wait_ms_per_s=4.74 nvcsw_s=109 vcsw_s=60.1 run_frac=0.978 stime_frac=0.226 minflt_s=1.47e+04
+    ranks 2-21 median: wait_ms_per_s=0 stime_frac=0 minflt_s=66.7
+      phold: run_frac=0.0003 vcsw/s=16.7 last cores (first 3 processes)=[[(0, 2), (14, 1)], [(1, 2), (5, 1)], [(0, 2), (8, 1)]]
+S_mtrim_gauss_100_1000_2000_w400_r2: 23 ranks, 184 PE threads, 16 other threads
+    rank 0        wait_ms_per_s=0.0885 nvcsw_s=4.08 vcsw_s=69.2 run_frac=0.988 stime_frac=0.0099 minflt_s=138
+    ranks 2-21 median: wait_ms_per_s=0.00917 stime_frac=0.0099 minflt_s=148
+      phold: run_frac=0.0013 vcsw/s=62.5 last cores (first 3 processes)=[[(1, 3)], [(8, 3)], [(1, 2), (5, 1)]]
+S_m0_gauss_100_1000_100_w400_r2.csv: no data
+S_m0_gauss_100_1000_2000_w400_r2.csv: no data
+S_mall_gauss_100_1000_100_w400_r2.csv: no data
+S_mall_gauss_100_1000_2000_w400_r2.csv: no data
+S_mtrim_gauss_100_1000_100_w400_r2.csv: no data
+S_mtrim_gauss_100_1000_2000_w400_r2.csv: no data
+sdiag7/j3641910/P_m0_gauss_100_1000_100_w400/pf.3641910.26.pid.txt
+    72.11%  2540840:phold  
+            |          
+            |--56.04%--__memset_evex_unaligned_erms
+            |          |          
+            |          |--27.08%--psmi_calloc_internal
+            |          |          |          
+            |          |          |--26.28%--ips_scbctrl_init
+            |          |          |          |          
+sdiag7/j3641910/P_m0_gauss_100_1000_2000_w400/pf.3641910.27.pid.txt
+    71.16%  2541144:phold  
+            |          
+            |--54.14%--__memset_evex_unaligned_erms
+            |          |          
+            |          |--26.41%--psmi_calloc_internal
+            |          |          |          
+            |          |           --25.76%--ips_scbctrl_init
+            |          |                     |          

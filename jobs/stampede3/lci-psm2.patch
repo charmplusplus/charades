@@ -1,0 +1,481 @@
+diff --git a/src/network/ofi/backend_ofi.cpp b/src/network/ofi/backend_ofi.cpp
+index 9fb4215c..0f0fabe5 100644
+--- a/src/network/ofi/backend_ofi.cpp
++++ b/src/network/ofi/backend_ofi.cpp
+@@ -94,6 +94,13 @@ ofi_net_context_impl_t::ofi_net_context_impl_t(runtime_t runtime_, attr_t attr_)
+   hints->domain_attr->threading = FI_THREAD_SAFE;
+   hints->tx_attr->inject_size = attr.max_inject_size;
+   hints->caps = FI_RMA | FI_MSG;
++  // LCI can supply per-operation provider contexts (ofi_detail::op_ctx_t).
++  // Without this, providers that need them (native psm2) are hidden or only
++  // reachable through a utility layer.
++  hints->mode = FI_CONTEXT | FI_CONTEXT2;
++  // LCI needs at least the 32-bit immediate in the CQ data. psm2 lists a
++  // variant without CQ data (its 64-bit tag layout) first; skip it.
++  hints->domain_attr->cq_data_size = sizeof(net_imm_data_t);
+ #if defined(LCI_USE_CUDA) || defined(LCI_USE_HIP)
+ #ifndef FI_HMEM
+ #error "The current libfabric version does not have GPU support"
+@@ -126,6 +133,26 @@ ofi_net_context_impl_t::ofi_net_context_impl_t(runtime_t runtime_, attr_t attr_)
+   }
+   ofi_info = fi_dupinfo(selected_info);
+   fi_freeinfo(all_infos);
++  // The CQ data carries the sender's rank in its upper 32 bits. With less
++  // than 8 bytes (psm2 has 4), take the rank from FI_SOURCE instead: ask the
++  // same provider and domain again with FI_SOURCE added.
++  rank_from_src = ofi_info->domain_attr->cq_data_size < sizeof(uint64_t);
++  if (rank_from_src && !(ofi_info->caps & FI_SOURCE)) {
++    free(hints->fabric_attr->prov_name);
++    hints->fabric_attr->prov_name = strdup(ofi_info->fabric_attr->prov_name);
++    free(hints->domain_attr->name);
++    hints->domain_attr->name = strdup(ofi_info->domain_attr->name);
++    hints->caps |= FI_SOURCE;
++    ret = fi_getinfo(FI_VERSION(1, 6), nullptr, nullptr, 0, hints, &all_infos);
++    LCI_Assert(ret == 0,
++               "Provider %s has %lu bytes of CQ data and no FI_SOURCE: %s\n",
++               ofi_info->fabric_attr->prov_name,
++               ofi_info->domain_attr->cq_data_size, fi_strerror(-ret));
++    fi_freeinfo(ofi_info);
++    ofi_info = fi_dupinfo(all_infos);
++    fi_freeinfo(all_infos);
++  }
++  use_op_ctx = (ofi_info->mode & (FI_CONTEXT | FI_CONTEXT2)) != 0;
+   LCI_Log(LOG_STATUS, "ofi", "Domain name: %s\n",
+           ofi_info->domain_attr && ofi_info->domain_attr->name
+               ? ofi_info->domain_attr->name
+@@ -149,6 +176,9 @@ ofi_net_context_impl_t::ofi_net_context_impl_t(runtime_t runtime_, attr_t attr_)
+           fi_tostr(&(ofi_info->caps), FI_TYPE_CAPS));
+   LCI_Log(LOG_INFO, "ofi", "Mode: %s\n",
+           fi_tostr(&(ofi_info->mode), FI_TYPE_MODE));
++  LCI_Log(LOG_INFO, "ofi", "CQ data: %lu bytes; rank from %s\n",
++          ofi_info->domain_attr->cq_data_size,
++          rank_from_src ? "FI_SOURCE" : "CQ data");
+   LCI_Log(LOG_DEBUG, "ofi", "Fi_info provided: %s\n",
+           fi_tostr(ofi_info, FI_TYPE_INFO));
+   LCI_Log(LOG_DEBUG, "ofi", "Fabric attributes: %s\n",
+@@ -231,6 +261,8 @@ ofi_device_impl_t::ofi_device_impl_t(net_context_t context_,
+   use_cxi_writedata =
+       strcmp(p_ofi_context->ofi_info->fabric_attr->prov_name, "cxi") == 0 &&
+       p_ofi_context->attr.support_putimm;
++  use_op_ctx = p_ofi_context->use_op_ctx;
++  rank_from_src = p_ofi_context->rank_from_src;
+   // Create domain.
+   FI_SAFECALL(fi_domain(p_ofi_context->ofi_fabric, p_ofi_context->ofi_info,
+                         &ofi_domain, nullptr));
+@@ -267,7 +299,9 @@ ofi_device_impl_t::ofi_device_impl_t(net_context_t context_,
+ 
+   struct fi_av_attr av_attr;
+   memset(&av_attr, 0, sizeof(av_attr));
+-  av_attr.type = FI_AV_MAP;
++  // A table AV makes the fi_addr of rank i equal to i, which is how
++  // rank_from_src maps a completion's source address back to a rank.
++  av_attr.type = rank_from_src ? FI_AV_TABLE : FI_AV_MAP;
+   FI_SAFECALL(fi_av_open(ofi_domain, &av_attr, &ofi_av, nullptr));
+   FI_SAFECALL(fi_ep_bind(ofi_ep, (fid_t)ofi_av, 0));
+   FI_SAFECALL(fi_enable(ofi_ep));
+@@ -326,6 +360,9 @@ ofi_device_impl_t::ofi_device_impl_t(net_context_t context_,
+     int ret =
+         fi_av_insert(ofi_av, (void*)peer_addr, 1, &peer_addrs[i], 0, nullptr);
+     LCI_Assert(ret == 1, "fi_av_insert failed! ret = %d\n", ret);
++    LCI_Assert(!rank_from_src || peer_addrs[i] == (fi_addr_t)i,
++               "FI_AV_TABLE gave rank %d fi_addr %lu\n", i,
++               (unsigned long)peer_addrs[i]);
+   }
+   // LCT_pmi_barrier();
+ }
+@@ -426,6 +463,8 @@ ofi_endpoint_impl_t::ofi_endpoint_impl_t(device_t device_, attr_t attr_)
+       lock(p_ofi_device->lock)
+ {
+   my_rank = get_rank_me();
++  rank_cq_bits =
++      p_ofi_device->rank_from_src ? 0 : (uint64_t)my_rank << 32;
+ }
+ 
+ ofi_endpoint_impl_t::~ofi_endpoint_impl_t() {}
+diff --git a/src/network/ofi/backend_ofi.hpp b/src/network/ofi/backend_ofi.hpp
+index d719c5f8..0a60a782 100644
+--- a/src/network/ofi/backend_ofi.hpp
++++ b/src/network/ofi/backend_ofi.hpp
+@@ -12,6 +12,7 @@
+ #include <rdma/fi_errno.h>
+ #include <rdma/fi_rma.h>
+ #include <mutex>
++#include <vector>
+ 
+ #define FI_SAFECALL(x)                                                    \
+   do {                                                                    \
+@@ -42,6 +43,52 @@
+ 
+ namespace lci
+ {
++namespace ofi_detail
++{
++// Providers that require FI_CONTEXT/FI_CONTEXT2 (e.g. native psm2) own the
++// memory an operation's context points at until it completes, so LCI's own
++// context is carried in a separate slot the provider may scribble over. The
++// slot also records the operation, because psm2's completion flags do not
++// say it (a receive completes with FI_REMOTE_CQ_DATA alone, no FI_RECV).
++struct op_ctx_t {
++  struct fi_context2 fi_ctx;
++  void* user_context;
++  net_opcode_t opcode;
++};
++
++// Contexts are freed by whichever thread polls the completion, so the
++// per-thread cache is bounded and spills to the heap.
++inline std::vector<op_ctx_t*>& op_ctx_cache()
++{
++  thread_local std::vector<op_ctx_t*> cache;
++  return cache;
++}
++
++inline op_ctx_t* alloc_op_ctx(void* user_context, net_opcode_t opcode)
++{
++  auto& cache = op_ctx_cache();
++  op_ctx_t* ctx;
++  if (!cache.empty()) {
++    ctx = cache.back();
++    cache.pop_back();
++  } else {
++    ctx = new op_ctx_t;
++  }
++  ctx->user_context = user_context;
++  ctx->opcode = opcode;
++  return ctx;
++}
++
++inline void free_op_ctx(op_ctx_t* ctx)
++{
++  auto& cache = op_ctx_cache();
++  if (cache.size() < 4096)
++    cache.push_back(ctx);
++  else
++    delete ctx;
++}
++}  // namespace ofi_detail
++
+ class ofi_lock_guard_t
+ {
+  public:
+@@ -79,6 +126,12 @@ class ofi_net_context_impl_t : public lci::net_context_impl_t
+ 
+   struct fi_info* ofi_info;
+   struct fid_fabric* ofi_fabric;
++  // The provider requires FI_CONTEXT or FI_CONTEXT2 (see ofi_detail::op_ctx_t)
++  bool use_op_ctx;
++  // CQ data is too small to carry the source rank next to the 32-bit
++  // immediate, so the rank comes from FI_SOURCE (with an FI_AV_TABLE, the
++  // source fi_addr is the rank)
++  bool rank_from_src;
+ };
+ 
+ class ofi_device_impl_t : public lci::device_impl_t
+@@ -105,6 +158,30 @@ class ofi_device_impl_t : public lci::device_impl_t
+   struct fid_av* ofi_av;
+   std::vector<fi_addr_t> peer_addrs;
+   bool use_cxi_writedata;
++  bool use_op_ctx;
++  bool rank_from_src;
++
++  void* wrap_context(void* user_context, net_opcode_t opcode)
++  {
++    return use_op_ctx ? ofi_detail::alloc_op_ctx(user_context, opcode)
++                      : user_context;
++  }
++  // Release a wrapped context whose operation was never posted
++  void discard_context(void* ctx)
++  {
++    if (use_op_ctx) ofi_detail::free_op_ctx(static_cast<ofi_detail::op_ctx_t*>(ctx));
++  }
++  // The LCI context of a completed operation; releases the wrapper
++  void* unwrap_context(void* ctx)
++  {
++    if (!use_op_ctx || ctx == nullptr) return ctx;
++    auto* op_ctx = static_cast<ofi_detail::op_ctx_t*>(ctx);
++    void* user_context = op_ctx->user_context;
++    ofi_detail::free_op_ctx(op_ctx);
++    return user_context;
++  }
++  void fill_status(net_status_t& status, const struct fi_cq_data_entry& entry,
++                   fi_addr_t src_addr);
+   uint64_t& ofi_lock_mode;
+   LCIU_CACHE_PADDING(0);
+   spinlock_t lock;
+@@ -149,6 +226,8 @@ class ofi_endpoint_impl_t : public lci::endpoint_impl_t
+ 
+   ofi_device_impl_t* p_ofi_device;
+   int my_rank;
++  // Upper 32 bits of the CQ data: the sender's rank, or 0 with rank_from_src
++  uint64_t rank_cq_bits;
+   struct fi_domain_attr* ofi_domain_attr;
+   struct fid_ep* ofi_ep;
+   std::vector<fi_addr_t>& peer_addrs;
+diff --git a/src/network/ofi/backend_ofi_inline.hpp b/src/network/ofi/backend_ofi_inline.hpp
+index f8139b61..3aae866f 100644
+--- a/src/network/ofi/backend_ofi_inline.hpp
++++ b/src/network/ofi/backend_ofi_inline.hpp
+@@ -16,6 +16,7 @@ inline size_t ofi_device_impl_t::poll_comp_impl(net_status_t* p_statuses,
+                                                 size_t max_polls)
+ {
+   struct fi_cq_data_entry fi_entries[LCI_BACKEND_MAX_POLLS];
++  fi_addr_t src_addrs[LCI_BACKEND_MAX_POLLS];
+ 
+   // Keep the configured polling lock across both reads so another poller
+   // cannot consume the error entry reported by fi_cq_read.
+@@ -24,35 +25,15 @@ inline size_t ofi_device_impl_t::poll_comp_impl(net_status_t* p_statuses,
+     return 0;
+   }
+ 
+-  ssize_t ne = fi_cq_read(ofi_cq, fi_entries, max_polls);
++  ssize_t ne = rank_from_src
++                   ? fi_cq_readfrom(ofi_cq, fi_entries, max_polls, src_addrs)
++                   : fi_cq_read(ofi_cq, fi_entries, max_polls);
+   if (ne > 0) {
+     // Got an entry here
+     for (int j = 0; j < ne; j++) {
+       if (p_statuses) {
+-        net_status_t& status = p_statuses[j];
+-        memset(&status, 0, sizeof(status));
+-        if (fi_entries[j].flags & FI_RECV) {
+-          status.opcode = net_opcode_t::RECV;
+-          status.user_context = fi_entries[j].op_context;
+-          status.length = fi_entries[j].len;
+-          status.imm_data = fi_entries[j].data & ((1ULL << 32) - 1);
+-          status.rank = (int)(fi_entries[j].data >> 32);
+-        } else if (fi_entries[j].flags & FI_REMOTE_WRITE) {
+-          status.opcode = net_opcode_t::REMOTE_WRITE;
+-          status.user_context = NULL;
+-          status.imm_data = fi_entries[j].data;
+-        } else if (fi_entries[j].flags & FI_SEND) {
+-          status.opcode = net_opcode_t::SEND;
+-          status.user_context = fi_entries[j].op_context;
+-        } else if (fi_entries[j].flags & FI_WRITE) {
+-          status.opcode = net_opcode_t::WRITE;
+-          status.user_context = fi_entries[j].op_context;
+-        } else {
+-          LCI_DBG_Assert(fi_entries[j].flags & FI_READ,
+-                         "Unexpected OFI opcode!\n");
+-          status.opcode = net_opcode_t::READ;
+-          status.user_context = fi_entries[j].op_context;
+-        }
++        fill_status(p_statuses[j], fi_entries[j],
++                    rank_from_src ? src_addrs[j] : FI_ADDR_NOTAVAIL);
+       }
+     }
+   } else if (ne == -FI_EAGAIN) {
+@@ -75,10 +56,16 @@ inline size_t ofi_device_impl_t::poll_comp_impl(net_status_t* p_statuses,
+         memset(&status, 0, sizeof(status));
+         status.opcode = net_opcode_t::ERROR;
+         status.rank = -1;
+-        const bool is_outgoing =
++        bool is_outgoing =
+             (error.flags & (FI_SEND | FI_WRITE | FI_READ)) != 0 &&
+             (error.flags & (FI_RECV | FI_REMOTE_WRITE)) == 0;
+-        status.user_context = is_outgoing ? error.op_context : nullptr;
++        if (use_op_ctx && error.op_context != nullptr) {
++          is_outgoing =
++              static_cast<ofi_detail::op_ctx_t*>(error.op_context)->opcode !=
++              net_opcode_t::RECV;
++        }
++        void* user_context = unwrap_context(error.op_context);
++        status.user_context = is_outgoing ? user_context : nullptr;
+       }
+       ne = 1;
+     }
+@@ -86,6 +73,56 @@ inline size_t ofi_device_impl_t::poll_comp_impl(net_status_t* p_statuses,
+   return static_cast<size_t>(ne);
+ }
+ 
++inline void ofi_device_impl_t::fill_status(net_status_t& status,
++                                           const struct fi_cq_data_entry& entry,
++                                           fi_addr_t src_addr)
++{
++  memset(&status, 0, sizeof(status));
++  if (use_op_ctx) {
++    // The wrapper says which operation completed. No context means the
++    // target side of a write with immediate data; a receive that a remote
++    // write consumed reports FI_REMOTE_WRITE.
++    if (entry.op_context == nullptr) {
++      status.opcode = net_opcode_t::REMOTE_WRITE;
++    } else {
++      auto* op_ctx = static_cast<ofi_detail::op_ctx_t*>(entry.op_context);
++      status.opcode = op_ctx->opcode;
++      if (status.opcode == net_opcode_t::RECV &&
++          (entry.flags & FI_REMOTE_WRITE))
++        status.opcode = net_opcode_t::REMOTE_WRITE;
++      status.user_context = unwrap_context(entry.op_context);
++    }
++  } else if (entry.flags & FI_RECV) {
++    status.opcode = net_opcode_t::RECV;
++    status.user_context = entry.op_context;
++  } else if (entry.flags & FI_REMOTE_WRITE) {
++    status.opcode = net_opcode_t::REMOTE_WRITE;
++  } else if (entry.flags & FI_SEND) {
++    status.opcode = net_opcode_t::SEND;
++    status.user_context = entry.op_context;
++  } else if (entry.flags & FI_WRITE) {
++    status.opcode = net_opcode_t::WRITE;
++    status.user_context = entry.op_context;
++  } else {
++    LCI_DBG_Assert(entry.flags & FI_READ, "Unexpected OFI opcode!\n");
++    status.opcode = net_opcode_t::READ;
++    status.user_context = entry.op_context;
++  }
++  if (status.opcode == net_opcode_t::RECV) {
++    status.length = entry.len;
++    status.imm_data = entry.data & ((1ULL << 32) - 1);
++    if (rank_from_src) {
++      LCI_DBG_Assert(src_addr != FI_ADDR_NOTAVAIL,
++                     "Receive without a source address\n");
++      status.rank = (int)src_addr;
++    } else {
++      status.rank = (int)(entry.data >> 32);
++    }
++  } else if (status.opcode == net_opcode_t::REMOTE_WRITE) {
++    status.imm_data = entry.data;
++  }
++}
++
+ namespace ofi_detail
+ {
+ inline void* get_mr_desc(mr_t mr)
+@@ -108,8 +145,9 @@ inline error_t ofi_device_impl_t::post_recv_impl(void* buffer, size_t size,
+ {
+   auto mr_desc = fi_mr_desc(static_cast<ofi_mr_impl_t*>(mr.p_impl)->ofi_mr);
+   LCI_OFI_CS_TRY_ENTER(LCI_NET_TRYLOCK_RECV, errorcode_t::retry_lock);
+-  ssize_t ret =
+-      fi_recv(ofi_ep, buffer, size, mr_desc, FI_ADDR_UNSPEC, user_context);
++  void* ctx = wrap_context(user_context, net_opcode_t::RECV);
++  ssize_t ret = fi_recv(ofi_ep, buffer, size, mr_desc, FI_ADDR_UNSPEC, ctx);
++  if (ret != FI_SUCCESS) discard_context(ctx);
+   LCI_OFI_CS_EXIT(LCI_NET_TRYLOCK_RECV);
+   if (ret == FI_SUCCESS)
+     return errorcode_t::done;
+@@ -130,12 +168,14 @@ inline size_t ofi_device_impl_t::post_recvs_impl(void* buffers[], size_t size,
+   ssize_t error;
+   size_t n_posted = 0;
+   for (size_t i = 0; i < count; i++) {
+-    error = fi_recv(ofi_ep, buffers[i], size, mr_desc, FI_ADDR_UNSPEC,
+-                    user_contexts[i]);
+-    if (error == FI_SUCCESS)
++    void* ctx = wrap_context(user_contexts[i], net_opcode_t::RECV);
++    error = fi_recv(ofi_ep, buffers[i], size, mr_desc, FI_ADDR_UNSPEC, ctx);
++    if (error == FI_SUCCESS) {
+       ++n_posted;
+-    else
++    } else {
++      discard_context(ctx);
+       break;
++    }
+   }
+   LCI_OFI_CS_EXIT(LCI_NET_TRYLOCK_RECV);
+   if (error == FI_SUCCESS || error == -FI_EAGAIN)
+@@ -160,15 +200,17 @@ inline error_t ofi_endpoint_impl_t::post_sends_impl(int rank, void* buffer,
+   msg.desc = nullptr;
+   msg.iov_count = 1;
+   msg.addr = peer_addrs[rank];
+-  msg.context = user_context;
+-  msg.data = (uint64_t)my_rank << 32 | imm_data;
++  msg.data = rank_cq_bits | imm_data;
+   LCI_OFI_CS_TRY_ENTER(LCI_NET_TRYLOCK_SEND, errorcode_t::retry_lock);
++  void* ctx = p_ofi_device->wrap_context(user_context, net_opcode_t::SEND);
++  msg.context = ctx;
+   ssize_t ret =
+       fi_sendmsg(ofi_ep, &msg, FI_INJECT | FI_COMPLETION | FI_REMOTE_CQ_DATA);
+ 
+   // ssize_t ret =
+   //     fi_injectdata(ofi_ep, buffer, size, (uint64_t)my_rank << 32 | imm_data,
+   //                   peer_addrs[rank]);
++  if (ret != FI_SUCCESS) p_ofi_device->discard_context(ctx);
+   LCI_OFI_CS_EXIT(LCI_NET_TRYLOCK_SEND);
+   if (ret == FI_SUCCESS)
+     return errorcode_t::done;
+@@ -186,9 +228,10 @@ inline error_t ofi_endpoint_impl_t::post_send_impl(int rank, void* buffer,
+                                                    bool /*high_priority*/)
+ {
+   LCI_OFI_CS_TRY_ENTER(LCI_NET_TRYLOCK_SEND, errorcode_t::retry_lock);
++  void* ctx = p_ofi_device->wrap_context(user_context, net_opcode_t::SEND);
+   ssize_t ret = fi_senddata(ofi_ep, buffer, size, ofi_detail::get_mr_desc(mr),
+-                            (uint64_t)my_rank << 32 | imm_data,
+-                            peer_addrs[rank], user_context);
++                            rank_cq_bits | imm_data, peer_addrs[rank], ctx);
++  if (ret != FI_SUCCESS) p_ofi_device->discard_context(ctx);
+   LCI_OFI_CS_EXIT(LCI_NET_TRYLOCK_SEND);
+   if (ret == FI_SUCCESS)
+     return errorcode_t::posted;
+@@ -221,11 +264,13 @@ inline error_t ofi_endpoint_impl_t::post_puts_impl(int rank, void* buffer,
+   riov.key = rmr.opaque_rkey;
+   msg.rma_iov = &riov;
+   msg.rma_iov_count = 1;
+-  msg.context = user_context;
+   msg.data = 0;
+   LCI_OFI_CS_TRY_ENTER(LCI_NET_TRYLOCK_SEND, errorcode_t::retry_lock);
++  void* ctx = p_ofi_device->wrap_context(user_context, net_opcode_t::WRITE);
++  msg.context = ctx;
+   ssize_t ret = fi_writemsg(ofi_ep, &msg,
+                             FI_INJECT | FI_COMPLETION | FI_DELIVERY_COMPLETE);
++  if (ret != FI_SUCCESS) p_ofi_device->discard_context(ctx);
+   LCI_OFI_CS_EXIT(LCI_NET_TRYLOCK_SEND);
+   if (ret == FI_SUCCESS)
+     return errorcode_t::done;
+@@ -259,10 +304,12 @@ inline error_t ofi_endpoint_impl_t::post_put_impl(int rank, void* buffer,
+   riov.key = rmr.opaque_rkey;
+   msg.rma_iov = &riov;
+   msg.rma_iov_count = 1;
+-  msg.context = user_context;
+   msg.data = 0;
+   LCI_OFI_CS_TRY_ENTER(LCI_NET_TRYLOCK_SEND, errorcode_t::retry_lock);
++  void* ctx = p_ofi_device->wrap_context(user_context, net_opcode_t::WRITE);
++  msg.context = ctx;
+   ssize_t ret = fi_writemsg(ofi_ep, &msg, FI_COMPLETION | FI_DELIVERY_COMPLETE);
++  if (ret != FI_SUCCESS) p_ofi_device->discard_context(ctx);
+   LCI_OFI_CS_EXIT(LCI_NET_TRYLOCK_SEND);
+   if (ret == FI_SUCCESS)
+     return errorcode_t::posted;
+@@ -322,12 +369,14 @@ inline error_t ofi_endpoint_impl_t::post_putImms_impl(
+   riov.key = rmr.opaque_rkey;
+   msg.rma_iov = &riov;
+   msg.rma_iov_count = 1;
+-  msg.context = user_context;
+   msg.data = imm_data;
+   LCI_OFI_CS_TRY_ENTER(LCI_NET_TRYLOCK_SEND, errorcode_t::retry_lock);
++  void* ctx = p_ofi_device->wrap_context(user_context, net_opcode_t::WRITE);
++  msg.context = ctx;
+   ssize_t ret = fi_writemsg(
+       ofi_ep, &msg,
+       FI_INJECT | FI_COMPLETION | FI_DELIVERY_COMPLETE | FI_REMOTE_CQ_DATA);
++  if (ret != FI_SUCCESS) p_ofi_device->discard_context(ctx);
+   LCI_OFI_CS_EXIT(LCI_NET_TRYLOCK_SEND);
+   if (ret == FI_SUCCESS)
+     return errorcode_t::done;
+@@ -383,11 +432,13 @@ inline error_t ofi_endpoint_impl_t::post_putImm_impl(
+   riov.key = rmr.opaque_rkey;
+   msg.rma_iov = &riov;
+   msg.rma_iov_count = 1;
+-  msg.context = user_context;
+   msg.data = imm_data;
+   LCI_OFI_CS_TRY_ENTER(LCI_NET_TRYLOCK_SEND, errorcode_t::retry_lock);
++  void* ctx = p_ofi_device->wrap_context(user_context, net_opcode_t::WRITE);
++  msg.context = ctx;
+   ssize_t ret = fi_writemsg(
+       ofi_ep, &msg, FI_COMPLETION | FI_DELIVERY_COMPLETE | FI_REMOTE_CQ_DATA);
++  if (ret != FI_SUCCESS) p_ofi_device->discard_context(ctx);
+   LCI_OFI_CS_EXIT(LCI_NET_TRYLOCK_SEND);
+   if (ret == FI_SUCCESS)
+     return errorcode_t::posted;
+@@ -422,12 +473,14 @@ inline error_t ofi_endpoint_impl_t::post_get_impl(int rank, void* buffer,
+   riov.key = rmr.opaque_rkey;
+   msg.rma_iov = &riov;
+   msg.rma_iov_count = 1;
+-  msg.context = user_context;
+   msg.data = 0;
+   LCI_OFI_CS_TRY_ENTER(LCI_NET_TRYLOCK_SEND, errorcode_t::retry_lock);
++  void* ctx = p_ofi_device->wrap_context(user_context, net_opcode_t::READ);
++  msg.context = ctx;
+   ssize_t ret = fi_readmsg(ofi_ep, &msg, FI_COMPLETION);
+   // ssize_t ret = fi_read(ofi_ep, buffer, size, desc, peer_addrs[rank], addr,
+   // rkey, user_context);
++  if (ret != FI_SUCCESS) p_ofi_device->discard_context(ctx);
+   LCI_OFI_CS_EXIT(LCI_NET_TRYLOCK_SEND);
+   if (ret == FI_SUCCESS)
+     return errorcode_t::posted;

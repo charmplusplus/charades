@@ -1,0 +1,17 @@
+diff --git a/src/scheduler/optimistic.C b/src/scheduler/optimistic.C
+index 2548282..68cb43b 100644
+--- a/src/scheduler/optimistic.C
++++ b/src/scheduler/optimistic.C
+@@ -195,6 +195,12 @@ void OptimisticScheduler::balancing_complete() {
+  * GVT passed them and fossil collection committed events that were cancelled.
+  */
+ void OptimisticScheduler::process_cancel_q() {
++  // Every queued cancellation lowers min_cancel_time (add_to_cancel_q calls
++  // update_min_cancel when its chare's minimum drops, which the first one
++  // after a call always does), and a call resets it before emptying every
++  // queue. At TIME_MAX nothing is queued: skip the walk over every chare, which
++  // execute() made on every pass (RESULTS.md 203)
++  if (min_cancel_time == TIME_MAX) return;
+   min_cancel_time = TIME_MAX;
+   cancel_lps.clear();
+   for (int i = 0; i < next_lps.get_size(); i++) {

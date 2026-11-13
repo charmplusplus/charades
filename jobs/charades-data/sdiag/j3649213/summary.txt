@@ -1,0 +1,50 @@
+A. Throughput, σ 2,000, PP 512 (M committed ev/s, mean of 2 reps; higher is better)
+  W 400  4 nodes:  125.4 (125.7, 125.0) traced/untraced 0.990
+  W 400 16 nodes:  442.5 (444.4, 440.7) traced/untraced 0.989
+  W 250 16 nodes:  403.8 (401.5, 406.1) traced/untraced 0.949
+  W 600 16 nodes:  392.2 (390.3, 394.1) traced/untraced 0.972
+  4->16 node efficiency at W 400: 0.88
+
+A. Waves (PE 0's gvt_trace.csv, waves 10-95%, both reps)
+  W 400  4 nodes (12429 waves): completed/wave 8.7, passed at previous wave 8.7, waves with a passed bucket left open 0.00, with events in transit 0.00, events in transit (mean) 0, advances/wave 1.00, µs/wave 164
+  W 400 16 nodes (11196 waves): completed/wave 9.6, passed at previous wave 9.6, waves with a passed bucket left open 0.00, with events in transit 0.00, events in transit (mean) 0, advances/wave 1.00, µs/wave 204
+  W 250 16 nodes (14521 waves): completed/wave 7.5, passed at previous wave 7.5, waves with a passed bucket left open 0.00, with events in transit 0.00, events in transit (mean) 0, advances/wave 1.00, µs/wave 183
+  W 600 16 nodes (10405 waves): completed/wave 10.1, passed at previous wave 10.1, waves with a passed bucket left open 0.00, with events in transit 0.00, events in transit (mean) 0, advances/wave 1.00, µs/wave 249
+
+A. The late PE (the slowest process's last PE) against the median PE of its process (gvt_rec, waves 10-95%, both reps)
+   delay/pickup/after in µs after the previous result; arrivals = events received since the PE's previous contribution;
+   near = arrivals within one bucket of GVT; lag = mean distance from GVT in buckets
+  W 400  4 nodes (3107 waves):
+    late  : delay 159.3 pick 19.4 after 139.9 events 92.1 arrivals 144.1 near 0.0 lag 163.3 count 0.99
+    median: delay 22.5 pick 4.6 after 18.0 events 1.1 arrivals 134.3 near 0.0 lag 163.9 count 0.37
+    late/median arrivals 1.07, near share late 0.000 median 0.000 | late PE's rank: r0 0.15, r4 0.08, r22 0.07
+  W 400 16 nodes (2800 waves):
+    late  : delay 157.5 pick 41.5 after 115.9 events 53.8 arrivals 173.6 near 0.0 lag 162.8 count 0.93
+    median: delay 21.4 pick 3.9 after 17.5 events 0.7 arrivals 140.5 near 0.0 lag 164.2 count 0.34
+    late/median arrivals 1.24, near share late 0.000 median 0.000 | late PE's rank: r0 0.18, r5 0.05, r11 0.05
+  W 250 16 nodes (3632 waves):
+    late  : delay 135.6 pick 43.7 after 91.9 events 59.0 arrivals 135.5 near 0.0 lag 147.9 count 0.94
+    median: delay 12.7 pick 1.5 after 11.1 events 0.3 arrivals 111.5 near 0.0 lag 148.6 count 0.05
+    late/median arrivals 1.22, near share late 0.000 median 0.000 | late PE's rank: r0 0.12, r1 0.05, r2 0.05
+  W 600 16 nodes (2602 waves):
+    late  : delay 218.2 pick 52.7 after 165.5 events 69.4 arrivals 204.1 near 0.0 lag 181.5 count 0.95
+    median: delay 38.2 pick 10.3 after 27.9 events 4.0 arrivals 164.3 near 0.0 lag 182.7 count 0.73
+    late/median arrivals 1.24, near share late 0.000 median 0.000 | late PE's rank: r0 0.21, r22 0.07, r2 0.05
+
+B. GVT bucket size / 8 (PP 512; M committed ev/s at bucket 8, mean of 2 reps; higher is better)
+  16 nodes σ 2,000  W 400      b8  443.9 | b16 0.993 (442, 440) | b32 0.989 (440, 438)
+  16 nodes σ 2,000  controller b8  395.8 | b16 1.010 (399, 401) | b32 0.987 (391, 390)
+  16 nodes σ 4,000  W 400      b8  436.9 | b16 0.998 (435, 437) | b32 0.996 (434, 437)
+  16 nodes σ 4,000  controller b8  377.2 | b16 0.982 (378, 363) | b32 0.984 (362, 381)
+   4 nodes σ 2,000  W 400      b8  126.9 | b16 1.001 (127, 127) | b32 1.007 (127, 128)
+   4 nodes σ 2,000  controller b8  131.7 | b16 1.000 (132, 131) | b32 0.986 (130, 129)
+   4 nodes σ 4,000  W 400      b8  117.1 | b16 0.997 (117, 117) | b32 1.008 (118, 118)
+   4 nodes σ 4,000  controller b8  120.6 | b16 0.996 (120, 120) | b32 0.976 (116, 120)
+
+C. Horizon margin x window, σ 2,000, 16 nodes (M committed ev/s; ratio to margin 8 at W 400; higher is better)
+  margin  4 w:400:  441.8 (442, 441) ratio 1.007 | efficiency 99.8400, events/msg 50.7
+  margin  4 w:600:  394.1 (394, 394) ratio 0.898 | efficiency 99.0000, events/msg 26.8
+  margin  8 w:400:  438.6 (439, 439) ratio 1.000 | efficiency 99.8800, events/msg 48.1
+  margin  8 w:600:  392.9 (395, 391) ratio 0.896 | efficiency 99.0500, events/msg 26.0
+  margin 16 w:400:  436.9 (435, 439) ratio 0.996 | efficiency 99.9250, events/msg 43.3
+  margin 16 w:600:  388.4 (388, 389) ratio 0.886 | efficiency 99.0550, events/msg 25.2

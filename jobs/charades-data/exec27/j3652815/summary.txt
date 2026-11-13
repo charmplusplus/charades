@@ -1,0 +1,12 @@
+A. Spin in the GVT-result step (uniform, WPs 512, W 400, long runs; M committed ev/s, mean of 2 reps; higher is better)
+   4 nodes, spin  0 µs:  111.1 (109.9, 112.3) ÷ no spin 1.000
+   4 nodes, spin 10 µs:  107.9 (107.6, 108.1) ÷ no spin 0.971 | critical-path prediction 0.956 (µs per GVT update 215)
+   4 nodes, spin 20 µs:  104.3 (104.5, 104.1) ÷ no spin 0.939 | critical-path prediction 0.915 (µs per GVT update 215)
+  16 nodes, spin  0 µs:  358.8 (361.3, 356.4) ÷ no spin 1.000
+  16 nodes, spin 10 µs:  347.4 (347.5, 347.4) ÷ no spin 0.968 | critical-path prediction 0.967 (µs per GVT update 291)
+  16 nodes, spin 20 µs:  335.7 (335.6, 335.8) ÷ no spin 0.935 | critical-path prediction 0.936 (µs per GVT update 291)
+
+B. The GVT-result step split (traced; per PE per GVT update, µs, and µs of PE time per committed event; lower is better)
+   4 nodes: per update: poll 38.6 = fossil 13.6 + GVT-time flush 22.7 (3.50 messages) + controller 0.0 + other 2.3 | per committed event: poll 0.300, fossil 0.105, flush 0.176, controller 0.000, other 0.018
+  16 nodes: per update: poll 58.5 = fossil 13.4 + GVT-time flush 42.1 (10.21 messages) + controller 0.0 + other 3.0 | per committed event: poll 0.433, fossil 0.100, flush 0.312, controller 0.000, other 0.022
+  16 - 4 per update: fossil -0.1 (-1%), flush_gvt +19.4 (97%), ctl_gvt -0.0 (-0%), other +0.6 (3%); poll +19.9 µs per update

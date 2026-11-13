@@ -1,0 +1,76 @@
+# Counts and digests (one count per cell in both engines; digests from the old arm, against F4's)
+n 4 phases counts C ['1024040252'] D ['1024040252'] -> one, as F4; digests 1 = F4; not ok: D adaptive r1 stall
+n 4 la10   counts C ['906615146'] D ['906615146'] -> one, as F4; digests 1 = F4
+n 4 g100   counts C ['723814576'] D ['723814576'] -> one, as F4; digests 1 = F4
+n 4 g2000  counts C ['723816353'] D ['723816353'] -> one, as F4; digests 1 = F4; not ok: D adaptive r1 stall
+n 4 uni    counts C ['723815947'] D ['723815947'] -> one, as F4; digests 1 = F4; not ok: D adaptive r1 stall
+n 4 tr     counts C ['1131043125'] D ['1131043125'] -> one, as F4; digests 1 = F4
+n 4 df     counts C ['722330219'] D ['722330219'] -> one, as F4; digests 1 = F4
+n16 phases counts C ['4096302492'] D ['4096302492'] -> one, as F4; digests 1 = F4
+n16 la10   counts C ['3626536751'] D ['3626536751'] -> one, as F4; digests 1 = F4; not ok: D adaptive r1 fail, D adaptive r2 fail
+n16 g100   counts C ['2895362159'] D ['2895362159'] -> one, as F4; digests 1 = F4
+n16 g2000  counts C ['2895361550'] D ['2895361550'] -> one, as F4; digests 1 = F4
+n16 uni    counts C ['2895361579'] D ['2895361579'] -> one, as F4; digests 1 = F4
+n16 tr     counts C ['4524190271'] D ['4524190271'] -> one, as F4; digests 1 = F4
+n16 df     counts C ['3123673830'] D ['3123673830'] -> one, as F4; digests 1 = F4
+
+# Disturbed reps: fixed-W runs above 1.03 count waves per GVT advance (F4: W 25 on lookahead 10 at 1.33 throughout)
+  n16 uni w:100 r1 1.049; n16 g100 w:100 r1 1.053; n16 la10 w:25 r2 1.333; n16 la10 w:25 r3 1.333; n16 la10 w:25 r1 1.333; n4 la10 w:25 r2 1.333; n4 la10 w:25 r3 1.333; n4 la10 w:25 r1 1.333
+
+# Trials past the reach (section 237; 0 = the same decisions as without it), every controller run
+  0: 84 runs
+
+## 4 nodes: each policy ÷ the best fixed W of the same engine and rep (median, range over reps; F4 in brackets, mean of its reps)
+| workload | Charades best fixed W (median M ev/s; ÷ F4) | controller (mean W) | Devastator's rule in Charades | Devastator best fixed W (median M ev/s; ÷ F4) | Devastator's own window | Charades best ÷ Devastator best (medians; ÷ its fastest rep) [F4] |
+|---|---|---|---|---|---|---|
+| phase-changing PHOLD | 75 (135.2; 0.997) | 0.92 (0.86–0.93) [0.85] (110, 146, 102) | 0.31 (0.29–0.32) [0.29] | 250 (98.2; 1.001) | r1 < 0.09 (stall) | 1.38 (1.35) [1.38] |
+| lookahead 10, σ 500 | 50 (165.3; 1.021) | 0.97 (0.97–0.98) [0.96] (60, 57, 57) | 0.46 (0.40–0.49) [0.46] | 200 (142.1; 1.031) | 0.72 (0.68–0.73) | 1.16 (1.15) [1.17] |
+| σ 100 | 300 (211.9; 1.030) | 0.97 (0.95–0.98) [0.95] (308, 321, 318) | 0.32 (0.32) [0.35] | 500 (168.4; 1.004) | 0.66 (0.52–0.71) | 1.26 (1.25) [1.23] |
+| σ 2,000 | 300 (161.3; 1.024) | 0.97 (0.96–0.97) [0.94] (314, 323, 326) | 0.30 (0.26–0.31) [0.36] | 1000 (99.9; 1.007) | r1 < 0.06 (stall) | 1.61 (1.61) [1.59] |
+| uniform | 300 (136.5; 1.008) | 0.96 (0.96–0.98) [0.94] (310, 309, 316) | 0.18 (0.16–0.35) [0.21] | 500 (68.3; 1.010) | 0.09 (0.09); r1 < 0.09 (stall) | 2.00 (1.98) [2.00] |
+| traffic | 500 (299.5; 1.033) | 0.96 (0.95–0.97) [0.95] (542, 517, 511) | 0.61 (0.56–0.61) [0.60] | 2000 (233.6; 1.004) | 0.28 (0.25–0.49) | 1.28 (1.28) [1.25] |
+| dragonfly | 20000 (122.7; 1.016) | 1.03 (1.03) [1.03] (14687, 14752, 14363) | 0.81 (0.79–0.83) [0.82] | 20000 (88.2; 1.013) | 0.80 (0.77–0.81) | 1.39 (1.38) [1.39] |
+
+## 16 nodes: each policy ÷ the best fixed W of the same engine and rep (median, range over reps; F4 in brackets, mean of its reps)
+| workload | Charades best fixed W (median M ev/s; ÷ F4) | controller (mean W) | Devastator's rule in Charades | Devastator best fixed W (median M ev/s; ÷ F4) | Devastator's own window | Charades best ÷ Devastator best (medians; ÷ its fastest rep) [F4] |
+|---|---|---|---|---|---|---|
+| phase-changing PHOLD | 75/100 (364.3; 0.986) | 0.96 (0.96–0.99) [0.95] (87, 94, 118) | 0.41 (0.41–0.42) [0.41] | 250 (285.8; 1.023) | skipped (capped before) | 1.27 (1.26) [1.32] |
+| lookahead 10, σ 500 | 50 (641.5; 1.014) | 1.00 (1.00–1.01) [0.98] (63, 61, 64) | 0.27 (0.27–0.30) [0.30] | 200 (510.9; 1.015) | 0.62 (0.62); r1 < 0.06 (fail); r2 < 0.06 (fail) | 1.26 (1.25) [1.26] |
+| σ 100 | 300 (837.0; 1.008) | 0.96 (0.95–0.97) [0.95] (380, 390, 382) | 0.33 (0.29–0.43) [0.35] | 1000 (661.8; 1.004) | 0.41 (0.35–0.42) | 1.26 (1.26) [1.26] |
+| σ 2,000 | 300/400 (614.1; 1.009) | 0.99 (0.99–1.00) [0.98] (385, 384, 368) | 0.16 (0.15–0.16) [0.15] | 1000 (371.1; 1.013) | skipped (capped before) | 1.65 (1.64) [1.66] |
+| uniform | 300 (387.7; 0.997) | 0.99 (0.98–1.00) [0.98] (356, 351, 351) | 0.24 (0.20–0.26) [0.24] | 1000 (195.7; 1.007) | 0.61 (0.56–0.62) | 1.98 (1.97) [2.00] |
+| traffic | 750 (1185.0; 1.026) | 0.98 (0.97–1.01) [0.93] (674, 687, 686) | 0.60 (0.60–0.62) [0.61] | 2000 (912.7; 1.012) | 0.19 (0.18–0.22) | 1.30 (1.30) [1.28] |
+| dragonfly | 20000 (416.0; 1.016) | 1.01 (1.01–1.02) [1.03] (15244, 14134, 13722) | 0.79 (0.79–0.82) [0.80] | 20000 (214.8; 1.012) | 0.84 (0.83–0.84) | 1.94 (1.93) [1.93] |
+
+## Worst case per policy (lowest rep-cell; Devastator windows that did not finish give an upper bound)
+  controller: 0.86 (phases n4 r3); range 0.86–1.03 over 42 rep-cells
+  Devastator's rule in Charades: 0.15 (g2000 n16 r3); range 0.15–0.83 over 42 rep-cells
+  Devastator's own window: 0.06 (la10 n16 r1 (<, fail)); range 0.06–0.84 over 32 rep-cells
+  one fixed w:100 for all five PHOLD workloads: worst 0.55 (n16 g100)
+  one fixed w:300 for all five PHOLD workloads: worst 0.51 (n4 la10)
+
+## Charades ÷ Devastator, each at its best fixed W: F4b ÷ F4 per cell: 0.963–1.029; range 1.16–2.00
+
+## The old flags: old arm ÷ the controller, paired per rep (median, range; higher = the flags cost less)
+  n4: phases 0.989 (0.924–1.046); la10 0.976 (0.966–0.977); g100 0.965 (0.957–0.983); g2000 0.991 (0.988–1.006); uni 0.990 (0.976–1.000); tr 0.960 (0.957–0.965); df 0.997 (0.988–0.999)
+  n16: phases 0.996 (0.974–0.996); la10 0.988 (0.971–0.990); g100 0.981 (0.976–0.985); g2000 0.978 (0.974–0.997); uni 0.991 (0.990–0.998); tr 0.971 (0.967–0.985); df 1.007 (0.996–1.008)
+
+## Devastator's rule in Charades: efficiency (%), mean W, final W per rep
+  n 4 phases r1 eff 72.0 mean W 1253 final 4192 | r2 eff 76.5 mean W 1209 final 2430 | r3 eff 78.9 mean W 1319 final 2350
+  n 4 la10   r1 eff 86.6 mean W 344 final 357 | r2 eff 86.0 mean W 343 final 476 | r3 eff 81.2 mean W 398 final 1256
+  n 4 g100   r1 eff 82.6 mean W 3134 final 12952 | r2 eff 84.0 mean W 2843 final 7466 | r3 eff 84.0 mean W 3125 final 18020
+  n 4 g2000  r1 eff 81.0 mean W 1770 final 2780 | r2 eff 75.7 mean W 1836 final 1630 | r3 eff 82.8 mean W 1683 final 1820
+  n 4 uni    r1 eff 89.4 mean W 33837 final 817372 | r2 eff 81.7 mean W 1767 final 4012 | r3 eff 84.0 mean W 10098 final 8494
+  n 4 tr     r1 eff 78.0 mean W 6523 final 9006 | r2 eff 84.9 mean W 5926 final 8503 | r3 eff 76.3 mean W 6595 final 7712
+  n 4 df     r1 eff 75.5 mean W 26848 final 28152 | r2 eff 78.1 mean W 26356 final 29370 | r3 eff 73.7 mean W 28309 final 28603
+  n16 phases r1 eff 75.8 mean W 1108 final 4308 | r2 eff 75.6 mean W 1149 final 9524 | r3 eff 75.1 mean W 1112 final 4306
+  n16 la10   r1 eff 87.2 mean W 557 final 2024 | r2 eff 87.1 mean W 540 final 7568 | r3 eff 85.9 mean W 542 final 8688
+  n16 g100   r1 eff 89.2 mean W 5927 final 5024 | r2 eff 79.7 mean W 6474 final 363968 | r3 eff 84.8 mean W 9340 final 5428
+  n16 g2000  r1 eff 78.3 mean W 2471 final 2306 | r2 eff 82.1 mean W 2302 final 2235 | r3 eff 79.4 mean W 2336 final 1837
+  n16 uni    r1 eff 75.5 mean W 5378 final 7506 | r2 eff 78.5 mean W 8539 final 16974 | r3 eff 73.7 mean W 5030 final 5715
+  n16 tr     r1 eff 73.6 mean W 8796 final 7352 | r2 eff 73.7 mean W 8976 final 8275 | r3 eff 72.4 mean W 12759 final 11052
+  n16 df     r1 eff 78.4 mean W 25866 final 27800 | r2 eff 74.2 mean W 27809 final 115568 | r3 eff 75.0 mean W 26710 final 32183
+
+## Spread between reps (max ÷ min): Charades best fixed W rate, controller; Devastator best fixed W rate
+  n4: phases 1.007/1.083/1.021; la10 1.017/1.005/1.012; g100 1.020/1.012/1.006; g2000 1.023/1.020/1.005; uni 1.012/1.013/1.012; tr 1.017/1.012/1.007; df 1.002/1.005/1.037
+  n16: phases 1.011/1.048/1.018; la10 1.004/1.007/1.005; g100 1.006/1.018/1.007; g2000 1.003/1.012/1.025; uni 1.009/1.011/1.027; tr 1.040/1.008/1.003; df 1.008/1.002/1.005

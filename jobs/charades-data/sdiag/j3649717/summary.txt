@@ -1,0 +1,61 @@
+A. Throughput, σ 2,000, W 400, PP 512 (M committed ev/s, mean of 2 reps; higher is better)
+   4 nodes Charm++ reduction   :  126.3 (126.7, 126.0) ÷ Charm++ reduction 1.000, traced/untraced 0.990
+   4 nodes tree, fan-out 4     :  125.9 (125.5, 126.2) ÷ Charm++ reduction 0.996, traced/untraced 0.986
+   4 nodes flat tree           :  123.8 (124.2, 123.5) ÷ Charm++ reduction 0.980, traced/untraced 0.989
+   4 nodes recursive doubling  :  125.9 (126.2, 125.6) ÷ Charm++ reduction 0.996, traced/untraced 0.994
+  16 nodes Charm++ reduction   :  443.6 (443.8, 443.4) ÷ Charm++ reduction 1.000, traced/untraced 0.986
+  16 nodes tree, fan-out 4     :  441.4 (442.4, 440.5) ÷ Charm++ reduction 0.995, traced/untraced 0.985
+  16 nodes flat tree           :  379.4 (378.1, 380.7) ÷ Charm++ reduction 0.855, traced/untraced 0.993
+  16 nodes recursive doubling  :  436.6 (437.3, 436.0) ÷ Charm++ reduction 0.984, traced/untraced 0.995
+  4->16 node efficiency, Charm++ reduction: 0.88
+  4->16 node efficiency, tree, fan-out 4: 0.88
+  4->16 node efficiency, flat tree: 0.77
+  4->16 node efficiency, recursive doubling: 0.87
+
+A. A GVT advance (µs, waves 10-95%, both reps; lower is better). floor = slowest process, last PE in -> result;
+   first hop = last PE in -> its process's handler takes the sums (median over all processes / over the slowest)
+   4 nodes Charm++ reduction   : advance   194, floor  32.8 (median  28.6), first hop   3.8 /   3.0 (12433 waves)
+   4 nodes tree, fan-out 4     : advance   195, floor  31.8 (median  27.8), first hop   1.7 /   1.4 (12417 waves)
+   4 nodes flat tree           : advance   198, floor  26.5 (median  21.6), first hop   1.7 /   1.4 (12403 waves)
+   4 nodes recursive doubling  : advance   192, floor  15.1 (median  10.0), first hop   3.8 /   2.9 (12432 waves)
+  16 nodes Charm++ reduction   : advance   223, floor  71.8 (median  69.7), first hop   4.1 /   3.1 (11251 waves)
+  16 nodes tree, fan-out 4     : advance   227, floor  77.6 (median  75.3), first hop   1.7 /   1.5 (11147 waves)
+  16 nodes flat tree           : advance   253, floor  54.8 (median  47.1), first hop   1.7 /   1.4 (11585 waves)
+  16 nodes recursive doubling  : advance   219, floor  36.7 (median  24.2), first hop   4.0 /   3.1 (11583 waves)
+
+A. Tree hops, offset-corrected (µs; lower is better); excess = above the pair's fastest hop in its 200-wave window
+   4 nodes tree, fan-out 4:
+    level 1: up median  14.0 p90  29.0 min   3.9 | down median   7.5 p90  20.1 min   3.9  (49668 hops)
+    level 2: up median  14.7 p90  29.5 min   4.3 | down median   7.6 p90  19.6 min   4.3  (37251 hops)
+    excess: up median   9.5 p90  24.5 | down median   2.7 p90  15.1 | root's sends to its children span 5.2 µs (median)
+    up handled by rank: r0 0.05, r21 0.05, r5 0.05, r22 0.05
+    down handled by rank: r3 0.05, r1 0.05, r22 0.05, r15 0.05
+   4 nodes flat tree:
+    level 1: up median  14.8 p90  29.9 min   3.8 | down median   7.0 p90  19.4 min   3.8  (86821 hops)
+    excess: up median  10.2 p90  25.3 | down median   2.4 p90  14.8 | root's sends to its children span 9.0 µs (median)
+    up handled by rank: r0 0.05, r21 0.05, r20 0.05, r5 0.04
+    down handled by rank: r17 0.05, r3 0.05, r11 0.05, r4 0.05
+  16 nodes tree, fan-out 4:
+    level 1: up median  12.7 p90  25.8 min   4.0 | down median   8.3 p90  21.6 min   4.0  (44588 hops)
+    level 2: up median  14.8 p90  29.7 min   4.0 | down median   7.8 p90  20.6 min   4.0  (178352 hops)
+    level 3: up median  15.4 p90  30.3 min   4.3 | down median   7.9 p90  20.6 min   4.3  (122617 hops)
+    excess: up median   9.8 p90  24.5 | down median   2.8 p90  15.7 | root's sends to its children span 5.0 µs (median)
+    up handled by rank: r0 0.05, r5 0.05, r1 0.05, r2 0.05
+    down handled by rank: r16 0.05, r21 0.05, r14 0.05, r20 0.05
+  16 nodes flat tree:
+    level 1: up median  18.1 p90  36.6 min   3.8 | down median   6.5 p90  13.5 min   3.8  (359135 hops)
+    excess: up median  12.9 p90  31.7 | down median   1.5 p90   8.6 | root's sends to its children span 45.3 µs (median)
+    up handled by rank: r1 0.05, r21 0.05, r3 0.05, r2 0.05
+    down handled by rank: r5 0.05, r16 0.05, r3 0.05, r2 0.05
+
+B. Scheduler pass size, Charm++ reduction (M committed ev/s; ÷ batch 16; higher is better)
+   4 nodes batch 4:  113.0 (113.2, 112.8) ÷ batch 16 0.894
+   4 nodes batch 8:  117.8 (114.5, 121.2) ÷ batch 16 0.932
+  16 nodes batch 4:  396.3 (396.2, 396.4) ÷ batch 16 0.893 | advance 241 µs, floor 44.0 µs
+  16 nodes batch 8:  425.8 (425.4, 426.3) ÷ batch 16 0.960 | advance 222 µs, floor 51.3 µs
+
+C. Flat tree ÷ Charm++ reduction, 16 nodes (M committed ev/s, mean of 2 reps; higher is better)
+  gauss:100:1000:4000    W 400     : Charm++  436.0 (436, 436), flat  369.2 (370, 368), ratio 0.847
+  gauss:100:1000:4000    controller: Charm++  368.5 (369, 368), flat  335.3 (333, 338), ratio 0.910
+  steady:100:1000:1.0    W 400     : Charm++  352.8 (351, 354), flat  352.1 (350, 355), ratio 0.998
+  steady:100:1000:1.0    controller: Charm++  343.4 (342, 345), flat  328.3 (332, 325), ratio 0.956

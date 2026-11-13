@@ -1,0 +1,135 @@
+diff --git a/src/globals.C b/src/globals.C
+index 171c5eb..b5ab7e6 100644
+--- a/src/globals.C
++++ b/src/globals.C
+@@ -63,6 +63,9 @@ double   g_tw_ctl_epsilon;
+ unsigned g_tw_ctl_cost;
+ unsigned g_tw_ctl_calibrate;
+ unsigned g_tw_ctl_floor;
++double   g_tw_ctl_alpha_gain;
++unsigned g_tw_ctl_warm;
++double   g_tw_ctl_w_gain;
+ unsigned g_tw_ctl_interval;
+ unsigned g_tw_ctl_dry;
+ unsigned g_tw_ctl_log;
+@@ -139,6 +142,9 @@ void clear_globals() {
+   g_tw_ctl_cost           = 0;
+   g_tw_ctl_calibrate      = 1;
+   g_tw_ctl_floor          = 2;
++  g_tw_ctl_alpha_gain     = 0.25;
++  g_tw_ctl_warm           = 0;
++  g_tw_ctl_w_gain         = 1;
+   g_tw_ctl_interval       = 8;
+   g_tw_ctl_dry            = 0;
+   g_tw_ctl_log            = 0;
+diff --git a/src/globals.h b/src/globals.h
+index 4c6d655..76f6bfd 100644
+--- a/src/globals.h
++++ b/src/globals.h
+@@ -77,7 +77,10 @@ extern unsigned g_tw_ctl;             ///< 0: fixed window, 1: delay quantile, 2
+ extern double   g_tw_ctl_epsilon;     ///< quantile rule: target share of PE time lost to rollbacks (--ctl-cost=0: of executed events rolled back)
+ extern unsigned g_tw_ctl_cost;        ///< quantile rule: 0 (default) epsilon is a share of events rolled back, 1 of PE time (experimental)
+ extern unsigned g_tw_ctl_calibrate;   ///< quantile rule: scale the bound by the waste seen
+-extern unsigned g_tw_ctl_floor;       ///< quantile rule: calibrate only on stragglers the window can cause
++extern unsigned g_tw_ctl_floor;
++extern double   g_tw_ctl_alpha_gain;  ///< quantile rule: share of the way (in log) alpha moves per fold
++extern unsigned g_tw_ctl_warm;
++extern double   g_tw_ctl_w_gain;      ///< quantile rule: share of the way (in log) W moves per round        ///< quantile rule: first calibrating folds that move alpha all the way       ///< quantile rule: calibrate only on stragglers the window can cause
+ extern unsigned g_tw_ctl_interval;    ///< GVT updates per controller round
+ extern unsigned g_tw_ctl_dry;         ///< run the controller but never change the window
+ extern unsigned g_tw_ctl_log;         ///< print every controller round on PE 0
+diff --git a/src/scheduler/controller.C b/src/scheduler/controller.C
+index 9d6bc4e..ee98080 100644
+--- a/src/scheduler/controller.C
++++ b/src/scheduler/controller.C
+@@ -21,9 +21,14 @@ static const double Q_MAX = 0.99;
+  */
+ static const double DECAY = 0.5;
+ static const double BATCH = 256;
+-/** Calibration moves alpha this share of the way (in log) per fold, ... */
+-static const double ALPHA_GAIN = 0.25;
+-/** ... and by at most this factor */
++/**
++ * Calibration moves alpha this share of the way (in log) per fold
++ * (--ctl-alpha-gain, default 0.25), and by at most a factor of 1.25. With
++ * --ctl-warm=N the first N calibrating folds move alpha all the way, so a
++ * short run does not spend its start at a small window while alpha walks
++ * down from 1 (4 nodes, full nodes, sigma 2000: about 25 folds and 5% of a
++ * 1.9 s run at W 110-200).
++ */
+ static const double ALPHA_STEP = 1.25;
+ /**
+  * Floor guard: W stays at least the delay distribution's Q_MIN quantile, and
+@@ -92,6 +97,7 @@ Controller::Controller()
+       dist_rollback_ns(0), dist_fwd_ns(0), dist_fwd_timed(0), dist_late(0),
+       dist_held(0),
+       alpha(1),
++      warm_folds(0),
+       kappa(1),
+       q(0), rounds(0), run_executed(0), run_stragglers(0), run_late(0),
+       run_held(0),
+@@ -289,7 +295,7 @@ double Controller::inverse_cdf(double q) const {
+  * may be rolled back, and alpha is that share as seen at the current W over
+  * r * F(W): the delay distribution gives how waste grows with W, and the
+  * waste seen gives the scale, cascades included. alpha moves slowly (see
+- * ALPHA_GAIN): the histogram follows phase changes, alpha only the scale.
++ * --ctl-alpha-gain): the histogram follows phase changes, alpha only the scale.
+  */
+ Time Controller::quantile_window(const uint64_t* sum) {
+   for (int b = 0; b < BINS; b++) {
+@@ -340,8 +346,13 @@ Time Controller::quantile_window(const uint64_t* sum) {
+       // 12-60 around a best fixed W of 25 (4 nodes, lookahead 10 / mean 200).
+       double seen = std::min(1e4, std::max(window_waste() / dist_executed /
+           bound, 1e-4));
+-      double step = std::pow(seen / alpha, ALPHA_GAIN);
+-      alpha *= std::min(ALPHA_STEP, std::max(1 / ALPHA_STEP, step));
++      if (warm_folds < g_tw_ctl_warm) {
++        alpha = seen;
++        warm_folds++;
++      } else {
++        double step = std::pow(seen / alpha, g_tw_ctl_alpha_gain);
++        alpha *= std::min(ALPHA_STEP, std::max(1 / ALPHA_STEP, step));
++      }
+     }
+   }
+   /**
+@@ -455,6 +466,13 @@ void Controller::decide(const uint64_t* sum) {
+   run_held += sum[HELD_STRAGGLERS];
+ 
+   Time w = g_tw_ctl == 2 ? hill_climb_window(sum) : quantile_window(sum);
++  // --ctl-w-gain < 1: W moves only this share of the way (in log) to the
++  // rule's choice each round, so round-to-round noise in the waste seen does
++  // not swing W across the knee (full nodes: W 260-460 round to round)
++  if (g_tw_ctl == 1 && g_tw_ctl_w_gain < 1 && window > 0 && w > 0) {
++    w = clamp_window((Time)std::llround(
++        window * std::pow((double)w / window, g_tw_ctl_w_gain)));
++  }
+   // The log shows this round's efficiency; the hill climb uses its average
+   double round_eff = sum[EXECUTED] ? (double)sum[COMMITTED] / sum[EXECUTED] : 0;
+   // --ctl-dry: every round runs and the log shows the window the policy
+diff --git a/src/scheduler/controller.h b/src/scheduler/controller.h
+index 982813c..1219b44 100644
+--- a/src/scheduler/controller.h
++++ b/src/scheduler/controller.h
+@@ -121,6 +121,7 @@ class Controller : public CBase_Controller {
+            dist_rolled_back, dist_elapsed_ns, dist_rollback_ns, dist_fwd_ns,
+            dist_fwd_timed, dist_late, dist_held;
+     double alpha;                ///< calibration: window waste seen / r * F(W)
++    unsigned warm_folds;         ///< calibrating folds done under --ctl-warm
+     /**
+      * --ctl-cost: PE time a rolled-back event costs (its forward work plus
+      * its share of rollback processing) over the PE time per executed event
+diff --git a/src/util/command_line.C b/src/util/command_line.C
+index b2fc198..25577b2 100644
+--- a/src/util/command_line.C
++++ b/src/util/command_line.C
+@@ -50,6 +50,9 @@ void parse_command_line(int argc, char** argv) {
+   kernel.register_argument("ctl-cost",             "Delay quantile rule: epsilon is a share of - EVENTS ROLLED BACK=0 (default), PE TIME LOST TO ROLLBACKS=1 (experimental: misses the indirect cost of rollbacks)", g_tw_ctl_cost);
+   kernel.register_argument("ctl-calibrate",        "Delay quantile rule: scale the straggler bound by the events seen rolled back - NO=0, YES=1", g_tw_ctl_calibrate);
+   kernel.register_argument("ctl-floor",            "Delay quantile rule: calibrate only on the rollbacks of stragglers the window can cause - NO=0, leave out stragglers sent with a delay of at least the window=1, also those htram held (not due when sent)=2 (default)", g_tw_ctl_floor);
++  kernel.register_argument("ctl-alpha-gain",       "Delay quantile rule: share of the way (in log) the calibration moves per fold, at most 1.25x (default 0.25)", g_tw_ctl_alpha_gain);
++  kernel.register_argument("ctl-warm",             "Delay quantile rule: the first N calibrating folds set alpha to the waste seen, unsmoothed (default 0)", g_tw_ctl_warm);
++  kernel.register_argument("ctl-w-gain",           "Delay quantile rule: share of the way (in log) W moves to the rule's choice per round (default 1)", g_tw_ctl_w_gain);
+   kernel.register_argument("ctl-interval",         "Controller round: count waves under the bucketed GVT (shared reduction), else GVT updates; at least 1", g_tw_ctl_interval);
+   kernel.register_argument("ctl-dry",              "Run the controller but keep the window fixed (measures its cost) - NO=0, YES=1", g_tw_ctl_dry);
+   kernel.register_argument("ctl-log",              "Print every controller round - NO=0, YES=1", g_tw_ctl_log);

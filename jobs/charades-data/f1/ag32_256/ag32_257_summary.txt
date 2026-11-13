@@ -1,0 +1,142 @@
+AG-1. Committed counts (distinct values per workload; F1/F5 32-node count):
+  g100      [5790765380]  ref [5790765380]  equal
+  g1000     [5790764382]  ref [5790764382]  equal
+  g2000     [5790760168]  ref [5790760168]  equal
+  g4000     [5790763559]  ref [5790763559]  equal
+  g500      [5790763840]  ref [5790763840]  equal
+  l10g2000  [7253094082]  ref [7253094082]  equal
+  l10g500   [7253098963]  ref [7253098963]  equal
+  tr        [18096870611]  ref [18096870611]  equal
+  uni       [5790767104]  ref [5790767104]  equal
+  runs (without warm-up): 395
+
+Part A (M committed ev/s, median of 5; spread = fastest/slowest rep; epm = htram events per message, median):
+
+  uni
+  agg      | W 300                    | W 400                    | W 500                    | W 600                    | ctl                     
+  off      |  280.4 s1.10 e  nan      |  279.4 s1.03 e  nan      |  269.3 s1.11 e  nan      |  276.3 s1.02 e  nan      |  270.1 s1.12 e  nan w351
+  pp512    |  504.7 s1.13 e  8.6      |  515.4 s1.03 e  8.3      |  499.9 s1.04 e  8.4      |  468.3 s1.18 e  8.5      |  531.0 s1.11 e  8.3 w390
+  pp2048   |  504.6 s1.13 e  8.6      |  516.9 s1.04 e  8.3      |  489.6 s1.14 e  8.4      |  470.6 s1.03 e  8.5      |  525.1 s1.06 e  8.3 w396
+  wps512   |  625.3 s1.16 e  8.6      |  643.0 s1.02 e  8.2      |  613.4 s1.03 e  8.3      |  576.7 s1.03 e  8.4      |  627.6 s1.10 e  8.2 w406
+  wps2048  |  625.3 s1.02 e  8.6      |  638.9 s1.02 e  8.2      |  608.5 s1.09 e  8.3      |  574.0 s1.08 e  8.4      |  632.7 s1.01 e  8.2 w413
+  AG-2 best htram wps512 W 400 643.0 / best direct W 300 280.4 = 2.29
+  AG-4 best fixed W per agg: off W 300 (280.4)  pp512 W 400 (515.4)  pp2048 W 400 (516.9)  wps512 W 400 (643.0)  wps2048 W 400 (638.9)
+  AG-6 ctl / best fixed per agg: off 0.964  pp512 1.030  pp2048 1.016  wps512 0.976  wps2048 0.990
+  AG-3 best PP 531.0 / best WPs 643.0 = 0.826
+  AG-3 pp epm 2048/512 by arm: W 300 1.00  W 400 1.00  W 500 1.00  W 600 0.99  ctl 0.99
+  AG-3 wps epm 2048/512 by arm: W 300 1.00  W 400 1.00  W 500 0.99  W 600 1.00  ctl 1.00
+  AG-3 pp512 epm W600/W300 1.00
+  AG-3 pp2048 epm W600/W300 0.99
+  AG-3 wps512 epm W600/W300 0.98
+  AG-3 wps2048 epm W600/W300 0.98
+  F1-32 pp512: W 300 507.8 e8.6  W 400 514.0 e8.3  ctl 523.5 e8.4
+  F1-32 wps512: W 300 623.9 e8.6  W 400 639.5 e8.3  ctl 627.8 e8.3
+
+  g4000
+  agg      | W 300                    | W 400                    | W 500                    | W 600                    | ctl                     
+  off      |  344.6 s1.02 e  nan      |  344.4 s1.01 e  nan      |  339.3 s1.02 e  nan      |  334.8 s1.04 e  nan      |  329.8 s1.37 e  nan w356
+  pp512    | 1080.6 s1.55 e 57.6      | 1060.6 s1.13 e 49.5      | 1027.3 s1.08 e 50.5      |  935.7 s1.09 e 53.8      | 1080.6 s1.08 e 48.8 w413
+  pp2048   |  862.1 s1.27 e 58.9      |  923.1 s1.10 e 53.2      |  946.5 s1.04 e 44.1      |  901.7 s1.04 e 38.5      |  895.4 s1.17 e 36.0 w560
+  wps512   | 1012.8 s1.10 e 30.2      | 1049.3 s1.06 e 28.4      |  960.4 s1.05 e 27.8      |  874.1 s1.18 e 28.2      | 1030.3 s1.17 e 27.3 w415
+  wps2048  | 1012.1 s1.02 e 30.3      | 1049.2 s1.15 e 28.3      |  960.0 s1.07 e 27.3      |  889.3 s1.02 e 27.7      | 1013.1 s2.02 e 27.4 w409
+  AG-2 best htram pp512 W 300 1080.6 / best direct W 300 344.6 = 3.14
+  AG-4 best fixed W per agg: off W 300 (344.6)  pp512 W 300 (1080.6)  pp2048 W 500 (946.5)  wps512 W 400 (1049.3)  wps2048 W 400 (1049.2)
+  AG-6 ctl / best fixed per agg: off 0.957  pp512 1.000  pp2048 0.946  wps512 0.982  wps2048 0.966
+  AG-3 best PP 1080.6 / best WPs 1049.3 = 1.030
+  AG-3 pp epm 2048/512 by arm: W 300 1.02  W 400 1.07  W 500 0.87  W 600 0.72  ctl 0.74
+  AG-3 wps epm 2048/512 by arm: W 300 1.00  W 400 1.00  W 500 0.98  W 600 0.98  ctl 1.00
+  AG-3 pp512 epm W600/W300 0.93
+  AG-3 pp2048 epm W600/W300 0.65
+  AG-3 wps512 epm W600/W300 0.93
+  AG-3 wps2048 epm W600/W300 0.91
+  F1-32 pp512: W 300 1077.3 e57.6  W 400 1113.9 e51.4  ctl 1067.6 e50.6
+
+Part B (M committed ev/s, median of 5; spread; mean controller W). F1/F5 32-node arms in brackets:
+  g100_pp2048      W 400 1662.1 s1.15  W 500 1561.3 s1.02  W 600 1374.9 s1.03  ctl 1591.3 s1.03 w439  [W 300 1512.5  W 400 1629.7  ctl 1532.3]
+                   best fixed (this job) W 400 1662.1; ctl / that 0.957; W/W ratios: W 500/W 400 0.939  W 600/W 500 0.881; ctl(this)/ctl(old) 1.038; W400or1000(this)/(old) 1.020; ctl / best fixed incl. old arms 0.957
+  g500_pp2048      W 400 1460.6 s1.04  W 500 1322.4 s1.22  W 600 1182.3 s1.10  ctl 1401.4 s1.10 w446  [W 300 1349.1  W 400 1425.0  ctl 1358.5]
+                   best fixed (this job) W 400 1460.6; ctl / that 0.959; W/W ratios: W 500/W 400 0.905  W 600/W 500 0.894; ctl(this)/ctl(old) 1.032; W400or1000(this)/(old) 1.025; ctl / best fixed incl. old arms 0.959
+  g1000_pp2048     W 400 1372.3 s1.28  W 500 1296.9 s1.20  W 600 1154.0 s1.04  ctl 1306.7 s1.10 w451  [W 300 1270.1  W 400 1324.0  ctl 1279.7]
+                   best fixed (this job) W 400 1372.3; ctl / that 0.952; W/W ratios: W 500/W 400 0.945  W 600/W 500 0.890; ctl(this)/ctl(old) 1.021; W400or1000(this)/(old) 1.037; ctl / best fixed incl. old arms 0.952
+  g2000_pp512      W 400 1244.2 s1.18  W 500 1145.5 s1.14  W 600 1038.6 s1.08  ctl 1188.0 s1.12 w418  [W 300 1142.4  W 400 1228.6  ctl 1163.5]
+                   best fixed (this job) W 400 1244.2; ctl / that 0.955; W/W ratios: W 500/W 400 0.921  W 600/W 500 0.907; ctl(this)/ctl(old) 1.021; W400or1000(this)/(old) 1.013; ctl / best fixed incl. old arms 0.955
+  l10g500_pp2048   W 50 1181.1 s1.05  W 75 1270.9 s1.19  W 100 1165.1 s1.04  W 150 962.7 s1.02  ctl 1099.9 s1.69 w71  [W 50 1141.1  W 100 1148.2  ctl 1222.4]
+                   best fixed (this job) W 75 1270.9; ctl / that 0.865; W/W ratios: W 75/W 50 1.076  W 100/W 75 0.917  W 150/W 100 0.826; ctl(this)/ctl(old) 0.900; W400or1000(this)/(old) 1.035; ctl / best fixed incl. old arms 0.865
+  l10g2000_wps512  W 50 929.2 s1.14  W 75 1047.2 s1.19  W 100 913.3 s1.36  ctl 1024.9 s1.09 w74  [W 50 967.2  W 100 942.2  ctl 1012.8]
+                   best fixed (this job) W 75 1047.2; ctl / that 0.979; W/W ratios: W 75/W 50 1.127  W 100/W 75 0.872; ctl(this)/ctl(old) 1.012; W400or1000(this)/(old) 0.961; ctl / best fixed incl. old arms 0.979
+  tr_pp2048        W 1000 2288.1 s1.02  W 1500 1947.5 s1.05  W 2000 1609.7 s1.04  ctl 2258.4 s1.01 w879  [W 500 1815.9  W 1000 2280.7  ctl 2223.8]
+                   best fixed (this job) W 1000 2288.1; ctl / that 0.987; W/W ratios: W 1500/W 1000 0.851  W 2000/W 1500 0.827; ctl(this)/ctl(old) 1.016; W400or1000(this)/(old) 1.003; ctl / best fixed incl. old arms 0.987
+
+AG-7. Spread (fastest/slowest rep) per arm; second number drops the slowest rep:
+  arms over 1.15: 18 of 79
+   g1000_pp2048     w:400   1.28  1.01
+   g1000_pp2048     w:500   1.20  1.07
+   g100_pp2048      w:400   1.15  1.00
+   g2000_pp512      w:400   1.18  1.02
+   g4000_off        mb:0    1.37  1.10
+   g4000_pp2048     mb:0    1.17  1.02
+   g4000_pp2048     w:300   1.27  1.01
+   g4000_pp512      w:300   1.55  1.02
+   g4000_wps2048    mb:0    2.02  1.02
+   g4000_wps512     mb:0    1.17  1.14
+   g4000_wps512     w:600   1.18  1.03
+   g500_pp2048      w:500   1.22  1.04
+   l10g2000_wps512  w:100   1.36  1.22  (over 1.15 without the slowest)
+   l10g2000_wps512  w:75    1.19  1.04
+   l10g500_pp2048   mb:0    1.69  1.61  (over 1.15 without the slowest)
+   l10g500_pp2048   w:75    1.19  1.17  (over 1.15 without the slowest)
+   uni_pp512        w:600   1.18  1.01
+   uni_wps512       w:300   1.16  1.01
+  median spread 1.084, max 2.02
+  arms whose slowest rep is >10% below the next, by rep: {'2': 3, '3': 12, '4': 1, '5': 2}
+  runs below 0.9 of their arm median, by rep: {'1': 2, '2': 6, '3': 15, '4': 2, '5': 3}
+
+Matched arms, this job / F1-32 or F5-32b (medians):
+  g1000_pp2048     ctl     1.021
+  g1000_pp2048     W 400   1.037
+  g100_pp2048      ctl     1.038
+  g100_pp2048      W 400   1.020
+  g2000_pp512      ctl     1.021
+  g2000_pp512      W 400   1.013
+  g4000_pp512      ctl     1.012
+  g4000_pp512      W 300   1.003
+  g4000_pp512      W 400   0.952
+  g500_pp2048      ctl     1.032
+  g500_pp2048      W 400   1.025
+  l10g2000_wps512  ctl     1.012
+  l10g2000_wps512  W 100   0.969
+  l10g2000_wps512  W 50    0.961
+  l10g500_pp2048   ctl     0.900
+  l10g500_pp2048   W 100   1.015
+  l10g500_pp2048   W 50    1.035
+  tr_pp2048        ctl     1.016
+  tr_pp2048        W 1000  1.003
+  uni_pp512        ctl     1.014
+  uni_pp512        W 300   0.994
+  uni_pp512        W 400   1.003
+  uni_wps512       ctl     1.000
+  uni_wps512       W 300   1.002
+  uni_wps512       W 400   1.005
+  range 0.900-1.038; without the lookahead 10 sigma 500 controller 0.952-1.038
+
+F1-32 / F5-32b controller / best fixed W over both grids (cross-job where the best is an AG32 arm):
+  g100_pp2048      ctl 1532.3 / new W 400 1662.1 = 0.922
+  g500_pp2048      ctl 1358.5 / new W 400 1460.6 = 0.930
+  g1000_pp2048     ctl 1279.7 / new W 400 1372.3 = 0.933
+  g2000_pp512      ctl 1163.5 / new W 400 1244.2 = 0.935
+  l10g500_pp2048   ctl 1222.4 / new W 75 1270.9 = 0.962
+  l10g2000_wps512  ctl 1012.8 / new W 75 1047.2 = 0.967
+  tr_pp2048        ctl 2223.8 / new W 1000 2288.1 = 0.972
+  uni_wps512       ctl 627.8 / new W 400 643.0 = 0.976
+  g4000_pp512      ctl 1067.6 / old W 400 1113.9 = 0.958
+
+W ratios within this job (paper settings):
+  uni_wps512       best W 400; each W / best: W 300 0.972  W 400 1.000  W 500 0.954  W 600 0.897
+  g4000_pp512      best W 300; each W / best: W 300 1.000  W 400 0.982  W 500 0.951  W 600 0.866
+  g100_pp2048      best W 400; each W / best: W 400 1.000  W 500 0.939  W 600 0.827
+  g500_pp2048      best W 400; each W / best: W 400 1.000  W 500 0.905  W 600 0.809
+  g1000_pp2048     best W 400; each W / best: W 400 1.000  W 500 0.945  W 600 0.841
+  g2000_pp512      best W 400; each W / best: W 400 1.000  W 500 0.921  W 600 0.835
+  l10g500_pp2048   best W 75; each W / best: W 50 0.929  W 75 1.000  W 100 0.917  W 150 0.757
+  l10g2000_wps512  best W 75; each W / best: W 50 0.887  W 75 1.000  W 100 0.872
+  tr_pp2048        best W 1000; each W / best: W 1000 1.000  W 1500 0.851  W 2000 0.703

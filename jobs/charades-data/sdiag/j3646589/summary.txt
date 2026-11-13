@@ -1,0 +1,33 @@
+A. Throughput by inbox mode (M committed ev/s at mode 0, mean of 3 reps; ratio = mode / mode 0, higher is better)
+
+  W 400
+  σ 100, PP      |  1n   43.3 padded 1.016 rings 1.018 (44/44/45 vs 43/44/43) |  4n  167.6 padded 1.002 rings 0.999 (167/170/166 vs 168/168/167) | 16n  621.7 padded 1.017 rings 0.968 (534/634/637 vs 618/623/624)
+  σ 2,000, PP    |  1n   33.4 padded 1.008 rings 1.012 (34/33/34 vs 34/33/33) |  4n  124.8 padded 1.005 rings 1.003 (125/126/125 vs 125/124/125) | 16n  435.8 padded 1.010 rings 1.005 (446/426/441 vs 441/443/423)
+  uniform, PP    |  1n   35.7 padded 0.998 rings 0.999 (36/35/36 vs 36/36/36) |  4n  120.7 padded 0.994 rings 1.000 (122/120/121 vs 120/122/120) | 16n  229.4 padded 1.058 rings 1.103 (258/253/249 vs 230/227/231)
+  uniform, WPs   |  1n   36.1 padded 0.995 rings 0.991 (36/36/36 vs 36/37/36) |  4n  100.7 padded 1.110 rings 1.135 (113/115/115 vs 101/98/103) | 16n  280.4 padded 1.149 rings 1.212 (337/343/340 vs 280/285/276)
+
+  controller
+  σ 100, PP      |  1n   46.9 padded 0.999 rings 0.996 (47/46/47 vs 47/47/46) |  4n  170.7 padded 1.002 rings 1.003 (171/172/171 vs 171/171/170) | 16n  609.3 padded 1.011 rings 1.014 (610/624/619 vs 603/611/614)
+  σ 2,000, PP    |  1n   38.7 padded 1.005 rings 0.996 (39/38/38 vs 39/39/39) |  4n  132.3 padded 0.997 rings 0.997 (131/132/132 vs 132/132/132) | 16n  406.0 padded 0.990 rings 0.972 (390/393/400 vs 405/405/408)
+  uniform, PP    |  1n   41.5 padded 1.002 rings 0.996 (41/41/41 vs 42/41/41) |  4n  130.5 padded 0.991 rings 0.996 (130/130/130 vs 130/132/130) | 16n  205.1 padded 1.045 rings 1.082 (223/219/223 vs 208/206/201)
+  uniform, WPs   |  1n   40.9 padded 1.010 rings 1.008 (41/41/41 vs 41/41/41) |  4n  102.9 padded 1.121 rings 1.173 (121/120/121 vs 102/104/103) | 16n  269.5 padded 1.128 rings 1.195 (319/322/324 vs 276/275/258)
+   1 nodes mode 1: geomean 1.004, min 0.995, max 1.016
+   1 nodes mode 2: geomean 1.002, min 0.991, max 1.018
+   4 nodes mode 1: geomean 1.027, min 0.991, max 1.121
+   4 nodes mode 2: geomean 1.036, min 0.996, max 1.173
+  16 nodes mode 1: geomean 1.050, min 0.990, max 1.149
+  16 nodes mode 2: geomean 1.065, min 0.968, max 1.212
+
+B. htram node-level receives at 16 nodes, uniform, W 400, all PEs, whole run (µs; lower is better)
+  uni_wps512 mode 0 r1: 8.75 µs/receive (hand-off 6.48, free_in 1.10) | pushes/receive 8.9, µs/push 0.732, overflows 0.000% | drain µs/item 0.348 | rate 276.9
+  uni_wps512 mode 0 r2: 8.90 µs/receive (hand-off 6.64, free_in 1.08) | pushes/receive 8.9, µs/push 0.744, overflows 0.000% | drain µs/item 0.346 | rate 277.6
+  uni_wps512 mode 1 r1: 5.75 µs/receive (hand-off 3.25, free_in 1.32) | pushes/receive 8.8, µs/push 0.368, overflows 0.000% | drain µs/item 0.338 | rate 316.1
+  uni_wps512 mode 1 r2: 5.84 µs/receive (hand-off 3.33, free_in 1.31) | pushes/receive 8.8, µs/push 0.377, overflows 0.000% | drain µs/item 0.338 | rate 315.1
+  uni_wps512 mode 2 r1: 4.16 µs/receive (hand-off 1.53, free_in 1.42) | pushes/receive 8.8, µs/push 0.173, overflows 0.000% | drain µs/item 0.343 | rate 332.5
+  uni_wps512 mode 2 r2: 4.14 µs/receive (hand-off 1.50, free_in 1.44) | pushes/receive 8.9, µs/push 0.169, overflows 0.000% | drain µs/item 0.340 | rate 339.4
+  uni_pp512  mode 0 r1: 7.73 µs/receive (hand-off 5.72, free_in 0.83) | pushes/receive 8.5, µs/push 0.676, overflows 0.000% | drain µs/item 0.378 | rate 217.9
+  uni_pp512  mode 0 r2: 8.05 µs/receive (hand-off 6.04, free_in 0.82) | pushes/receive 8.6, µs/push 0.706, overflows 0.000% | drain µs/item 0.364 | rate 231.4
+  uni_pp512  mode 1 r1: 4.95 µs/receive (hand-off 2.92, free_in 0.85) | pushes/receive 8.5, µs/push 0.343, overflows 0.000% | drain µs/item 0.361 | rate 245.0
+  uni_pp512  mode 1 r2: 4.97 µs/receive (hand-off 2.94, free_in 0.85) | pushes/receive 8.6, µs/push 0.343, overflows 0.000% | drain µs/item 0.364 | rate 241.9
+  uni_pp512  mode 2 r1: 3.41 µs/receive (hand-off 1.40, free_in 0.83) | pushes/receive 8.5, µs/push 0.164, overflows 0.000% | drain µs/item 0.364 | rate 250.5
+  uni_pp512  mode 2 r2: 3.38 µs/receive (hand-off 1.37, free_in 0.84) | pushes/receive 8.6, µs/push 0.160, overflows 0.000% | drain µs/item 0.363 | rate 249.7

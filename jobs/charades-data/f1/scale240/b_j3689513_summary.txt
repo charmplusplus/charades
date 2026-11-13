@@ -1,0 +1,74 @@
+runs: Charades 270, Devastator 180, ROSS 165; failed or missing: 0
+
+Rates: M committed ev/s, median of reps (higher is better). Ratios: Charades ÷ other (higher is better).
+C/D ctl: Charades controller ÷ Devastator best W (as the old table); C/D best: Charades best arm (controller or fixed) ÷ Devastator best.
+new/old: this C/D ctl ÷ the old table's; C n/o, D n/o, R n/o: that engine's rate (Charades: controller) ÷ its own in the old job.
+
+## σ 500
+  N | Charades ctl     best fixed         ctl/fx | Devastator    ROSS             | C/D ct C/D bs    C/R |    old new/old |  C n/o  D n/o  R n/o |  sprd same events
+  1 |   46.4 pp2048      47.9 pp2048 W300  0.969 |   38.8 W500     11.5 cons      |   1.19   1.23   4.04 |   1.03   1.156 |  1.156  1.000  0.993 | 1.007 yes
+  2 |   89.4 pp2048      91.9 pp2048 W300  0.973 |   74.9 W1000    20.9 cons      |   1.19   1.23   4.28 |   1.03   1.157 |  1.150  0.994  0.997 | 1.025 yes
+  4 |  179.1 pp2048     184.9 pp2048 W300  0.969 |  145.4 W1000    40.6 cons      |   1.23   1.27   4.41 |   1.08   1.138 |  1.147  1.008  1.013 | 1.014 yes
+  8 |  357.1 pp2048     367.4 pp2048 W300  0.972 |  245.3 W1000    76.5 cons      |   1.46   1.50   4.67 |   1.20   1.212 |  1.226  1.012  1.001 | 1.024 yes
+ 16 |  676.6 pp2048     727.9 pp2048 W400  0.930 |  502.4 W1000   145.5 optw500   |   1.35   1.45   4.65 |   1.19   1.130 |  1.128  0.998  0.988 | 1.089 yes
+   per-node rate ÷ 1-node rate (1.0 is perfect):
+     Charades ctl  1: 1.00  2: 0.96  4: 0.97  8: 0.96  16: 0.91
+     Devastator    1: 1.00  2: 0.96  4: 0.94  8: 0.79  16: 0.81
+     ROSS          1: 1.00  2: 0.91  4: 0.88  8: 0.83  16: 0.79
+   ROSS arms (M ev/s): 1: cons 11.5 opt 10.6 optw500 10.7 | 2: cons 20.9 opt 19.0 optw500 19.4 | 4: cons 40.6 opt 37.1 optw500 38.4 | 8: cons 76.5 opt 73.0 optw500 74.7 | 16: cons 145.1 opt 140.7 optw500 145.5
+
+## σ 2,000
+  N | Charades ctl     best fixed         ctl/fx | Devastator    ROSS             | C/D ct C/D bs    C/R |    old new/old |  C n/o  D n/o  R n/o |  sprd same events
+  1 |   42.4 pp512       43.9 pp512 W300   0.966 |   29.4 W500      9.2 cons      |   1.44   1.49   4.60 |   1.27   1.135 |  1.126  0.992  0.991 | 1.004 yes
+  2 |   77.4 pp512       79.7 pp512 W300   0.972 |   50.1 W1000    14.4 cons      |   1.55   1.59   5.38 |   1.37   1.128 |  1.114  0.988  0.986 | 1.021 yes
+  4 |  152.7 pp512      158.9 pp512 W300   0.961 |  100.2 W1000    28.4 cons      |   1.52   1.59   5.37 |   1.34   1.135 |  1.136  1.002  1.010 | 1.006 yes
+  8 |  302.8 pp512      312.8 pp512 W300   0.968 |  187.6 W1000    54.3 opt       |   1.61   1.67   5.58 |   1.38   1.169 |  1.191  1.019  1.012 | 1.019 yes
+ 16 |  594.7 pp512      609.1 pp512 W300   0.976 |  364.3 W1000   105.5 optw500   |   1.63   1.67   5.64 |   1.35   1.212 |  1.204  0.993  1.000 | 1.009 yes
+   per-node rate ÷ 1-node rate (1.0 is perfect):
+     Charades ctl  1: 1.00  2: 0.91  4: 0.90  8: 0.89  16: 0.88
+     Devastator    1: 1.00  2: 0.85  4: 0.85  8: 0.80  16: 0.77
+     ROSS          1: 1.00  2: 0.78  4: 0.77  8: 0.74  16: 0.72
+   ROSS arms (M ev/s): 1: cons 9.2 opt 8.8 optw500 8.8 | 2: cons 14.4 opt 13.8 optw500 13.9 | 4: cons 28.4 opt 27.5 optw500 27.7 | 8: cons 54.3 opt 54.3 optw500 54.3 | 16: cons 104.2 opt 103.5 optw500 105.5
+
+## uniform
+  N | Charades ctl     best fixed         ctl/fx | Devastator    ROSS             | C/D ct C/D bs    C/R |    old new/old |  C n/o  D n/o  R n/o |  sprd same events
+  1 |   45.9 wps512      47.3 pp512 W300   0.969 |   29.2 W500      9.4 cons      |   1.57   1.62   4.89 |   1.38   1.139 |  1.131  0.993  1.005 | 1.008 yes
+  2 |   79.3 pp512       82.2 pp512 W300   0.964 |   39.1 W500     13.8 cons      |   2.03   2.11   5.73 |   1.87   1.087 |  1.090  1.003  0.997 | 1.007 yes
+  4 |  151.9 pp512      158.4 pp512 W300   0.959 |   67.5 W500     25.5 cons      |   2.25   2.35   5.95 |   1.99   1.131 |  1.135  1.004  1.015 | 1.017 yes
+  8 |  227.5 pp512      232.7 wps512 W300  0.978 |  106.2 W500     48.1 opt       |   2.14   2.19   4.73 |   1.94   1.104 |  1.097  0.994  1.004 | 1.023 yes
+ 16 |  384.5 wps512     383.3 wps512 W400  1.003 |  191.0 W1000    90.9 opt       |   2.01   2.01   4.23 |   1.84   1.093 |  1.082  0.991  0.979 | 1.028 yes
+   per-node rate ÷ 1-node rate (1.0 is perfect):
+     Charades ctl  1: 1.00  2: 0.86  4: 0.83  8: 0.62  16: 0.52
+     Devastator    1: 1.00  2: 0.67  4: 0.58  8: 0.45  16: 0.41
+     ROSS          1: 1.00  2: 0.74  4: 0.68  8: 0.64  16: 0.61
+   ROSS arms (M ev/s): 1: cons 9.4 opt 8.7 | 2: cons 13.8 opt 13.4 | 4: cons 25.5 opt 25.2 | 8: cons 46.2 opt 48.1 | 16: cons 84.8 opt 90.9
+
+## lookahead 10, σ 500
+  N | Charades ctl     best fixed         ctl/fx | Devastator    ROSS             | C/D ct C/D bs    C/R |    old new/old |  C n/o  D n/o  R n/o |  sprd same events
+  1 |   41.7 pp2048      42.9 pp2048 W50   0.972 |   38.8 W100     10.6 optw100   |   1.08   1.11   3.95 |   0.95   1.134 |  1.126  0.993  1.002 | 1.012 yes
+  2 |   80.3 pp2048      82.4 pp2048 W50   0.974 |   73.6 W200     19.2 optw100   |   1.09   1.12   4.19 |   0.97   1.120 |  1.103  0.984  1.009 | 1.018 yes
+  4 |  163.0 pp2048     166.2 pp2048 W50   0.981 |  141.1 W200     37.8 optw100   |   1.15   1.18   4.32 |   1.02   1.135 |  1.125  0.991  1.026 | 1.018 yes
+  8 |  323.7 pp2048     329.5 pp2048 W50   0.983 |  248.8 W200     73.4 optw100   |   1.30   1.32   4.41 |   1.15   1.130 |  1.187  1.051  1.036 | 1.018 yes
+ 16 |  641.7 pp2048     646.2 pp2048 W50   0.993 |  491.4 W200    143.3 optw100   |   1.31   1.32   4.48 |   1.14   1.144 |  1.134  0.991  1.026 | 1.023 yes
+   per-node rate ÷ 1-node rate (1.0 is perfect):
+     Charades ctl  1: 1.00  2: 0.96  4: 0.98  8: 0.97  16: 0.96
+     Devastator    1: 1.00  2: 0.95  4: 0.91  8: 0.80  16: 0.79
+     ROSS          1: 1.00  2: 0.91  4: 0.89  8: 0.87  16: 0.85
+   ROSS arms (M ev/s): 1: cons 10.4 opt 10.4 optw100 10.6 | 2: cons 18.8 opt 18.7 optw100 19.2 | 4: cons 36.2 opt 36.8 optw100 37.8 | 8: cons 67.3 opt 71.8 optw100 73.4 | 16: cons 122.5 opt 139.9 optw100 143.3
+
+## σ 1,000, Charades only (PP 512)
+  N | Charades ctl     best fixed         ctl/fx | Devastator    ROSS             | C/D ct C/D bs    C/R |    old new/old |  C n/o  D n/o  R n/o |  sprd same events
+  1 |   44.3 pp512       45.8 pp512 W300   0.967 |    0.0 WNone     0.0 None      |                      |                |                      | 1.005 yes
+  2 |   82.5 pp512       85.3 pp512 W300   0.967 |    0.0 WNone     0.0 None      |                      |                |                      | 1.014 yes
+  4 |  166.9 pp512      170.6 pp512 W300   0.979 |    0.0 WNone     0.0 None      |                      |                |                      | 1.014 yes
+  8 |  331.3 pp512      345.5 pp512 W300   0.959 |    0.0 WNone     0.0 None      |                      |                |                      | 1.040 yes
+ 16 |  646.1 pp512      665.6 pp512 W400   0.971 |    0.0 WNone     0.0 None      |                      |                |                      | 1.052 yes
+
+## Controller ÷ best fixed W (higher is better)
+σ 500                          1: 0.969  2: 0.973  4: 0.969  8: 0.972  16: 0.930
+σ 2,000                        1: 0.966  2: 0.972  4: 0.961  8: 0.968  16: 0.976
+uniform                        1: 0.969  2: 0.964  4: 0.959  8: 0.978  16: 1.003
+lookahead 10, σ 500            1: 0.972  2: 0.974  4: 0.981  8: 0.983  16: 0.993
+σ 1,000, Charades only (PP 512) 1: 0.967  2: 0.967  4: 0.979  8: 0.959  16: 0.971
+
+Charades controller ahead of Devastator in 20 of 20 cells; lowest 1.08 (l10g500 1 nodes)

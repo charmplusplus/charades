@@ -1,0 +1,29 @@
+# Counts and digests
+n16: Charades ['2087384844'] digests ['377d077123c46354']; Devastator ['2087384844'] -> same
+n32: Charades ['4104430712'] digests ['6331beff81bcbf02']; Devastator ['4104430712'] -> same
+VA's 16-node digests: ['377d077123c46354']
+
+# Each engine at its best (medians; M committed ev/s); Charades ÷ Devastator, higher is better
+| cell | Charades E W5000 / E W2500 / L W2500 / controller | Devastator W2500 / W5000 / W10000 | C best fixed ÷ D best | C controller ÷ D best | ÷ D fastest rep (C best fixed) | controller ÷ best fixed, per rep |
+|---|---|---|---|---|---|---|
+| 32 nodes | 734.4 / 622.4 / 658.2 / 731.7 | 532.4 / 580.0 / 582.1 | 1.26 (E W 5000; D W 10000) | 1.26 | 1.26 | 0.958–1.089 |
+| 16, half A | 373.2 / 342.0 / 345.5 / 375.8 | 289.5 / 292.6 / 290.7 | 1.28 (E W 5000; D W 5000) | 1.28 | 1.25 | 0.999–1.007 |
+| 16, half B | 369.1 / 337.7 / 351.4 / 370.1 | 286.4 / 291.3 / 286.2 | 1.27 (E W 5000; D W 5000) | 1.27 | 1.27 | 0.997–1.060 |
+| 16, VA's allocation | 367.7 / 343.8 / 353.3 / 374.8 | 290.2 / 287.6 / 297.4 | 1.24 (E W 5000; D W 10000) | 1.26 | 1.23 | 0.995–1.021 |
+
+# C9: each half ÷ VA's 16-node cell (medians), per arm; Devastator best
+  16, half A: E W 5000 1.015, E W 2500 0.995, L W 2500 0.978, controller 1.003, Devastator best 0.984
+  16, half B: E W 5000 1.004, E W 2500 0.982, L W 2500 0.995, controller 0.988, Devastator best 0.979
+
+# Spread between reps (max ÷ min)
+  n32: E W 5000 759 746 590 734 731 (1.285) | E W 2500 618 547 639 622 630 (1.168) | L W 2500 660 658 655 648 668 (1.032) | E controller 727 732 713 764 749 (1.071) | D W2500 533 528 528 532 540 (1.023) | D W5000 580 571 574 582 580 (1.019) | D W10000 584 582 581 583 562 (1.040)
+  n16A: E W 5000 370 373 377 (1.017) | E W 2500 336 348 342 (1.036) | L W 2500 331 354 346 (1.071) | E controller 372 376 376 (1.011) | D W2500 291 290 279 (1.041) | D W5000 298 293 292 (1.020) | D W10000 273 291 295 (1.082)
+  n16B: E W 5000 369 371 350 (1.062) | E W 2500 340 334 338 (1.019) | L W 2500 328 351 353 (1.079) | E controller 369 370 375 (1.017) | D W2500 288 274 286 (1.049) | D W5000 291 58 291 (5.060) | D W10000 246 286 288 (1.172)
+
+# O (old diagnostics) ÷ E W 5,000, paired per rep
+  n16: median 0.999, range 0.977–1.057
+  n32: median 0.998, range 0.963–1.244
+
+# per-node rate 32 ÷ 16 (VA's allocation; half A; half B): 16, VA's allocation: C best fixed 0.999, controller 0.976, D 0.979; 16, half A: C best fixed 0.984, controller 0.974, D 0.995; 16, half B: C best fixed 0.995, controller 0.988, D 0.999
+
+# big2 (section 226), 32 nodes: Charades best ('C3', 'w:2500') 603.7, Devastator W 10000 576.9 -> 1.05; V32b ÷ big2: Charades best fixed 1.217, Devastator 1.009

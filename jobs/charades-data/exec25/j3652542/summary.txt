@@ -1,0 +1,14 @@
+uniform, WPs 512, W 400 (µs per committed event, mean of 2 reps; lower is better)
+  exec | loop | handlers | send_total | produce | fp | fp_miss | remote | local | flush_idle | cancel_q | poll | drain | untimed | iter_end
+   4 nodes: 1.602 0.824 0.502 0.322 0.072 0.022 0.040 0.073 0.000 0.016 0.017 0.289 0.283 0.172 0.010 | handlers per executed event 0.498, remote send each 0.082, fast-path share 0.124, idle flush each 0.076 (0.206 per event), timed share of exec 0.892
+  16 nodes: 1.865 0.830 0.498 0.332 0.073 0.006 0.051 0.090 0.000 0.047 0.022 0.426 0.315 0.225 0.013 | handlers per executed event 0.496, remote send each 0.093, fast-path share 0.031, idle flush each 0.164 (0.286 per event), timed share of exec 0.880
+  16 - 4: exec +0.264; loop +0.006 (2%), handlers -0.004 (-1%), send_total +0.010 (4%), produce +0.001 (0%), fp -0.016 (-6%), fp_miss +0.011 (4%), remote +0.018 (7%), local -0.000 (-0%), flush_idle +0.031 (12%), cancel_q +0.005 (2%), poll +0.136 (52%), drain +0.033 (12%), untimed +0.052 (20%), iter_end +0.002 (1%)
+   4 nodes traced ÷ untraced: 0.848 (untraced 116.4 M ev/s)
+  16 nodes traced ÷ untraced: 0.902 (untraced 348.6 M ev/s)
+σ 4,000, PP 512, W 400 (µs per committed event, mean of 2 reps; lower is better)
+  exec | loop | handlers | send_total | produce | fp | fp_miss | remote | local | flush_idle | cancel_q | poll | drain | untimed | iter_end
+   4 nodes: 1.636 0.974 0.605 0.369 0.072 0.050 0.034 0.094 0.000 0.025 0.022 0.165 0.260 0.190 0.013 | handlers per executed event 0.600, remote send each 0.131, fast-path share 0.280, idle flush each 0.090 (0.277 per event), timed share of exec 0.884
+  16 nodes: 1.754 0.965 0.599 0.365 0.072 0.049 0.033 0.092 0.000 0.091 0.033 0.163 0.258 0.244 0.019 | handlers per executed event 0.597, remote send each 0.128, fast-path share 0.280, idle flush each 0.198 (0.463 per event), timed share of exec 0.861
+  16 - 4: exec +0.119; loop -0.009 (-7%), handlers -0.006 (-5%), send_total -0.003 (-3%), produce +0.000 (0%), fp -0.000 (-0%), fp_miss -0.000 (-0%), remote -0.002 (-2%), local -0.000 (-0%), flush_idle +0.067 (56%), cancel_q +0.011 (10%), poll -0.002 (-1%), drain -0.003 (-2%), untimed +0.054 (45%), iter_end +0.006 (5%)
+   4 nodes traced ÷ untraced: 0.854 (untraced 117.2 M ev/s)
+  16 nodes traced ÷ untraced: 0.849 (untraced 428.3 M ev/s)

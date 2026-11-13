@@ -1,0 +1,38 @@
+runs kept: 26; dropped without count waves: 0; failed/stalled/missing log/pad mismatch: 0
+
+# Count: ['11581457663'] [P64 11581457663] SAME
+
+# Rates (M committed ev/s, median of 5; spread = fastest / slowest rep), events per message, PE time per committed event (2,944 / rate, µs), efficiency %, controller mean W; P64 median and this / P64
+  probe (r5)     W 400        990.2  1.00  ev/msg    5.6  PE 2.973  eff 99.950  rb/com 0.00051  W   400  P64 998.9  ratio 0.991
+  control (r5)   W 400       1006.6  1.06  ev/msg    5.6  PE 2.925  eff 99.950  rb/com 0.00050  W   400  P64 998.9  ratio 1.008
+  WPs 512        controller   982.4  1.05  ev/msg    5.5  PE 2.997  eff 99.930  rb/com 0.00068  W   472  P64 980.0  ratio 1.002
+  WPs 512        W 400       1001.3  1.03  ev/msg    5.6  PE 2.940  eff 99.950  rb/com 0.00049  W   400  P64 998.9  ratio 1.002
+  local 1 pad 1  controller  1467.8  1.04  ev/msg   35.6  PE 2.006  eff 99.970  rb/com 0.00026  W   414
+  local 1 pad 1  W 400       1522.3  1.03  ev/msg   37.0  PE 1.934  eff 99.990  rb/com 0.00011  W   400
+
+# Ratios (medians; higher is better for the first named)
+  controller local 1 pad 1 / WPs 512 1.494
+  W 400      local 1 pad 1 / WPs 512 1.520
+  WPs 512        controller / W 400 0.981
+  local 1 pad 1  controller / W 400 0.964
+  control / P64 998.9: 1.008 (median), probe 0.991
+  WPs 512 W 400 / control, paired by rep: 1.010 0.977 0.973 1.004 1.048  median 1.004
+  local 1 pad 1 W 400 / control, paired by rep: 1.501 1.496 1.498 1.517 1.599  median 1.501
+  paired by rep (local 1 / WPs 512, same rep, minutes apart):
+    controller 1.513 1.468 1.457 1.504 1.496  median 1.496
+    W 400      1.487 1.532 1.540 1.510 1.525  median 1.525
+  bundling across jobs: local 1 better arm 1522.3 / P64 best direct 540.6 = 2.82; WPs better arm 1001.3 / 540.6 = 1.85 (P64: 1.85)
+
+# Message triggers (share of htram messages, medians); messages per event through htram; htram events per committed event
+  control (r5)   W 400      msgs/event 0.1777  GVT 0.989  urgent 0.0110  full 0.0000  idle 0.0000  bypass/msgs 0.0000  htram/committed 0.9922
+  WPs 512        controller msgs/event 0.1806  GVT 0.972  urgent 0.0285  full 0.0000  idle 0.0000  bypass/msgs 0.0000  htram/committed 0.9924
+  WPs 512        W 400      msgs/event 0.1775  GVT 0.992  urgent 0.0084  full 0.0000  idle 0.0000  bypass/msgs 0.0000  htram/committed 0.9922
+  local 1 pad 1  controller msgs/event 0.0281  GVT 0.920  urgent 0.0796  full 0.0000  idle 0.0001  bypass/msgs 0.0118  htram/committed 0.9920
+  local 1 pad 1  W 400      msgs/event 0.0271  GVT 0.970  urgent 0.0301  full 0.0000  idle 0.0002  bypass/msgs 0.0096  htram/committed 0.9918
+
+# Per rep (M ev/s, by rep 1-5; wall s in brackets)
+  control (r5)   W 400        991.6 [15.0]  1006.9 [14.8]  1016.2 [14.7]  1006.6 [14.8]   960.0 [15.4]
+  WPs 512        controller   964.1 [20.3]   969.9 [15.3]  1007.6 [14.7]   983.4 [15.2]   982.4 [15.1]
+  WPs 512        W 400       1001.3 [15.0]   983.5 [15.2]   988.4 [15.1]  1011.1 [14.8]  1006.2 [14.9]
+  local 1 pad 1  controller  1458.8 [11.3]  1424.0 [11.5]  1467.8 [11.2]  1479.2 [11.2]  1469.9 [11.2]
+  local 1 pad 1  W 400       1488.6 [11.2]  1506.4 [11.0]  1522.3 [11.1]  1527.2 [10.9]  1534.9 [10.9]

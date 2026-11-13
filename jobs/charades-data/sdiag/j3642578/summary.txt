@@ -1,0 +1,28 @@
+Throughput, untraced (M ev/s; ratio numa / plain, higher is better)
+  sigma 100: plain 167.6 (167.1, 168.0); numa 171.0 (171.1, 170.8); ratio 1.020
+  sigma 2000: plain 125.2 (124.7, 125.6); numa 125.3 (123.8, 126.8); ratio 1.001
+
+Lateness (traced, waves 10-95%, both reps)
+  T_plain_s100     r0 25 us, r1 14, rest 12; r0 last PE 0.71; slowest-PE delay 112 us
+  T_fullperf_s100  r0 23 us, r1 15, rest 12; r0 last PE 0.56; slowest-PE delay 108 us
+  T_light_s100     r0 24 us, r1 14, rest 12; r0 last PE 0.62; slowest-PE delay 109 us
+  T_numa_s100      r0 25 us, r1 13, rest 11; r0 last PE 0.74; slowest-PE delay 109 us
+  T_light_s2000    r0 27 us, r1 24, rest 24; r0 last PE 0.12; slowest-PE delay 158 us
+  T_numa_s2000     r0 27 us, r1 24, rest 23; r0 last PE 0.12; slowest-PE delay 159 us
+
+Per-thread /proc, 30-90% window: minor faults/s and kernel-time share (mean over processes)
+  T_fullperf_s100  r0 faults/s 3697, kernel 0.051 | r1 415, 0.001 | median rest 244, 0.000
+  T_light_s100: none
+  T_numa_s100: none
+  T_light_s2000: none
+  T_numa_s2000: none
+
+perf (every user-mode fault, process 0) vs /proc minor faults over the whole run, per rank
+  T_fullperf_s100_r1 rank 0 (tid 1378827): perf user faults 107252, /proc minflt 107102, perf/proc 1.00
+  T_fullperf_s100_r1 rank 1 (tid 1378902): perf user faults 1596, /proc minflt 1584, perf/proc 1.01
+  T_fullperf_s100_r1 rank 11 (tid 1378923): perf user faults 2860, /proc minflt 2845, perf/proc 1.01
+  T_fullperf_s100_r1 rank 22 (tid 1378943): perf user faults 1590, /proc minflt 1578, perf/proc 1.01
+  T_fullperf_s100_r2 rank 0 (tid 1381698): perf user faults 107899, /proc minflt 105892, perf/proc 1.02
+  T_fullperf_s100_r2 rank 1 (tid 1381773): perf user faults 2172, /proc minflt 2128, perf/proc 1.02
+  T_fullperf_s100_r2 rank 11 (tid 1381793): perf user faults 1623, /proc minflt 1608, perf/proc 1.01
+  T_fullperf_s100_r2 rank 22 (tid 1381814): perf user faults 1156, /proc minflt 1129, perf/proc 1.02

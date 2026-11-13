@@ -1,0 +1,30 @@
+# Counts (V8-1)
+Charades ['1078843202']; Devastator ['1078843202']; VA ['1078843202'] -> one count, equal to VA
+
+# Rates per arm (M committed ev/s, median; V8 5 reps, VA 3 in brackets); V8 / VA
+  Charades E W 5000        193.34 ( 195.73)  0.988   reps 193.3 196.2 195.1 188.6 193.2
+  Charades E W 2500        188.72 ( 188.40)  1.002   reps 184.8 188.7 188.9 189.2 188.3
+  Charades L W 2500        194.28 ( 195.01)  0.996   reps 194.0 194.0 195.7 194.3 196.0
+  Charades E controller    196.35 ( 197.30)  0.995   reps 199.1 189.2 194.3 198.5 196.4
+  Devastator W 2500      151.54 ( 137.85)  1.099   reps 153.4 152.0 151.5 150.9 151.5
+  Devastator W 5000      151.90 ( 145.83)  1.042   reps 154.1 152.3 151.9 149.8 149.5
+  Devastator W 10000     152.06 ( 151.74)  1.002   reps 152.9 154.2 150.2 152.1 150.4
+
+# Each engine at its best (V8-2, V8-3); VA in brackets
+  Charades best fixed L W 2500 194.3 (E W 5000 195.7); controller 196.4 (197.3); Devastator W 10000 152.1 (W 10000 151.7)
+  V8 / VA: Charades controller 0.995, best fixed 0.993; Devastator best 1.002
+  Charades / Devastator: controller 1.291 (1.300); best fixed 1.278 (1.290)
+  against Devastator's fastest rep (154.2): controller 1.274, best fixed 1.260
+
+# Controller / best fixed arm of the same rep (V8-4)
+  per rep 1.026 0.964 0.993 1.022 1.002; median 1.002
+  controller mean W per rep: 3186 2815 3370 2763 3588
+
+# Spread between reps (max / min)
+  Charades E W 5000 1.040
+  Charades E W 2500 1.024
+  Charades L W 2500 1.011
+  Charades E controller 1.053
+  Devastator W 2500 1.017
+  Devastator W 5000 1.031
+  Devastator W 10000 1.026

@@ -1,0 +1,69 @@
+Rates: M committed ev/s, median of 3 (higher is better); ratios higher is better for the first arm.
+
+## PHOLD σ 500, 16 node(s): counts 1, digests 1
+   fixed: w:200 626.5  w:300 716.0  w:400 724.0  w:600 584.9   (best w:400; cost of one 1.5 step from it: w:200 1.156, w:300 1.011, w:600 1.238 x time)
+   C      704.1  ÷ best fixed 0.972  reps 695.8 704.1 715.3
+   CL     689.8  ÷ best fixed 0.953  reps 678.6 689.8 697.9
+   CPL    673.4  ÷ best fixed 0.930  reps 671.0 673.4 685.4
+   D      719.5  ÷ best fixed 0.994  reps 714.1 719.5 731.8
+   DL     686.0  ÷ best fixed 0.947  reps 672.5 686.0 697.3
+   C ÷ best fixed 0.972 | D ÷ F W400 (measuring) 0.994 | DL ÷ D (log, fixed W) 0.953 | CL ÷ C (log) 0.980 | CPL ÷ CL (period 32) 0.976 | C ÷ D (moving W, both measuring) 0.979
+   CL per round (DL cost 1.5 ns per committed event per PE-ms):
+      extra time -1.7% (near W400: -4064584275715652% of it; time near  48%), changes 360 of 3608 rounds, cost ÷ DL by rounds since change 0:1.014(10%) 1:0.974(10%) 2:0.983(10%) 3+:0.981(70%)
+      extra time  1.1% (near W400: -29% of it; time near  34%), changes 366 of 3662 rounds, cost ÷ DL by rounds since change 0:1.066(11%) 1:1.011(10%) 2:1.019(10%) 3+:1.003(69%)
+      extra time -0.5% (near W400: -2107530642983374% of it; time near  32%), changes 369 of 3698 rounds, cost ÷ DL by rounds since change 0:1.026(10%) 1:0.988(10%) 2:1.002(10%) 3+:0.991(70%)
+   CPL per round (DL cost 1.5 ns per committed event per PE-ms):
+      extra time  0.1% (near W400: -553% of it; time near  25%), changes 107 of 3672 rounds, cost ÷ DL by rounds since change 0:1.103(3%) 1:1.012(3%) 2:1.005(3%) 3+:0.998(91%)
+      extra time  2.2% (near W400:  -4% of it; time near   8%), changes 114 of 3894 rounds, cost ÷ DL by rounds since change 0:1.152(3%) 1:1.037(3%) 2:1.045(3%) 3+:1.017(91%)
+      extra time  1.8% (near W400: -10% of it; time near  14%), changes 111 of 3775 rounds, cost ÷ DL by rounds since change 0:1.116(3%) 1:1.028(3%) 2:1.032(3%) 3+:1.015(91%)
+
+## PHOLD σ 500, 1 node(s): counts 1, digests 1
+   fixed: w:200 42.5  w:300 45.6  w:400 41.3  w:600 34.1   (best w:300; cost of one 1.5 step from it: w:200 1.072, w:400 1.105, w:600 1.338 x time)
+   C       44.2  ÷ best fixed 0.970  reps 44.1 44.2 44.5
+   CL      44.2  ÷ best fixed 0.968  reps 42.9 44.2 44.6
+   CPL     43.0  ÷ best fixed 0.944  reps 42.9 43.0 43.6
+   D       45.4  ÷ best fixed 0.996  reps 45.3 45.4 45.6
+   DL      45.4  ÷ best fixed 0.995  reps 44.9 45.4 45.5
+   C ÷ best fixed 0.970 | D ÷ F W300 (measuring) 0.996 | DL ÷ D (log, fixed W) 0.998 | CL ÷ C (log) 0.999 | CPL ÷ CL (period 32) 0.975 | C ÷ D (moving W, both measuring) 0.973
+   CL per round (DL cost 22.0 ns per committed event per PE-ms):
+      extra time  2.7% (near W300:  -1% of it; time near  67%), changes 395 of 3954 rounds, cost ÷ DL by rounds since change 0:1.047(10%) 1:1.027(10%) 2:1.030(10%) 3+:1.025(70%)
+      extra time  1.6% (near W300:  -5% of it; time near  76%), changes 392 of 3921 rounds, cost ÷ DL by rounds since change 0:1.031(10%) 1:1.016(10%) 2:1.022(10%) 3+:1.014(70%)
+      extra time  5.6% (near W300:  20% of it; time near  55%), changes 401 of 4018 rounds, cost ÷ DL by rounds since change 0:1.085(10%) 1:1.056(10%) 2:1.056(10%) 3+:1.056(70%)
+   CPL per round (DL cost 22.0 ns per committed event per PE-ms):
+      extra time  4.0% (near W300:   4% of it; time near  72%), changes 114 of 3905 rounds, cost ÷ DL by rounds since change 0:1.092(3%) 1:1.059(3%) 2:1.064(3%) 3+:1.038(91%)
+      extra time  5.4% (near W300:  31% of it; time near  79%), changes 115 of 3918 rounds, cost ÷ DL by rounds since change 0:1.118(3%) 1:1.078(3%) 2:1.076(3%) 3+:1.054(91%)
+      extra time  5.2% (near W300:  25% of it; time near  75%), changes 115 of 3941 rounds, cost ÷ DL by rounds since change 0:1.091(3%) 1:1.058(3%) 2:1.065(3%) 3+:1.053(91%)
+
+## traffic, 16 node(s): counts 1, digests 1
+   fixed: w:350 848.9  w:500 1079.4  w:750 1174.2  w:1000 1057.6   (best w:750; cost of one 1.5 step from it: w:350 1.383, w:500 1.088, w:1000 1.110 x time)
+   C     1157.1  ÷ best fixed 0.985  reps 1147.0 1157.1 1159.3
+   CL    1091.3  ÷ best fixed 0.929  reps 1084.4 1091.3 1137.1
+   CPL   1130.9  ÷ best fixed 0.963  reps 1112.2 1130.9 1131.7
+   D     1052.9  ÷ best fixed 0.897  reps 997.7 1052.9 1055.0
+   DL    1045.3  ÷ best fixed 0.890  reps 1043.6 1045.3 1046.3
+   C ÷ best fixed 0.985 | D ÷ F W500 (measuring) 0.975 | DL ÷ D (log, fixed W) 0.993 | CL ÷ C (log) 0.943 | CPL ÷ CL (period 32) 1.036 | C ÷ D (moving W, both measuring) 1.099
+   CL per round (DL cost 1.0 ns per committed event per PE-ms):
+      extra time -8.8% (near W500: -1037549862060854% of it; time near   4%), changes 1026 of 10270 rounds, cost ÷ DL by rounds since change 0:0.942(10%) 1:0.916(10%) 2:0.935(10%) 3+:0.915(70%)
+      extra time -3.7% (near W500: -771447935176775% of it; time near   6%), changes 1079 of 10797 rounds, cost ÷ DL by rounds since change 0:0.971(10%) 1:0.942(10%) 2:0.975(10%) 3+:0.965(70%)
+      extra time -4.4% (near W500: -1235652414536492% of it; time near   8%), changes 1093 of 10935 rounds, cost ÷ DL by rounds since change 0:0.976(10%) 1:0.949(10%) 2:0.959(10%) 3+:0.956(70%)
+   CPL per round (DL cost 1.0 ns per committed event per PE-ms):
+      extra time -8.2% (near W500: -434090217976500% of it; time near   1%), changes 315 of 10709 rounds, cost ÷ DL by rounds since change 0:0.964(3%) 1:0.915(3%) 2:0.927(3%) 3+:0.923(91%)
+      extra time -8.2% (near W500: -194255938015044% of it; time near   1%), changes 302 of 10249 rounds, cost ÷ DL by rounds since change 0:0.958(3%) 1:0.922(3%) 2:0.936(3%) 3+:0.922(91%)
+      extra time -6.4% (near W500: -438460646468516% of it; time near   3%), changes 316 of 10734 rounds, cost ÷ DL by rounds since change 0:0.984(3%) 1:0.943(3%) 2:0.949(3%) 3+:0.938(91%)
+
+## traffic, 1 node(s): counts 1, digests 1
+   fixed: w:350 69.1  w:500 73.8  w:750 69.0  w:1000 64.6   (best w:500; cost of one 1.5 step from it: w:350 1.068, w:750 1.070, w:1000 1.142 x time)
+   C       72.1  ÷ best fixed 0.977  reps 71.6 72.1 72.8
+   CL      69.5  ÷ best fixed 0.941  reps 68.0 69.5 70.7
+   CPL     70.1  ÷ best fixed 0.950  reps 69.9 70.1 71.0
+   D       73.8  ÷ best fixed 0.999  reps 72.2 73.8 74.2
+   DL      72.4  ÷ best fixed 0.980  reps 72.3 72.4 72.7
+   C ÷ best fixed 0.977 | D ÷ F W500 (measuring) 0.999 | DL ÷ D (log, fixed W) 0.981 | CL ÷ C (log) 0.963 | CPL ÷ CL (period 32) 1.010 | C ÷ D (moving W, both measuring) 0.977
+   CL per round (DL cost 13.8 ns per committed event per PE-ms):
+      extra time  2.4% (near W500:  31% of it; time near  56%), changes 1314 of 13157 rounds, cost ÷ DL by rounds since change 0:1.034(10%) 1:1.023(10%) 2:1.027(10%) 3+:1.023(70%)
+      extra time  6.1% (near W500:  26% of it; time near  43%), changes 1317 of 13181 rounds, cost ÷ DL by rounds since change 0:1.083(10%) 1:1.065(10%) 2:1.067(10%) 3+:1.061(70%)
+      extra time  4.1% (near W500:  30% of it; time near  51%), changes 1299 of 13001 rounds, cost ÷ DL by rounds since change 0:1.058(10%) 1:1.043(10%) 2:1.043(10%) 3+:1.040(70%)
+   CPL per round (DL cost 13.8 ns per committed event per PE-ms):
+      extra time  3.1% (near W500:  81% of it; time near  85%), changes 369 of 12545 rounds, cost ÷ DL by rounds since change 0:1.056(3%) 1:1.026(3%) 2:1.038(3%) 3+:1.031(91%)
+      extra time  1.9% (near W500:  66% of it; time near  75%), changes 376 of 12780 rounds, cost ÷ DL by rounds since change 0:1.046(3%) 1:1.010(3%) 2:1.023(3%) 3+:1.019(91%)
+      extra time  3.5% (near W500:  59% of it; time near  65%), changes 387 of 13145 rounds, cost ÷ DL by rounds since change 0:1.066(3%) 1:1.032(3%) 2:1.036(3%) 3+:1.035(91%)

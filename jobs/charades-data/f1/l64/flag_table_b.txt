@@ -1,0 +1,8 @@
+Flags in every arm: +pe 2944 <run --gvt-bucket-size=8 --aggregation=1 --agg-buffer=512 --agg-policy=1 --agg-horizon-margin=8 +lci_ndevices 23 +pemap 2-46:2,3-47:2 +mempool_remote_free
+probe w400 [charades-r5]                  1  dir>/steady_100_1000_1.0_376832_15_2048000 /work2/09863/rrao/stampede3/charades-r5/tests/test_configs/bucket --optimism-window=400 --agg-mode=0
+warm_l1p1 w400 [charades-pplpad]          1  dir>/steady_100_1000_1.0_376832_15_256000 /work2/09863/rrao/stampede3/charades-pplpad/tests/test_configs/bucket --optimism-window=400 --agg-mode=2 --agg-pp-local=1 --agg-pp-pad=1
+uni_r5_wps_512 w400 [charades-r5]         5  dir>/steady_100_1000_1.0_376832_15_2048000 /work2/09863/rrao/stampede3/charades-r5/tests/test_configs/bucket --optimism-window=400 --agg-mode=0
+uni_wps_512 mb0 [charades-pplpad]         5  dir>/steady_100_1000_1.0_376832_15_2048000 /work2/09863/rrao/stampede3/charades-pplpad/tests/test_configs/bucket --ctl=3 --ctl-bracket=1 --agg-mode=0
+uni_wps_512 w400 [charades-pplpad]        5  dir>/steady_100_1000_1.0_376832_15_2048000 /work2/09863/rrao/stampede3/charades-pplpad/tests/test_configs/bucket --optimism-window=400 --agg-mode=0
+uni_pp_512_l1_p1 mb0 [charades-pplpad]    5  dir>/steady_100_1000_1.0_376832_15_2048000 /work2/09863/rrao/stampede3/charades-pplpad/tests/test_configs/bucket --ctl=3 --ctl-bracket=1 --agg-mode=2 --agg-pp-local=1 --agg-pp-pad=1
+uni_pp_512_l1_p1 w400 [charades-pplpad]   5  dir>/steady_100_1000_1.0_376832_15_2048000 /work2/09863/rrao/stampede3/charades-pplpad/tests/test_configs/bucket --optimism-window=400 --agg-mode=2 --agg-pp-local=1 --agg-pp-pad=1

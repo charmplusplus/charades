@@ -1,0 +1,78 @@
+
+ST_m0_s100_r1: 25 thread files, 23 PE tids mapped; window 1.81 s of 3.02 s
+  rank 0 (1940128)       7113 calls/s,   80.3 ms/s in calls: openat 2166/s 24.8 ms/s, read 1845/s 12.9 ms/s, close 1766/s 10.9 ms/s, futex 619/s 7.5 ms/s, brk 108/s 1.3 ms/s, mmap 106/s 2.6 ms/s
+                     targets: read:gvt_16.out 1625/s, read:/dev/hfi1_0 213/s, writev:gvt_16.out 27/s, mmap:4096 23/s, mmap:397312 17/s
+  rank 1 (1940206)        301 calls/s,   19.5 ms/s in calls: futex 234/s 3.7 ms/s, mprotect 49/s 4.7 ms/s, writev 4/s 0.2 ms/s, mmap 3/s 2.8 ms/s, write 3/s 0.1 ms/s, munmap 1/s 0.0 ms/s
+                     targets: writev:gvt_pe_1.csv 4/s, write:gvt_1.out 2/s, mmap:134217728 1/s, munmap:62914560 1/s, munmap:4194304 1/s
+  rank 11 (1940236)       238 calls/s,   18.4 ms/s in calls: futex 177/s 3.5 ms/s, mprotect 44/s 3.7 ms/s, writev 4/s 0.2 ms/s, mmap 3/s 2.3 ms/s, write 3/s 0.1 ms/s, openat 1/s 8.3 ms/s
+                     targets: writev:gvt_pe_11.csv 4/s, write:gvt_16.out 2/s, mmap:134217728 1/s, munmap:67108864 1/s, mmap:33558528 1/s
+  rank 22 (1940247)       506 calls/s,   20.4 ms/s in calls: futex 437/s 8.6 ms/s, mprotect 52/s 2.9 ms/s, writev 4/s 0.2 ms/s, mmap 3/s 1.0 ms/s, write 3/s 0.1 ms/s, openat 1/s 7.1 ms/s
+                     targets: writev:gvt_1.out 4/s, write:gvt_16.out 2/s, mmap:67108864 1/s, mmap:33558528 1/s, mmap:5246976 1/s
+  median PE: 261 calls/s; rank 0 ÷ median = 27
+  other 1940147            16 calls/s, 1065.9 ms/s in calls: poll 16/s 1065.9 ms/s
+                     targets: poll:fd[{fd=8 16/s
+
+ST_m0_s100_r2: 25 thread files, 23 PE tids mapped; window 1.83 s of 3.04 s
+  rank 0 (1941264)       7207 calls/s,   89.1 ms/s in calls: openat 2103/s 25.3 ms/s, read 1787/s 12.3 ms/s, close 1708/s 11.0 ms/s, futex 973/s 9.5 ms/s, brk 96/s 1.3 ms/s, mmap 90/s 3.2 ms/s
+                     targets: read:gvt_0.out 1612/s, read:/dev/hfi1_0 169/s, mmap:4096 19/s, writev:gvt_0.out 17/s, writev:gvt_waves_0.csv 16/s
+  rank 1 (1941337)        467 calls/s,   26.8 ms/s in calls: futex 401/s 7.4 ms/s, mprotect 49/s 8.2 ms/s, writev 4/s 0.2 ms/s, mmap 3/s 3.0 ms/s, write 3/s 0.1 ms/s, munmap 1/s 0.0 ms/s
+                     targets: writev:gvt_pe_1.csv 4/s, write:gvt_0.out 2/s, mmap:134217728 1/s, munmap:35651584 1/s, munmap:31457280 1/s
+  rank 11 (1941372)       394 calls/s,   18.9 ms/s in calls: futex 333/s 5.8 ms/s, mprotect 44/s 3.2 ms/s, writev 4/s 0.2 ms/s, mmap 3/s 2.5 ms/s, write 3/s 0.1 ms/s, openat 1/s 6.8 ms/s
+                     targets: writev:gvt_pe_11.csv 4/s, write:/sys/devices/system/node/node1/hugepages/hugepages-1048576kB/nr_hugepages 2/s, mmap:67108864 1/s, mmap:33558528 1/s, mmap:5246976 1/s
+  rank 22 (1941383)       868 calls/s,   27.8 ms/s in calls: futex 799/s 15.0 ms/s, mprotect 52/s 2.8 ms/s, writev 4/s 0.2 ms/s, mmap 4/s 1.9 ms/s, write 3/s 0.1 ms/s, openat 1/s 7.4 ms/s
+                     targets: writev:gvt_pe_22.csv 4/s, write:gvt_22.out 2/s, mmap:134217728 1/s, munmap:67108864 1/s, mmap:33558528 1/s
+  median PE: 387 calls/s; rank 0 ÷ median = 19
+  other 1941283            64 calls/s,  990.1 ms/s in calls: poll 64/s 990.1 ms/s
+                     targets: poll:fd[{fd=8 64/s
+
+ST_m0_s2000_r1: 25 thread files, 23 PE tids mapped; window 2.21 s of 3.68 s
+  rank 0 (1940688)       6773 calls/s,  128.8 ms/s in calls: futex 1931/s 58.7 ms/s, openat 1554/s 19.3 ms/s, read 1275/s 8.7 ms/s, close 1232/s 8.1 ms/s, process_vm_readv 342/s 9.9 ms/s, writev 225/s 4.4 ms/s
+                     targets: read:gvt_19.out 1270/s, writev:/dev/hfi1_0 218/s, mmap:2101248 10/s, read:gvt_5.out 5/s, writev:gvt_pe_0.csv 3/s
+  rank 1 (1940766)       2412 calls/s,   93.1 ms/s in calls: futex 1800/s 59.0 ms/s, process_vm_readv 344/s 13.5 ms/s, writev 208/s 6.2 ms/s, mprotect 49/s 4.7 ms/s, mmap 3/s 2.3 ms/s, write 2/s 0.1 ms/s
+                     targets: writev:/dev/hfi1_0 205/s, writev:gvt_pe_1.csv 3/s, write:gvt_1.out 2/s, mmap:134217728 0/s, munmap:39845888 0/s
+  rank 11 (1940796)      2178 calls/s,   81.4 ms/s in calls: futex 1774/s 56.9 ms/s, process_vm_readv 197/s 6.1 ms/s, writev 149/s 4.4 ms/s, mprotect 48/s 4.1 ms/s, mmap 3/s 2.5 ms/s, write 2/s 0.1 ms/s
+                     targets: writev:/dev/hfi1_0 145/s, writev:gvt_pe_11.csv 3/s, write:gvt_11.out 2/s, mmap:67108864 0/s, mmap:33558528 0/s
+  rank 22 (1940807)      2223 calls/s,   74.8 ms/s in calls: futex 1958/s 57.2 ms/s, process_vm_readv 114/s 3.4 ms/s, writev 96/s 2.3 ms/s, mprotect 44/s 2.8 ms/s, mmap 3/s 1.6 ms/s, write 2/s 0.1 ms/s
+                     targets: writev:/dev/hfi1_0 92/s, writev:gvt_pe_22.csv 3/s, write:gvt_8.out 2/s, mmap:134217728 0/s, munmap:67108864 0/s
+  median PE: 2202 calls/s; rank 0 ÷ median = 3
+  other 1940707           131 calls/s,  997.2 ms/s in calls: poll 115/s 996.4 ms/s, process_vm_readv 13/s 0.7 ms/s, munmap 1/s 0.0 ms/s, mmap 1/s 0.0 ms/s, mprotect 0/s 0.0 ms/s
+                     targets: poll:fd[{fd=8 115/s, mmap:67108864 0/s, munmap:67108864 0/s, mmap:134217728 0/s, munmap:54525952 0/s
+
+ST_m0_s2000_r2: 25 thread files, 23 PE tids mapped; window 2.22 s of 3.70 s
+  rank 0 (1941842)       6665 calls/s,  124.2 ms/s in calls: futex 1842/s 62.8 ms/s, openat 1545/s 14.5 ms/s, read 1295/s 9.1 ms/s, close 1225/s 7.6 ms/s, process_vm_readv 328/s 9.0 ms/s, writev 206/s 3.8 ms/s
+                     targets: read:/sys/devices/system/cpu/online 1290/s, writev:/dev/hfi1_0 206/s, mmap:2101248 10/s, read:gvt_ranks_0.csv 5/s, mmap:397312 0/s
+  rank 1 (1941915)       2326 calls/s,   82.4 ms/s in calls: futex 1771/s 55.4 ms/s, process_vm_readv 310/s 11.7 ms/s, writev 190/s 6.2 ms/s, mprotect 48/s 5.0 ms/s, mmap 3/s 3.8 ms/s, munmap 1/s 0.2 ms/s
+                     targets: writev:/dev/hfi1_0 190/s, mmap:134217728 0/s, munmap:41943040 0/s, munmap:25165824 0/s, mmap:33558528 0/s
+  rank 11 (1941945)      2094 calls/s,   71.6 ms/s in calls: futex 1732/s 54.5 ms/s, process_vm_readv 184/s 5.9 ms/s, writev 125/s 3.4 ms/s, mprotect 46/s 4.3 ms/s, mmap 3/s 3.3 ms/s, rseq 0/s 0.0 ms/s
+                     targets: writev:/dev/hfi1_0 125/s, mmap:67108864 0/s, mmap:33558528 0/s, mmap:5246976 0/s, mmap:99618816 0/s
+  rank 22 (1941961)      2399 calls/s,   72.3 ms/s in calls: futex 2152/s 62.2 ms/s, process_vm_readv 109/s 2.9 ms/s, writev 86/s 1.9 ms/s, mprotect 46/s 2.3 ms/s, mmap 3/s 2.8 ms/s, rseq 0/s 0.0 ms/s
+                     targets: writev:/dev/hfi1_0 86/s, mmap:67108864 0/s, mmap:33558528 0/s, mmap:5246976 0/s, mmap:99618816 0/s
+  median PE: 2218 calls/s; rank 0 ÷ median = 3
+  other 1941856           127 calls/s,  965.0 ms/s in calls: poll 109/s 964.3 ms/s, process_vm_readv 16/s 0.7 ms/s, munmap 1/s 0.0 ms/s, mmap 0/s 0.0 ms/s, mprotect 0/s 0.0 ms/s
+                     targets: poll:fd[{fd=8 109/s, mmap:134217728 0/s, munmap:58720256 0/s, munmap:8388608 0/s
+
+ST_mtrim_s100_r1: 25 thread files, 23 PE tids mapped; window 1.65 s of 2.74 s
+  rank 0 (1940416)       7501 calls/s,   89.1 ms/s in calls: openat 2384/s 29.4 ms/s, read 2031/s 14.1 ms/s, close 1943/s 12.1 ms/s, futex 516/s 7.7 ms/s, mmap 74/s 2.2 ms/s, gettid 71/s 0.4 ms/s
+                     targets: read:/sys/devices/system/cpu/online 1790/s, read:/dev/hfi1_0 234/s, writev:/sys/devices/system/cpu/online 39/s, mmap:4096 24/s, ioctl:/dev/hfi1_0 18/s
+  rank 1 (1940485)        346 calls/s,   14.9 ms/s in calls: futex 329/s 5.0 ms/s, writev 5/s 0.2 ms/s, write 3/s 0.2 ms/s, mmap 1/s 0.3 ms/s, munmap 1/s 0.2 ms/s, openat 1/s 8.6 ms/s
+                     targets: writev:gvt_pe_1.csv 5/s, write:gvt_12.out 2/s, mmap:134217728 1/s, munmap:18874368 1/s, munmap:48234496 1/s
+  rank 11 (1940514)       243 calls/s,   12.6 ms/s in calls: futex 227/s 2.6 ms/s, writev 5/s 0.2 ms/s, write 3/s 0.1 ms/s, mmap 1/s 0.9 ms/s, openat 1/s 8.4 ms/s, close 1/s 0.2 ms/s
+                     targets: writev:gvt_pe_11.csv 5/s, write:gvt_11.out 2/s, mmap:67108864 1/s, mmap:99618816 1/s, write:gvt_pe_11.csv 1/s
+  rank 22 (1940525)       598 calls/s,   14.9 ms/s in calls: futex 580/s 5.8 ms/s, writev 5/s 0.5 ms/s, write 3/s 0.1 ms/s, mmap 2/s 0.1 ms/s, openat 1/s 7.9 ms/s, close 1/s 0.2 ms/s
+                     targets: writev:/sys/devices/system/cpu/online 5/s, write:/sys/devices/system/cpu/online 3/s, mmap:134217728 1/s, munmap:67108864 1/s, mmap:99618816 1/s
+  median PE: 281 calls/s; rank 0 ÷ median = 27
+  other 1940430            37 calls/s, 1024.3 ms/s in calls: poll 37/s 1024.3 ms/s
+                     targets: poll:fd[{fd=8 37/s
+
+ST_mtrim_s100_r2: 25 thread files, 23 PE tids mapped; window 1.70 s of 2.84 s
+  rank 0 (1941558)       7163 calls/s,  154.7 ms/s in calls: openat 2258/s 29.3 ms/s, read 1919/s 13.0 ms/s, close 1833/s 11.3 ms/s, futex 581/s 6.9 ms/s, mmap 65/s 1.7 ms/s, faccessat2 63/s 0.6 ms/s
+                     targets: read:/sys/devices/system/cpu/online 1730/s, read:/dev/hfi1_0 181/s, writev:/sys/devices/system/cpu/online 31/s, mmap:4096 21/s, writev:gvt_pe_21.csv 17/s
+  rank 1 (1941631)        264 calls/s,   14.1 ms/s in calls: futex 247/s 3.4 ms/s, writev 5/s 0.2 ms/s, write 3/s 0.1 ms/s, mmap 1/s 0.3 ms/s, munmap 1/s 0.2 ms/s, openat 1/s 9.5 ms/s
+                     targets: writev:gvt_pe_1.csv 5/s, write:gvt_1.out 2/s, mmap:134217728 1/s, munmap:37748736 1/s, munmap:29360128 1/s
+  rank 11 (1941666)       223 calls/s,   13.6 ms/s in calls: futex 207/s 2.5 ms/s, writev 5/s 0.2 ms/s, write 3/s 0.1 ms/s, mmap 1/s 0.7 ms/s, openat 1/s 9.2 ms/s, close 1/s 0.2 ms/s
+                     targets: writev:gvt_pe_11.csv 5/s, write:/sys/devices/system/cpu/online 2/s, mmap:67108864 1/s, mmap:99618816 1/s, write:gvt_pe_11.csv 1/s
+  rank 22 (1941677)       552 calls/s,    9.1 ms/s in calls: futex 536/s 5.4 ms/s, writev 5/s 0.2 ms/s, write 3/s 0.1 ms/s, mmap 1/s 0.0 ms/s, openat 1/s 3.0 ms/s, close 1/s 0.1 ms/s
+                     targets: writev:gvt_1.out 5/s, write:/sys/devices/system/cpu/online 2/s, mmap:67108864 1/s, mmap:99618816 1/s, write:gvt_1.out 1/s
+  median PE: 229 calls/s; rank 0 ÷ median = 31
+  other 1941577            21 calls/s,  978.1 ms/s in calls: poll 21/s 978.1 ms/s
+                     targets: poll:fd[{fd=8 21/s

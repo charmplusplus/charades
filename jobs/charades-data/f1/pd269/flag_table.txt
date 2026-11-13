@@ -1,0 +1,21 @@
+Launch (all 66): srun --mpi=pmi2 --kill-on-bad-exit=1 --wait=30 -N 16 -n 32 -c 24 -w <16 nodes> [perfwrap_d.sh: profile runs only] numactl --localalloc phold
+Flags in every arm: +pe 736 <run /work2/09863/rrao/stampede3/charades-pplpad/tests/test_configs/bucket --optimism-window=400 --gvt-bucket-size=8 --aggregation=1 --agg-buffer=512 --agg-policy=1 --agg-horizon-margin=8 +lci_ndevices 23 +pemap 2-46:2,3-47:2 +mempool_remote_free
+arm                    runs perfwrap  flags beyond the common set
+warm_l1p2                 1       no  dir>/steady_100_1000_1.0_94208_15_256000 --agg-mode=2 --agg-pp-local=1 --agg-pp-pad=2
+uni_wps_512               5       no  dir>/steady_100_1000_1.0_94208_15_2048000 --agg-mode=0
+uni_pp_512                5       no  dir>/steady_100_1000_1.0_94208_15_2048000 --agg-mode=2
+uni_pp_512_l16_p1         5       no  dir>/steady_100_1000_1.0_94208_15_2048000 --agg-mode=2 --agg-pp-pad=1
+uni_pp_512_l16_p2         5       no  dir>/steady_100_1000_1.0_94208_15_2048000 --agg-mode=2 --agg-pp-pad=2
+uni_pp_512_l1             5       no  dir>/steady_100_1000_1.0_94208_15_2048000 --agg-mode=2 --agg-pp-local=1
+uni_pp_512_l1_p1          5       no  dir>/steady_100_1000_1.0_94208_15_2048000 --agg-mode=2 --agg-pp-local=1 --agg-pp-pad=1
+uni_pp_512_l1_p2          5       no  dir>/steady_100_1000_1.0_94208_15_2048000 --agg-mode=2 --agg-pp-local=1 --agg-pp-pad=2
+g4000_pp_512              5       no  dir>/gauss_100_1000_4000_94208_15_2048000 --agg-mode=2
+g4000_pp_512_l16_p2       5       no  dir>/gauss_100_1000_4000_94208_15_2048000 --agg-mode=2 --agg-pp-pad=2
+g4000_pp_512_l1           5       no  dir>/gauss_100_1000_4000_94208_15_2048000 --agg-mode=2 --agg-pp-local=1
+g4000_pp_512_l1_p1        5       no  dir>/gauss_100_1000_4000_94208_15_2048000 --agg-mode=2 --agg-pp-local=1 --agg-pp-pad=1
+g4000_pp_512_l1_p2        5       no  dir>/gauss_100_1000_4000_94208_15_2048000 --agg-mode=2 --agg-pp-local=1 --agg-pp-pad=2
+prof_wps_512              1      yes  dir>/steady_100_1000_1.0_94208_15_2048000 --agg-mode=0
+prof_pp_512               1      yes  dir>/steady_100_1000_1.0_94208_15_2048000 --agg-mode=2
+prof_pp_512_l1            1      yes  dir>/steady_100_1000_1.0_94208_15_2048000 --agg-mode=2 --agg-pp-local=1
+prof_pp_512_l1_p1         1      yes  dir>/steady_100_1000_1.0_94208_15_2048000 --agg-mode=2 --agg-pp-local=1 --agg-pp-pad=1
+prof_pp_512_l1_p2         1      yes  dir>/steady_100_1000_1.0_94208_15_2048000 --agg-mode=2 --agg-pp-local=1 --agg-pp-pad=2

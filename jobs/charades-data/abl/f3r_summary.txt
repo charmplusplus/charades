@@ -1,0 +1,139 @@
+# Counts and digests (one value per workload and node count is right)
+n4 g100  ok  18 not ok  0  counts ['723814576']  digests ['60ae9641a33971e2']
+n4 g2000 ok  18 not ok  0  counts ['723816353']  digests ['acbaf97337f45bc0']
+n4 uni   ok  18 not ok  0  counts ['723815947']  digests ['e4ad729389332e94']
+n4 tr    ok  18 not ok  0  counts ['2262103209']  digests ['f4babdcd41892605']
+n4 df    ok   2 not ok  0  counts ['1445988962']  digests ['bdaedbeb3f00545f']
+n16 g100  ok  18 not ok  0  counts ['2895362159']  digests ['e1f0e10bdbd289e6']
+n16 g2000 ok  18 not ok  0  counts ['2895361550']  digests ['6f651f43e1858b3e']
+n16 uni   ok  18 not ok  0  counts ['2895361579']  digests ['da0417dfc6ae6116']
+n16 tr    ok  18 not ok  0  counts ['9048375910']  digests ['58f089905cadc8ce']
+n1 df    ok   2 not ok  0  counts ['382524695']  digests ['08f17bb7d4f828d1']
+
+## 4 nodes: M committed ev/s (mean of 2 reps; higher is better) and event counts (M, mean of 2 reps)
+
+### σ 100 (W B = 400)
+| arm | window | M ev/s | rolled back (M) | remote sends (M) | anti-messages (M) | held (M) | held ÷ remote sends | held cancelled in sender (M) |
+|---|---|---|---|---|---|---|---|---|
+| no hold, fast path on | none | 80.06 | 753.5 | 1382.4 | 705.0 | — | — | — |
+| no hold, fast path on | 400 | 95.69 | 0.2 | 677.5 | 0.2 | — | — | — |
+| no hold, fast path off | none | 61.62 | 414.1 | 1064.8 | 387.4 | — | — | — |
+| no hold, fast path off | 400 | 77.42 | 0.2 | 677.6 | 0.2 | — | — | — |
+| hold, cutoff 16 | none | 11.16 | 2020.8 | 2568.8 | 1891.4 | 2568.8 | 1.00 | 192.9 |
+| hold, cutoff 128 | none | 42.34 | 609.6 | 1247.9 | 570.6 | 1245.4 | 1.00 | 185.2 |
+| hold, cutoff 512 | none | 60.02 | 385.4 | 1038.0 | 360.7 | 758.2 | 0.73 | 92.1 |
+| hold, cutoff 16 | 400 | 80.06 | 0.3 | 677.7 | 0.3 | 677.7 | 1.00 | 0.1 |
+| hold, cutoff 128 | 400 | 76.48 | 0.2 | 677.6 | 0.2 | 360.8 | 0.53 | 0.1 |
+
+### σ 2,000 (W B = 400)
+| arm | window | M ev/s | rolled back (M) | remote sends (M) | anti-messages (M) | held (M) | held ÷ remote sends | held cancelled in sender (M) |
+|---|---|---|---|---|---|---|---|---|
+| no hold, fast path on | none | 49.88 | 82.9 | 803.6 | 82.5 | — | — | — |
+| no hold, fast path on | 400 | 55.04 | 0.3 | 721.5 | 0.3 | — | — | — |
+| no hold, fast path off | none | 45.55 | 75.5 | 796.3 | 75.2 | — | — | — |
+| no hold, fast path off | 400 | 49.53 | 0.3 | 721.5 | 0.3 | — | — | — |
+| hold, cutoff 16 | none | 20.27 | 817.2 | 1535.5 | 814.4 | 1535.5 | 1.00 | 375.0 |
+| hold, cutoff 128 | none | 25.30 | 595.2 | 1314.3 | 593.1 | 1279.1 | 0.97 | 266.1 |
+| hold, cutoff 512 | none | 44.44 | 82.9 | 803.7 | 82.6 | 36.3 | 0.05 | 1.3 |
+| hold, cutoff 16 | 400 | 47.77 | 0.6 | 721.8 | 0.6 | 721.8 | 1.00 | 0.3 |
+| hold, cutoff 128 | 400 | 49.64 | 0.3 | 721.5 | 0.3 | 383.6 | 0.53 | 0.1 |
+
+### uniform (W B = 400)
+| arm | window | M ev/s | rolled back (M) | remote sends (M) | anti-messages (M) | held (M) | held ÷ remote sends | held cancelled in sender (M) |
+|---|---|---|---|---|---|---|---|---|
+| no hold, fast path on | none | 39.19 | 33.3 | 756.2 | 33.2 | — | — | — |
+| no hold, fast path on | 400 | 40.64 | 0.3 | 723.3 | 0.3 | — | — | — |
+| no hold, fast path off | none | 37.30 | 42.2 | 765.1 | 42.1 | — | — | — |
+| no hold, fast path off | 400 | 39.94 | 0.3 | 723.3 | 0.3 | — | — | — |
+| hold, cutoff 16 | none | 10.09 | 1772.3 | 2493.6 | 1770.6 | 2493.6 | 1.00 | 898.3 |
+| hold, cutoff 128 | none | 12.41 | 1323.3 | 2044.9 | 1321.9 | 2017.8 | 0.99 | 643.7 |
+| hold, cutoff 512 | none | 37.57 | 37.7 | 760.6 | 37.6 | 24.4 | 0.03 | 0.4 |
+| hold, cutoff 16 | 400 | 36.01 | 0.6 | 723.5 | 0.6 | 723.5 | 1.00 | 0.2 |
+| hold, cutoff 128 | 400 | 40.18 | 0.3 | 723.3 | 0.3 | 383.8 | 0.53 | 0.1 |
+
+### traffic (W B = 1000)
+| arm | window | M ev/s | rolled back (M) | remote sends (M) | anti-messages (M) | held (M) | held ÷ remote sends | held cancelled in sender (M) |
+|---|---|---|---|---|---|---|---|---|
+| no hold, fast path on | none | 187.57 | 911.3 | 554.4 | 153.9 | — | — | — |
+| no hold, fast path on | 1000 | 200.71 | 4.1 | 401.2 | 0.7 | — | — | — |
+| no hold, fast path off | none | 164.77 | 743.8 | 526.6 | 126.1 | — | — | — |
+| no hold, fast path off | 1000 | 182.70 | 4.4 | 401.3 | 0.8 | — | — | — |
+| hold, cutoff 16 | none | 178.98 | 575.7 | 503.3 | 102.8 | 503.3 | 1.00 | 24.6 |
+| hold, cutoff 128 | none | 181.10 | 544.1 | 497.5 | 97.0 | 496.1 | 1.00 | 23.3 |
+| hold, cutoff 512 | none | 164.64 | 725.8 | 527.7 | 127.2 | 410.6 | 0.78 | 25.9 |
+| hold, cutoff 16 | 1000 | 190.58 | 6.8 | 401.7 | 1.2 | 401.7 | 1.00 | 0.3 |
+| hold, cutoff 128 | 1000 | 188.25 | 4.1 | 401.2 | 0.7 | 392.5 | 0.98 | 0.3 |
+
+## 4 nodes: ratios (higher is better for the first arm named)
+| workload | fast path off ÷ on, no window / W B | hold ÷ no hold (fast path off), no window, cutoff 16 / 128 / 512 | hold ÷ no hold (fast path off), W B, cutoff 16 / 128 | best hold ÷ best no hold (fast path on) | best hold ÷ deadline htram (section 223) | no window ÷ W B, fast path on |
+|---|---|---|---|---|---|---|
+| σ 100 | 0.77 / 0.81 | 0.18 / 0.69 / 0.97 | 1.03 / 0.99 | 0.84 | 0.40 | 0.84 |
+| σ 2,000 | 0.91 / 0.90 | 0.45 / 0.56 / 0.98 | 0.96 / 1.00 | 0.90 | 0.32 | 0.91 |
+| uniform | 0.95 / 0.98 | 0.27 / 0.33 / 1.01 | 0.90 / 1.01 | 0.99 | 0.30 | 0.96 |
+| traffic | 0.88 / 0.91 | 1.09 / 1.10 / 1.00 | 1.04 / 1.03 | 0.95 | 0.67 | 0.93 |
+
+## 16 nodes: M committed ev/s (mean of 2 reps; higher is better) and event counts (M, mean of 2 reps)
+
+### σ 100 (W B = 400)
+| arm | window | M ev/s | rolled back (M) | remote sends (M) | anti-messages (M) | held (M) | held ÷ remote sends | held cancelled in sender (M) |
+|---|---|---|---|---|---|---|---|---|
+| no hold, fast path on | none | 314.79 | 3021.5 | 5537.0 | 2827.4 | — | — | — |
+| no hold, fast path on | 400 | 373.86 | 0.2 | 2709.8 | 0.2 | — | — | — |
+| no hold, fast path off | none | 236.64 | 1704.7 | 4304.2 | 1594.6 | — | — | — |
+| no hold, fast path off | 400 | 303.27 | 0.2 | 2709.8 | 0.2 | — | — | — |
+| hold, cutoff 16 | none | 46.92 | 8757.8 | 10905.5 | 8195.9 | 10905.5 | 1.00 | 460.0 |
+| hold, cutoff 128 | none | 98.13 | 4793.2 | 7196.3 | 4486.7 | 7189.1 | 1.00 | 1367.6 |
+| hold, cutoff 512 | none | 241.64 | 1382.7 | 4003.2 | 1293.5 | 3147.7 | 0.79 | 418.6 |
+| hold, cutoff 16 | 400 | 311.31 | 1.1 | 2710.7 | 1.0 | 2710.7 | 1.00 | 0.4 |
+| hold, cutoff 128 | 400 | 302.22 | 0.2 | 2709.8 | 0.2 | 1444.3 | 0.53 | 0.1 |
+
+### σ 2,000 (W B = 400)
+| arm | window | M ev/s | rolled back (M) | remote sends (M) | anti-messages (M) | held (M) | held ÷ remote sends | held cancelled in sender (M) |
+|---|---|---|---|---|---|---|---|---|
+| no hold, fast path on | none | 190.47 | 378.5 | 3261.4 | 376.7 | — | — | — |
+| no hold, fast path on | 400 | 210.54 | 0.3 | 2885.0 | 0.3 | — | — | — |
+| no hold, fast path off | none | 174.09 | 351.7 | 3234.8 | 350.0 | — | — | — |
+| no hold, fast path off | 400 | 193.73 | 0.3 | 2885.0 | 0.3 | — | — | — |
+| hold, cutoff 16 | none | 66.75 | 4147.0 | 7017.4 | 4132.7 | 7017.4 | 1.00 | 1912.1 |
+| hold, cutoff 128 | none | 86.94 | 2852.5 | 5727.2 | 2842.5 | 5715.8 | 1.00 | 1309.7 |
+| hold, cutoff 512 | none | 172.80 | 369.7 | 3252.7 | 368.0 | 575.1 | 0.18 | 37.1 |
+| hold, cutoff 16 | 400 | 183.51 | 1.6 | 2886.3 | 1.6 | 2886.3 | 1.00 | 0.7 |
+| hold, cutoff 128 | 400 | 191.31 | 0.3 | 2885.0 | 0.3 | 1535.3 | 0.53 | 0.1 |
+
+### uniform (W B = 400)
+| arm | window | M ev/s | rolled back (M) | remote sends (M) | anti-messages (M) | held (M) | held ÷ remote sends | held cancelled in sender (M) |
+|---|---|---|---|---|---|---|---|---|
+| no hold, fast path on | none | 129.48 | 278.2 | 3171.2 | 277.8 | — | — | — |
+| no hold, fast path on | 400 | 143.93 | 0.4 | 2893.8 | 0.4 | — | — | — |
+| no hold, fast path off | none | 130.96 | 259.9 | 3153.0 | 259.5 | — | — | — |
+| no hold, fast path off | 400 | 144.57 | 0.3 | 2893.8 | 0.3 | — | — | — |
+| hold, cutoff 16 | none | 35.10 | 7654.8 | 10544.9 | 7651.5 | 10544.9 | 1.00 | 3834.5 |
+| hold, cutoff 128 | none | 40.80 | 6839.1 | 9728.7 | 6835.2 | 9721.5 | 1.00 | 3475.2 |
+| hold, cutoff 512 | none | 128.90 | 292.8 | 3185.8 | 292.3 | 191.9 | 0.06 | 6.6 |
+| hold, cutoff 16 | 400 | 136.92 | 1.4 | 2894.9 | 1.4 | 2894.9 | 1.00 | 0.7 |
+| hold, cutoff 128 | 400 | 146.63 | 0.3 | 2893.8 | 0.3 | 1538.8 | 0.53 | 0.1 |
+
+### traffic (W B = 1000)
+| arm | window | M ev/s | rolled back (M) | remote sends (M) | anti-messages (M) | held (M) | held ÷ remote sends | held cancelled in sender (M) |
+|---|---|---|---|---|---|---|---|---|
+| no hold, fast path on | none | 723.48 | 3789.0 | 2241.8 | 639.8 | — | — | — |
+| no hold, fast path on | 1000 | 773.96 | 5.4 | 1603.0 | 1.0 | — | — | — |
+| no hold, fast path off | none | 641.05 | 3008.8 | 2112.0 | 510.0 | — | — | — |
+| no hold, fast path off | 1000 | 716.73 | 5.2 | 1602.9 | 0.9 | — | — | — |
+| hold, cutoff 16 | none | 612.12 | 3325.7 | 2228.2 | 626.2 | 2228.2 | 1.00 | 176.5 |
+| hold, cutoff 128 | none | 640.09 | 3015.1 | 2163.7 | 561.7 | 2163.6 | 1.00 | 156.2 |
+| hold, cutoff 512 | none | 629.47 | 3126.3 | 2165.9 | 563.9 | 1830.3 | 0.85 | 141.9 |
+| hold, cutoff 16 | 1000 | 761.15 | 17.6 | 1605.2 | 3.2 | 1605.2 | 1.00 | 1.2 |
+| hold, cutoff 128 | 1000 | 744.07 | 4.1 | 1602.7 | 0.7 | 1569.3 | 0.98 | 0.3 |
+
+## 16 nodes: ratios (higher is better for the first arm named)
+| workload | fast path off ÷ on, no window / W B | hold ÷ no hold (fast path off), no window, cutoff 16 / 128 / 512 | hold ÷ no hold (fast path off), W B, cutoff 16 / 128 | best hold ÷ best no hold (fast path on) | best hold ÷ deadline htram (section 223) | no window ÷ W B, fast path on |
+|---|---|---|---|---|---|---|
+| σ 100 | 0.75 / 0.81 | 0.20 / 0.41 / 1.02 | 1.03 / 1.00 | 0.83 | 0.38 | 0.84 |
+| σ 2,000 | 0.91 / 0.92 | 0.38 / 0.50 / 0.99 | 0.95 / 0.99 | 0.91 | 0.32 | 0.90 |
+| uniform | 1.01 / 1.00 | 0.27 / 0.31 / 0.98 | 0.95 / 1.01 | 1.02 | 0.38 | 0.90 |
+| traffic | 0.89 / 0.93 | 0.95 / 1.00 / 0.98 | 1.06 / 1.04 | 0.98 | 0.72 | 0.93 |
+
+# ROSS dragonfly window (M committed ev/s, mean of 2 reps) and Charades controller
+n1: W 0: 9.84 (70.7%), W 625: 9.89 (100.0%), W 1250: 12.23 (100.0%), W 2500: 13.70 (99.6%), W 5000: 13.09 (93.6%) | best ÷ none 1.39 (W 2500) | Charades controller 41.80 ÷ ROSS best 3.05 | ROSS counts ['382524695'] Charades ['382524695']
+n4: W 0: 28.69 (63.0%), W 625: 25.77 (100.0%), W 1250: 34.40 (100.0%), W 2500: 40.11 (99.6%), W 5000: 42.25 (96.0%) | best ÷ none 1.47 (W 5000) | Charades controller 125.86 ÷ ROSS best 2.98 | ROSS counts ['1445988962'] Charades ['1445988962']

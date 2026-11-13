@@ -1,0 +1,51 @@
+
+K_s100_r1: 25 threads, window 6.85 s
+  0x3c0ec00: rank 0 95/s, median other PE 2/s, max other 76/s
+  0x14b474015810: rank 0 89/s, median other PE 2/s, max other 124/s
+  0x3bcd9c0: rank 0 27/s, median other PE 41/s, max other 52/s
+  0x3cce610: rank 0 8/s, median other PE 6/s, max other 8/s
+  0x3c3e4c8: rank 0 6/s, median other PE 0/s, max other 2/s
+  stacks on 0x3c0ec00, rank 0 (651 calls):
+      346 FUTEX_WAKE_PRIVATE: __GI___lll_lock_wake@libc.so.6 < __GI___pthread_mutex_unlock_usercnt@libc.so.6 < mempool_malloc@libreconverse.so < comm_backend::lci2_impl::CommBackendLCI2::malloc@libreconverse.so < comm_backend::malloc@libreconverse.so < CmiAlloc@libreconverse.so < lci::progress_recv@liblci.so < lci::process_completion_batch@liblci.so < lci::progress_x::call_impl@liblci.so
+      134 FUTEX_WAIT_PRIVATE: __GI___lll_lock_wait@libc.so.6 < __pthread_mutex_lock@GLIBC_2.2.5@libc.so.6 < mempool_malloc@libreconverse.so < comm_backend::lci2_impl::CommBackendLCI2::malloc@libreconverse.so < comm_backend::malloc@libreconverse.so < CmiAlloc@libreconverse.so < lci::progress_recv@liblci.so < lci::process_completion_batch@liblci.so < lci::progress_x::call_impl@liblci.so
+       31 FUTEX_WAKE_PRIVATE: __GI___lll_lock_wake@libc.so.6 < __GI___pthread_mutex_unlock_usercnt@libc.so.6 < mempool_malloc@libreconverse.so < comm_backend::lci2_impl::CommBackendLCI2::malloc@libreconverse.so < comm_backend::malloc@libreconverse.so < CmiAlloc@libreconverse.so < CkAllocMsg@phold < HTram::shipLocalPP@phold < agg_send@phold
+       24 FUTEX_WAKE_PRIVATE: __GI___lll_lock_wake@libc.so.6 < __GI___pthread_mutex_unlock_usercnt@libc.so.6 < lci::progress_send@liblci.so < lci::process_completion_batch@liblci.so < lci::progress_x::call_impl@liblci.so < comm_backend::lci2_impl::CommBackendLCI2::progress@libreconverse.so < pollProgress@libreconverse.so < CsdSchedulerRegistered@libreconverse.so < CsdScheduler@libreconverse.so
+  stacks on 0x3c0ec00, other PEs (1087 calls):
+      526 FUTEX_WAKE_PRIVATE: __GI___lll_lock_wake@libc.so.6 < __GI___pthread_mutex_unlock_usercnt@libc.so.6 < CkDeliverMessageFree@phold < CkLocRec::invokeEntry@phold < _processHandler@phold < pollConverseThreadQueue@libreconverse.so < CsdSchedulerRegistered@libreconverse.so < CsdScheduler@libreconverse.so < StartInteropScheduler@libreconverse.so
+      224 FUTEX_WAIT_PRIVATE: __GI___lll_lock_wait@libc.so.6 < __pthread_mutex_lock@GLIBC_2.2.5@libc.so.6 < mempool_free_thread@libreconverse.so < CkDeliverMessageFree@phold < CkLocRec::invokeEntry@phold < _processHandler@phold < pollConverseThreadQueue@libreconverse.so < CsdSchedulerRegistered@libreconverse.so < CsdScheduler@libreconverse.so
+      176 FUTEX_WAKE_PRIVATE: __GI___lll_lock_wake@libc.so.6 < __GI___pthread_mutex_unlock_usercnt@libc.so.6 < HTramRecv::receive_small@phold < CkDeliverMessageFree@phold < _processHandler@phold < pollNodeQueuesFirst@libreconverse.so < CsdSchedulerRegistered@libreconverse.so < CsdScheduler@libreconverse.so < StartInteropScheduler@libreconverse.so
+       66 FUTEX_WAIT_PRIVATE: __GI___lll_lock_wait@libc.so.6 < __pthread_mutex_lock@GLIBC_2.2.5@libc.so.6 < mempool_free_thread@libreconverse.so < HTramRecv::receive_small@phold < CkDeliverMessageFree@phold < _processHandler@phold < pollNodeQueuesFirst@libreconverse.so < CsdSchedulerRegistered@libreconverse.so < CsdScheduler@libreconverse.so
+
+K_s100_r2: 25 threads, window 7.69 s
+  0x3b2d4e0: rank 0 91/s, median other PE 2/s, max other 72/s
+  0x153860015810: rank 0 71/s, median other PE 2/s, max other 96/s
+  0x3aec280: rank 0 34/s, median other PE 38/s, max other 47/s
+  0x3b4bb90: rank 0 6/s, median other PE 5/s, max other 8/s
+  0x3b5a218: rank 0 6/s, median other PE 1/s, max other 2/s
+  stacks on 0x3b2d4e0, rank 0 (699 calls):
+      422 FUTEX_WAKE_PRIVATE: __GI___lll_lock_wake@libc.so.6 < __GI___pthread_mutex_unlock_usercnt@libc.so.6 < mempool_malloc@libreconverse.so < comm_backend::lci2_impl::CommBackendLCI2::malloc@libreconverse.so < comm_backend::malloc@libreconverse.so < CmiAlloc@libreconverse.so < lci::progress_recv@liblci.so < lci::process_completion_batch@liblci.so < lci::progress_x::call_impl@liblci.so
+      141 FUTEX_WAIT_PRIVATE: __GI___lll_lock_wait@libc.so.6 < __pthread_mutex_lock@GLIBC_2.2.5@libc.so.6 < mempool_malloc@libreconverse.so < comm_backend::lci2_impl::CommBackendLCI2::malloc@libreconverse.so < comm_backend::malloc@libreconverse.so < CmiAlloc@libreconverse.so < lci::progress_recv@liblci.so < lci::process_completion_batch@liblci.so < lci::progress_x::call_impl@liblci.so
+       25 FUTEX_WAKE_PRIVATE: __GI___lll_lock_wake@libc.so.6 < __GI___pthread_mutex_unlock_usercnt@libc.so.6 < lci::progress_send@liblci.so < lci::process_completion_batch@liblci.so < lci::progress_x::call_impl@liblci.so < comm_backend::lci2_impl::CommBackendLCI2::progress@libreconverse.so < pollProgress@libreconverse.so < CsdSchedulerRegistered@libreconverse.so < CsdScheduler@libreconverse.so
+       14 FUTEX_WAKE_PRIVATE: __GI___lll_lock_wake@libc.so.6 < __GI___pthread_mutex_unlock_usercnt@libc.so.6 < mempool_malloc@libreconverse.so < comm_backend::lci2_impl::CommBackendLCI2::malloc@libreconverse.so < comm_backend::malloc@libreconverse.so < CmiAlloc@libreconverse.so < CkAllocMsg@phold < HTram::shipLocalPP@phold < agg_send@phold
+  stacks on 0x3b2d4e0, other PEs (1156 calls):
+      558 FUTEX_WAKE_PRIVATE: __GI___lll_lock_wake@libc.so.6 < __GI___pthread_mutex_unlock_usercnt@libc.so.6 < CkDeliverMessageFree@phold < CkLocRec::invokeEntry@phold < _processHandler@phold < pollConverseThreadQueue@libreconverse.so < CsdSchedulerRegistered@libreconverse.so < CsdScheduler@libreconverse.so < StartInteropScheduler@libreconverse.so
+      262 FUTEX_WAIT_PRIVATE: __GI___lll_lock_wait@libc.so.6 < __pthread_mutex_lock@GLIBC_2.2.5@libc.so.6 < mempool_free_thread@libreconverse.so < CkDeliverMessageFree@phold < CkLocRec::invokeEntry@phold < _processHandler@phold < pollConverseThreadQueue@libreconverse.so < CsdSchedulerRegistered@libreconverse.so < CsdScheduler@libreconverse.so
+      168 FUTEX_WAKE_PRIVATE: __GI___lll_lock_wake@libc.so.6 < __GI___pthread_mutex_unlock_usercnt@libc.so.6 < HTramRecv::receive_small@phold < CkDeliverMessageFree@phold < _processHandler@phold < pollNodeQueuesFirst@libreconverse.so < CsdSchedulerRegistered@libreconverse.so < CsdScheduler@libreconverse.so < StartInteropScheduler@libreconverse.so
+       68 FUTEX_WAIT_PRIVATE: __GI___lll_lock_wait@libc.so.6 < __pthread_mutex_lock@GLIBC_2.2.5@libc.so.6 < mempool_free_thread@libreconverse.so < HTramRecv::receive_small@phold < CkDeliverMessageFree@phold < _processHandler@phold < pollNodeQueuesFirst@libreconverse.so < CsdSchedulerRegistered@libreconverse.so < CsdScheduler@libreconverse.so
+
+K_s2000_r1: 25 threads, window 27.38 s
+  0x265b570: rank 0 71/s, median other PE 6/s, max other 8/s
+  0x2688248: rank 0 22/s, median other PE 4/s, max other 5/s
+  0x261a2c0: rank 0 13/s, median other PE 14/s, max other 16/s
+  0x150558015810: rank 0 9/s, median other PE 6/s, max other 73/s
+  0x150564015810: rank 0 8/s, median other PE 6/s, max other 66/s
+  stacks on 0x265b570, rank 0 (1947 calls):
+      992 FUTEX_WAKE_PRIVATE: __GI___lll_lock_wake@libc.so.6 < __GI___pthread_mutex_unlock_usercnt@libc.so.6 < mempool_malloc@libreconverse.so < comm_backend::lci2_impl::CommBackendLCI2::malloc@libreconverse.so < comm_backend::malloc@libreconverse.so < CmiAlloc@libreconverse.so < lci::progress_recv@liblci.so < lci::process_completion_batch@liblci.so < lci::progress_x::call_impl@liblci.so
+      391 FUTEX_WAIT_PRIVATE: __GI___lll_lock_wait@libc.so.6 < __pthread_mutex_lock@GLIBC_2.2.5@libc.so.6 < mempool_malloc@libreconverse.so < comm_backend::lci2_impl::CommBackendLCI2::malloc@libreconverse.so < comm_backend::malloc@libreconverse.so < CmiAlloc@libreconverse.so < lci::progress_recv@liblci.so < lci::process_completion_batch@liblci.so < lci::progress_x::call_impl@liblci.so
+       72 FUTEX_WAKE_PRIVATE: __GI___lll_lock_wake@libc.so.6 < __GI___pthread_mutex_unlock_usercnt@libc.so.6 < mempool_malloc@libreconverse.so < comm_backend::lci2_impl::CommBackendLCI2::malloc@libreconverse.so < comm_backend::malloc@libreconverse.so < CmiAlloc@libreconverse.so < CkAllocMsg@phold < HTramRecv::receive_small@phold < CkDeliverMessageFree@phold
+       59 FUTEX_WAKE_PRIVATE: __GI___lll_lock_wake@libc.so.6 < __GI___pthread_mutex_unlock_usercnt@libc.so.6 < mempool_malloc@libreconverse.so < comm_backend::lci2_impl::CommBackendLCI2::malloc@libreconverse.so < comm_backend::malloc@libreconverse.so < CmiAlloc@libreconverse.so < CkAllocMsg@phold < charm_anti_send@phold < tw_event_rollback@phold
+  stacks on 0x265b570, other PEs (3612 calls):
+     1546 FUTEX_WAKE_PRIVATE: __GI___lll_lock_wake@libc.so.6 < __GI___pthread_mutex_unlock_usercnt@libc.so.6 < CkDeliverMessageFree@phold < CkLocRec::invokeEntry@phold < _processHandler@phold < pollConverseThreadQueue@libreconverse.so < CsdSchedulerRegistered@libreconverse.so < CsdScheduler@libreconverse.so < StartInteropScheduler@libreconverse.so
+      806 FUTEX_WAKE_PRIVATE: __GI___lll_lock_wake@libc.so.6 < __GI___pthread_mutex_unlock_usercnt@libc.so.6 < HTramRecv::receive_small@phold < CkDeliverMessageFree@phold < _processHandler@phold < pollNodeQueuesFirst@libreconverse.so < CsdSchedulerRegistered@libreconverse.so < CsdScheduler@libreconverse.so < StartInteropScheduler@libreconverse.so
+      711 FUTEX_WAIT_PRIVATE: __GI___lll_lock_wait@libc.so.6 < __pthread_mutex_lock@GLIBC_2.2.5@libc.so.6 < mempool_free_thread@libreconverse.so < CkDeliverMessageFree@phold < CkLocRec::invokeEntry@phold < _processHandler@phold < pollConverseThreadQueue@libreconverse.so < CsdSchedulerRegistered@libreconverse.so < CsdScheduler@libreconverse.so
+      321 FUTEX_WAIT_PRIVATE: __GI___lll_lock_wait@libc.so.6 < __pthread_mutex_lock@GLIBC_2.2.5@libc.so.6 < mempool_free_thread@libreconverse.so < HTramRecv::receive_small@phold < CkDeliverMessageFree@phold < _processHandler@phold < pollNodeQueuesFirst@libreconverse.so < CsdSchedulerRegistered@libreconverse.so < CsdScheduler@libreconverse.so

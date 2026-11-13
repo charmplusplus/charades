@@ -1,0 +1,34 @@
+== 1. Untraced runs: throughput, first 2 s against the rest (from progress lines)
+arm                      N   rep  exec s   M ev/s | rest÷first2s lost in 2s | other slow 0.25 s bins (s)
+g2000_delay             16    r1    5.82    497.4 |         1.18       0.30 | 
+g2000_delay             16    r2    5.89    491.4 |         1.17       0.29 | 
+g2000_delay             16    r3    5.84    495.7 |         1.20       0.33 | 
+g2000_direct            16    r1   14.40    201.0 |         1.00       0.01 | 
+g2000_direct            16    r2   14.85    194.9 |         1.02       0.04 | 
+g2000_direct            16    r3   14.43    200.6 |         1.01       0.01 | 
+g2000_pp_perf           16    r1    6.09    475.8 |         1.22       0.36 | 
+g2000_pp_perf           16    r2    6.12    473.3 |         1.21       0.34 | 
+g2000_pp                16    r1    5.89    491.3 |         1.25       0.39 | 
+g2000_pp                16    r2    6.00    482.9 |         1.22       0.36 | 
+g2000_pp                16    r3    5.98    484.4 |         1.21       0.35 | 
+g2000_wps               16    r1    5.69    509.2 |         1.06       0.10 | 
+g2000_wps               16    r2    5.92    489.1 |         1.00      -0.01 | 2.75
+g2000_wps               16    r3    5.79    500.1 |         1.03       0.05 | 
+g4000_pp                16    r1    6.37    454.6 |         1.17       0.29 | 
+g4000_pp                16    r2    6.41    451.6 |         1.19       0.32 | 
+g4000_pp                16    r3    6.43    450.1 |         1.16       0.27 | 
+
+Per arm (median of reps): exec s, M ev/s, rest÷first 2 s, s lost in the first 2 s; ratio to g100_def at the same N (higher is better)
+  g2000_delay           16  exec   5.84    495.7 M ev/s   1.18   0.30 s
+  g2000_direct          16  exec  14.43    200.6 M ev/s   1.01   0.01 s
+  g2000_pp              16  exec   5.98    484.4 M ev/s   1.22   0.36 s
+  g2000_pp_perf         16  exec   6.11    474.6 M ev/s   1.21   0.35 s
+  g2000_wps             16  exec   5.79    500.1 M ev/s   1.03   0.05 s
+  g4000_pp              16  exec   6.41    451.6 M ev/s   1.17   0.29 s
+
+== 2. Traced runs, per 0.25 s of wall time (µs per wave; lower is better). Kernel, faults and switches per PE per wave.
+
+== 4. hfi1 counters per run window, all nodes (per second; first 2 s | rest), and the largest node over the run
+   no sampler files
+
+== 5. Devastator

@@ -1,0 +1,21 @@
+Long runs (end time 2,048,000), each engine at its best setting, median of 3 (M committed ev/s; higher is better)
+| workload | Charades 1 / 4 / 16 nodes | Devastator 1 / 4 / 16 nodes | Charades ÷ Devastator 1 / 4 / 16 | short runs (section 95) | efficiency 4→16, Charades / Devastator | short runs |
+|---|---|---|---|---|---|---|
+| gauss:100:1000:2000 | 39.4 / 139.9 / 518.9 | 29.6 / 102.0 / 366.8 | **1.33 / 1.37 / 1.41** | 1.29 / 1.28 / 1.14 | 0.93 / 0.90 | 0.81 / 0.91 |
+| gauss:100:1000:4000 | 38.8 / 130.8 / 486.8 | 28.4 / 78.1 / 291.2 | **1.37 / 1.67 / 1.67** | 1.34 / 1.48 / 1.41 | 0.93 / 0.93 | 0.87 / 0.92 |
+| steady:100:1000:1.0 | 42.3 / 135.4 / 363.3 | 29.6 / 68.4 / 190.9 | **1.43 / 1.98 / 1.90** | 1.41 / 1.90 / 1.42 | 0.67 / 0.70 | 0.52 / 0.69 |
+
+Best settings (reps counted): Charades per node count; Devastator W
+  gauss:100:1000:2000: N1 hi_pp512 w:250 (3); N4 hi_pp512 q:0.001 (3); N16 hi_pp512 w:400 (3) | Devastator W 500 (3), 1000 (3), 1000 (3)
+  gauss:100:1000:4000: N1 hi_pp512 w:250 (3); N4 hi_pp512 q:0.001 (3); N16 hi_pp512 w:400 (3) | Devastator W 500 (3), 1000 (3), 1000 (3)
+  steady:100:1000:1.0: N1 uni_wps512 w:250 (3); N4 uni_pp512 q:0.001 (3); N16 uni_wps512 w:400 (3) | Devastator W 500 (3), 500 (3), 1000 (3)
+
+Charades' controller ÷ its best fixed W (same aggregation), 1 / 4 / 16 nodes; short runs at 16 in brackets
+  gauss:100:1000:2000: 0.99 / 1.03 / 0.98 [0.92]
+  gauss:100:1000:4000: 0.99 / 1.02 / 0.98 [0.86]
+  steady:100:1000:1.0: 0.97 / 1.00 / 0.99
+
+Spread: max/min over the 3 reps of the best Charades cell at 16 nodes
+  gauss:100:1000:2000: 518.9, 524.8, 452.9 (1.159)
+  gauss:100:1000:4000: 493.4, 486.8, 483.5 (1.020)
+  steady:100:1000:1.0: 364.5, 362.1, 363.3 (1.007)
