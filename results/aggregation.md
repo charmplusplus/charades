@@ -47,12 +47,13 @@ Message cost, htram's modes and buffers, the deadline flush policy, choosing htr
 | 274 | 2026-11-11 | current (stopped by its probe); superseded in part by 275 | L64b results: the probe stopped the job (P64's own binary at 0.52 of its P64 rate); both slow 64-node jobs… |
 | 275 | 2026-11-11 | design (results in 276) | Can the job name a bad node? L64b again with a network record between runs |
 | 276 | 2026-11-11 | current | L64b results: at normal speed, padded local 1 runs at 1.52× WPs 512 on uniform at 64 nodes (1.49× under the… |
-| 277 | 2026-11-12 | design (results in 278 and later) | Padded local 1 as a candidate setting for uniform in the tables, 1–64 nodes |
+| 277 | 2026-11-12 | design (results: 1–16 nodes in 278; 32 and 64 nodes stopped by their probes in 282 and 283) | Padded local 1 as a candidate setting for uniform in the tables, 1–64 nodes |
 | 278 | 2026-11-12 | current (1–16 nodes); superseded in part by 280 | UL results, 1–16 nodes: padded local 1 is 1.17× the table's setting on uniform at 16 nodes, but 0.61–0.80 o… |
 | 279 | 2026-11-12 | design (results in 280) | Why local 1 loses at 1 node: a profile, and fewer copies into the shared buffer |
 | 280 | 2026-11-12 | current | PF1 results: at 1 node, local 1 loses its time in the copy into the shared buffer, almost all of it on two… |
 | 281 | 2026-11-12 | current | Charades' htram setting in each paper cell, 1–64 nodes |
-| 282 | 2026-11-13 | current | UL at 32 and 64 nodes: both probes stopped their jobs (the fabric was congested: switch back-pressure about… |
+| 282 | 2026-11-13 | current; superseded in part by section 283 (congestion diagnosis withdrawn) | UL at 32 and 64 nodes: both probes stopped their jobs (the fabric was congested: switch back-pressure about… |
+| 283 | 2026-11-13 | current | UL at 32 and 64 nodes, second attempt: both probes stopped their jobs again, at the same slow rates; switch… |
 | 3 | 2026-10-20 | historical | Per-message cost and scaling |
 | 4 | 2026-10-20 | superseded | Aggregation through htram |
 | 5 | 2026-10-20 | historical | Deadline flush policy |
@@ -1853,7 +1854,7 @@ PE time per event through htram = PEs × execution time ÷ events sent through h
 
 ### §277 · Padded local 1 as a candidate setting for uniform in the tables, 1–64 nodes (job UL design, 2026-11-12; written before any runs)
 
-> **Status: design (results: 1–16 nodes in 278; 32 and 64 nodes stopped by their probes in 282, rerun as 3716315 and 3716316, results in a later section listed in INDEX).** User decision 2026-11-12, after section 276: padded local 1 becomes one of uniform's htram settings in the tables, which take Charades' controller at the better setting per node count.
+> **Status: design (results: 1–16 nodes in 278; 32 and 64 nodes stopped by their probes twice, in 282 and 283; the user decides how to fill those cells).** User decision 2026-11-12, after section 276: padded local 1 becomes one of uniform's htram settings in the tables, which take Charades' controller at the better setting per node count.
 > - **Code:** Charades `main` 9f7480a merges `pp-pad` (`--agg-pp-local`, `--agg-pp-pad`); htram `pdes` fast-forwarded to 978e065. Both settings default to the old behaviour, so existing configurations run unchanged.
 > - **Mac tests on the merge** (2026-11-12):
 >   - **Engine tier** with the five local-buffer configs named: 4,637 of 4,668 passed, and the five named configs passed every run, including their 20 repeats at the multi-PE shapes. The 31 that did not pass are the known ones from section 267, and none runs the merged code:
@@ -2139,7 +2140,7 @@ The perturbation agrees: local 4 makes a quarter of the copies and cuts the copy
 
 **Close calls and gaps:**
 - **Lookahead 10, σ 2,000 at 1–16 nodes:** PP 512 and WPs 512 are within 1.4% of each other, inside the reps' spread. The table takes the higher median.
-- **Uniform at 32 and 64 nodes:** local 1 is pending (jobs 3711819 and 3711820 were stopped by their probes, section 282; reruns 3716315 and 3716316). At 64 nodes it ran at 1.49× WPs 512 under the controller in job L64b (section 276), so it will probably take both cells. This table changes when UL reports.
+- **Uniform at 32 and 64 nodes:** local 1 is pending. Both UL attempts there were stopped by their probes on a slow machine (sections 282 and 283). At 64 nodes it ran at 1.49× WPs 512 under the controller in job L64b (section 276), at normal speed and with the same code; section 283 lists that as the option for the 64-node cell. This table changes when the user decides.
 - **Traffic at 64 nodes is not settled.** WPs 512 is 1.05× PP 2,048 at W 500, but it never ran at W 1,000 (PP 2,048's best fixed W there, 4,308.2 M ev/s) or with the controller. The table keeps PP 2,048.
 - **Local 1 is a candidate on uniform only:**
   - σ 4,000: 0.84 of PP 512 at 16 nodes (section 270).
@@ -2147,7 +2148,7 @@ The perturbation agrees: local 4 makes a quarter of the copies and cuts the copy
 
 ### §282 · UL at 32 and 64 nodes: both probes stopped their jobs (the fabric was congested: switch back-pressure about 200× normal, no lost packets); resubmitted (2026-11-13; skx batch jobs 3711819 and 3711820, stopped; reruns 3716315 and 3716316)
 
-> **Status: current (no results; the reruns' results go in a later section).** Design in section 277.
+> **Status: current (no results); superseded in part by section 283: the reruns were stopped too, and its congestion diagnosis is withdrawn there.** Design in section 277.
 > - **Jobs:** 3711820 (64 nodes) ran 2026-11-12 21:04–21:08 and 3711819 (32 nodes) 21:07–21:11. Each stopped after its probe, before the gate. They cost about 6.5 node-hours together.
 > - **Data:** `~/charades-data/f1/ul277/fail/` (the probe run and the network records `net/start.nodes` and `net/probe.nodes` of each job).
 
@@ -2194,6 +2195,60 @@ The perturbation agrees: local 4 makes a quarter of the copies and cuts the copy
 **Changes and reruns:**
 - **The probe's stop now exits 0** when the machine is slow, so Slurm records the job as COMPLETED instead of FAILED. A probe that gives no rate still exits 1. `ul277.slurm` md5 d0aac967… (was 2dc2b263…, kept as `ul277_pre282.slurm`). Both branches were checked locally, and the stub runs for 32 and 64 nodes print the same 43 srun commands as before. The login-node checks passed for both groups.
 - **Resubmitted unchanged otherwise:** 3716315 (32 nodes) and 3716316 (64 nodes), skx, same exclusions. Predictions and the table rule are section 277's.
+
+### §283 · UL at 32 and 64 nodes, second attempt: both probes stopped their jobs again, at the same slow rates; switch back-pressure was 4–10× lower than in the first attempt, so it does not explain the loss (2026-11-13; skx batch jobs 3716315 and 3716316)
+
+> **Status: current (no results for the table; how to fill uniform's 32- and 64-node cells is for the user to decide).** Design in section 277; first attempt in section 282, whose diagnosis this section corrects.
+> - **Jobs:** 3716316 (64 nodes) ran 2026-11-13 12:22–12:26 and 3716315 (32 nodes) 12:27–12:30. Each stopped after its probe, before the gate, and Slurm recorded both as COMPLETED (section 282's change). They cost about 6.4 node-hours together; the four probe stops of sections 282 and 283 cost about 12.9.
+> - **Data:** `~/charades-data/f1/ul277/fail/` (`n32_j3716315`, `n64_j3716316`: the probe run and the network records). Analysis `~/charades-data/f1/ul277/probe_283.py` → `probe_283_summary.txt`, over these two jobs, section 282's two and L64b's slow and normal probes (sections 274 and 276).
+
+**The probes** (one run each of the same configuration: reference binary `charades-r5`, uniform, WPs 512 at W 400, end time 2,048,000; the run time is from the GVT progress lines, which come every 64 rounds):
+
+| job | date | nodes | rate (M committed ev/s) | ÷ F1 / P64 (higher is better) | run time (s) | time beyond a run at F1's / P64's rate (s) | … of it in stalls: gaps over 0.15 s between GVT lines (s, count) | … the rest: a slower steady pace (s) | median gap between GVT lines (s) |
+|---|---|---|---|---|---|---|---|---|---|
+| L64b, 3708796 (normal) | 2026-11-11 | 64 | 990.2 | 0.991 | 11.7 | 0.1 | 0.0 (0) | 0.1 | 0.032 |
+| L64b, 3704609 | 2026-11-11 | 64 | 520.1 | 0.521 | 22.3 | 10.7 | 9.0 (45) | 1.7 | 0.042 |
+| UL n64, 3711820 | 2026-11-12 | 64 | 518.2 | 0.519 | 22.3 | 10.8 | 3.7 (16) | 7.1 | 0.038 |
+| UL n64, 3716316 | 2026-11-13 | 64 | 530.1 | 0.531 | 21.8 | 10.3 | 5.3 (24) | 4.9 | 0.041 |
+| UL n32, 3711819 | 2026-11-12 | 32 | 429.0 | 0.671 | 13.5 | 4.4 | 2.0 (9) | 2.5 | 0.028 |
+| UL n32, 3716315 | 2026-11-13 | 32 | 442.4 | 0.692 | 13.1 | 4.0 | 2.7 (14) | 1.4 | 0.025 |
+
+- F1's rate at 32 nodes is 639.5 M ev/s and P64's at 64 nodes 998.9; the stop is below 0.90 of them.
+- **The loss is nearly the same in every slow job:** 10.3–10.8 s at 64 nodes in three jobs over three days, on three different sets of nodes, and 4.0–4.4 s at 32 nodes. Only its form changes: stalls take 34–84% of it, and a slower pace between stalls the rest.
+
+**Back-pressure does not account for it** (network-card counters, recorded before and after the probe; TxWait per word sent, median over nodes, lower is better):
+
+| job | TxWait per word sent | packets lost or resent on any node |
+|---|---|---|
+| L64b, 3708796 (normal; 48 nodes in the probe's record) | 3.1 × 10⁻⁴ | 0 |
+| UL n32, 3711819 | 2.6 × 10⁻² | 0 |
+| UL n32, 3716315 | 2.6 × 10⁻³ | 0 |
+| UL n64, 3711820 | 3.3 × 10⁻² | 0 |
+| UL n64, 3716316 | 8.2 × 10⁻³ | 0 |
+
+- From the first attempt to the second, back-pressure fell 10× at 32 nodes and 4× at 64 nodes, while the rate stayed the same (0.67 → 0.69, 0.52 → 0.53) and the stalls grew (9 → 14, 16 → 24). So the back-pressure our cards saw is not what cost the time.
+- **Section 282's conclusion is withdrawn:** "the fabric was congested … other jobs' load on shared links is the likely cause". The back-pressure is real (still 8–80× normal), but it does not explain the loss.
+- **What these counters cannot see:** a card's TxWait measures only the link from the node to its leaf switch. Congestion, discards or a slow link deeper in the fabric would show only in the switches' counters, which only the fabric manager reads.
+
+**Ruled out:**
+- **A change on our side.** The probe binary dates from 2026-11-06 and its Reconverse, LCI and LCT libraries from 2026-11-03, both before the last normal run. The system's `libpsm2` and `libfabric` on the login node date from 2026-09-24. The same binary ran at normal speed at 16 nodes on 2026-11-12 05:52 (job 3711818, 1.03 of F1) and at 1 node at 12:46 (PF1, 0.97 of F1).
+- **One bad node.** No node is in all five slow jobs. Two nodes are in three of them and in no normal one (c479-094 and c493-114), but the other two slow jobs (3704609 and 3711819) had neither.
+- **A maintenance notice.** The login message's last entry is 2026-10-14 (the SPR partition's newer fabric), and no Slurm reservation covers maintenance.
+
+**Not tested:**
+- **The fabric manager during a slow probe.** It keeps 20 minutes of readings, and the jobs were seen 70 minutes after they ended. At 13:41 it showed a quiet fabric: congestion at most 92,488 against the 5 × 10⁸ threshold (section 275), and 3 ports over the integrity threshold.
+- **Whether the stalls are PSM2 resends.** That would need a run with a shorter `PSM2_ERRCHK_TIMEOUT`, to see whether the stalls shorten with it.
+
+**Frequency:** 6 of the 7 jobs at 32–64 nodes since 2026-11-10 have run slow, against 1 of about 16 before (section 282). The paper's 32- and 64-node numbers (F1-32, P64, A64 and the ablation jobs) all ran before 2026-11-10, at normal speed.
+
+**What it leaves for the tables** (section 277's rule: uniform's cell takes local 1's controller median where it is higher than F1's or P64's value; a node count whose reference misses UL-2 is rerun, not scaled):
+- **64 nodes, measured already at normal speed.** L64b (section 276, job 3708796) ran padded local 1 under the controller at 1,467.8 M ev/s (5 reps, spread 1.04), 1.50× P64's 980.0.
+  - In that job the machine ran at P64's speed: its control (P64's binary, WPs 512 at W 400) was 1.008 of P64, which is the test UL-2 asks for.
+  - Its tree, `charades-pplpad` (`pp-pad` 836f7fd), has the same `src/`, `models/` and `scripts/` as UL's `charades-r6` (main 9f7480a, which merges it), and the same htram, 978e065.
+  - It ran the same workload and launch, with one committed count, P64's.
+  - Using it departs from section 277 only in which job supplies the number.
+- **32 nodes, not measured.** No run of local 1 at 32 nodes has reached the gate. Section 277 predicted 1.20–1.40× WPs 512 there.
+- **Until the user decides,** both cells keep WPs 512, and the front page and section 281 say local 1 is pending.
 
 ## Earlier
 
