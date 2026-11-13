@@ -2175,6 +2175,22 @@ The perturbation agrees: local 4 makes a quarter of the copies and cuts the copy
 - **So other jobs' load on shared links is the likely cause.** That fits the time-varying noise seen before (sections 144 and 155).
 - The fabric manager was not queried (its 20-minute history had long passed when the jobs were seen).
 
+**Earlier 32- and 64-node jobs** (gaps of more than 0.15 s between consecutive GVT progress lines, which come every 64 rounds, in the uniform WPs 512 W 400 run; rate ÷ the reference, higher is better):
+
+| job | date | nodes | gaps over 0.15 s (total) | rate ÷ F1 / P64 |
+|---|---|---|---|---|
+| F1-32, 3688916 | 2026-11-07 | 32 | 0 | 1 (it is the reference) |
+| P64, 3696079 | 2026-11-08 | 64 | 0 | 1 (it is the reference) |
+| L64, 3700829 | 2026-11-10 | 64 | 37 (7.6 s) | 0.49 |
+| L64b, 3704609 (probe) | 2026-11-11 | 64 | 45 (9.0 s) | 0.52 |
+| L64b again, 3708796 (probe) | 2026-11-11, night | 64 | 0 | 0.99 |
+| UL n64, 3711820 (probe) | 2026-11-12 | 64 | 16 (3.7 s) | 0.52 |
+| UL n32, 3711819 (probe) | 2026-11-12 | 32 | 9 (2.0 s) | 0.67 |
+
+- **The slow probes here show the same stalls as L64 and L64b:** most last 0.18–0.22 s (all 0.16–0.43 s).
+- **Yet no packet was lost.** Section 274 read L64's stalls as PSM2 resending lost packets after its 160 ms timeout, but those jobs recorded no card counters. A PSM2 resend can also follow an acknowledgement that arrives late under heavy back-pressure; that is untested. So congestion is the likely common cause of all four slow jobs.
+- **Frequency:** before 2026-11-10, one of about 16 jobs at 32–64 nodes ran slow (A2, 3653806, 2026-10-29; section 144), and two had single slow reps (F5-32b, V32b). Since then 4 of 5 have.
+
 **Changes and reruns:**
 - **The probe's stop now exits 0** when the machine is slow, so Slurm records the job as COMPLETED instead of FAILED. A probe that gives no rate still exits 1. `ul277.slurm` md5 d0aac967… (was 2dc2b263…, kept as `ul277_pre282.slurm`). Both branches were checked locally, and the stub runs for 32 and 64 nodes print the same 43 srun commands as before. The login-node checks passed for both groups.
 - **Resubmitted unchanged otherwise:** 3716315 (32 nodes) and 3716316 (64 nodes), skx, same exclusions. Predictions and the table rule are section 277's.
