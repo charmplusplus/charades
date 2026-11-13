@@ -1,0 +1,18 @@
+local 1 pad 1 controller: 16 nodes 450.5 (3 reps, UL), 64 nodes 1467.8 (5 reps, L64b); 64 nodes W 400 1522.3
+
+                                 1        2        4        8       16       32       64
+Charades, old                 45.9     79.3    151.9    229.0    384.5    627.8    980.0
+Charades, new                 45.9     79.3    151.9    229.0    450.5    627.8   1467.8
+Devastator                    29.2     39.1     67.5    115.4    191.0    312.4    489.3
+ROSS                           9.4     13.8     25.5     46.8     90.9    162.4    295.2
+C / D, old                    1.57     2.03     2.25     1.99     2.01     2.01     2.00
+C / D, new                    1.57     2.03     2.25     1.99     2.36     2.01     3.00
+C / R, new                    4.89     5.73     5.95     4.90     4.96     3.87     4.97
+C / R range, new: 3.87-5.95 (old 3.32-5.95)
+C / D at 64 against Devastator's fastest rep (497.1): new 2.95 (old 1.97)
+per-node 16->32: Charades 0.697 (old 0.816) / Devastator 0.818 / ROSS 0.893
+per-node 32->64: Charades 1.169 (old 0.781) / Devastator 0.783 / ROSS 0.909
+per-node 1->64: Charades 0.500 (old 0.334) / Devastator 0.262 / ROSS 0.492
+
+bundling at 64 nodes (best htram fixed W / best direct fixed W, P64 direct 540.6): local 1 W 400 2.82; WPs 512 (P64) 1.85
+controller / best direct fixed W at 64 nodes: local 1 2.72; WPs 512 (P64) 1.81
