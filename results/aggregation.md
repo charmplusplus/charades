@@ -53,7 +53,7 @@ Message cost, htram's modes and buffers, the deadline flush policy, choosing htr
 | 280 | 2026-11-12 | current | PF1 results: at 1 node, local 1 loses its time in the copy into the shared buffer, almost all of it on two… |
 | 281 | 2026-11-12 | current; uniform at 64 nodes updated in 284 | Charades' htram setting in each paper cell, 1–64 nodes |
 | 282 | 2026-11-13 | current; superseded in part by section 283 (congestion diagnosis withdrawn) | UL at 32 and 64 nodes: both probes stopped their jobs (the fabric was congested: switch back-pressure about… |
-| 283 | 2026-11-13 | current (64 nodes filled from L64b by the user, 284; 32 nodes open) | UL at 32 and 64 nodes, second attempt: both probes stopped their jobs again, at the same slow rates; switch… |
+| 283 | 2026-11-13 | current (64 nodes filled from L64b by the user, 284; 32 nodes not retried for now) | UL at 32 and 64 nodes, second attempt: both probes stopped their jobs again, at the same slow rates; switch… |
 | 284 | 2026-11-13 | current | Uniform's table cells at 16 and 64 nodes take padded local 1, the 64-node cell from job L64b |
 | 3 | 2026-10-20 | historical | Per-message cost and scaling |
 | 4 | 2026-10-20 | superseded | Aggregation through htram |
@@ -1855,7 +1855,7 @@ PE time per event through htram = PEs × execution time ÷ events sent through h
 
 ### §277 · Padded local 1 as a candidate setting for uniform in the tables, 1–64 nodes (job UL design, 2026-11-12; written before any runs)
 
-> **Status: design (results: 1–16 nodes in 278; 32 and 64 nodes stopped by their probes twice, in 282 and 283; the 64-node cell taken from L64b by the user's decision, 284; 32 nodes open).** User decision 2026-11-12, after section 276: padded local 1 becomes one of uniform's htram settings in the tables, which take Charades' controller at the better setting per node count.
+> **Status: design (results: 1–16 nodes in 278; 32 and 64 nodes stopped by their probes twice, in 282 and 283; the 64-node cell taken from L64b by the user's decision, 284; 32 nodes not retried for now).** User decision 2026-11-12, after section 276: padded local 1 becomes one of uniform's htram settings in the tables, which take Charades' controller at the better setting per node count.
 > - **Code:** Charades `main` 9f7480a merges `pp-pad` (`--agg-pp-local`, `--agg-pp-pad`); htram `pdes` fast-forwarded to 978e065. Both settings default to the old behaviour, so existing configurations run unchanged.
 > - **Mac tests on the merge** (2026-11-12):
 >   - **Engine tier** with the five local-buffer configs named: 4,637 of 4,668 passed, and the five named configs passed every run, including their 20 repeats at the multi-PE shapes. The 31 that did not pass are the known ones from section 267, and none runs the merged code:
@@ -2199,7 +2199,7 @@ The perturbation agrees: local 4 makes a quarter of the copies and cuts the copy
 
 ### §283 · UL at 32 and 64 nodes, second attempt: both probes stopped their jobs again, at the same slow rates; switch back-pressure was 4–10× lower than in the first attempt, so it does not explain the loss (2026-11-13; skx batch jobs 3716315 and 3716316)
 
-> **Status: current (no results for the table). The user took L64b's numbers for 64 nodes (section 284); 32 nodes is open.** Design in section 277; first attempt in section 282, whose diagnosis this section corrects.
+> **Status: current (no results for the table). The user took L64b's numbers for 64 nodes (section 284) and decided not to retry 32 nodes for now.** Design in section 277; first attempt in section 282, whose diagnosis this section corrects.
 > - **Jobs:** 3716316 (64 nodes) ran 2026-11-13 12:22–12:26 and 3716315 (32 nodes) 12:27–12:30. Each stopped after its probe, before the gate, and Slurm recorded both as COMPLETED (section 282's change). They cost about 6.4 node-hours together; the four probe stops of sections 282 and 283 cost about 12.9.
 > - **Data:** `~/charades-data/f1/ul277/fail/` (`n32_j3716315`, `n64_j3716316`: the probe run and the network records). Analysis `~/charades-data/f1/ul277/probe_283.py` → `probe_283_summary.txt`, over these two jobs, section 282's two and L64b's slow and normal probes (sections 274 and 276).
 
@@ -2259,7 +2259,7 @@ The perturbation agrees: local 4 makes a quarter of the copies and cuts the copy
 **What changes:**
 - **16 nodes:** local 1's controller median from job UL (section 278), 450.5 M ev/s, replaces F1's WPs 512 value, 384.5, as section 277's rule says. Section 278 held this back so that the per-node columns would move only once, when 32 and 64 nodes reported. With 32 nodes unmeasured, it goes in now.
 - **64 nodes:** local 1's controller median from job L64b (section 276, job 3708796), 1,467.8 M ev/s (5 reps, spread 1.04), replaces P64's WPs 512 value, 980.0. Section 283 says why it can stand in for UL: the same code, workload, launch and committed count, on a machine at P64's speed (control 1.008 of P64).
-- **32 nodes:** stays WPs 512 (627.8 M ev/s). Local 1 has not been measured there (section 283); whether to try again is open.
+- **32 nodes:** stays WPs 512 (627.8 M ev/s). Local 1 has not been measured there (section 283), and the user decided on 2026-11-13 not to retry it for now.
 - **Devastator and ROSS keep F1's, R8's and P64's numbers,** so uniform's ratios at 16 and 64 nodes are across jobs. In both jobs the reference ran within 1% of the table's values (UL's WPs 512 at 16 nodes 1.004 of F1, section 278; L64b's control 1.008 of P64).
 
 **Uniform's row, before and after** (M committed ev/s; ratios Charades ÷ other, higher is better for Charades; per-node rate, 1.0 is perfect):
